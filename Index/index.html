@@ -1,201 +1,299 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Instituto Superior Tecnológico El Libertador</title>
-  <link rel="stylesheet" href="styles.css" />
+    <!-- Configuración del documento -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Título de la página -->
+    <title>Instituto Superior Tecnológico El Libertador</title>
+    <!-- Hoja de estilos -->
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-  <!-- SIDEBAR -->
+    <!-- ==========================================================
+         MENÚ LATERAL (SIDEBAR)
+         ========================================================== -->
+    <aside class="sidebar">
+        <!-- Contenedor superior -->
+        <div>
+            <!-- Logo e información institucional -->
+            <div class="logo-area">
+                <img src="img/LOGO_ISTEL.png" alt="Logo Instituto">
+                <h1>
+                    Instituto Superior Tecnológico<br>
+                    "El Libertador"
+                </h1>
+                <p>
+                    Plataforma Académica moderna de gestión de proyectos estudiantiles. 
+                </p>
+            </div>
+            <!-- Menú principal -->
+            <div class="menu">
+                <div class="menu-item">
+                    🏠 Inicio
+                </div>
+                <div class="menu-item">
+                    📁 Mis Proyectos 
+                </div>
+                <div class="menu-item">
+                    🌎 Biblioteca Global
+                </div>
+            </div>
+        </div>
+        <!-- Pie del menú lateral -->
+        <div class="sidebar-footer">
+            <button class="close-btn">
+                Cerrar Sesión
+            </button>
+        </div>
+    </aside>
 
-  <aside class="sidebar">
+    <!-- ==========================================================
+         CONTENIDO PRINCIPAL
+         ========================================================== -->
+    <main class="main">
 
-    <div>
-
-      <div class="logo-area">
-        <img src="WhatsApp Image 2026-05-22 at 5.05.07 PM.jpeg" alt="Logo Instituto">
-
-        <h1>
-          Instituto Superior Tecnológico<br>
-          "El Libertador"
-        </h1>
-
-        <p>
-          Plataforma Académica de Repositorio Estudiantil
-        </p>
-      </div>
-
-      <div class="menu">
-
-        <div class="menu-item">
-          <span>&#127968;</span>
-          Inicio
+        <!-- ======================================================
+             BARRA SUPERIOR
+             ====================================================== -->
+        <div class="topbar">
+            <!-- Mensaje de bienvenida -->
+            <div class="welcome">
+                <h2>
+                    Bienvenido, Usuario 👋
+                </h2>
+                <p>
+                    Continúa gestionando tus proyectos académicos.
+                </p>
+            </div>
+            <!-- Elementos ubicados al lado derecho -->
+            <div class="topbar-right">
+                <!-- Campana de notificaciones -->
+                <div class="notification-icon">
+                    🔔
+                    <!-- Contador de notificaciones -->
+                    <span class="notification-count">
+                        3
+                    </span>
+                </div>
+                <!-- Avatar del usuario -->
+                <div class="user-avatar">
+                    U
+                </div>
+                <!-- Botón para crear un nuevo proyecto -->
+                <button class="upload-btn">
+                    + Nuevo Proyecto
+                </button>
+            </div>
         </div>
 
-        <div class="menu-item">
-          <span>&#128194;</span>
-          Mi Repositorio
+        <!-- ======================================================
+             TARJETAS DE RESUMEN
+             ====================================================== -->
+        <section class="status-section">
+            <!-- Tarjeta proyectos aprobados -->
+            <div class="status-card approved-card">
+                <div class="icon">
+                    ✅
+                </div>
+                <div class="status-number">
+                    3
+                </div>
+                <div class="status-title">
+                    Aprobados
+                </div>
+            </div>
+            <!-- Tarjeta proyectos en revisión -->
+            <div class="status-card review-card">
+                <div class="icon">
+                    ⏳
+                </div>
+                <div class="status-number">
+                    2
+                </div>
+                <div class="status-title">
+                    En revisión
+                </div>
+            </div>
+            <!-- Tarjeta proyectos con cambios -->
+            <div class="status-card changes-card">
+                <div class="icon">
+                    ⚠️
+                </div>
+                <div class="status-number">
+                    1
+                </div>
+                <div class="status-title">
+                    Requieren cambios
+                </div>
+            </div>
+            <!-- Tarjeta documentos subidos -->
+            <div class="status-card documents-card">
+                <div class="icon">
+                    📄
+                </div>
+                <div class="status-number">
+                    15
+                </div>
+                <div class="status-title">
+                    Documentos
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================================================
+             CONTENEDOR PRINCIPAL DEL DASHBOARD
+             ====================================================== -->
+        <div class="dashboard-container">
+
+            <!-- ==================================================
+                 COLUMNA IZQUIERDA
+                 ================================================== -->
+            <div class="left-column">
+                <!-- Título -->
+                <h2 class="section-title">
+                    Mis Proyectos
+                </h2>
+                <!-- Tarjetas de proyectos -->
+                <section class="projects-grid">
+                    <!-- Proyecto 1 -->
+                    <div class="project-card">
+                        <div class="project-status approved">
+                            Aprobado
+                        </div>
+                        <h3>
+                            Sistema de Gestión Documental
+                        </h3>
+                        <p>
+                            Plataforma académica enfocada en la organización y administración de proyectos estudiantiles.
+                        </p>
+                        <div class="project-footer">
+                            <div class="date">
+                                Actualizado hace 2 días
+                            </div>
+                            <button class="open-btn">
+                                Abrir Proyecto
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Proyecto 2 -->
+                    <div class="project-card">
+                        <div class="project-status revision">
+                            En revisión
+                        </div>
+                        <h3>
+                            Aplicación Web Educativa
+                        </h3>
+                        <p>
+                            Proyecto orientado al desarrollo de herramientas digitales para apoyo académico institucional.
+                        </p>
+                        <div class="project-footer">
+                            <div class="date">
+                                Actualizado ayer
+                            </div>
+                            <button class="open-btn">
+                                Abrir Proyecto
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Proyecto 3 -->
+                    <div class="project-card">
+                        <div class="project-status changes">
+                            Requiere cambios
+                        </div>
+                        <h3>
+                            Repositorio Inteligente
+                        </h3>
+                        <p>
+                            Sistema de almacenamiento y clasificación de proyectos académicos con interfaz moderna.
+                        </p>
+                        <div class="project-footer">
+                            <div class="date">
+                                Actualizado hace 5 días
+                            </div>
+                            <button class="open-btn">
+                                Abrir Proyecto
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ==================================================
+                     ACTIVIDAD RECIENTE
+                     ==================================================
+                <section class="activity-section">
+                    <h2 class="section-title">
+                        Actividad reciente
+                    </h2>
+                    <div class="activity-card">
+                        ✅ Sistema de Gestión Documental aprobado.
+                    </div>
+                    <div class="activity-card">
+                        📄 Se actualizó el documento PDF.
+                    </div>
+                    <div class="activity-card">
+                        📤 Nueva versión del proyecto subida.
+                    </div>
+                </section> -->
+            </div>
+
+            <!-- ==================================================
+                 COLUMNA DERECHA
+                 ================================================== -->
+            <div class="right-column">
+                <!-- Panel de notificaciones -->
+                <div class="notifications-panel">
+                    <h2>
+                        🔔 Notificaciones
+                    </h2>
+                    <div class="notification-card">
+                        <strong>
+                            Proyecto aprobado
+                        </strong>
+                        <p>
+                            Hace 2 horas
+                        </p>
+                    </div>
+                    <div class="notification-card">
+                        <strong>
+                            Nueva observación registrada
+                        </strong>
+                        <p>
+                            Hace 1 día
+                        </p>
+                    </div>
+                    <div class="notification-card">
+                        <strong>
+                            Documento actualizado
+                        </strong>
+                        <p>
+                            Hace 3 días
+                        </p>
+                    </div>
+                    <button class="open-btn">
+                        + Ver más
+                    </button>
+                </div>
+                <!-- Panel de avisos institucionales -->
+                <div class="announcements-panel">
+                    <h2>
+                        📢 Avisos Institucionales
+                    </h2>
+                    <div class="announcement-card">
+                        📌 Entrega de proyectos hasta el 30 de junio.
+                    </div>
+                    <div class="announcement-card">
+                        📌 Actualización del reglamento académico.
+                    </div>
+                    <div class="announcement-card">
+                        📌 Mantenimiento del sistema el sábado.
+                    </div>
+                </div>
+            </div>
         </div>
-
-        <div class="menu-item">
-          <span>&#127758;</span>
-          Biblioteca Global
-        </div>
-
-        <div class="menu-item">
-          <span>&#128100;</span>
-          Mi Perfil
-        </div>
-
-      </div>
-
-    </div>
-
-    <div class="sidebar-footer">
-      <strong>Repositorio Académico</strong><br>
-      Gestión moderna de proyectos estudiantiles.
-    </div>
-
-  </aside>
-
-
-  <!-- MAIN -->
-
-  <main class="main">
-
-    <!-- TOPBAR -->
-
-    <div class="topbar">
-
-      <div class="welcome">
-        <h2>Bienvenido, Julián</h2>
-        <p>
-          Continúa gestionando tus proyectos académicos.
-        </p>
-      </div>
-
-      <button class="upload-btn">
-        + Subir Proyecto
-      </button>
-
-    </div>
-
-
-    <!-- STATUS -->
-
-    <section class="status-section">
-
-      <div class="status-card">
-        <div class="status-title">Proyectos aprobados</div>
-        <div class="status-number green">3</div>
-      </div>
-
-      <div class="status-card">
-        <div class="status-title">En revisión</div>
-        <div class="status-number yellow">2</div>
-      </div>
-
-      <div class="status-card">
-        <div class="status-title">Requieren cambios</div>
-        <div class="status-number red">1</div>
-      </div>
-
-    </section>
-
-
-    <!-- PROJECTS -->
-
-    <h2 class="section-title">Mis Proyectos</h2>
-
-    <section class="projects-grid">
-
-      <div class="project-card">
-
-        <div class="project-header">
-          <div class="project-status approved">
-            Aprobado
-          </div>
-        </div>
-
-        <h3>Sistema de Gestión Documental</h3>
-
-        <p>
-          Plataforma académica enfocada en la organización y administración de proyectos estudiantiles.
-        </p>
-
-        <div class="project-footer">
-          <div class="date">
-            Actualizado hace 2 días
-          </div>
-
-          <button class="open-btn">
-            Abrir Proyecto
-          </button>
-        </div>
-
-      </div>
-
-
-      <div class="project-card">
-
-        <div class="project-header">
-          <div class="project-status revision">
-            En revisión
-          </div>
-        </div>
-
-        <h3>Aplicación Web Educativa</h3>
-
-        <p>
-          Proyecto orientado al desarrollo de herramientas digitales para apoyo académico institucional.
-        </p>
-
-        <div class="project-footer">
-          <div class="date">
-            Actualizado ayer
-          </div>
-
-          <button class="open-btn">
-            Abrir Proyecto
-          </button>
-        </div>
-
-      </div>
-
-
-      <div class="project-card">
-
-        <div class="project-header">
-          <div class="project-status changes">
-            Requiere cambios
-          </div>
-        </div>
-
-        <h3>Repositorio Inteligente</h3>
-
-        <p>
-          Sistema de almacenamiento y clasificación de proyectos académicos con interfaz moderna.
-        </p>
-
-        <div class="project-footer">
-          <div class="date">
-            Actualizado hace 5 días
-          </div>
-
-          <button class="open-btn">
-            Abrir Proyecto
-          </button>
-        </div>
-
-      </div>
-
-    </section>
-
-  </main>
-
-  <script src="script.js"></script>
-
+    </main>
+    <!-- Archivo JavaScript -->
+    <script src="script.js"></script>
 </body>
 </html>
