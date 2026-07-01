@@ -1,299 +1,381 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <!-- Configuración del documento -->
+    <!-- Inicio de configuración del documento -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Título de la página -->
     <title>Instituto Superior Tecnológico El Libertador</title>
-    <!-- Hoja de estilos -->
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <!-- Final de configuración del documento -->
 </head>
 <body>
+    <!-- Inicio de fondo para cerrar el menú móvil -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <!-- Final de fondo para cerrar el menú móvil -->
 
-    <!-- ==========================================================
-         MENÚ LATERAL (SIDEBAR)
-         ========================================================== -->
-    <aside class="sidebar">
-        <!-- Contenedor superior -->
+    <!-- Inicio de sidebar -->
+    <aside class="sidebar" id="sidebar" aria-label="Menú principal">
         <div>
-            <!-- Logo e información institucional -->
+            <!-- Inicio de logo institucional -->
             <div class="logo-area">
-                <img src="img/LOGO_ISTEL.png" alt="Logo Instituto">
+                <img src="img/LOGO_ISTEL.png" alt="Logo Instituto Superior Tecnológico El Libertador">
                 <h1>
                     Instituto Superior Tecnológico<br>
                     "El Libertador"
                 </h1>
-                <p>
-                    Plataforma Académica moderna de gestión de proyectos estudiantiles. 
-                </p>
+                <p>Plataforma académica de gestión de proyectos estudiantiles.</p>
             </div>
-            <!-- Menú principal -->
-            <div class="menu">
-                <div class="menu-item">
-                    🏠 Inicio
-                </div>
-                <div class="menu-item">
-                    📁 Mis Proyectos 
-                </div>
-                <div class="menu-item">
-                    🌎 Biblioteca Global
-                </div>
-            </div>
+            <!-- Final de logo institucional -->
+
+            <!-- Inicio de menú lateral -->
+            <nav class="menu" aria-label="Navegación principal">
+                <a href="#" class="menu-item active">
+                    <span class="menu-icon"><i class="fa-solid fa-house"></i></span>
+                    <span>Inicio</span>
+                </a>
+                <a href="#" class="menu-item">
+                    <span class="menu-icon"><i class="fa-solid fa-folder-open"></i></span>
+                    <span>Mis proyectos</span>
+                </a>
+                <a href="#" class="menu-item">
+                    <span class="menu-icon"><i class="fa-solid fa-book-open"></i></span>
+                    <span>Repositorio</span>
+                </a>
+                <a href="#" class="menu-item">
+                    <span class="menu-icon"><i class="fa-solid fa-calendar-days"></i></span>
+                    <span>Calendario</span>
+                </a>
+                <a href="#" class="menu-item">
+                    <span class="menu-icon"><i class="fa-solid fa-bell"></i></span>
+                    <span>Notificaciones</span>
+                </a>
+            </nav>
+            <!-- Final de menú lateral -->
         </div>
-        <!-- Pie del menú lateral -->
+
+        <!-- Inicio de cierre de sesión del sidebar -->
         <div class="sidebar-footer">
-            <button class="close-btn">
-                Cerrar Sesión
+            <button class="close-btn" type="button">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                Cerrar sesión
             </button>
         </div>
+        <!-- Final de cierre de sesión del sidebar -->
     </aside>
+    <!-- Final de sidebar -->
 
-    <!-- ==========================================================
-         CONTENIDO PRINCIPAL
-         ========================================================== -->
+    <!-- Inicio de contenido principal -->
     <main class="main">
+        <!-- Inicio de topbar -->
+        <header class="topbar">
+            <!-- Inicio de botón hamburguesa -->
+            <button class="hamburger-btn" id="hamburgerBtn" type="button" aria-label="Abrir menú" aria-expanded="false">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <!-- Final de botón hamburguesa -->
 
-        <!-- ======================================================
-             BARRA SUPERIOR
-             ====================================================== -->
-        <div class="topbar">
-            <!-- Mensaje de bienvenida -->
+            <!-- Inicio de bienvenida -->
             <div class="welcome">
-                <h2>
-                    Bienvenido, Usuario 👋
-                </h2>
-                <p>
-                    Continúa gestionando tus proyectos académicos.
-                </p>
+                <h2>¡Bienvenido, Usuario! <i class="fa-solid fa-hand-sparkles" style="color: rgb(20, 48, 97);"></i></h2>
+                <p>Continúa gestionando tus proyectos académicos.</p>
             </div>
-            <!-- Elementos ubicados al lado derecho -->
+            <!-- Final de bienvenida -->
+
+            <!-- Inicio de acciones superiores -->
             <div class="topbar-right">
-                <!-- Campana de notificaciones -->
-                <div class="notification-icon">
-                    🔔
-                    <!-- Contador de notificaciones -->
-                    <span class="notification-count">
-                        3
-                    </span>
-                </div>
-                <!-- Avatar del usuario -->
-                <div class="user-avatar">
-                    U
-                </div>
-                <!-- Botón para crear un nuevo proyecto -->
-                <button class="upload-btn">
-                    + Nuevo Proyecto
+                <button class="icon-btn theme-toggle" id="themeToggle" type="button" aria-label="Cambiar modo claro u oscuro">
+                    <i class="fa-solid fa-moon"></i>
                 </button>
-            </div>
-        </div>
+                <button class="notification-icon" type="button" aria-label="Ver notificaciones">
+                    <i class="fa-solid fa-bell"></i>
+                    <span class="notification-count">3</span>
+                </button>
 
-        <!-- ======================================================
-             TARJETAS DE RESUMEN
-             ====================================================== -->
-        <section class="status-section">
-            <!-- Tarjeta proyectos aprobados -->
-            <div class="status-card approved-card">
-                <div class="icon">
-                    ✅
+                <!-- Inicio de menú de usuario -->
+                <div class="avatar-menu">
+                    <button class="user-avatar" id="avatarButton" type="button" aria-label="Abrir menú de usuario" aria-expanded="false">
+                        U
+                    </button>
+                    <div class="avatar-dropdown" id="avatarDropdown">
+                        <button type="button">Cambiar correo electrónico</button>
+                        <button type="button">Cambiar contraseña</button>
+                        <button type="button" class="danger-option">Cerrar sesión</button>
+                    </div>
                 </div>
-                <div class="status-number">
-                    3
-                </div>
-                <div class="status-title">
-                    Aprobados
-                </div>
+                <!-- Final de menú de usuario -->
             </div>
-            <!-- Tarjeta proyectos en revisión -->
-            <div class="status-card review-card">
-                <div class="icon">
-                    ⏳
+            <!-- Final de acciones superiores -->
+        </header>
+        <!-- Final de topbar -->
+
+        <!-- Inicio de tarjetas superiores -->
+        <section class="status-section" aria-label="Resumen académico">
+            <article class="status-card approved-card">
+                <div class="status-card-header">
+                    <span class="icon"><i class="fa-solid fa-thumbtack"></i></span>
+                    <span class="status-label">Proyecto actual</span>
                 </div>
-                <div class="status-number">
-                    2
+                <h3>Sistema de Gestión Documental</h3>
+                <p>Estado actual del proyecto principal registrado en este semestre.</p>
+                <span class="status-meta">En revisión</span>
+            </article>
+
+            <article class="status-card review-card">
+                <div class="status-card-header">
+                    <span class="icon"><i class="fa-solid fa-pen-to-square"></i></span>
+                    <span class="status-label">Observaciones</span>
                 </div>
-                <div class="status-title">
-                    En revisión
+                <h3>Revisión de documentos</h3>
+                <p>Observaciones registradas por el tutor que aún requieren atención.</p>
+                <span class="status-meta">2 observaciones pendientes</span>
+            </article>
+
+            <article class="status-card changes-card">
+                <div class="status-card-header">
+                    <span class="icon"><i class="fa-solid fa-calendar-check"></i></span>
+                    <span class="status-label">Próximo recordatorio</span>
                 </div>
-            </div>
-            <!-- Tarjeta proyectos con cambios -->
-            <div class="status-card changes-card">
-                <div class="icon">
-                    ⚠️
+                <h3>Reunión con tutor</h3>
+                <p>Actividad académica personal más cercana en tu calendario.</p>
+                <span class="status-meta">02 Jul · 15:30</span>
+            </article>
+
+            <article class="status-card documents-card">
+                <div class="status-card-header">
+                    <span class="icon"><i class="fa-solid fa-file-lines"></i></span>
+                    <span class="status-label">Última entrega</span>
                 </div>
-                <div class="status-number">
-                    1
-                </div>
-                <div class="status-title">
-                    Requieren cambios
-                </div>
-            </div>
-            <!-- Tarjeta documentos subidos -->
-            <div class="status-card documents-card">
-                <div class="icon">
-                    📄
-                </div>
-                <div class="status-number">
-                    15
-                </div>
-                <div class="status-title">
-                    Documentos
-                </div>
-            </div>
+                <h3>Informe actualizado</h3>
+                <p>Último documento académico registrado para revisión del proyecto.</p>
+                <span class="status-meta">Hace 2 días</span>
+            </article>
         </section>
+        <!-- Final de tarjetas superiores -->
 
-        <!-- ======================================================
-             CONTENEDOR PRINCIPAL DEL DASHBOARD
-             ====================================================== -->
+        <!-- Inicio de dashboard -->
         <div class="dashboard-container">
-
-            <!-- ==================================================
-                 COLUMNA IZQUIERDA
-                 ================================================== -->
+            <!-- Inicio de columna de proyectos -->
             <div class="left-column">
-                <!-- Título -->
-                <h2 class="section-title">
-                    Mis Proyectos
-                </h2>
-                <!-- Tarjetas de proyectos -->
-                <section class="projects-grid">
-                    <!-- Proyecto 1 -->
-                    <div class="project-card">
-                        <div class="project-status approved">
-                            Aprobado
-                        </div>
-                        <h3>
-                            Sistema de Gestión Documental
-                        </h3>
-                        <p>
-                            Plataforma académica enfocada en la organización y administración de proyectos estudiantiles.
-                        </p>
-                        <div class="project-footer">
-                            <div class="date">
-                                Actualizado hace 2 días
-                            </div>
-                            <button class="open-btn">
-                                Abrir Proyecto
-                            </button>
-                        </div>
+                <!-- Inicio de encabezado de proyectos -->
+                <div class="section-heading">
+                    <div>
+                        <span class="section-eyebrow">Gestión académica</span>
+                        <h2 class="section-title">Mis proyectos</h2>
                     </div>
-                    <!-- Proyecto 2 -->
-                    <div class="project-card">
-                        <div class="project-status revision">
-                            En revisión
-                        </div>
-                        <h3>
-                            Aplicación Web Educativa
-                        </h3>
-                        <p>
-                            Proyecto orientado al desarrollo de herramientas digitales para apoyo académico institucional.
-                        </p>
-                        <div class="project-footer">
-                            <div class="date">
-                                Actualizado ayer
-                            </div>
-                            <button class="open-btn">
-                                Abrir Proyecto
-                            </button>
-                        </div>
-                    </div>
-                    <!-- Proyecto 3 -->
-                    <div class="project-card">
-                        <div class="project-status changes">
-                            Requiere cambios
-                        </div>
-                        <h3>
-                            Repositorio Inteligente
-                        </h3>
-                        <p>
-                            Sistema de almacenamiento y clasificación de proyectos académicos con interfaz moderna.
-                        </p>
-                        <div class="project-footer">
-                            <div class="date">
-                                Actualizado hace 5 días
-                            </div>
-                            <button class="open-btn">
-                                Abrir Proyecto
-                            </button>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- ==================================================
-                     ACTIVIDAD RECIENTE
-                     ==================================================
-                <section class="activity-section">
-                    <h2 class="section-title">
-                        Actividad reciente
-                    </h2>
-                    <div class="activity-card">
-                        ✅ Sistema de Gestión Documental aprobado.
-                    </div>
-                    <div class="activity-card">
-                        📄 Se actualizó el documento PDF.
-                    </div>
-                    <div class="activity-card">
-                        📤 Nueva versión del proyecto subida.
-                    </div>
-                </section> -->
-            </div>
-
-            <!-- ==================================================
-                 COLUMNA DERECHA
-                 ================================================== -->
-            <div class="right-column">
-                <!-- Panel de notificaciones -->
-                <div class="notifications-panel">
-                    <h2>
-                        🔔 Notificaciones
-                    </h2>
-                    <div class="notification-card">
-                        <strong>
-                            Proyecto aprobado
-                        </strong>
-                        <p>
-                            Hace 2 horas
-                        </p>
-                    </div>
-                    <div class="notification-card">
-                        <strong>
-                            Nueva observación registrada
-                        </strong>
-                        <p>
-                            Hace 1 día
-                        </p>
-                    </div>
-                    <div class="notification-card">
-                        <strong>
-                            Documento actualizado
-                        </strong>
-                        <p>
-                            Hace 3 días
-                        </p>
-                    </div>
-                    <button class="open-btn">
-                        + Ver más
+                    <button class="upload-btn" type="button">
+                        <i class="fa-solid fa-plus"></i>
+                        Nuevo Proyecto
                     </button>
                 </div>
-                <!-- Panel de avisos institucionales -->
-                <div class="announcements-panel">
-                    <h2>
-                        📢 Avisos Institucionales
-                    </h2>
-                    <div class="announcement-card">
-                        📌 Entrega de proyectos hasta el 30 de junio.
+                <!-- Final de encabezado de proyectos -->
+
+                <!-- Inicio de listado de proyectos -->
+                <section class="projects-grid" aria-label="Listado de proyectos">
+                    <article class="project-card">
+                        <div class="project-card-top">
+                            <span class="project-status revision">En revisión</span>
+                        </div>
+                        <h3>Sistema de Gestión Documental</h3>
+                        <p>Plataforma académica enfocada en la organización y administración de proyectos estudiantiles.</p>
+                        <div class="project-details">
+                            <span>Semestre: 6.º semestre</span>
+                            <span>Tutor: Ing. Ramírez</span>
+                            <span>Última actualización: hace 2 días</span>
+                        </div>
+                        <div class="project-footer">
+                            <span class="date">Informe actualizado en revisión</span>
+                            <button class="open-btn" type="button">Abrir Proyecto</button>
+                        </div>
+                    </article>
+
+                    <article class="project-card">
+                        <div class="project-card-top">
+                            <span class="project-status changes">Requiere cambios</span>
+                        </div>
+                        <h3>Aplicación Web Educativa</h3>
+                        <p>Proyecto orientado al desarrollo de herramientas digitales para apoyo académico institucional.</p>
+                        <div class="project-details">
+                            <span>Semestre: 6.º semestre</span>
+                            <span>Tutor: Mgs. Andrade</span>
+                            <span>Última actualización: ayer</span>
+                        </div>
+                        <div class="project-footer">
+                            <span class="date">Corregir observaciones del tutor</span>
+                            <button class="open-btn" type="button">Abrir Proyecto</button>
+                        </div>
+                    </article>
+
+                    <!-- Card 3
+                    <article class="project-card">
+                        <div class="project-card-top">
+                            <span class="project-status approved">Aprobado</span>
+                        </div>
+                        
+                        <h3>Repositorio Inteligente</h3>
+                        <p>Sistema de almacenamiento y clasificación de proyectos académicos con interfaz moderna.</p>
+                        <div class="project-details">
+                            <span>Semestre: 5.º semestre</span>
+                            <span>Tutor: Ing. Castillo</span>
+                            <span>Última actualización: hace 5 días</span>
+                        </div>
+                        <div class="project-footer">
+                            <span class="date">Entrega revisada y aprobada</span>
+                            <button class="open-btn" type="button">Abrir Proyecto</button>
+                        </div>
+                    </article>
+                    -->
+                </section>
+                <button class="open-btn ghost-btn more-projects-btn" type="button">
+                    Ver más
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+                <!-- Final de listado de proyectos -->
+
+                <!-- Inicio de calendario académico -->
+                <section class="calendar-summary" aria-label="Calendario académico">
+                    <div class="section-heading calendar-heading">
+                        <div>
+                            <span class="section-eyebrow">Agenda rápida</span>
+                            <h2 class="section-title">Calendario académico</h2>
+                        </div>
+                        <button class="open-btn ghost-btn calendar-action" type="button">
+                            Ver calendario completo
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </button>
                     </div>
-                    <div class="announcement-card">
-                        📌 Actualización del reglamento académico.
+
+                    <div class="calendar-content">
+                        <div class="calendar-month">
+                            <div class="calendar-title">
+                                <strong>Julio 2026</strong>
+                                <span>Recordatorios del semestre</span>
+                            </div>
+                            <div class="calendar-grid">
+                                <span class="calendar-day-name">Lun</span>
+                                <span class="calendar-day-name">Mar</span>
+                                <span class="calendar-day-name">Mié</span>
+                                <span class="calendar-day-name">Jue</span>
+                                <span class="calendar-day-name">Vie</span>
+                                <span class="calendar-day-name">Sáb</span>
+                                <span class="calendar-day-name">Dom</span>
+
+                                <span class="calendar-day muted-day">29</span>
+                                <span class="calendar-day muted-day">30</span>
+                                <span class="calendar-day current-day">1</span>
+                                <span class="calendar-day reminder-day">2</span>
+                                <span class="calendar-day">3</span>
+                                <span class="calendar-day">4</span>
+                                <span class="calendar-day reminder-day">5</span>
+                                <span class="calendar-day">6</span>
+                                <span class="calendar-day">7</span>
+                                <span class="calendar-day">8</span>
+                                <span class="calendar-day">9</span>
+                                <span class="calendar-day reminder-day">10</span>
+                                <span class="calendar-day">11</span>
+                                <span class="calendar-day">12</span>
+                                <span class="calendar-day">13</span>
+                                <span class="calendar-day">14</span>
+                                <span class="calendar-day">15</span>
+                                <span class="calendar-day">16</span>
+                                <span class="calendar-day">17</span>
+                                <span class="calendar-day">18</span>
+                                <span class="calendar-day">19</span>
+                                <span class="calendar-day">20</span>
+                                <span class="calendar-day reminder-day">21</span>
+                                <span class="calendar-day">22</span>
+                                <span class="calendar-day">23</span>
+                                <span class="calendar-day">24</span>
+                                <span class="calendar-day">25</span>
+                                <span class="calendar-day">26</span>
+                                <span class="calendar-day">27</span>
+                                <span class="calendar-day">28</span>
+                                <span class="calendar-day">29</span>
+                                <span class="calendar-day">30</span>
+                                <span class="calendar-day">31</span>
+                                <span class="calendar-day muted-day">1</span>
+                                <span class="calendar-day muted-day">2</span>
+                            </div>
+                        </div>
+
                     </div>
-                    <div class="announcement-card">
-                        📌 Mantenimiento del sistema el sábado.
-                    </div>
-                </div>
+                </section>
+                <!-- Final de calendario académico -->
             </div>
+            <!-- Final de columna de proyectos -->
+
+            <!-- Inicio de panel derecho -->
+            <aside class="right-column" aria-label="Información complementaria">
+                <!-- Inicio de notificaciones -->
+                <section class="notifications-panel">
+                    <div class="panel-heading">
+                        <h2><i class="fa-solid fa-bell"></i> Notificaciones</h2>
+                        <span>3 nuevas</span>
+                    </div>
+                    <article class="notification-card">
+                        <strong>Observación registrada</strong>
+                        <p>Tu tutor dejó una observación en el informe actualizado.</p>
+                        <span>Hace 2 horas</span>
+                    </article>
+                    <article class="notification-card">
+                        <strong>Documento revisado</strong>
+                        <p>Se revisó la última versión del capítulo metodológico.</p>
+                        <span>Hace 1 día</span>
+                    </article>
+                    <article class="notification-card">
+                        <strong>Recordatorio próximo</strong>
+                        <p>Reunión con tutor programada para el 02 de julio.</p>
+                        <span>Hace 3 días</span>
+                    </article>
+                    <button class="open-btn ghost-btn" type="button">
+                        Ver más
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </section>
+                <!-- Final de notificaciones -->
+
+                <!-- Inicio de recordatorios -->
+                <section class="reminders-panel">
+                    <div class="panel-heading">
+                        <h2><i class="fa-solid fa-thumbtack"></i> Recordatorios</h2>
+                        <span>Personal</span>
+                    </div>
+                    <article class="reminder-card">
+                        <div class="reminder-date">02 Jul</div>
+                        <div>
+                            <strong>Reunión con tutor</strong>
+                            <p>Sistema de Gestión Documental · 15:30</p>
+                        </div>
+                    </article>
+                    <article class="reminder-card">
+                        <div class="reminder-date">05 Jul</div>
+                        <div>
+                            <strong>Revisión de observaciones</strong>
+                            <p>Aplicación Web Educativa · 09:00</p>
+                        </div>
+                    </article>
+                    <article class="reminder-card">
+                        <div class="reminder-date">10 Jul</div>
+                        <div>
+                            <strong>Entrega de correcciones</strong>
+                            <p>Informe académico · 11:00</p>
+                        </div>
+                    </article>
+                    <button class="open-btn ghost-btn" type="button">
+                        Ver más
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </section>
+                <!-- Final de recordatorios -->
+            </aside>
+            <!-- Final de panel derecho -->
         </div>
+        <!-- Final de dashboard -->
     </main>
-    <!-- Archivo JavaScript -->
+    <!-- Final de contenido principal -->
+
+    <!-- Inicio de scripts -->
     <script src="script.js"></script>
+    <!-- Final de scripts -->
 </body>
 </html>
