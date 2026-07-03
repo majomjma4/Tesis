@@ -1,6 +1,6 @@
 console.log("Dashboard inicializado correctamente.");
 
-// Inicio de selección de elementos
+// Inicio de seleccion de elementos
 const sidebar = document.querySelector("#sidebar");
 const sidebarOverlay = document.querySelector("#sidebarOverlay");
 const hamburgerBtn = document.querySelector("#hamburgerBtn");
@@ -11,9 +11,9 @@ const bell = document.querySelector(".notification-icon");
 const logoutButtons = Array.from(document.querySelectorAll("button")).filter((button) =>
     button.textContent.toLowerCase().includes("cerrar sesi")
 );
-// Final de selección de elementos
+// Final de seleccion de elementos
 
-// Inicio de funciones del menú lateral
+// Inicio de funciones del menu lateral
 function closeSidebar() {
     sidebar?.classList.remove("open");
     sidebarOverlay?.classList.remove("show");
@@ -25,7 +25,7 @@ function toggleSidebar() {
     sidebarOverlay?.classList.toggle("show", Boolean(isOpen));
     hamburgerBtn?.setAttribute("aria-expanded", String(Boolean(isOpen)));
 }
-// Final de funciones del menú lateral
+// Final de funciones del menu lateral
 
 // Inicio de funciones del avatar
 function closeAvatarMenu() {
@@ -40,7 +40,7 @@ function toggleAvatarMenu(event) {
 }
 // Final de funciones del avatar
 
-// Inicio de animación inicial de tarjetas
+// Inicio de animacion inicial de tarjetas
 window.addEventListener("load", () => {
     const cards = document.querySelectorAll(
         ".status-card, .project-card, .calendar-summary, .notification-card, .reminder-card"
@@ -52,9 +52,9 @@ window.addEventListener("load", () => {
         }, index * 85);
     });
 });
-// Final de animación inicial de tarjetas
+// Final de animacion inicial de tarjetas
 
-// Inicio de eventos del menú lateral
+// Inicio de eventos del menu lateral
 hamburgerBtn?.addEventListener("click", toggleSidebar);
 sidebarOverlay?.addEventListener("click", closeSidebar);
 
@@ -67,7 +67,7 @@ document.querySelectorAll(".menu-item").forEach((item) => {
         closeSidebar();
     });
 });
-// Final de eventos del menú lateral
+// Final de eventos del menu lateral
 
 // Inicio de eventos del avatar
 avatarButton?.addEventListener("click", toggleAvatarMenu);
@@ -110,7 +110,7 @@ bell?.addEventListener("click", () => {
 // Inicio de cierre de sesion
 logoutButtons.forEach((button) => {
     button.addEventListener("click", () => {
-        window.location.href = "login.html";
+        window.location.href = "index.php?page=login";
     });
 });
 // Final de cierre de sesion
