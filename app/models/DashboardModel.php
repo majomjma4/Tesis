@@ -6,6 +6,7 @@ final class DashboardModel
 {
     public function getSummary(): array
     {
+        // Resumen superior del dashboard academico.
         return [
             [
                 'cardClass' => 'approved-card',
@@ -44,6 +45,7 @@ final class DashboardModel
 
     public function getProjects(): array
     {
+        // Proyectos de ejemplo hasta conectar el modulo con persistencia real.
         return [
             [
                 'statusClass' => 'revision',
@@ -70,6 +72,7 @@ final class DashboardModel
 
     public function getNotifications(): array
     {
+        // Notificaciones visibles en el panel lateral.
         return [
             ['title' => 'Observacion registrada', 'text' => 'Tu tutor dejo una observacion en el informe actualizado.', 'time' => 'Hace 2 horas'],
             ['title' => 'Documento revisado', 'text' => 'Se reviso la ultima version del capitulo metodologico.', 'time' => 'Hace 1 dia'],
@@ -79,6 +82,7 @@ final class DashboardModel
 
     public function getReminders(): array
     {
+        // Recordatorios personales del usuario autenticado.
         return [
             ['date' => '02 Jul', 'title' => 'Reunion con tutor', 'text' => 'Sistema de Gestion Documental - 15:30'],
             ['date' => '05 Jul', 'title' => 'Revision de observaciones', 'text' => 'Aplicacion Web Educativa - 09:00'],
@@ -88,6 +92,7 @@ final class DashboardModel
 
     public function getCalendar(): array
     {
+        // Estructura simple para pintar el calendario mensual en la vista.
         return [
             'month' => 'Julio 2026',
             'subtitle' => 'Recordatorios del semestre',

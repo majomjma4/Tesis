@@ -6,6 +6,7 @@ final class AuthController
 {
     public function login(): void
     {
+        // El controlador obtiene los datos necesarios y delega el render a la vista.
         $auth = new AuthModel();
 
         View::render('auth/login', [

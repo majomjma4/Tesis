@@ -8,8 +8,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
+    <!-- Inicio de capa para cerrar el menu movil -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <!-- Final de capa para cerrar el menu movil -->
 
+    <!-- Inicio de menu lateral principal -->
     <aside class="sidebar" id="sidebar" aria-label="Menu principal">
         <div>
             <div class="logo-area">
@@ -52,8 +55,11 @@
             </button>
         </div>
     </aside>
+    <!-- Final de menu lateral principal -->
 
+    <!-- Inicio de contenido principal -->
     <main class="main">
+        <!-- Inicio de barra superior -->
         <header class="topbar">
             <button class="hamburger-btn" id="hamburgerBtn" type="button" aria-label="Abrir menu" aria-expanded="false">
                 <i class="fa-solid fa-bars"></i>
@@ -85,12 +91,19 @@
                 </div>
             </div>
         </header>
+        <!-- Final de barra superior -->
 
         <?= $content ?>
     </main>
+    <!-- Final de contenido principal -->
 
+    <!-- Inicio de scripts de pagina -->
     <?php if (!empty($pageScript)): ?>
         <script src="<?= e($pageScript) ?>"></script>
     <?php endif; ?>
+    <?php if (!empty($GLOBALS['config']['dev_autoreload'])): ?>
+        <script src="<?= e(asset('js/dev-reload.js')) ?>" data-endpoint="<?= e(route('dev-reload')) ?>" defer></script>
+    <?php endif; ?>
+    <!-- Final de scripts de pagina -->
 </body>
 </html>

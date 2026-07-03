@@ -1,3 +1,4 @@
+<!-- Inicio de skeleton loader -->
 <section class="skeleton-loader" id="dashboardSkeleton" aria-label="Cargando informacion del dashboard" hidden>
     <div class="skeleton-status-grid">
         <?php for ($i = 0; $i < 4; $i++): ?>
@@ -24,7 +25,9 @@
         </div>
     </div>
 </section>
+<!-- Final de skeleton loader -->
 
+<!-- Inicio de resumen academico -->
 <section class="status-section" aria-label="Resumen academico">
     <?php foreach ($summaryCards as $card): ?>
         <article class="status-card <?= e($card['cardClass']) ?>">
@@ -38,9 +41,13 @@
         </article>
     <?php endforeach; ?>
 </section>
+<!-- Final de resumen academico -->
 
+<!-- Inicio de contenido del dashboard -->
 <div class="dashboard-container">
+    <!-- Inicio de columna principal -->
     <div class="left-column">
+        <!-- Inicio de encabezado de proyectos -->
         <div class="section-heading">
             <div>
                 <span class="section-eyebrow">Gestion academica</span>
@@ -51,7 +58,9 @@
                 Nuevo Proyecto
             </button>
         </div>
+        <!-- Final de encabezado de proyectos -->
 
+        <!-- Inicio de listado de proyectos -->
         <section class="projects-grid" aria-label="Listado de proyectos">
             <?php foreach ($projects as $project): ?>
                 <article class="project-card">
@@ -72,12 +81,14 @@
                 </article>
             <?php endforeach; ?>
         </section>
+        <!-- Final de listado de proyectos -->
 
         <button class="open-btn ghost-btn more-projects-btn" type="button">
             Ver mas
             <i class="fa-solid fa-arrow-right"></i>
         </button>
 
+        <!-- Inicio de calendario academico -->
         <section class="calendar-summary" aria-label="Calendario academico">
             <div class="section-heading calendar-heading">
                 <div>
@@ -108,9 +119,13 @@
                 </div>
             </div>
         </section>
+        <!-- Final de calendario academico -->
     </div>
+    <!-- Final de columna principal -->
 
+    <!-- Inicio de columna complementaria -->
     <aside class="right-column" aria-label="Informacion complementaria">
+        <!-- Inicio de notificaciones -->
         <section class="notifications-panel">
             <div class="panel-heading">
                 <h2><i class="fa-solid fa-bell"></i> Notificaciones</h2>
@@ -130,7 +145,9 @@
                 <i class="fa-solid fa-arrow-right"></i>
             </button>
         </section>
+        <!-- Final de notificaciones -->
 
+        <!-- Inicio de recordatorios -->
         <section class="reminders-panel">
             <div class="panel-heading">
                 <h2><i class="fa-solid fa-thumbtack"></i> Recordatorios</h2>
@@ -152,5 +169,8 @@
                 <i class="fa-solid fa-arrow-right"></i>
             </button>
         </section>
+        <!-- Final de recordatorios -->
     </aside>
+    <!-- Final de columna complementaria -->
 </div>
+<!-- Final de contenido del dashboard -->

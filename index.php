@@ -13,12 +13,14 @@ require APP_PATH . '/models/DashboardModel.php';
 require APP_PATH . '/models/AuthModel.php';
 require APP_PATH . '/controllers/DashboardController.php';
 require APP_PATH . '/controllers/AuthController.php';
+require APP_PATH . '/controllers/DevController.php';
 
 // Front controller: centraliza las rutas principales de la aplicacion.
 $page = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 
 match ($page) {
     'login' => (new AuthController())->login(),
+    'dev-reload' => (new DevController())->reloadStamp(),
     'dashboard', 'home', 'inicio' => (new DashboardController())->index(),
     default => (new DashboardController())->index(),
 };

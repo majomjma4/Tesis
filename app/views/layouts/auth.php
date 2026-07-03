@@ -8,10 +8,17 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body class="<?= e($bodyClass ?? '') ?>">
+    <!-- Inicio de contenido especifico de autenticacion -->
     <?= $content ?>
+    <!-- Final de contenido especifico de autenticacion -->
 
+    <!-- Inicio de scripts de autenticacion -->
     <?php if (!empty($pageScript)): ?>
         <script src="<?= e($pageScript) ?>"></script>
     <?php endif; ?>
+    <?php if (!empty($GLOBALS['config']['dev_autoreload'])): ?>
+        <script src="<?= e(asset('js/dev-reload.js')) ?>" data-endpoint="<?= e(route('dev-reload')) ?>" defer></script>
+    <?php endif; ?>
+    <!-- Final de scripts de autenticacion -->
 </body>
 </html>

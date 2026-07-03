@@ -6,6 +6,7 @@ final class View
 {
     public static function render(string $view, array $data = [], string $layout = 'main'): void
     {
+        // Construye las rutas internas de la vista y del layout solicitado.
         $viewFile = APP_PATH . '/views/' . $view . '.php';
         $layoutFile = APP_PATH . '/views/layouts/' . $layout . '.php';
 
@@ -17,6 +18,7 @@ final class View
 
         extract($data, EXTR_SKIP);
 
+        // Captura la vista como contenido para insertarla dentro del layout.
         ob_start();
         require $viewFile;
         $content = ob_get_clean();

@@ -6,6 +6,7 @@ final class DashboardController
 {
     public function index(): void
     {
+        // Los datos del dashboard se mantienen fuera de la vista para respetar MVC.
         $dashboard = new DashboardModel();
 
         View::render('dashboard/index', [

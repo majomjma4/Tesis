@@ -9,4 +9,5 @@ $baseUrl = $scriptDirectory === '/' ? '' : rtrim($scriptDirectory, '/');
 return [
     'app_name' => 'Gestion Documental Academica',
     'base_url' => $baseUrl,
+    'dev_autoreload' => true,
 ];
