@@ -1,7 +1,7 @@
 <main class="login-shell">
     <section class="login-intro" aria-label="Informacion institucional">
         <div class="institution-brand">
-            <img src="<?= e(asset('img/LOGO_ISTEL.png')) ?>" alt="Logo Instituto Superior Tecnologico El Libertador">
+            <img src="<?= e(asset('img/logo2.webp')) ?>" alt="Logo Instituto Superior Tecnologico El Libertador">
             <div>
                 <span>Instituto Superior Tecnologico</span>
                 <strong>El Libertador</strong>

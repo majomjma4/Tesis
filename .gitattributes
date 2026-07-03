@@ -1,0 +1,15 @@
+# Mantiene finales de linea consistentes en archivos de codigo.
+*.php text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+
+# Los binarios no deben normalizarse como texto.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.docx binary
