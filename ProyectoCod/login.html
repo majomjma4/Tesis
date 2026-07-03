@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <!-- Inicio de configuracion del documento -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar sesion | Gestion Documental Academica</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <!-- Final de configuracion del documento -->
+
+    <!-- Inicio de estilos de pantalla de inicio de sesion -->
+    <style>
+        body.login-page{
+            display:block;
+            min-height:100vh;
+            min-height:100dvh;
+            background:
+                linear-gradient(135deg,rgba(15,61,145,.94),rgba(13,47,112,.92)),
+                var(--bg);
+            color:var(--text);
+        }
+        .login-shell{
+            min-height:100vh;
+            min-height:100dvh;
+            display:grid;
+            grid-template-columns:minmax(320px,1fr) minmax(360px,480px);
+            align-items:center;
+            gap:44px;
+            width:min(1180px,100%);
+            margin:0 auto;
+            padding:42px 28px;
+        }
+        .login-intro{
+            color:white;
+            max-width:620px;
+        }
+        .institution-brand{
+            display:flex;
+            align-items:center;
+            gap:16px;
+            margin-bottom:36px;
+        }
+        .institution-brand img{
+            width:82px;
+            height:82px;
+            object-fit:contain;
+            background:white;
+            border-radius:18px;
+            padding:10px;
+            box-shadow:0 18px 35px rgba(0,0,0,.14);
+        }
+        .institution-brand span{
+            display:block;
+            font-size:14px;
+            line-height:1.4;
+            opacity:.82;
+            font-weight:700;
+            text-transform:uppercase;
+        }
+        .institution-brand strong{
+            display:block;
+            margin-top:4px;
+            font-size:20px;
+            line-height:1.25;
+        }
+        .login-intro h1{
+            max-width:580px;
+            font-size:clamp(34px,5vw,58px);
+            line-height:1.03;
+            letter-spacing:0;
+            margin-bottom:18px;
+        }
+        .login-intro p{
+            max-width:540px;
+            color:rgba(255,255,255,.84);
+            font-size:18px;
+            line-height:1.7;
+        }
+        .role-list{
+            display:flex;
+            flex-wrap:wrap;
+            gap:12px;
+            margin-top:28px;
+        }
+        .role-list span{
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            background:rgba(255,255,255,.11);
+            border:1px solid rgba(255,255,255,.18);
+            border-radius:999px;
+            padding:10px 14px;
+            color:white;
+            font-size:14px;
+            font-weight:700;
+        }
+        .role-list i{
+            color:var(--accent);
+        }
+        .login-panel{
+            background:var(--surface);
+            border:1px solid rgba(255,255,255,.58);
+            border-radius:24px;
+            padding:34px;
+            box-shadow:0 28px 65px rgba(0,0,0,.22);
+        }
+        .login-panel-header{
+            margin-bottom:26px;
+        }
+        .login-panel-header span{
+            color:var(--accent);
+            font-size:13px;
+            font-weight:800;
+            text-transform:uppercase;
+        }
+        .login-panel-header h2{
+            color:var(--text);
+            font-size:30px;
+            margin-top:7px;
+            letter-spacing:0;
+        }
+        .login-panel-header p{
+            color:var(--muted);
+            line-height:1.55;
+            margin-top:10px;
+        }
+        .login-alert{
+            display:none;
+            align-items:flex-start;
+            gap:10px;
+            background:rgba(239,68,68,.1);
+            border:1px solid rgba(239,68,68,.25);
+            border-radius:14px;
+            color:#b91c1c;
+            padding:12px 14px;
+            font-size:14px;
+            font-weight:700;
+            line-height:1.4;
+            margin-bottom:18px;
+        }
+        .login-alert.show{
+            display:flex;
+        }
+        .login-form{
+            display:grid;
+            gap:18px;
+        }
+        .form-group{
+            display:grid;
+            gap:8px;
+        }
+        .form-group label{
+            color:var(--text);
+            font-size:14px;
+            font-weight:800;
+        }
+        .input-wrap{
+            display:flex;
+            align-items:center;
+            gap:12px;
+            background:var(--surface-soft);
+            border:1px solid var(--line);
+            border-radius:16px;
+            padding:0 15px;
+            transition:.2s ease;
+        }
+        .input-wrap:focus-within{
+            border-color:var(--blue);
+            box-shadow:0 0 0 4px rgba(37,99,235,.12);
+            background:var(--surface);
+        }
+        .input-wrap i{
+            width:18px;
+            color:var(--primary);
+            text-align:center;
+        }
+        .input-wrap input{
+            width:100%;
+            min-height:50px;
+            border:0;
+            outline:0;
+            background:transparent;
+            color:var(--text);
+            font:inherit;
+        }
+        .input-wrap input::placeholder{
+            color:#94a3b8;
+        }
+        .form-group.invalid .input-wrap{
+            border-color:var(--danger);
+            box-shadow:0 0 0 4px rgba(239,68,68,.1);
+        }
+        .field-error{
+            display:none;
+            color:var(--danger);
+            font-size:13px;
+            font-weight:700;
+        }
+        .form-group.invalid .field-error{
+            display:block;
+        }
+        .form-options{
+            display:flex;
+            justify-content:flex-end;
+            align-items:center;
+            margin-top:-2px;
+        }
+        .forgot-link{
+            color:var(--blue);
+            font-size:14px;
+            font-weight:800;
+            transition:.2s ease;
+        }
+        .forgot-link:hover{
+            color:var(--accent);
+        }
+        .login-submit{
+            width:100%;
+            min-height:52px;
+            background:linear-gradient(135deg,var(--primary),var(--blue));
+            color:white;
+            border-radius:16px;
+            cursor:pointer;
+            font-weight:800;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:10px;
+            transition:.25s ease;
+        }
+        .login-submit:hover{
+            transform:translateY(-2px);
+            box-shadow:0 16px 28px rgba(37,99,235,.26);
+        }
+        .access-note{
+            margin-top:20px;
+            display:flex;
+            align-items:flex-start;
+            gap:10px;
+            background:rgba(16,185,129,.11);
+            border:1px solid rgba(16,185,129,.24);
+            color:var(--muted);
+            border-radius:16px;
+            padding:13px 14px;
+            font-size:13px;
+            line-height:1.45;
+        }
+        .access-note i{
+            color:var(--accent);
+            margin-top:2px;
+        }
+        @media(max-width:900px){
+            .login-shell{
+                grid-template-columns:1fr;
+                gap:30px;
+                padding:32px 22px;
+            }
+            .login-intro{
+                max-width:760px;
+            }
+            .login-intro p{
+                font-size:16px;
+            }
+            .login-panel{
+                width:100%;
+                max-width:560px;
+            }
+        }
+        @media(max-width:560px){
+            .login-shell{
+                padding:22px 14px;
+            }
+            .institution-brand{
+                align-items:flex-start;
+                margin-bottom:26px;
+            }
+            .institution-brand img{
+                width:68px;
+                height:68px;
+                border-radius:16px;
+            }
+            .institution-brand strong{
+                font-size:17px;
+            }
+            .login-intro h1{
+                font-size:32px;
+            }
+            .role-list{
+                gap:9px;
+            }
+            .role-list span{
+                width:100%;
+                justify-content:flex-start;
+            }
+            .login-panel{
+                border-radius:20px;
+                padding:24px 18px;
+            }
+            .login-panel-header h2{
+                font-size:25px;
+            }
+        }
+    </style>
+    <!-- Final de estilos de pantalla de inicio de sesion -->
+</head>
+<body class="login-page">
+    <!-- Inicio de contenedor principal de inicio de sesion -->
+    <main class="login-shell">
+        <!-- Inicio de presentacion institucional -->
+        <section class="login-intro" aria-label="Informacion institucional">
+            <!-- Inicio de marca institucional -->
+            <div class="institution-brand">
+                <img src="img/LOGO_ISTEL.png" alt="Logo Instituto Superior Tecnologico El Libertador">
+                <div>
+                    <span>Instituto Superior Tecnologico</span>
+                    <strong>El Libertador</strong>
+                </div>
+            </div>
+            <!-- Final de marca institucional -->
+
+            <!-- Inicio de nombre de la plataforma -->
+            <h1>Plataforma de Seguimiento Documental Academico</h1>
+            <p>Gestión, revisión y acompañamiento de proyectos academicos para la carrera de Desarrollo de Software.</p>
+            <!-- Final de nombre de la plataforma -->
+
+            <!-- Inicio de perfiles de acceso -->
+            <div class="role-list" aria-label="Perfiles autorizados">
+                <span><i class="fa-solid fa-user-graduate"></i> Estudiantes</span>
+                <span><i class="fa-solid fa-chalkboard-user"></i> Docentes</span>
+                <span><i class="fa-solid fa-user-shield"></i> Administradores</span>
+            </div>
+            <!-- Final de perfiles de acceso -->
+        </section>
+        <!-- Final de presentacion institucional -->
+
+        <!-- Inicio de panel de formulario -->
+        <section class="login-panel" aria-label="Formulario de inicio de sesion">
+            <!-- Inicio de encabezado del formulario -->
+            <header class="login-panel-header">
+                <span>Acceso institucional</span>
+                <h2>Iniciar sesion</h2>
+                <p>Ingresa con tu correo o usuario asignado por la institucion.</p>
+            </header>
+            <!-- Final de encabezado del formulario -->
+
+            <!-- Inicio de mensaje de error -->
+            <div class="login-alert" id="loginAlert" role="alert" aria-live="polite">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span>Usuario o contrasena incorrectos.</span>
+            </div>
+            <!-- Final de mensaje de error -->
+
+            <!-- Inicio de formulario de acceso -->
+            <form class="login-form" id="loginForm" novalidate>
+                <!-- Inicio de campo de usuario -->
+                <div class="form-group" id="userGroup">
+                    <label for="user">Correo institucional o usuario</label>
+                    <div class="input-wrap">
+                        <i class="fa-solid fa-user"></i>
+                        <input type="text" id="user" name="user" autocomplete="username" placeholder="usuario@gmail.com">
+                    </div>
+                    <span class="field-error">Este campo es obligatorio.</span>
+                </div>
+                <!-- Final de campo de usuario -->
+
+                <!-- Inicio de campo de contrasena -->
+                <div class="form-group" id="passwordGroup">
+                    <label for="password">Contrasena</label>
+                    <div class="input-wrap">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Ingresa tu contrasena">
+                    </div>
+                    <span class="field-error">Este campo es obligatorio.</span>
+                </div>
+                <!-- Final de campo de contrasena -->
+
+                <!-- Inicio de enlace de recuperacion -->
+                <div class="form-options">
+                    <a class="forgot-link" href="#">¿Olvidaste tu contrasena?</a>
+                </div>
+                <!-- Final de enlace de recuperacion -->
+
+                <!-- Inicio de boton de ingreso -->
+                <button class="login-submit" type="submit">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    Iniciar sesion
+                </button>
+                <!-- Final de boton de ingreso -->
+            </form>
+            <!-- Final de formulario de acceso -->
+
+            <!-- Inicio de mensaje informativo -->
+            <p class="access-note">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>Acceso restringido a usuarios registrados por la institucion. Las cuentas son creadas unicamente por el administrador del sistema.</span>
+            </p>
+            <!-- Final de mensaje informativo -->
+        </section>
+        <!-- Final de panel de formulario -->
+    </main>
+    <!-- Final de contenedor principal de inicio de sesion -->
+
+    <!-- Inicio de validacion visual del formulario -->
+    <script>
+        const loginForm = document.querySelector("#loginForm");
+        const userInput = document.querySelector("#user");
+        const passwordInput = document.querySelector("#password");
+        const loginAlert = document.querySelector("#loginAlert");
+
+        function updateFieldState(input) {
+            const group = input.closest(".form-group");
+            group.classList.toggle("invalid", input.value.trim() === "");
+        }
+
+        [userInput, passwordInput].forEach((input) => {
+            input.addEventListener("input", () => updateFieldState(input));
+            input.addEventListener("blur", () => updateFieldState(input));
+        });
+
+        loginForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+
+            updateFieldState(userInput);
+            updateFieldState(passwordInput);
+
+            const hasEmptyFields = !userInput.value.trim() || !passwordInput.value.trim();
+            loginAlert.classList.remove("show");
+
+            if (!hasEmptyFields) {
+                window.location.href = "index.html";
+            }
+        });
+    </script>
+    <!-- Final de validacion visual del formulario -->
+</body>
+</html>

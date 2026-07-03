@@ -8,6 +8,9 @@ const avatarButton = document.querySelector("#avatarButton");
 const avatarDropdown = document.querySelector("#avatarDropdown");
 const themeToggle = document.querySelector("#themeToggle");
 const bell = document.querySelector(".notification-icon");
+const logoutButtons = Array.from(document.querySelectorAll("button")).filter((button) =>
+    button.textContent.toLowerCase().includes("cerrar sesi")
+);
 // Final de selección de elementos
 
 // Inicio de funciones del menú lateral
@@ -103,3 +106,11 @@ bell?.addEventListener("click", () => {
     }, 500);
 });
 // Final de efecto de notificaciones
+
+// Inicio de cierre de sesion
+logoutButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+        window.location.href = "login.html";
+    });
+});
+// Final de cierre de sesion
