@@ -13,10 +13,13 @@ final class DashboardController
             'title' => 'Dashboard | Gestion Documental Academica',
             'pageScript' => asset('js/dashboard.js'),
             'summaryCards' => $dashboard->getSummary(),
-            'projects' => $dashboard->getProjects(),
+            'currentReport' => $dashboard->getCurrentReport(),
+            'teamMembers' => $dashboard->getTeamMembers(),
+            'observations' => $dashboard->getObservations(),
+            'recentActivity' => $dashboard->getRecentActivity(),
+            'processDates' => $dashboard->getProcessDates(),
             'notifications' => $dashboard->getNotifications(),
             'reminders' => $dashboard->getReminders(),
-            'calendar' => $dashboard->getCalendar(),
         ]);
     }
 }

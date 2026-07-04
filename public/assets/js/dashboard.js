@@ -6,12 +6,37 @@ const sidebarOverlay = document.querySelector("#sidebarOverlay");
 const hamburgerBtn = document.querySelector("#hamburgerBtn");
 const avatarButton = document.querySelector("#avatarButton");
 const avatarDropdown = document.querySelector("#avatarDropdown");
+const teamToggle = document.querySelector("#teamToggle");
+const teamDropdown = document.querySelector("#teamDropdown");
 const themeToggle = document.querySelector("#themeToggle");
 const bell = document.querySelector(".notification-icon");
 const logoutButtons = Array.from(document.querySelectorAll("button")).filter((button) =>
     button.textContent.toLowerCase().includes("cerrar sesi")
 );
+const themeStorageKey = "theme";
 // Final de seleccion de elementos
+
+// Inicio de preferencia visual
+function setThemeIcon(isDarkMode) {
+    if (!themeToggle) {
+        return;
+    }
+
+    themeToggle.innerHTML = isDarkMode
+        ? '<i class="fa-solid fa-sun"></i>'
+        : '<i class="fa-solid fa-moon"></i>';
+}
+
+function applyTheme(theme) {
+    const isDarkMode = theme === "dark";
+
+    document.documentElement.classList.toggle("theme-dark", isDarkMode);
+    document.body.classList.toggle("dark-mode", isDarkMode);
+    setThemeIcon(isDarkMode);
+}
+
+applyTheme(localStorage.getItem(themeStorageKey) === "dark" ? "dark" : "light");
+// Final de preferencia visual
 
 // Inicio de funciones del menu lateral
 function closeSidebar() {
@@ -33,17 +58,30 @@ function closeAvatarMenu() {
     avatarButton?.setAttribute("aria-expanded", "false");
 }
 
+function closeTeamMenu() {
+    teamDropdown?.classList.remove("show");
+    teamToggle?.setAttribute("aria-expanded", "false");
+}
+
 function toggleAvatarMenu(event) {
     event.stopPropagation();
     const isOpen = avatarDropdown?.classList.toggle("show");
     avatarButton?.setAttribute("aria-expanded", String(Boolean(isOpen)));
+    closeTeamMenu();
+}
+
+function toggleTeamMenu(event) {
+    event.stopPropagation();
+    const isOpen = teamDropdown?.classList.toggle("show");
+    teamToggle?.setAttribute("aria-expanded", String(Boolean(isOpen)));
+    closeAvatarMenu();
 }
 // Final de funciones del avatar
 
 // Inicio de animacion inicial de tarjetas
 window.addEventListener("load", () => {
     const cards = document.querySelectorAll(
-        ".status-card, .project-card, .calendar-summary, .notification-card, .reminder-card"
+        ".status-card, .current-report, .observations-preview, .activity-summary, .process-dates, .notification-card, .reminder-card"
     );
 
     cards.forEach((card, index) => {
@@ -71,10 +109,15 @@ document.querySelectorAll(".menu-item").forEach((item) => {
 
 // Inicio de eventos del avatar
 avatarButton?.addEventListener("click", toggleAvatarMenu);
+teamToggle?.addEventListener("click", toggleTeamMenu);
 
 document.addEventListener("click", (event) => {
     if (!event.target.closest(".avatar-menu")) {
         closeAvatarMenu();
+    }
+
+    if (!event.target.closest(".report-team")) {
+        closeTeamMenu();
     }
 });
 // Final de eventos del avatar
@@ -84,17 +127,17 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
         closeSidebar();
         closeAvatarMenu();
+        closeTeamMenu();
     }
 });
 // Final de eventos generales
 
 // Inicio de cambio de tema
 themeToggle?.addEventListener("click", () => {
-    document.body.classList.toggle("dark-mode");
-    const isDarkMode = document.body.classList.contains("dark-mode");
-    themeToggle.innerHTML = isDarkMode
-        ? '<i class="fa-solid fa-sun"></i>'
-        : '<i class="fa-solid fa-moon"></i>';
+    const nextTheme = document.documentElement.classList.contains("theme-dark") ? "light" : "dark";
+
+    localStorage.setItem(themeStorageKey, nextTheme);
+    applyTheme(nextTheme);
 });
 // Final de cambio de tema
 

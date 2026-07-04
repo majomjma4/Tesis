@@ -43,30 +43,79 @@ final class DashboardModel
         ];
     }
 
-    public function getProjects(): array
+    public function getCurrentReport(): array
     {
-        // Proyectos de ejemplo hasta conectar el modulo con persistencia real.
+        // Informe principal del estudiante hasta conectar el modulo con persistencia real.
+        return [
+            'statusClass' => 'revision',
+            'status' => 'En revision',
+            'title' => 'Sistema de Gestion Documental',
+            'description' => 'Informe academico principal en proceso de revision documental por el tutor asignado.',
+            'semester' => 'Septimo semestre',
+            'tutor' => 'Ing. Tutor Asignado',
+            'version' => 'Version 4',
+            'document' => 'Informe_actualizado_v4.pdf',
+            'lastDelivery' => '03 Jul 2026',
+            'lastReview' => '04 Jul 2026',
+            'pendingObservations' => '2 observaciones pendientes',
+        ];
+    }
+
+    public function getTeamMembers(): array
+    {
+        // Integrantes de ejemplo hasta conectar el proyecto con usuarios reales.
+        return [
+            ['initial' => 'C', 'name' => 'Carlos Martinez', 'role' => 'Lider'],
+            ['initial' => 'A', 'name' => 'Andres Perez', 'role' => 'Integrante'],
+            ['initial' => 'L', 'name' => 'Lucia Gomez', 'role' => 'Integrante'],
+        ];
+    }
+
+    public function getObservations(): array
+    {
+        // Vista previa de observaciones recientes del informe actual.
         return [
             [
-                'statusClass' => 'revision',
-                'status' => 'En revision',
-                'title' => 'Sistema de Gestion Documental',
-                'description' => 'Plataforma academica enfocada en la organizacion y administracion de proyectos estudiantiles.',
-                'semester' => 'Septimo semestre',
-                'tutor' => 'Ing. Tutor Asignado',
-                'updatedAt' => 'Hace 2 dias',
-                'footer' => 'Informe actualizado en revision',
+                'statusClass' => 'pending',
+                'status' => 'Pendiente',
+                'title' => 'Marco metodologico',
+                'text' => 'Ampliar la descripcion del enfoque utilizado y justificar la tecnica de recoleccion de datos.',
+                'date' => '04 Jul 2026',
             ],
             [
-                'statusClass' => 'changes',
-                'status' => 'Requiere cambios',
-                'title' => 'Aplicacion Web Educativa',
-                'description' => 'Proyecto orientado al desarrollo de herramientas digitales para apoyo academico institucional.',
-                'semester' => 'Septimo semestre',
-                'tutor' => 'Mgs. Tutor Asignado',
-                'updatedAt' => 'Ayer',
-                'footer' => 'Corregir observaciones del tutor',
+                'statusClass' => 'pending',
+                'status' => 'Pendiente',
+                'title' => 'Formato de referencias',
+                'text' => 'Unificar el formato de citas y referencias bibliograficas antes del siguiente envio.',
+                'date' => '04 Jul 2026',
             ],
+                        [
+                'statusClass' => 'pending',
+                'status' => 'Pendiente',
+                'title' => 'Marco metodologico',
+                'text' => 'Ampliar la descripcion del enfoque utilizado y justificar la tecnica de recoleccion de datos.',
+                'date' => '04 Jul 2026',
+            ],
+        ];
+    }
+
+    public function getRecentActivity(): array
+    {
+        // Actividad resumida; el historial completo pertenece al detalle del proyecto.
+        return [
+            ['icon' => 'fa-upload', 'title' => 'Version 4 enviada', 'text' => 'El informe actualizado fue registrado para revision.', 'time' => '03 Jul 2026'],
+            ['icon' => 'fa-pen-to-square', 'title' => 'Revision del tutor', 'text' => 'Se registraron observaciones sobre la ultima version.', 'time' => '04 Jul 2026'],
+            ['icon' => 'fa-arrows-rotate', 'title' => 'Estado actualizado', 'text' => 'El informe permanece en revision documental.', 'time' => '04 Jul 2026'],
+        ];
+    }
+
+    public function getProcessDates(): array
+    {
+        // Fechas clave del proceso academico, sin reemplazar el calendario completo futuro.
+        return [
+            ['label' => 'Ultima entrega', 'value' => '03 Jul 2026'],
+            ['label' => 'Ultima revision', 'value' => '04 Jul 2026'],
+            ['label' => 'Proxima fecha', 'value' => 'Sin programar'],
         ];
     }
 

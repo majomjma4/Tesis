@@ -45,109 +45,166 @@
 
 <!-- Inicio de contenido del dashboard -->
 <div class="dashboard-container">
-    <!-- Inicio de columna principal -->
-    <div class="left-column">
-        <!-- Inicio de encabezado de proyectos -->
-        <div class="section-heading">
-            <div>
-                <span class="section-eyebrow">Gestion academica</span>
-                <h2 class="section-title">Mis proyectos</h2>
-            </div>
-            <button class="upload-btn" type="button">
-                <i class="fa-solid fa-plus"></i>
-                Nuevo Proyecto
-            </button>
-        </div>
-        <!-- Final de encabezado de proyectos -->
-
-        <!-- Inicio de listado de proyectos -->
-        <section class="projects-grid" aria-label="Listado de proyectos">
-            <?php foreach ($projects as $project): ?>
-                <article class="project-card">
-                    <div class="project-card-top">
-                        <span class="project-status <?= e($project['statusClass']) ?>"><?= e($project['status']) ?></span>
-                    </div>
-                    <h3><?= e($project['title']) ?></h3>
-                    <p><?= e($project['description']) ?></p>
-                    <div class="project-details">
-                        <span>Semestre: <?= e($project['semester']) ?></span>
-                        <span>Tutor: <?= e($project['tutor']) ?></span>
-                        <span>Ultima actualizacion: <?= e($project['updatedAt']) ?></span>
-                    </div>
-                    <div class="project-footer">
-                        <span class="date"><?= e($project['footer']) ?></span>
-                        <button class="open-btn" type="button">Abrir Proyecto</button>
-                    </div>
-                </article>
-            <?php endforeach; ?>
-        </section>
-        <!-- Final de listado de proyectos -->
-
-        <button class="open-btn ghost-btn more-projects-btn" type="button">
-            Ver mas
-            <i class="fa-solid fa-arrow-right"></i>
-        </button>
-
-        <!-- Inicio de calendario academico -->
-        <section class="calendar-summary" aria-label="Calendario academico">
-            <div class="section-heading calendar-heading">
-                <div>
-                    <span class="section-eyebrow">Agenda rapida</span>
-                    <h2 class="section-title">Calendario academico</h2>
+    <?php
+        $teamCount = count($teamMembers);
+        $teamSummary = $teamCount === 1 ? $teamMembers[0]['name'] : $teamCount . ' Integrantes';
+        $teamLabel = $teamCount === 1 ? 'Realizado por' : 'Integrantes';
+    ?>
+    <!-- Inicio de fila superior -->
+    <div class="dashboard-top-grid">
+        <!-- Inicio de informe actual -->
+        <section class="current-report" aria-label="Informe academico actual">
+            <div class="report-main">
+                <div class="report-heading">
+                    <span class="section-eyebrow">Seguimiento academico</span>
+                    <span class="project-status <?= e($currentReport['statusClass']) ?>"><?= e($currentReport['status']) ?></span>
                 </div>
-                <button class="open-btn ghost-btn calendar-action" type="button">
-                    Ver calendario completo
+
+                <h2><?= e($currentReport['title']) ?></h2>
+                <p><?= e($currentReport['description']) ?></p>
+
+                <div class="report-actions">
+                    <button class="upload-btn" type="button">
+                        <i class="fa-solid fa-upload"></i>
+                        Subir nueva version
+                    </button>
+                    <button class="open-btn" type="button">
+                        <i class="fa-solid fa-folder-open"></i>
+                        Ver informe completo
+                    </button>
+                </div>
+            </div>
+
+            <div class="report-side">
+                <div class="report-version">
+                    <span>Documento actual</span>
+                    <strong><?= e($currentReport['document']) ?></strong>
+                    <small><?= e($currentReport['version']) ?> - Entregado el <?= e($currentReport['lastDelivery']) ?></small>
+                </div>
+
+                <div class="report-meta-grid">
+                    <div>
+                        <span>Semestre</span>
+                        <strong><?= e($currentReport['semester']) ?></strong>
+                    </div>
+                    <div>
+                        <span>Tutor</span>
+                        <strong><?= e($currentReport['tutor']) ?></strong>
+                    </div>
+                    <div>
+                        <span>Ultima revision</span>
+                        <strong><?= e($currentReport['lastReview']) ?></strong>
+                    </div>
+                    <div>
+                        <span>Observaciones</span>
+                        <strong><?= e($currentReport['pendingObservations']) ?></strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-extra-row">
+                <div class="report-quick-actions" aria-label="Accesos rapidos del informe">
+                    <button type="button">
+                        <i class="fa-solid fa-download"></i>
+                        Descargar
+                    </button>
+                    <button type="button">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        Historial
+                    </button>
+                    <button type="button">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                        Observaciones
+                    </button>
+                </div>
+
+                <div class="report-team" aria-label="Integrantes del proyecto">
+                    <button class="team-toggle <?= $teamCount === 1 ? 'single-member' : 'multiple-members' ?>" id="teamToggle" type="button" aria-label="Ver integrantes del proyecto" aria-expanded="false">
+                        <?php if ($teamCount === 1): ?>
+                            <span><?= e($teamLabel) ?></span>
+                            <strong><?= e($teamSummary) ?></strong>
+                        <?php else: ?>
+                            <strong><?= e($teamSummary) ?></strong>
+                            <span class="team-stack">
+                                <?php foreach ($teamMembers as $member): ?>
+                                    <span class="team-avatar" title="<?= e($member['name'] . ' - ' . $member['role']) ?>">
+                                        <?= e($member['initial']) ?>
+                                    </span>
+                                <?php endforeach; ?>
+                            </span>
+                        <?php endif; ?>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+
+                    <div class="team-dropdown" id="teamDropdown">
+                        <?php foreach ($teamMembers as $member): ?>
+                            <div class="team-member">
+                                <span class="team-avatar"><?= e($member['initial']) ?></span>
+                                <div>
+                                    <strong><?= e($member['name']) ?></strong>
+                                    <small><?= e($member['role']) ?></small>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+        <!-- Final de informe actual -->
+
+        <!-- Inicio de notificaciones -->
+        <aside class="right-column" aria-label="Informacion complementaria">
+            <section class="notifications-panel">
+                <div class="panel-heading">
+                    <h2><i class="fa-solid fa-bell"></i> Notificaciones</h2>
+                    <span><?= count($notifications) ?> nuevas</span>
+                </div>
+
+                <?php foreach ($notifications as $notification): ?>
+                    <article class="notification-card">
+                        <strong><?= e($notification['title']) ?></strong>
+                        <p><?= e($notification['text']) ?></p>
+                        <span><?= e($notification['time']) ?></span>
+                    </article>
+                <?php endforeach; ?>
+
+                <button class="open-btn ghost-btn" type="button">
+                    Ver mas
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </section>
+        </aside>
+        <!-- Final de notificaciones -->
+    </div>
+    <!-- Final de fila superior -->
+
+    <!-- Inicio de seguimiento rapido -->
+    <div class="dashboard-follow-grid">
+        <section class="observations-preview" aria-label="Observaciones recientes">
+            <div class="section-heading compact-heading">
+                <div>
+                    <span class="section-eyebrow">Revision documental</span>
+                    <h2 class="section-title">Observaciones recientes</h2>
+                </div>
+                <button class="open-btn ghost-btn compact-action" type="button">
+                    Ver todas
                     <i class="fa-solid fa-arrow-right"></i>
                 </button>
             </div>
 
-            <div class="calendar-content">
-                <div class="calendar-month">
-                    <div class="calendar-title">
-                        <strong><?= e($calendar['month']) ?></strong>
-                        <span><?= e($calendar['subtitle']) ?></span>
+            <?php foreach ($observations as $observation): ?>
+                <article class="observation-card">
+                    <div class="observation-top">
+                        <strong><?= e($observation['title']) ?></strong>
+                        <span class="observation-status <?= e($observation['statusClass']) ?>"><?= e($observation['status']) ?></span>
                     </div>
-                    <div class="calendar-grid">
-                        <?php foreach ($calendar['weekDays'] as $dayName): ?>
-                            <span class="calendar-day-name"><?= e($dayName) ?></span>
-                        <?php endforeach; ?>
-
-                        <?php foreach ($calendar['days'] as $day): ?>
-                            <span class="calendar-day <?= e($day['class']) ?>"><?= e($day['number']) ?></span>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
-        </section>
-        <!-- Final de calendario academico -->
-    </div>
-    <!-- Final de columna principal -->
-
-    <!-- Inicio de columna complementaria -->
-    <aside class="right-column" aria-label="Informacion complementaria">
-        <!-- Inicio de notificaciones -->
-        <section class="notifications-panel">
-            <div class="panel-heading">
-                <h2><i class="fa-solid fa-bell"></i> Notificaciones</h2>
-                <span><?= count($notifications) ?> nuevas</span>
-            </div>
-
-            <?php foreach ($notifications as $notification): ?>
-                <article class="notification-card">
-                    <strong><?= e($notification['title']) ?></strong>
-                    <p><?= e($notification['text']) ?></p>
-                    <span><?= e($notification['time']) ?></span>
+                    <p><?= e($observation['text']) ?></p>
+                    <small><?= e($observation['date']) ?></small>
                 </article>
             <?php endforeach; ?>
-
-            <button class="open-btn ghost-btn" type="button">
-                Ver mas
-                <i class="fa-solid fa-arrow-right"></i>
-            </button>
         </section>
-        <!-- Final de notificaciones -->
 
-        <!-- Inicio de recordatorios -->
         <section class="reminders-panel">
             <div class="panel-heading">
                 <h2><i class="fa-solid fa-thumbtack"></i> Recordatorios</h2>
@@ -169,8 +226,42 @@
                 <i class="fa-solid fa-arrow-right"></i>
             </button>
         </section>
-        <!-- Final de recordatorios -->
-    </aside>
-    <!-- Final de columna complementaria -->
+    </div>
+    <!-- Final de seguimiento rapido -->
+
+    <!-- Inicio de historial resumido completo -->
+    <section class="activity-summary" aria-label="Actividad reciente del informe">
+        <div class="section-heading compact-heading">
+            <div>
+                <span class="section-eyebrow">Historial resumido</span>
+                <h2 class="section-title">Actividad reciente</h2>
+            </div>
+        </div>
+
+        <div class="activity-list">
+            <?php foreach ($recentActivity as $activity): ?>
+                <article class="activity-item">
+                    <span class="activity-icon"><i class="fa-solid <?= e($activity['icon']) ?>"></i></span>
+                    <div>
+                        <strong><?= e($activity['title']) ?></strong>
+                        <p><?= e($activity['text']) ?></p>
+                        <small><?= e($activity['time']) ?></small>
+                    </div>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    </section>
+    <!-- Final de historial resumido completo -->
+
+    <!-- Inicio de fechas del proceso -->
+    <section class="process-dates" aria-label="Fechas importantes del proceso">
+        <?php foreach ($processDates as $date): ?>
+            <article>
+                <span><?= e($date['label']) ?></span>
+                <strong><?= e($date['value']) ?></strong>
+            </article>
+        <?php endforeach; ?>
+    </section>
+    <!-- Final de fechas del proceso -->
 </div>
 <!-- Final de contenido del dashboard -->

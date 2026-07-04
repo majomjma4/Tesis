@@ -4,10 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= e($title ?? 'Gestion Documental Academica') ?></title>
+    <script>
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.classList.add('theme-dark');
+        }
+    </script>
     <link rel="stylesheet" href="<?= e(asset('css/styles.css')) ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
-<body>
+<body class="<?= e(($bodyClass ?? '') . ' app-shell') ?>">
     <!-- Inicio de capa para cerrar el menu movil -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <!-- Final de capa para cerrar el menu movil -->
@@ -71,6 +76,10 @@
             </div>
 
             <div class="topbar-right">
+                <button class="topbar-action-btn" type="button">
+                    <i class="fa-solid fa-plus"></i>
+                    Nuevo proyecto
+                </button>
                 <button class="icon-btn theme-toggle" id="themeToggle" type="button" aria-label="Cambiar modo claro u oscuro">
                     <i class="fa-solid fa-moon"></i>
                 </button>
