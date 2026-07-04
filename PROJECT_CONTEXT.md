@@ -6,6 +6,8 @@ Versión del documento: 1.0
 
 ---
 
+Si dentro del proyecto existe un archivo denominado DEVELOPMENT_STATUS.md, la inteligencia artificial deberá leerlo antes de comenzar cualquier tarea para conocer el estado actual del desarrollo y evitar implementar funcionalidades ya existentes o asumir características que aún no han sido desarrolladas.
+
 # 1. Introducción
 
 Este documento tiene como objetivo proporcionar el contexto completo del proyecto para cualquier inteligencia artificial o desarrollador que participe en su desarrollo.
@@ -1035,3 +1037,11 @@ Antes de proponer una nueva funcionalidad o modificar una existente, la IA deber
 Las decisiones deberán mantener coherencia con las reglas de negocio, la arquitectura y la visión definida en PROJECT_CONTEXT.md.
 
 Ninguna modificación deberá contradecir las decisiones previamente documentadas.
+
+## Actualización del CHANGELOG
+
+Cuando se complete una funcionalidad importante o se produzca un cambio significativo en la arquitectura, la inteligencia artificial deberá proponer la actualización correspondiente del archivo `CHANGELOG.md`.
+
+No deberá registrar correcciones menores, cambios estéticos o modificaciones de poca relevancia.
+
+El CHANGELOG debe reflejar únicamente los hitos importantes del desarrollo del proyecto.
