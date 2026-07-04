@@ -117,6 +117,34 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 ---
 
+# [v0.5.0] - 04/07/2026
+
+## Rediseño del Dashboard de Seguimiento Académico
+
+### Dashboard
+
+- Se rediseñó la pantalla principal para enfocarla en el seguimiento del informe académico actual.
+- Se reorganizó la información principal del proyecto, documento vigente, semestre, tutor, última revisión y observaciones pendientes.
+- Se incorporaron accesos rápidos para descargar el informe, consultar historial y revisar observaciones.
+- Se añadió un resumen desplegable de integrantes del proyecto dentro de la tarjeta principal.
+- Se reorganizaron las secciones de notificaciones, observaciones recientes y recordatorios para mejorar la lectura del estado académico.
+
+### Interfaz
+
+- Se simplificaron acciones duplicadas relacionadas con el envío de correcciones y subida de nuevas versiones.
+- Se eliminó la sección de siguiente acción para evitar redundancia con el flujo principal del informe.
+- Se ajustó la distribución visual del dashboard para mejorar el aprovechamiento del espacio disponible.
+- Se mejoró la responsividad de componentes principales, botones, tarjetas y desplegables.
+- Se movió la acción de nuevo proyecto a la barra superior como acceso global.
+
+### Mejoras Técnicas
+
+- Se implementó persistencia del modo claro y oscuro mediante almacenamiento local del navegador.
+- Se añadieron datos simulados de integrantes del proyecto desde el modelo del Dashboard para preparar la futura integración con datos reales.
+- Se ajustó la interacción del desplegable de integrantes para cierre por clic externo y tecla Escape.
+
+---
+
 # Próxima Versión
 
 Las siguientes versiones del CHANGELOG se actualizarán únicamente cuando se complete una funcionalidad importante del sistema.
