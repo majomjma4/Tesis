@@ -157,8 +157,8 @@
         <aside class="right-column" aria-label="Informacion complementaria">
             <section class="notifications-panel">
                 <div class="panel-heading">
-                    <h2><i class="fa-solid fa-bell"></i> Notificaciones</h2>
-                    <span><?= count($notifications) ?> nuevas</span>
+                    <h2><i class="fa-solid fa-bell"></i> Alertas clave</h2>
+                    <span><?= count($notifications) ?> importantes</span>
                 </div>
 
                 <?php foreach ($notifications as $notification): ?>
@@ -170,7 +170,7 @@
                 <?php endforeach; ?>
 
                 <button class="open-btn ghost-btn" type="button">
-                    Ver mas
+                    Ver alertas
                     <i class="fa-solid fa-arrow-right"></i>
                 </button>
             </section>
@@ -184,11 +184,11 @@
         <section class="observations-preview" aria-label="Observaciones recientes">
             <div class="section-heading compact-heading">
                 <div>
-                    <span class="section-eyebrow">Revision documental</span>
-                    <h2 class="section-title">Observaciones recientes</h2>
+                    <span class="section-eyebrow">Pendientes por corregir</span>
+                    <h2 class="section-title">Observaciones accionables</h2>
                 </div>
                 <button class="open-btn ghost-btn compact-action" type="button">
-                    Ver todas
+                    Revisar todas
                     <i class="fa-solid fa-arrow-right"></i>
                 </button>
             </div>
@@ -207,8 +207,8 @@
 
         <section class="reminders-panel">
             <div class="panel-heading">
-                <h2><i class="fa-solid fa-thumbtack"></i> Recordatorios</h2>
-                <span>Personal</span>
+                <h2><i class="fa-solid fa-thumbtack"></i> Proximas acciones</h2>
+                <span>Plan</span>
             </div>
 
             <?php foreach ($reminders as $reminder): ?>
@@ -222,7 +222,7 @@
             <?php endforeach; ?>
 
             <button class="open-btn ghost-btn" type="button">
-                Ver mas
+                Ver plan
                 <i class="fa-solid fa-arrow-right"></i>
             </button>
         </section>
@@ -233,8 +233,8 @@
     <section class="activity-summary" aria-label="Actividad reciente del informe">
         <div class="section-heading compact-heading">
             <div>
-                <span class="section-eyebrow">Historial resumido</span>
-                <h2 class="section-title">Actividad reciente</h2>
+                <span class="section-eyebrow">Trazabilidad</span>
+                <h2 class="section-title">Ultimos cambios del informe</h2>
             </div>
         </div>
 

@@ -18,7 +18,11 @@ function base_url(string $path = ''): string
 
 function asset(string $path): string
 {
-    return base_url('public/assets/' . ltrim($path, '/'));
+    $path = ltrim($path, '/');
+    $url = base_url('public/assets/' . $path);
+    $filePath = defined('ROOT_PATH') ? ROOT_PATH . '/public/assets/' . $path : '';
+
+    return is_file($filePath) ? $url . '?v=' . filemtime($filePath) : $url;
 }
 
 function route(string $page = 'dashboard'): string

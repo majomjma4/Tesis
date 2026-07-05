@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="dashboard-root">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="<?= e(asset('css/styles.css')) ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
-<body class="<?= e(($bodyClass ?? '') . ' app-shell') ?>">
+<body class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell')) ?>">
     <!-- Inicio de capa para cerrar el menu movil -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <!-- Final de capa para cerrar el menu movil -->
@@ -54,9 +54,9 @@
         </div>
 
         <div class="sidebar-footer">
-            <button class="close-btn" type="button">
+            <button class="close-btn js-logout-trigger" type="button">
                 <i class="fa-solid fa-right-from-bracket"></i>
-                Cerrar sesion
+                Cerrar sesión
             </button>
         </div>
     </aside>
@@ -93,9 +93,9 @@
                         U
                     </button>
                     <div class="avatar-dropdown" id="avatarDropdown">
-                        <button type="button">Cambiar correo electronico</button>
-                        <button type="button">Cambiar contrasena</button>
-                        <button type="button" class="danger-option">Cerrar sesion</button>
+                        <button type="button">Cambiar correo electrónico</button>
+                        <button type="button">Cambiar contraseña</button>
+                        <button type="button" class="danger-option js-logout-trigger">Cerrar sesión</button>
                     </div>
                 </div>
             </div>
@@ -105,6 +105,22 @@
         <?= $content ?>
     </main>
     <!-- Final de contenido principal -->
+
+    <!-- Inicio de confirmacion de cierre de sesion -->
+    <div class="logout-modal-overlay" id="logoutModal" hidden>
+        <div class="logout-modal" role="dialog" aria-modal="true" aria-labelledby="logoutModalTitle" aria-describedby="logoutModalText">
+            <span class="logout-modal-icon" aria-hidden="true">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </span>
+            <h2 id="logoutModalTitle">¿Cerrar sesión?</h2>
+            <p id="logoutModalText">¿Estás seguro de que deseas cerrar la sesión actual?</p>
+            <div class="logout-modal-actions">
+                <button class="modal-cancel-btn" id="logoutCancelBtn" type="button">Cancelar</button>
+                <button class="modal-accept-btn" id="logoutAcceptBtn" type="button" data-logout-url="<?= e(route('logout')) ?>">Aceptar</button>
+            </div>
+        </div>
+    </div>
+    <!-- Final de confirmacion de cierre de sesion -->
 
     <!-- Inicio de scripts de pagina -->
     <?php if (!empty($pageScript)): ?>

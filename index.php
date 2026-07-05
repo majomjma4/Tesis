@@ -20,6 +20,7 @@ $page = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 
 match ($page) {
     'login' => (new AuthController())->login(),
+    'logout' => (new AuthController())->logout(),
     'dev-reload' => (new DevController())->reloadStamp(),
     'dashboard', 'home', 'inicio' => (new DashboardController())->index(),
     default => (new DashboardController())->index(),

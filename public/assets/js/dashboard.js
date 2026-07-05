@@ -10,9 +10,10 @@ const teamToggle = document.querySelector("#teamToggle");
 const teamDropdown = document.querySelector("#teamDropdown");
 const themeToggle = document.querySelector("#themeToggle");
 const bell = document.querySelector(".notification-icon");
-const logoutButtons = Array.from(document.querySelectorAll("button")).filter((button) =>
-    button.textContent.toLowerCase().includes("cerrar sesi")
-);
+const logoutModal = document.querySelector("#logoutModal");
+const logoutCancelBtn = document.querySelector("#logoutCancelBtn");
+const logoutAcceptBtn = document.querySelector("#logoutAcceptBtn");
+const logoutButtons = document.querySelectorAll(".js-logout-trigger");
 const themeStorageKey = "theme";
 // Final de seleccion de elementos
 
@@ -78,6 +79,31 @@ function toggleTeamMenu(event) {
 }
 // Final de funciones del avatar
 
+// Inicio de funciones de cierre de sesion
+function openLogoutModal() {
+    closeAvatarMenu();
+    closeSidebar();
+    closeTeamMenu();
+    logoutModal?.removeAttribute("hidden");
+    requestAnimationFrame(() => {
+        logoutModal?.classList.add("show");
+        document.body.classList.add("modal-open");
+        logoutCancelBtn?.focus();
+    });
+}
+
+function closeLogoutModal() {
+    logoutModal?.classList.remove("show");
+    document.body.classList.remove("modal-open");
+
+    setTimeout(() => {
+        if (!logoutModal?.classList.contains("show")) {
+            logoutModal?.setAttribute("hidden", "");
+        }
+    }, 220);
+}
+// Final de funciones de cierre de sesion
+
 // Inicio de animacion inicial de tarjetas
 window.addEventListener("load", () => {
     const cards = document.querySelectorAll(
@@ -128,6 +154,7 @@ document.addEventListener("keydown", (event) => {
         closeSidebar();
         closeAvatarMenu();
         closeTeamMenu();
+        closeLogoutModal();
     }
 });
 // Final de eventos generales
@@ -152,8 +179,21 @@ bell?.addEventListener("click", () => {
 
 // Inicio de cierre de sesion
 logoutButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-        window.location.href = "index.php?page=login";
+    button.addEventListener("click", (event) => {
+        event.preventDefault();
+        openLogoutModal();
     });
+});
+
+logoutCancelBtn?.addEventListener("click", closeLogoutModal);
+
+logoutModal?.addEventListener("click", (event) => {
+    if (event.target === logoutModal) {
+        closeLogoutModal();
+    }
+});
+
+logoutAcceptBtn?.addEventListener("click", () => {
+    window.location.href = logoutAcceptBtn.dataset.logoutUrl || "index.php?page=logout";
 });
 // Final de cierre de sesion
