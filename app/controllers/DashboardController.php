@@ -10,6 +10,7 @@ final class DashboardController
         $dashboard = new DashboardModel();
 
         View::render('dashboard/index', [
+            'currentPage' => 'dashboard',
             'title' => 'Dashboard | Gestion Documental Academica',
             'pageScript' => asset('js/dashboard.js'),
             'summaryCards' => $dashboard->getSummary(),

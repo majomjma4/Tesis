@@ -30,23 +30,23 @@
             </div>
 
             <nav class="menu" aria-label="Navegacion principal">
-                <a href="<?= e(route('dashboard')) ?>" class="menu-item active">
+                <a href="<?= e(route('dashboard')) ?>" class="menu-item <?= ($currentPage ?? '') === 'dashboard' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-house"></i></span>
                     <span>Inicio</span>
                 </a>
-                <a href="#" class="menu-item">
+                <a href="<?= e(route('projects')) ?>" class="menu-item <?= ($currentPage ?? '') === 'projects' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-folder-open"></i></span>
                     <span>Mis proyectos</span>
                 </a>
-                <a href="#" class="menu-item">
+                <a href="#" class="menu-item <?= ($currentPage ?? '') === 'repository' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-book-open"></i></span>
                     <span>Repositorio</span>
                 </a>
-                <a href="#" class="menu-item">
+                <a href="#" class="menu-item <?= ($currentPage ?? '') === 'calendar' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-calendar-days"></i></span>
                     <span>Calendario</span>
                 </a>
-                <a href="#" class="menu-item">
+                <a href="#" class="menu-item <?= ($currentPage ?? '') === 'notifications' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-bell"></i></span>
                     <span>Notificaciones</span>
                 </a>
@@ -123,6 +123,7 @@
     <!-- Final de confirmacion de cierre de sesion -->
 
     <!-- Inicio de scripts de pagina -->
+    <script src="<?= e(asset('js/main.js')) ?>"></script>
     <?php if (!empty($pageScript)): ?>
         <script src="<?= e($pageScript) ?>"></script>
     <?php endif; ?>
