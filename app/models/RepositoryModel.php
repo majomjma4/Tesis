@@ -78,6 +78,24 @@ final class RepositoryModel
                 'type' => 'Proyecto inicial',
                 'keywords' => ['Perfil', 'Seguimiento', 'Titulación']
             ],
+            [
+                'title' => 'Sistema para Perfil de Tesis y Seguimiento',
+                'description' => 'Herramienta para controlar perfiles de tesis, revisiones, observaciones y avances del proceso de titulación.',
+                'career' => 'Desarrollo de Software',
+                'career_slug' => 'software',
+                'authors' => 'Andrea Pérez',
+                'tutor' => 'Abg. Alex Galarza',
+                'teacher_slug' => 'alex-galarza',
+                'semester' => '1',
+                'category' => 'Perfil de Tesis',
+                'category_slug' => 'perfil-de-tesis',
+                'year' => '2024',
+                'pao' => 'pao-ii-2024',
+                'pao_label' => 'PAO II 2024',
+                'type' => 'Proyecto inicial',
+                'keywords' => ['Perfil', 'Seguimiento', 'Titulación']
+            ],
+
         ];
     }
 
@@ -127,6 +145,17 @@ final class RepositoryModel
                 'category_label' => 'Vinculación',
                 'keywords' => ['Defensa', 'Presentación', 'Exposición']
             ],
+            [
+                'title' => 'Guía para defensa de proyecto',
+                'description' => 'Apoyo para preparar la presentación oral, responder observaciones y organizar la defensa final.',
+                'type' => 'Guía académica',
+                'year' => '2024',
+                'pao_label' => 'PAO I 2024',
+                'category_slug' => 'vinculacion',
+                'category_label' => 'Vinculación',
+                'keywords' => ['Defensa', 'Presentación', 'Exposición']
+            ],
+           
         ];
     }
 

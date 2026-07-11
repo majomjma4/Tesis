@@ -173,6 +173,36 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 ---
 
+# [v0.6.1] - 11/07/2026
+
+## Mejoras del Repositorio Institucional
+
+### Repositorio
+
+- Se renombró la vista principal del módulo a `app/views/repository/repositorio.php` y se actualizó su controlador.
+- Se convirtió la sección de documentos de apoyo en un carrusel con cuatro tarjetas visibles.
+- Se implementó el desplazamiento de una tarjeta por cada interacción con las flechas.
+- Se evitó la navegación circular y se configuró la aparición de cada flecha únicamente cuando existe contenido disponible en su dirección.
+- Se reservó la posición número doce para una tarjeta informativa cuando existen más de once documentos de apoyo.
+- Se integró el carrusel con el buscador y el filtro de categoría.
+
+### Interfaz
+
+- Se unificó el diseño de las tarjetas del repositorio con el Dashboard para los modos claro y oscuro.
+- Se incorporaron bordes de color, sombras y estados interactivos para las tarjetas.
+- Se agregó un skeleton loader durante la precarga del repositorio.
+- Se ajustó la distribución del catálogo a cuatro columnas en escritorio, dos en tablet y una en móvil.
+- Se mejoró el comportamiento responsive de insignias, contadores, filtros y controles del carrusel.
+- Se limitó el crecimiento de la interfaz en pantallas superiores a 1900 px mediante márgenes exteriores, conservando las proporciones internas.
+
+### Mejoras Técnicas
+
+- Se corrigió la activación independiente de los filtros desplegables de documentos de apoyo y proyectos.
+- Se conservaron las palabras clave de forma no visible para mantener su disponibilidad en las búsquedas.
+- Se preparó el carrusel para manejar hasta once documentos visibles y una tarjeta informativa adicional.
+
+---
+
 Las siguientes versiones del CHANGELOG se actualizarán únicamente cuando se complete una funcionalidad importante del sistema.
 
 Ejemplos:
@@ -189,5 +219,4 @@ Ejemplos:
 - Configuración del sistema.
 
 Cada nueva versión deberá registrar únicamente los cambios relevantes realizados desde la versión anterior.
-
 

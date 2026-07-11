@@ -4,7 +4,7 @@
 
 Versión del documento: 1.0
 
-Última actualización: 10/07/2026
+Última actualización: 11/07/2026
 
 ---
 
@@ -246,6 +246,15 @@ Implementado:
 - Buscadores independientes para catalogo y material complementario.
 - Resaltado visual de coincidencias en las busquedas.
 - Estructura visual separada para encabezados, filtros y tarjetas.
+- Vista principal del módulo ubicada en `app/views/repository/repositorio.php`.
+- Carrusel para documentos de apoyo con cuatro tarjetas visibles y desplazamiento de una tarjeta por interacción.
+- Navegación lateral limitada, sin recorrido circular y con flechas visibles únicamente cuando existe contenido en la dirección correspondiente.
+- Límite visual de doce posiciones en el carrusel; cuando existen más de once documentos, la última posición se reserva para una tarjeta informativa de acceso a más contenido.
+- Recalculo automático del carrusel al utilizar el buscador o el filtro de categoría.
+- Skeleton loader para la precarga del repositorio.
+- Diseño claro y oscuro consistente con las tarjetas del Dashboard.
+- Distribución responsive del catálogo en cuatro columnas para escritorio, dos para tablet y una para móvil.
+- Contenedor general centrado en pantallas superiores a 1900 px sin alterar las proporciones internas del contenido.
 
 Pendiente:
 
@@ -396,7 +405,6 @@ Este documento deberá actualizarse cuando:
 - Cambie el estado de desarrollo de algún módulo.
 
 Su objetivo es reflejar el estado real del proyecto en todo momento.
-
 
 
 

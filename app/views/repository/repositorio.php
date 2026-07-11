@@ -1,3 +1,29 @@
+<!-- Inicio de precarga del repositorio -->
+<section class="skeleton-loader repository-skeleton" id="repositorySkeleton" aria-label="Cargando repositorio">
+    <div class="skeleton-card repository-skeleton-hero">
+        <span class="skeleton-line medium"></span>
+        <span class="skeleton-line title"></span>
+        <span class="skeleton-line"></span>
+    </div>
+    <div class="repository-skeleton-toolbar">
+        <span class="skeleton-line"></span>
+        <span class="skeleton-line"></span>
+    </div>
+    <div class="repository-skeleton-grid">
+        <?php for ($skeletonIndex = 0; $skeletonIndex < 4; $skeletonIndex++): ?>
+            <div class="skeleton-card repository-skeleton-card">
+                <span class="skeleton-pill"></span>
+                <span class="skeleton-line title"></span>
+                <span class="skeleton-line"></span>
+                <span class="skeleton-line medium"></span>
+                <span class="skeleton-line short"></span>
+            </div>
+        <?php endfor; ?>
+    </div>
+</section>
+<!-- Final de precarga del repositorio -->
+
+<div id="repositoryContent" style="display: none;">
 <!-- Inicio de cabecera del repositorio -->
 <section class="repository-hero">
     <div>
@@ -53,9 +79,21 @@
 
         <div class="repository-section-divider" aria-hidden="true"></div>
 
+        <div class="repository-carousel-topbar" aria-label="Opciones de documentos de apoyo">
+            <button class="repository-carousel-more" id="repositorySupportMore" type="button">
+                Ver más
+                <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+
         <div class="repository-section-divider" aria-hidden="true"></div>
 
-        <div class="repository-grid repository-support-grid" id="repositorySupportGrid">
+        <div class="repository-carousel-stage">
+            <button class="repository-carousel-btn repository-carousel-prev" id="repositorySupportPrev" type="button" aria-label="Ver documentos anteriores">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+
+            <div class="repository-grid repository-support-grid" id="repositorySupportGrid">
             <?php foreach ($supportDocuments as $document): ?>
                 <article class="repository-card repository-support-card" data-support-text="<?= e($document['title'] . ' ' . $document['description'] . ' ' . $document['type'] . ' ' . $document['year'] . ' ' . $document['pao_label'] . ' ' . $document['category_label'] . ' ' . implode(' ', $document['keywords'])) ?>" data-support-category="<?= e($document['category_slug']) ?>">
                     <div class="repository-card-top">
@@ -71,19 +109,32 @@
                         <span><i class="fa-solid fa-folder-open"></i> Documento de apoyo</span>
                     </div>
 
-                    <div class="repository-keywords">
-                        <?php foreach ($document['keywords'] as $keyword): ?>
-                            <span><?= e($keyword) ?></span>
-                        <?php endforeach; ?>
-                    </div>
+                    <span hidden><?= e(implode(' ', $document['keywords'])) ?></span>
 
-                    <button class="open-btn repository-open-btn" type="button">
-                        Ver documento
-                        <i class="fa-solid fa-arrow-right"></i>
-                    </button>
+                    <div class="repository-card-actions">
+                        <button class="open-btn repository-open-btn" type="button">
+                            Ver documento
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
                 </article>
             <?php endforeach; ?>
+
+                <article class="repository-card repository-support-card repository-more-card" id="repositorySupportMoreCard" hidden>
+                    <div class="repository-more-card-icon" aria-hidden="true">
+                        <i class="fa-solid fa-folder-plus"></i>
+                    </div>
+                    <span class="repository-type">Más documentos disponibles</span>
+                    <h3>¿Quieres ver más?</h3>
+                    <p>Este carrusel muestra un máximo de documentos. Accede a la vista completa para consultar todo el material de apoyo disponible.</p>
+                </article>
+            </div>
+
+            <button class="repository-carousel-btn repository-carousel-next" id="repositorySupportNext" type="button" aria-label="Ver documentos siguientes">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
         </div>
+
     </section>
     <!-- Final de documentos de apoyo -->
 
@@ -193,16 +244,14 @@
                         <span><i class="fa-solid fa-chalkboard-user"></i> <?= e($project['tutor']) ?></span>
                     </div>
 
-                    <div class="repository-keywords">
-                        <?php foreach ($project['keywords'] as $keyword): ?>
-                            <span><?= e($keyword) ?></span>
-                        <?php endforeach; ?>
-                    </div>
+                    <span hidden><?= e(implode(' ', $project['keywords'])) ?></span>
 
-                    <button class="open-btn repository-open-btn" type="button">
-                        Ver documento
-                        <i class="fa-solid fa-arrow-right"></i>
-                    </button>
+                    <div class="repository-card-actions">
+                        <button class="open-btn repository-open-btn" type="button">
+                            Ver documento
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
                 </article>
             <?php endforeach; ?>
         </div>
@@ -214,4 +263,5 @@
         </div>
     </section>
     <!-- Final de catálogo institucional -->
+</div>
 </div>

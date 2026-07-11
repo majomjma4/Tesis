@@ -11,7 +11,7 @@ final class RepositoryController
     {
         $repositoryModel = new RepositoryModel();
 
-        View::render('repository/index', [
+        View::render('repository/repositorio', [
             'currentPage' => 'repository',
             'title' => 'Repositorio Institucional | Gestión Documental Académica',
             'pageScript' => asset('js/repository.js'),
