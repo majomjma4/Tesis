@@ -185,6 +185,11 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Se evitó la navegación circular y se configuró la aparición de cada flecha únicamente cuando existe contenido disponible en su dirección.
 - Se reservó la posición número doce para una tarjeta informativa cuando existen más de once documentos de apoyo.
 - Se integró el carrusel con el buscador y el filtro de categoría.
+- Se completó la primera fase visual de evolución del catálogo institucional.
+- Se incorporó un contador descriptivo de proyectos y una acción para limpiar filtros.
+- Se prepararon las tarjetas para la futura navegación hacia el detalle del proyecto.
+- Se completó la segunda fase con favoritos funcionales y aislados mediante persistencia temporal por sesión.
+- Se completó la tercera fase con navegación real desde las tarjetas hacia una pantalla de detalle dedicada.
 
 ### Interfaz
 
@@ -194,12 +199,40 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Se ajustó la distribución del catálogo a cuatro columnas en escritorio, dos en tablet y una en móvil.
 - Se mejoró el comportamiento responsive de insignias, contadores, filtros y controles del carrusel.
 - Se limitó el crecimiento de la interfaz en pantallas superiores a 1900 px mediante márgenes exteriores, conservando las proporciones internas.
+- Se añadieron colores institucionales centralizados para Tesis, Perfil de tesis, Prácticas preprofesionales, Proyecto PIS y Vinculación.
+- Se agregaron tecnologías, indicador de etiquetas adicionales, número de descargas y la acción visual `Explorar proyecto`.
+- Se incorporaron corazones de favorito con estado visual y mensajes discretos de confirmación.
+- Se agregó un estado vacío específico para usuarios sin favoritos y una acción para volver al catálogo completo.
+- Se incorporó una vista 30/70 con encabezado, breadcrumbs, información académica, autores, tutor, resumen, tecnologías y palabras clave.
+- Se completó la cuarta fase sustituyendo el explorador simulado por lectura real de archivos ZIP privados.
+- Se agregó navegación por carpetas, breadcrumbs internos, tamaños legibles, iconos y ordenamiento de carpetas antes que archivos.
+- Se incorporaron estados para carpetas y ZIP vacíos, archivos inexistentes, ZIP dañados y rutas inválidas.
+- Se completó la quinta fase con descargas completas e individuales desde la pantalla de detalle.
+- Se agregaron acciones de descarga por archivo dentro del explorador.
+- La pantalla de detalle mantiene modo oscuro, responsive y el layout principal de la plataforma.
 
 ### Mejoras Técnicas
 
 - Se corrigió la activación independiente de los filtros desplegables de documentos de apoyo y proyectos.
 - Se conservaron las palabras clave de forma no visible para mantener su disponibilidad en las búsquedas.
 - Se preparó el carrusel para manejar hasta once documentos visibles y una tarjeta informativa adicional.
+- Se amplió la búsqueda simulada para incluir autores, tutor, tipo, tecnologías, palabras clave, PAO y año.
+- Se corrigieron los identificadores internos del filtro de docentes para que coincidan con los proyectos publicados.
+- Se creó `FavoriteModel` como almacenamiento temporal por sesión, desacoplado de la vista y reemplazable por MySQL.
+- Se agregó una acción POST con protección CSRF, validación de proyectos publicados y respuestas JSON.
+- Se verificó el aislamiento entre dos sesiones, la persistencia tras recarga y los estados HTTP 403, 404 y 405.
+- La vinculación definitiva con usuarios autenticados y base de datos permanece pendiente.
+- Se agregó la ruta validada `repository-detail` con respuesta 404 para proyectos inexistentes.
+- Se reutilizó la misma acción de favoritos en catálogo y detalle, evitando lógica duplicada.
+- Se creó `ArchiveService` para aislar la lectura ZIP, normalizar rutas internas e impedir recorridos fuera del archivo.
+- Se añadió una ruta JSON validada para consultar directorios sin exponer rutas físicas del servidor.
+- Se incorporó un generador de fixtures ZIP privados para pruebas reproducibles.
+- Debido a que `ZipArchive` está deshabilitado en el PHP actual de XAMPP, el servicio utiliza `PharData` como lector alternativo y conserva compatibilidad con `ZipArchive` para el entorno final.
+- Se implementó streaming seguro de archivos internos sin extracción permanente ni exposición de rutas físicas.
+- Se añadieron encabezados de descarga con nombre original UTF-8, MIME controlado y `nosniff`.
+- Se creó `DownloadModel` para simular incrementos por sesión hasta disponer de persistencia global en MySQL.
+- El contador aumenta solo después de validar el ZIP completo y no cambia por descargas individuales, navegación o fallos.
+- Se probaron nombres con espacios, tildes, paréntesis y guiones, además de rutas inválidas y archivos inexistentes.
 
 ---
 
@@ -219,4 +252,3 @@ Ejemplos:
 - Configuración del sistema.
 
 Cada nueva versión deberá registrar únicamente los cambios relevantes realizados desde la versión anterior.
-

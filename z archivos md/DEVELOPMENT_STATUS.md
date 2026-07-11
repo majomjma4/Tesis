@@ -255,9 +255,32 @@ Implementado:
 - Diseño claro y oscuro consistente con las tarjetas del Dashboard.
 - Distribución responsive del catálogo en cuatro columnas para escritorio, dos para tablet y una para móvil.
 - Contenedor general centrado en pantallas superiores a 1900 px sin alterar las proporciones internas del contenido.
+- Fase 1 de evolución del catálogo completada con contador descriptivo, colores por tipo, tecnologías, descargas y acción visual para explorar proyectos.
+- Favoritos funcionales con persistencia temporal por sesión, aislamiento entre sesiones, filtro, contador y mensajes visuales.
+- Acción de favoritos mediante POST con validación de proyecto publicado, token CSRF y respuestas JSON consistentes.
+- Modelo temporal `FavoriteModel` separado de la vista y preparado para sustituirse por persistencia MySQL.
+- Fase 3 completada con ruta y pantalla de detalle para proyectos publicados.
+- Detalle académico responsive con encabezado, breadcrumbs, autores separados, tutor, resumen completo, tecnologías y palabras clave.
+- Distribución adaptable 30/70 con panel informativo sticky únicamente en pantallas con altura suficiente.
+- Fase 4 completada con exploración real y de solo lectura de archivos ZIP privados.
+- Servicio `ArchiveService` para normalizar rutas, rechazar recorridos `../`, listar carpetas y archivos y calcular metadatos.
+- Navegación asíncrona por carpetas, breadcrumbs internos, carpetas primero, tamaños legibles e iconos por formato.
+- Estados funcionales para carpeta vacía, ZIP vacío, ZIP inexistente, ZIP ilegible y ruta inválida.
+- Fixtures ZIP privados y regenerables para desarrollo, almacenados fuera de `public` e ignorados por Git.
+- Respaldo de lectura mediante `PharData` porque la extensión `ZipArchive` no está habilitada actualmente en XAMPP.
+- Fase 5 completada con descarga validada del ZIP completo y descarga individual de archivos internos.
+- Streaming de archivos internos directamente desde el ZIP, sin extracción permanente ni rutas públicas.
+- Conservación de nombres UTF-8 mediante `Content-Disposition` y tipos MIME seguros.
+- Contador general incrementado únicamente para descargas completas válidas; las descargas individuales no lo modifican.
+- Modelo temporal `DownloadModel` respaldado por sesión y preparado para migrarse a un contador global en MySQL.
+- Favoritos compartidos entre catálogo y detalle mediante la misma acción protegida.
+- Búsqueda ampliada a título, descripción, autores, tutor, tipo, tecnologías, palabras clave, PAO y año.
+- Acción para limpiar conjuntamente la búsqueda, los filtros y el modo de favoritos.
 
 Pendiente:
 
+- Migración de favoritos desde sesión hacia usuarios autenticados y base de datos MySQL.
+- Visualizadores de archivos.
 - Descarga de documentos.
 - Vinculacion con archivos reales.
 - Persistencia en base de datos.
@@ -382,15 +405,16 @@ Las mejoras importantes relacionadas con arquitectura o estructura deberán eval
 
 # 20. Próximo Objetivo
 
-El siguiente paso recomendado para el desarrollo es implementar la infraestructura común del sistema:
+El siguiente paso inmediato acordado es continuar la evolución gradual del Repositorio Institucional con la Fase 6:
 
-- Conexión a la base de datos.
-- Gestión de usuarios.
-- Inicio de sesión real.
-- Manejo de sesiones.
-- Control de roles.
+- Visualización integrada de PDF.
+- Vista previa segura de imágenes.
+- Lectura de archivos de texto.
+- Visualización escapada de código fuente.
+- Estado informativo para formatos no compatibles.
+- Límites configurables para archivos grandes.
 
-Una vez completada esta base, podrá iniciarse el desarrollo de los módulos de gestión de proyectos, gestión documental y revisión académica.
+Después permanecerán pendientes la vista previa DOCX y el pulido final del repositorio. La conexión a MySQL, autenticación real, sesiones de usuario y control de roles continúan siendo objetivos prioritarios de infraestructura para reemplazar la persistencia temporal utilizada en favoritos y descargas.
 
 ---
 
@@ -405,6 +429,3 @@ Este documento deberá actualizarse cuando:
 - Cambie el estado de desarrollo de algún módulo.
 
 Su objetivo es reflejar el estado real del proyecto en todo momento.
-
-
-

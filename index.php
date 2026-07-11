@@ -13,6 +13,9 @@ require APP_PATH . '/models/DashboardModel.php';
 require APP_PATH . '/models/AuthModel.php';
 require APP_PATH . '/models/ProjectModel.php';
 require APP_PATH . '/models/RepositoryModel.php';
+require APP_PATH . '/models/FavoriteModel.php';
+require APP_PATH . '/models/DownloadModel.php';
+require APP_PATH . '/services/ArchiveService.php';
 require APP_PATH . '/controllers/DashboardController.php';
 require APP_PATH . '/controllers/AuthController.php';
 require APP_PATH . '/controllers/DevController.php';
@@ -29,5 +32,10 @@ match ($page) {
     'dashboard', 'home', 'inicio' => (new DashboardController())->index(),
     'projects', 'proyectos', 'mis-proyectos' => (new ProjectsController())->index(),
     'repository', 'repositorio' => (new RepositoryController())->index(),
+    'repository-detail', 'detalle-repositorio' => (new RepositoryController())->detail(),
+    'repository-files' => (new RepositoryController())->files(),
+    'repository-download' => (new RepositoryController())->downloadProject(),
+    'repository-file-download' => (new RepositoryController())->downloadFile(),
+    'repository-favorite' => (new RepositoryController())->toggleFavorite(),
     default => (new DashboardController())->index(),
 };

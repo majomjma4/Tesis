@@ -10,19 +10,29 @@ const repositoryCategory = document.querySelector("#repositoryCategory");
 const repositoryType = document.querySelector("#repositoryType");
 const repositoryPao = document.querySelector("#repositoryPao");
 const repositoryCards = [...document.querySelectorAll(".repository-results .repository-card")];
+const repositoryResults = document.querySelector(".repository-results");
 const repositorySupportCards = [...document.querySelectorAll(".repository-support .repository-card:not(.repository-more-card)")];
 const repositorySupportMoreCard = document.querySelector("#repositorySupportMoreCard");
 const repositoryCount = document.querySelector("#repositoryCount");
+const repositoryFavoritesCount = document.querySelector("#repositoryFavoritesCount");
+const repositoryFavoritesFilter = document.querySelector("#repositoryFavoritesFilter");
+const repositoryClearFilters = document.querySelector("#repositoryClearFilters");
+const repositoryToast = document.querySelector("#repositoryToast");
 const repositorySupportCount = document.querySelector("#repositorySupportCount");
 const repositorySupportPrev = document.querySelector("#repositorySupportPrev");
 const repositorySupportNext = document.querySelector("#repositorySupportNext");
 const repositorySupportMore = document.querySelector("#repositorySupportMore");
 const repositoryEmpty = document.querySelector("#repositoryEmpty");
+const repositoryEmptyTitle = document.querySelector("#repositoryEmptyTitle");
+const repositoryEmptyText = document.querySelector("#repositoryEmptyText");
+const repositoryShowAllProjects = document.querySelector("#repositoryShowAllProjects");
 const repositoryDropdowns = [...document.querySelectorAll("[data-dropdown]")];
 const repositorySupportPageSize = 4;
 const repositorySupportLimit = 12;
 const repositorySupportDocumentLimit = repositorySupportLimit - 1;
 let repositorySupportCurrentPage = 0;
+let repositoryFavoritesOnly = false;
+let repositoryToastTimer = null;
 
 // Inicio de precarga estilo skeleton
 setTimeout(() => {
@@ -50,13 +60,14 @@ function filterRepositoryProjects() {
     let visibleProjects = 0;
 
     repositoryCards.forEach((card) => {
-        const matchesSearch = normalizeRepositoryText(card.textContent ?? "").includes(searchValue);
+        const matchesSearch = normalizeRepositoryText(card.dataset.projectSearch ?? card.textContent ?? "").includes(searchValue);
         const matchesSemester = semesterValue === "all" || card.dataset.semester === semesterValue;
         const matchesTeacher = teacherValue === "all" || card.dataset.teacher === teacherValue;
         const matchesCategory = categoryValue === "all" || card.dataset.category === categoryValue;
         const matchesType = typeValue === "all" || card.dataset.type === typeValue;
         const matchesPao = paoValue === "all" || card.dataset.pao === paoValue;
-        const isVisible = matchesSearch && matchesSemester && matchesTeacher && matchesCategory && matchesType && matchesPao;
+        const matchesFavorite = !repositoryFavoritesOnly || card.dataset.favorite === "true";
+        const isVisible = matchesSearch && matchesSemester && matchesTeacher && matchesCategory && matchesType && matchesPao && matchesFavorite;
 
         card.hidden = !isVisible;
         if (isVisible) {
@@ -65,12 +76,144 @@ function filterRepositoryProjects() {
     });
 
     if (repositoryCount) {
-        repositoryCount.textContent = `${visibleProjects} ${visibleProjects === 1 ? "resultado" : "resultados"}`;
+        repositoryCount.textContent = `Mostrando ${visibleProjects} de ${repositoryCards.length} proyectos`;
     }
     if (repositoryEmpty) {
         repositoryEmpty.hidden = visibleProjects !== 0;
     }
+    if (repositoryEmptyTitle && repositoryEmptyText && repositoryShowAllProjects) {
+        const favoritesAreEmpty = visibleProjects === 0 && repositoryFavoritesOnly;
+        repositoryEmptyTitle.textContent = favoritesAreEmpty ? "Aún no has guardado proyectos favoritos" : "No se encontraron proyectos";
+        repositoryEmptyText.textContent = favoritesAreEmpty
+            ? "Guarda proyectos con el corazón para encontrarlos rápidamente aquí."
+            : "Prueba con otros términos o modifica los filtros seleccionados.";
+        repositoryShowAllProjects.hidden = !favoritesAreEmpty;
+    }
 }
+
+function updateRepositoryFavoritesCount() {
+    const favoritesCount = repositoryCards.filter((card) => card.dataset.favorite === "true").length;
+    if (repositoryFavoritesCount) {
+        repositoryFavoritesCount.textContent = String(favoritesCount);
+    }
+}
+
+function showRepositoryToast(message) {
+    if (!repositoryToast) return;
+
+    window.clearTimeout(repositoryToastTimer);
+    repositoryToast.textContent = message;
+    repositoryToast.hidden = false;
+    requestAnimationFrame(() => repositoryToast.classList.add("show"));
+
+    repositoryToastTimer = window.setTimeout(() => {
+        repositoryToast.classList.remove("show");
+        window.setTimeout(() => {
+            repositoryToast.hidden = true;
+        }, 220);
+    }, 2200);
+}
+
+function setRepositoryFavoritesFilter(active) {
+    repositoryFavoritesOnly = active;
+    if (!repositoryFavoritesFilter) return;
+
+    repositoryFavoritesFilter.classList.toggle("is-active", repositoryFavoritesOnly);
+    repositoryFavoritesFilter.setAttribute("aria-pressed", String(repositoryFavoritesOnly));
+    const icon = repositoryFavoritesFilter.querySelector("i");
+    const label = repositoryFavoritesFilter.querySelector(":scope > span");
+    icon?.classList.toggle("fa-regular", !repositoryFavoritesOnly);
+    icon?.classList.toggle("fa-solid", repositoryFavoritesOnly);
+    if (label) label.textContent = repositoryFavoritesOnly ? "Mostrando favoritos" : "Favoritos";
+}
+
+repositoryFavoritesFilter?.addEventListener("click", () => {
+    setRepositoryFavoritesFilter(!repositoryFavoritesOnly);
+    filterRepositoryProjects();
+});
+
+repositoryCards.forEach((card) => {
+    const favoriteButton = card.querySelector(".repository-favorite-btn");
+
+    favoriteButton?.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        const actionUrl = repositoryResults?.dataset.favoriteUrl ?? "";
+        const csrfToken = repositoryResults?.dataset.favoriteCsrf ?? "";
+        const projectId = card.dataset.projectId ?? "";
+
+        favoriteButton.disabled = true;
+        favoriteButton.setAttribute("aria-busy", "true");
+
+        try {
+            const response = await fetch(actionUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+                body: new URLSearchParams({ project_id: projectId, csrf_token: csrfToken }),
+            });
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || "No fue posible completar la acción.");
+            }
+
+            const isFavorite = Boolean(result.data.favorite);
+            const icon = favoriteButton.querySelector("i");
+            const projectTitle = card.querySelector("h3")?.textContent?.trim() ?? "proyecto";
+            card.dataset.favorite = String(isFavorite);
+            favoriteButton.classList.toggle("is-favorite", isFavorite);
+            favoriteButton.setAttribute("aria-pressed", String(isFavorite));
+            favoriteButton.setAttribute("title", isFavorite ? "Eliminar de favoritos" : "Guardar en favoritos");
+            favoriteButton.setAttribute("aria-label", `${isFavorite ? "Eliminar de favoritos" : "Guardar en favoritos"}: ${projectTitle}`);
+            icon?.classList.toggle("fa-solid", isFavorite);
+            icon?.classList.toggle("fa-regular", !isFavorite);
+
+            if (repositoryFavoritesCount) {
+                repositoryFavoritesCount.textContent = String(result.data.favoritesCount);
+            } else {
+                updateRepositoryFavoritesCount();
+            }
+            filterRepositoryProjects();
+            showRepositoryToast(result.message);
+        } catch (error) {
+            showRepositoryToast(error instanceof Error ? error.message : "No fue posible completar la acción.");
+        } finally {
+            favoriteButton.disabled = false;
+            favoriteButton.removeAttribute("aria-busy");
+        }
+    });
+
+    const openProjectDetail = (event) => {
+        if (event.type === "keydown" && event.key !== "Enter") return;
+        if (event.target.closest("button")) return;
+        const projectUrl = card.dataset.projectUrl;
+        if (!projectUrl) return;
+        event.preventDefault();
+        window.location.href = projectUrl;
+    };
+
+    card.addEventListener("click", openProjectDetail);
+    card.addEventListener("keydown", openProjectDetail);
+});
+
+repositoryClearFilters?.addEventListener("click", () => {
+    if (repositorySearch) repositorySearch.value = "";
+    setRepositoryFavoritesFilter(false);
+
+    [repositorySemester, repositoryTeacher, repositoryCategory, repositoryType, repositoryPao].forEach((input) => {
+        const dropdown = input?.closest("[data-dropdown]");
+        const allOption = dropdown?.querySelector('[data-dropdown-option][data-value="all"]');
+        if (dropdown && allOption) {
+            syncRepositoryDropdown(dropdown, "all", allOption.textContent?.trim() ?? "Todos");
+        }
+    });
+
+    filterRepositoryProjects();
+});
+
+repositoryShowAllProjects?.addEventListener("click", () => {
+    setRepositoryFavoritesFilter(false);
+    filterRepositoryProjects();
+});
 
 function filterRepositorySupportDocuments() {
     const searchValue = normalizeRepositoryText(repositorySupportSearch?.value ?? "");
