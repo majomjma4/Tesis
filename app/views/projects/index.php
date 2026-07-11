@@ -24,7 +24,7 @@
     <div class="dashboard-top-grid">
         
         <!-- Columna Izquierda: Información de Proyecto e Historial Documental -->
-        <div class="left-column">
+        <div class="left-column projects-main-column">
             
             <!-- Ficha del Proyecto Principal -->
             <section class="project-card active-project-card" aria-label="Información detallada del proyecto">
@@ -157,7 +157,7 @@
         </div>
         
         <!-- Columna Derecha: Nueva Entrega y Métricas -->
-        <aside class="right-column">
+        <aside class="right-column projects-side-column">
             
             <!-- Formulario de Nueva Entrega -->
             <section class="reminders-panel upload-version-panel" aria-label="Nueva entrega de documento">

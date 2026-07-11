@@ -145,7 +145,33 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 ---
 
-# Próxima Versión
+# [v0.6.0] - 10/07/2026
+
+## Modulo de Repositorio Institucional
+
+### Repositorio
+
+- Se desarrollo la primera version funcional del repositorio institucional para la carrera de Desarrollo de Software.
+- Se incorporo un bloque de material complementario con guias y documentos de apoyo.
+- Se agrego un catalogo institucional de proyectos finalizados.
+- Se implementaron filtros por semestre, docente, categoria, tipo y PAO.
+- Se anadio un buscador independiente para material complementario y otro para catalogo.
+- Se habilito resaltado visual de coincidencias en la busqueda.
+- Se ajusto la estructura visual para separar claramente filtros, encabezados y tarjetas.
+
+### Interfaz
+
+- Se mejoro la responsividad del repositorio para pantallas pequenas.
+- Se reorganizo el comportamiento de las tarjetas para escritorio, tablet y movil.
+- Se optimizo el diseno de los selectores personalizados y sus menus desplegables.
+
+### Mejoras Tecnicas
+
+- Se incorporaron datos simulados para proyectos y documentos de apoyo desde el modelo del repositorio.
+- Se separo la logica de filtrado del catalogo y del material complementario.
+- Se reforzo la interaccion de los filtros desplegables con cierre por clic externo y tecla Escape.
+
+---
 
 Las siguientes versiones del CHANGELOG se actualizarán únicamente cuando se complete una funcionalidad importante del sistema.
 
@@ -163,3 +189,5 @@ Ejemplos:
 - Configuración del sistema.
 
 Cada nueva versión deberá registrar únicamente los cambios relevantes realizados desde la versión anterior.
+
+

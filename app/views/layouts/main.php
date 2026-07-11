@@ -38,7 +38,7 @@
                     <span class="menu-icon"><i class="fa-solid fa-folder-open"></i></span>
                     <span>Mis proyectos</span>
                 </a>
-                <a href="#" class="menu-item <?= ($currentPage ?? '') === 'repository' ? 'active' : '' ?>">
+                <a href="<?= e(route('repository')) ?>" class="menu-item <?= ($currentPage ?? '') === 'repository' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-book-open"></i></span>
                     <span>Repositorio</span>
                 </a>

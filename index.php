@@ -12,10 +12,12 @@ require APP_PATH . '/Core/View.php';
 require APP_PATH . '/models/DashboardModel.php';
 require APP_PATH . '/models/AuthModel.php';
 require APP_PATH . '/models/ProjectModel.php';
+require APP_PATH . '/models/RepositoryModel.php';
 require APP_PATH . '/controllers/DashboardController.php';
 require APP_PATH . '/controllers/AuthController.php';
 require APP_PATH . '/controllers/DevController.php';
 require APP_PATH . '/controllers/ProjectsController.php';
+require APP_PATH . '/controllers/RepositoryController.php';
 
 // Front controller: centraliza las rutas principales de la aplicacion.
 $page = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
@@ -26,5 +28,6 @@ match ($page) {
     'dev-reload' => (new DevController())->reloadStamp(),
     'dashboard', 'home', 'inicio' => (new DashboardController())->index(),
     'projects', 'proyectos', 'mis-proyectos' => (new ProjectsController())->index(),
+    'repository', 'repositorio' => (new RepositoryController())->index(),
     default => (new DashboardController())->index(),
 };

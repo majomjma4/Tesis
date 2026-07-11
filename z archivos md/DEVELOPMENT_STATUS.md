@@ -4,7 +4,7 @@
 
 Versión del documento: 1.0
 
-Última actualización: 03/07/2026
+Última actualización: 10/07/2026
 
 ---
 
@@ -24,7 +24,7 @@ Antes de comenzar una nueva tarea, se recomienda revisar este documento para con
 
 Estado del proyecto:
 
-🟡 En desarrollo
+En desarrollo
 
 La arquitectura principal del sistema ya se encuentra implementada.
 
@@ -67,7 +67,7 @@ No deberán realizarse cambios importantes en la arquitectura sin una justificac
 
 Estado:
 
-🟡 En desarrollo
+En desarrollo
 
 Implementado:
 
@@ -93,7 +93,7 @@ Pendiente:
 
 Estado:
 
-🟡 En desarrollo
+En desarrollo
 
 Implementado:
 
@@ -196,7 +196,7 @@ Pendiente:
 
 Estado:
 
-🟡 En desarrollo
+En desarrollo
 
 Implementado:
 
@@ -216,7 +216,7 @@ Pendiente:
 
 Estado:
 
-🟡 En desarrollo
+En desarrollo
 
 Implementado:
 
@@ -235,18 +235,25 @@ Pendiente:
 
 Estado:
 
-🔴 Pendiente
+En desarrollo
+
+Implementado:
+
+- Primera version funcional del repositorio institucional.
+- Bloque de material complementario con guias y documentos de apoyo.
+- Catalogo institucional de proyectos finalizados.
+- Filtros por semestre, docente, categoria, tipo y PAO.
+- Buscadores independientes para catalogo y material complementario.
+- Resaltado visual de coincidencias en las busquedas.
+- Estructura visual separada para encabezados, filtros y tarjetas.
 
 Pendiente:
 
-- Consulta de proyectos finalizados.
 - Descarga de documentos.
-- Organización por categorías.
-- Búsqueda.
-- Filtros.
+- Vinculacion con archivos reales.
+- Persistencia en base de datos.
 
 ---
-
 # 13. Gestión de Usuarios
 
 Estado:
@@ -270,7 +277,7 @@ Pendiente:
 
 Estado:
 
-🟡 En desarrollo
+En desarrollo
 
 Implementado:
 
@@ -335,7 +342,7 @@ Pendiente:
 
 Estado:
 
-🟡 En desarrollo
+En desarrollo
 
 Implementado:
 
@@ -389,3 +396,7 @@ Este documento deberá actualizarse cuando:
 - Cambie el estado de desarrollo de algún módulo.
 
 Su objetivo es reflejar el estado real del proyecto en todo momento.
+
+
+
+
