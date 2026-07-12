@@ -9,9 +9,9 @@ $carpetaVacia = 'Carpeta Vac' + [char]0x00ED + 'a'
 $version = 'versi' + [char]0x00F3 + 'n'
 $pngBytes = [Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nQAAAABJRU5ErkJggg==')
 
-function New-PdfBytes {
+function New-PdfBytes([string]$Title = 'Documento de prueba del repositorio', [string]$Subtitle = 'Vista previa PDF disponible correctamente.') {
     $ascii = [System.Text.Encoding]::ASCII
-    $content = "BT`n/F1 18 Tf`n72 760 Td`n(Documento de prueba del repositorio) Tj`n0 -28 Td`n/F1 11 Tf`n(Vista previa PDF disponible correctamente.) Tj`nET"
+    $content = "BT`n/F1 18 Tf`n72 760 Td`n($Title) Tj`n0 -28 Td`n/F1 11 Tf`n($Subtitle) Tj`nET"
     $objects = @(
         '<< /Type /Catalog /Pages 2 0 R >>',
         '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
@@ -39,14 +39,14 @@ $pdfBytes = New-PdfBytes
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-function New-DocxBytes {
+function New-DocxBytes([string]$Heading = 'Informe de proyecto', [string]$Paragraph = 'Este documento DOCX permite comprobar la vista previa segura del repositorio.') {
     $memory = New-Object System.IO.MemoryStream
     $docx = New-Object System.IO.Compression.ZipArchive($memory, [System.IO.Compression.ZipArchiveMode]::Create, $true)
     try {
         $docxEntries = [ordered]@{
             '[Content_Types].xml' = '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'
             '_rels/.rels' = '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'
-            'word/document.xml' = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Informe de proyecto</w:t></w:r></w:p><w:p><w:r><w:t>Este documento DOCX permite comprobar la vista previa segura del repositorio.</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Primer objetivo acad&#x00E9;mico</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>Tecnolog&#x00ED;a</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>PHP</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>Arquitectura</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>MVC</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:sectPr/></w:body></w:document>'
+            'word/document.xml' = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>{0}</w:t></w:r></w:p><w:p><w:r><w:t>{1}</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Documento acad&#x00E9;mico institucional</w:t></w:r></w:p><w:sectPr/></w:body></w:document>' -f $Heading, $Paragraph)
         }
         foreach ($docxEntryName in $docxEntries.Keys) {
             $docxEntry = $docx.CreateEntry($docxEntryName)
@@ -142,5 +142,31 @@ try {
 }
 
 [System.IO.File]::WriteAllText((Join-Path $storagePath 'damaged.zip'), 'not-a-valid-zip', [System.Text.UTF8Encoding]::new($false))
+
+$supportPath = Join-Path $PSScriptRoot '..\storage\support-materials'
+$supportPath = [System.IO.Path]::GetFullPath($supportPath)
+[System.IO.Directory]::CreateDirectory($supportPath) | Out-Null
+$obsoleteSupportFile = Join-Path $supportPath 'lista_verificacion_tesis.txt'
+if (Test-Path -LiteralPath $obsoleteSupportFile) { Remove-Item -LiteralPath $obsoleteSupportFile -Force }
+[System.IO.File]::WriteAllBytes((Join-Path $supportPath 'guia_perfil_tesis.pdf'), (New-PdfBytes 'Guia para el perfil de tesis' 'Orientaciones institucionales para el proceso de titulacion.'))
+[System.IO.File]::WriteAllText((Join-Path $supportPath 'lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt'), "Lista de verificacion`n`n- Tema delimitado`n- Objetivos definidos`n- Referencias revisadas`n", [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllBytes((Join-Path $supportPath 'seguimiento_practicas.docx'), (New-DocxBytes 'Seguimiento de practicas' 'Formato para registrar actividades y evidencias de practicas preprofesionales.'))
+[System.IO.File]::WriteAllBytes((Join-Path $supportPath 'instructivo_proyectos_pis.pdf'), (New-PdfBytes 'Instructivo para proyectos PIS' 'Pasos para organizar entregables y evidencias academicas.'))
+[System.IO.File]::WriteAllBytes((Join-Path $supportPath 'informe_vinculacion.docx'), (New-DocxBytes 'Informe de vinculacion' 'Plantilla institucional para documentar resultados e impacto comunitario.'))
+[System.IO.File]::WriteAllText((Join-Path $supportPath 'reglamento_material_apoyo.txt'), "Reglamento de uso del material de apoyo`n`nLos documentos deben utilizarse exclusivamente con fines academicos.`n", [System.Text.UTF8Encoding]::new($false))
+$supportPackagePath = Join-Path $supportPath 'material_tesis_completo.zip'
+if (Test-Path -LiteralPath $supportPackagePath) { Remove-Item -LiteralPath $supportPackagePath -Force }
+$supportPackageStream = [System.IO.File]::Open($supportPackagePath, [System.IO.FileMode]::CreateNew)
+try {
+    $supportPackage = New-Object System.IO.Compression.ZipArchive($supportPackageStream, [System.IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach ($packageName in @('guia_perfil_tesis.pdf', 'lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt')) {
+            $packageEntry = $supportPackage.CreateEntry($packageName)
+            $packageEntryStream = $packageEntry.Open()
+            $sourceStream = [System.IO.File]::OpenRead((Join-Path $supportPath $packageName))
+            try { $sourceStream.CopyTo($packageEntryStream) } finally { $sourceStream.Dispose(); $packageEntryStream.Dispose() }
+        }
+    } finally { $supportPackage.Dispose() }
+} finally { $supportPackageStream.Dispose() }
 
 Write-Output "Fixtures ZIP creados en $storagePath"

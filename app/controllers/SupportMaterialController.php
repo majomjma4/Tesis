@@ -1,0 +1,195 @@
+<?php
+
+declare(strict_types=1);
+
+final class SupportMaterialController
+{
+    private const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'pptx', 'png', 'jpg', 'jpeg', 'webp', 'txt', 'zip'];
+
+    public function index(): void
+    {
+        $this->ensureSession();
+        $downloadModel = new SupportMaterialDownloadModel();
+        $materials = array_map(static function (array $material) use ($downloadModel): array {
+            $material['downloads'] = $downloadModel->getTotal($material['id'], $material['downloads']);
+            $material['detail_url'] = base_url('index.php?page=support-material-detail&id=' . rawurlencode((string) $material['id']));
+            return $material;
+        }, (new SupportMaterialModel())->getAll());
+
+        View::render('repository/materiales', [
+            'currentPage' => 'repository',
+            'title' => 'Material de apoyo | Repositorio Institucional',
+            'pageScript' => asset('js/support-materials.js'),
+            'materials' => $materials,
+            'repositoryUrl' => route('repository'),
+        ]);
+    }
+
+    public function detail(): void
+    {
+        $this->ensureSession();
+        $materialId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
+        $material = $materialId === false || $materialId === null ? null : (new SupportMaterialModel())->findById((int) $materialId);
+        if ($material === null) {
+            http_response_code(404);
+        } else {
+            $material['downloads'] = (new SupportMaterialDownloadModel())->getTotal($material['id'], $material['downloads']);
+        }
+
+        View::render('repository/material-detalle', [
+            'currentPage' => 'repository',
+            'title' => $material === null ? 'Material no encontrado | Repositorio' : $material['title'] . ' | Material de apoyo',
+            'pageScript' => asset('js/repository-detail.js'),
+            'material' => $material,
+            'repositoryUrl' => route('repository'),
+            'materialsUrl' => route('support-materials'),
+            'previewActionUrl' => route('support-material-preview'),
+            'previewContentActionUrl' => route('support-material-preview-content'),
+            'downloadActionUrl' => route('support-material-download'),
+        ]);
+    }
+
+    public function preview(): void
+    {
+        $this->ensureGetJson();
+        [$material, $file, $stream] = $this->resolveFileRequest(true);
+        $fileData = $this->buildPreviewFile($file, $stream);
+        $materialId = rawurlencode((string) $material['id']);
+        $fileId = rawurlencode((string) $file['id']);
+        $preview = (new FilePreviewService())->prepare(
+            $fileData,
+            base_url("index.php?page=support-material-preview-content&material_id={$materialId}&file_id={$fileId}"),
+            base_url("index.php?page=support-material-download&material_id={$materialId}&file_id={$fileId}")
+        );
+        fclose($stream);
+        $this->sendJson(true, $preview['message'], ['preview' => $preview]);
+    }
+
+    public function previewContent(): void
+    {
+        $this->ensureSession();
+        $this->ensureGet();
+        [, $file, $stream] = $this->resolveFileRequest();
+        $fileData = $this->buildPreviewFile($file, $stream);
+        if (!(new FilePreviewService())->canStreamInline($fileData)) {
+            fclose($stream);
+            http_response_code(415);
+            $this->renderError('Este formato debe descargarse para consultarlo.');
+        }
+
+        session_write_close();
+        header('Content-Type: ' . $this->mimeFor($file['extension']));
+        header('Content-Length: ' . $file['size_bytes']);
+        header('Content-Disposition: inline; filename*=UTF-8\'\'' . rawurlencode($file['name']));
+        header('X-Content-Type-Options: nosniff');
+        header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
+        header('Cache-Control: private, no-store, max-age=0');
+        fpassthru($stream);
+        fclose($stream);
+        exit;
+    }
+
+    public function download(): void
+    {
+        $this->ensureSession();
+        $this->ensureGet();
+        [$material, $file, $stream] = $this->resolveFileRequest();
+        if ($file['primary'] || ($file['package'] ?? false)) {
+            (new SupportMaterialDownloadModel())->increment($material['id']);
+        }
+        session_write_close();
+        $fallbackName = preg_replace('/[^A-Za-z0-9._-]/', '_', $file['name']) ?: 'documento';
+        header('Content-Type: ' . $this->mimeFor($file['extension']));
+        header('Content-Length: ' . $file['size_bytes']);
+        header('Content-Disposition: attachment; filename="' . $fallbackName . '"; filename*=UTF-8\'\'' . rawurlencode($file['name']));
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store, max-age=0');
+        fpassthru($stream);
+        fclose($stream);
+        exit;
+    }
+
+    private function resolveFileRequest(bool $jsonResponse = false): array
+    {
+        $materialId = filter_var($_GET['material_id'] ?? $_GET['id'] ?? null, FILTER_VALIDATE_INT);
+        $fileId = filter_var($_GET['file_id'] ?? $_GET['path'] ?? null, FILTER_VALIDATE_INT);
+        $model = new SupportMaterialModel();
+        $material = $materialId === false || $materialId === null ? null : $model->findById((int) $materialId);
+        if ($material === null) {
+            $this->failFileRequest(404, 'El material solicitado no está disponible.', $jsonResponse);
+        }
+        $file = $fileId === false || $fileId === null ? null : $model->findFile($material, (int) $fileId);
+        if ($file === null || !in_array($file['extension'], self::ALLOWED_EXTENSIONS, true)) {
+            $this->failFileRequest(404, 'El archivo solicitado no está disponible.', $jsonResponse);
+        }
+
+        $basePath = realpath(ROOT_PATH . '/storage/support-materials');
+        $realPath = realpath($file['path']);
+        if ($basePath === false || $realPath === false || !str_starts_with(strtolower($realPath), strtolower($basePath . DIRECTORY_SEPARATOR)) || !is_readable($realPath)) {
+            $this->failFileRequest(404, 'El archivo solicitado no está disponible.', $jsonResponse);
+        }
+        $stream = fopen($realPath, 'rb');
+        if ($stream === false) {
+            $this->failFileRequest(422, 'No fue posible abrir el archivo solicitado.', $jsonResponse);
+        }
+        return [$material, $file, $stream];
+    }
+
+    private function buildPreviewFile(array $file, $stream): array
+    {
+        return ['name' => $file['name'], 'path' => (string) $file['id'], 'size' => $file['size_bytes'], 'mime' => $this->mimeFor($file['extension']), 'stream' => $stream, 'archive' => null];
+    }
+
+    private function mimeFor(string $extension): string
+    {
+        return match ($extension) {
+            'pdf' => 'application/pdf', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'png' => 'image/png', 'jpg', 'jpeg' => 'image/jpeg', 'webp' => 'image/webp', 'txt' => 'text/plain; charset=UTF-8', 'zip' => 'application/zip',
+            default => 'application/octet-stream',
+        };
+    }
+
+    private function ensureSession(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+    }
+
+    private function ensureGet(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+            http_response_code(405);
+            $this->renderError('Método no permitido.');
+        }
+    }
+
+    private function ensureGetJson(): void
+    {
+        $this->ensureSession();
+        header('Content-Type: application/json; charset=UTF-8');
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+            http_response_code(405);
+            $this->sendJson(false, 'Método no permitido.');
+        }
+    }
+
+    private function renderError(string $message): never
+    {
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo $message;
+        exit;
+    }
+
+    private function failFileRequest(int $status, string $message, bool $jsonResponse): never
+    {
+        http_response_code($status);
+        if ($jsonResponse) $this->sendJson(false, $message);
+        $this->renderError($message);
+    }
+
+    private function sendJson(bool $success, string $message, array $data = []): never
+    {
+        echo json_encode(['success' => $success, 'message' => $message, 'data' => $data], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+}

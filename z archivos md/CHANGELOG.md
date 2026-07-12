@@ -254,6 +254,13 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Se añadieron estados `aria-busy`, regiones dinámicas anunciables y límites accesibles en los controles de zoom.
 - Se agregó compatibilidad con `prefers-reduced-motion` sin modificar el diseño o posicionamiento existente.
 - Se ejecutaron pruebas de regresión sobre catálogo, CSRF, favoritos, exploración ZIP, visualizadores, descargas, respuestas 404 y UTF-8.
+- Se convirtió Material de apoyo en un módulo MVC funcional y diferenciado del catálogo de proyectos.
+- Se conectaron las tarjetas y acciones `Ver más` con un catálogo completo y pantallas de detalle individuales.
+- Se incorporaron archivos privados distintos para PDF, DOCX y TXT, además de un paquete ZIP autorizado con múltiples recursos.
+- Se reutilizaron los servicios seguros de vista previa para PDF, DOCX y texto sin exponer rutas físicas.
+- Se implementaron descargas validadas del archivo principal, adicionales y paquete completo mediante rutas controladas.
+- Se agregó un contador temporal por sesión que solo cambia en descargas principales o completas válidas.
+- Se añadieron búsqueda, filtro por categoría, contador, estados vacíos, modo oscuro y adaptación responsive al catálogo de materiales.
 
 ---
 

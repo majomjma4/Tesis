@@ -80,10 +80,10 @@
         <div class="repository-section-divider" aria-hidden="true"></div>
 
         <div class="repository-carousel-topbar" aria-label="Opciones de documentos de apoyo">
-            <button class="repository-carousel-more" id="repositorySupportMore" type="button">
+            <a class="repository-carousel-more" id="repositorySupportMore" href="<?= e($supportMaterialsUrl) ?>">
                 Ver más
                 <i class="fa-solid fa-arrow-right"></i>
-            </button>
+            </a>
         </div>
 
         <div class="repository-section-divider" aria-hidden="true"></div>
@@ -112,10 +112,10 @@
                     <span hidden><?= e(implode(' ', $document['keywords'])) ?></span>
 
                     <div class="repository-card-actions">
-                        <button class="open-btn repository-open-btn" type="button">
+                        <a class="open-btn repository-open-btn" href="<?= e($document['detail_url']) ?>">
                             Ver documento
                             <i class="fa-solid fa-arrow-right"></i>
-                        </button>
+                        </a>
                     </div>
                 </article>
             <?php endforeach; ?>
@@ -127,6 +127,7 @@
                     <span class="repository-type">Más documentos disponibles</span>
                     <h3>¿Quieres ver más?</h3>
                     <p>Este carrusel muestra un máximo de documentos. Accede a la vista completa para consultar todo el material de apoyo disponible.</p>
+                    <a class="open-btn repository-open-btn" href="<?= e($supportMaterialsUrl) ?>">Consultar materiales <i class="fa-solid fa-arrow-right"></i></a>
                 </article>
             </div>
 
@@ -333,6 +334,12 @@
             <p id="repositoryEmptyText">Prueba con otros términos o modifica los filtros seleccionados.</p>
             <button class="repository-empty-action" id="repositoryShowAllProjects" type="button" hidden>Ver todos los proyectos</button>
         </div>
+
+        <nav class="repository-pagination" id="repositoryPagination" aria-label="Paginación de proyectos" hidden>
+            <button type="button" id="repositoryPagePrevious"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> Anterior</button>
+            <span id="repositoryPageInfo" aria-live="polite">Página 1 de 1</span>
+            <button type="button" id="repositoryPageNext">Siguiente <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+        </nav>
 
         <div class="repository-toast" id="repositoryToast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
     </section>

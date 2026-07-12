@@ -1,1 +1,3 @@
 /storage/repository/*.zip
+/storage/support-materials/*
+!/storage/support-materials/.gitkeep

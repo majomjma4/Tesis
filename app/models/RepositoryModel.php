@@ -94,88 +94,8 @@ final class RepositoryModel
                 'technologies' => ['C#', '.NET', 'SQL Server', 'MVC'],
                 'keywords' => ['Perfil', 'Seguimiento', 'Titulación', 'Revisión académica']
             ],
-            [
-                'id' => 5,
-                'title' => 'Aplicación Móvil para Gestión de Proyectos PIS',
-                'description' => 'Aplicación móvil para organizar entregas, evidencias y actividades colaborativas de proyectos integradores.',
-                'career' => 'Desarrollo de Software',
-                'career_slug' => 'software',
-                'authors' => 'Sofía Ruiz, Mateo Vera y Luis Castro',
-                'tutor' => 'Mgs. Luis Zambrano',
-                'teacher_slug' => 'luis-zambrano',
-                'semester' => '4',
-                'category' => 'Proyecto PIS',
-                'category_slug' => 'proyecto-pis',
-                'year' => '2026',
-                'pao' => 'pao-ii-2026',
-                'pao_label' => 'PAO II 2026',
-                'type' => 'Proyecto PIS',
-                'type_slug' => 'proyecto-pis',
-                'downloads' => 121,
-                'technologies' => ['Flutter', 'Dart', 'Firebase', 'GitHub', 'API REST', 'Aplicación móvil'],
-                'keywords' => ['Proyecto integrador', 'Trabajo colaborativo', 'Evidencias', 'Aplicación móvil']
-            ],
 
-        ];
-    }
 
-    /**
-     * Obtiene guías y documentos de apoyo disponibles en el repositorio.
-     */
-    public function getSupportDocuments(): array
-    {
-        return [
-            [
-                'title' => 'Guía para la elaboración del informe final',
-                'description' => 'Documento base para estructurar objetivos, marco teórico, metodología y conclusiones del trabajo final.',
-                'type' => 'Guía académica',
-                'year' => '2026',
-                'pao_label' => 'PAO I 2026',
-                'category_slug' => 'tesis',
-                'category_label' => 'Tesis',
-                'keywords' => ['Formato', 'Informe', 'Titulación']
-            ],
-            [
-                'title' => 'Plantilla de presentación de avances',
-                'description' => 'Material de apoyo para exponer avances, resultados parciales y observaciones del tutor en clase.',
-                'type' => 'Documento de apoyo',
-                'year' => '2026',
-                'pao_label' => 'PAO II 2026',
-                'category_slug' => 'proyecto-pis',
-                'category_label' => 'Proyectos PIS',
-                'keywords' => ['Presentación', 'Avance', 'Tutoría']
-            ],
-            [
-                'title' => 'Formato de revisión de entregables',
-                'description' => 'Documento para controlar la entrega de informes, anexos y correcciones finales antes de la defensa.',
-                'type' => 'Guía práctica',
-                'year' => '2025',
-                'pao_label' => 'PAO II 2025',
-                'category_slug' => 'practicas',
-                'category_label' => 'Prácticas',
-                'keywords' => ['Entrega', 'Checklist', 'Correcciones']
-            ],
-            [
-                'title' => 'Guía para defensa de proyecto',
-                'description' => 'Apoyo para preparar la presentación oral, responder observaciones y organizar la defensa final.',
-                'type' => 'Guía académica',
-                'year' => '2024',
-                'pao_label' => 'PAO I 2024',
-                'category_slug' => 'vinculacion',
-                'category_label' => 'Vinculación',
-                'keywords' => ['Defensa', 'Presentación', 'Exposición']
-            ],
-            [
-                'title' => 'Guía para defensa de proyecto',
-                'description' => 'Apoyo para preparar la presentación oral, responder observaciones y organizar la defensa final.',
-                'type' => 'Guía académica',
-                'year' => '2024',
-                'pao_label' => 'PAO I 2024',
-                'category_slug' => 'vinculacion',
-                'category_label' => 'Vinculación',
-                'keywords' => ['Defensa', 'Presentación', 'Exposición']
-            ],
-           
         ];
     }
 

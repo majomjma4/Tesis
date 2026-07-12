@@ -34,7 +34,11 @@ final class RepositoryController
             'categories' => $repositoryModel->getCategories(),
             'projectTypes' => $repositoryModel->getProjectTypes(),
             'academicPeriods' => $repositoryModel->getAcademicPeriods(),
-            'supportDocuments' => $repositoryModel->getSupportDocuments()
+            'supportDocuments' => array_map(static function (array $material): array {
+                $material['detail_url'] = base_url('index.php?page=support-material-detail&id=' . rawurlencode((string) $material['id']));
+                return $material;
+            }, (new SupportMaterialModel())->getAll()),
+            'supportMaterialsUrl' => route('support-materials'),
         ]);
     }
 

@@ -292,11 +292,21 @@ Implementado:
 - Restauración del foco al regresar desde una vista previa y estados de carga anunciables para tecnologías de asistencia.
 - Contadores dinámicos anunciables, límites de zoom reflejados en los controles y compatibilidad con la preferencia de movimiento reducido.
 - Verificación funcional de catálogo, CSRF, favoritos, detalle, ZIP, visualizadores, descargas, errores HTTP y codificación UTF-8.
+- Módulo funcional de Material de apoyo separado del catálogo de proyectos mediante `SupportMaterialModel` y `SupportMaterialController`.
+- Tarjetas del carrusel conectadas a detalles individuales de guías, formatos, instructivos, plantillas y reglamentos.
+- Catálogo completo de materiales accesible desde el botón y la tarjeta `Ver más`, con búsqueda, categoría, contador y estado vacío.
+- Detalle institucional con breadcrumbs, metadatos, descripción completa, palabras clave, archivo principal y archivos adicionales.
+- Vistas previas seguras reutilizadas para PDF, DOCX y TXT, conservando el modal responsive y el visor PDF nativo.
+- Descargas privadas validadas por material y archivo, con lista blanca de extensiones, protección de directorio y encabezados seguros.
+- Paquete ZIP autorizado para materiales con múltiples archivos, sin generación dinámica durante la solicitud.
+- Contador temporal por sesión incrementado únicamente al descargar el archivo principal o el paquete completo.
+- Fixtures privados diferenciados por material y generador reproducible fuera del directorio público.
 
 Pendiente:
 
 - Migración de favoritos desde sesión hacia usuarios autenticados y base de datos MySQL.
 - Migración de datos simulados y persistencia temporal hacia MySQL.
+- Persistencia real del catálogo, archivos y descargas de Material de apoyo en MySQL.
 - Vinculacion con archivos reales.
 - Persistencia en base de datos.
 

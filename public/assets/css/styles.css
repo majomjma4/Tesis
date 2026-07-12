@@ -2517,9 +2517,11 @@ body.login-page{
 .repository-file-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .repository-file-name i { width: 18px; color: var(--primary); font-size: 17px; text-align: center; }
 .repository-file-name .repository-file-icon--folder { color: #f59e0b; }
-.repository-file-action { min-height: 34px; display: flex; align-items: center; justify-content: flex-end; }
-.repository-file-action a { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); color: var(--primary); display: grid; place-items: center; }
-.repository-file-action a:hover { border-color: rgba(37,99,235,.35); background: var(--primary); color: #fff; }
+.repository-file-action { min-height: 34px; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.repository-file-action a,
+.repository-file-action button { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); color: var(--primary); display: grid; place-items: center; cursor: pointer; }
+.repository-file-action a:hover,
+.repository-file-action button:hover { border-color: rgba(37,99,235,.35); background: var(--primary); color: #fff; }
 .repository-preview { padding: 0 20px 20px; }
 .repository-preview[hidden],
 .repository-preview-state[hidden],
@@ -2540,9 +2542,12 @@ body.login-page{
 .repository-preview-expand:disabled { opacity: .45; cursor: not-allowed; }
 .repository-preview-modal { position: fixed; inset: 0; z-index: 9999; padding: 24px; background: rgba(15,23,42,.58); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: grid; place-items: center; }
 .repository-preview-modal[hidden] { display: none; }
-.repository-preview-modal-dialog { width: min(1080px,92vw); height: min(86vh,850px); overflow: hidden; border: 1px solid rgba(255,255,255,.16); border-radius: 22px; background: var(--surface); box-shadow: 0 30px 100px rgba(2,6,23,.58); display: grid; grid-template-rows: 64px minmax(0,1fr); animation: repository-modal-in .2s ease-out; }
+.repository-preview-modal-dialog { width: min(1080px,92vw); height: 86vh; overflow: hidden; border: .5px solid rgba(255,255,255,.1); border-radius: 22px; background: var(--surface); box-shadow: 0 30px 100px rgba(2,6,23,.58); display: grid; grid-template-rows: 68px minmax(0,1fr); animation: repository-modal-in 220ms cubic-bezier(.2,.8,.2,1); }
+.repository-preview-modal--pdf .repository-preview-modal-dialog { width: min(1140px,92vw); height: 89vh; }
 .repository-preview-modal-header { padding: 0 16px 0 22px; border-bottom: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.repository-preview-modal-header h3 { margin: 0; color: var(--text); font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.repository-preview-modal-heading { min-width: 0; display: grid; gap: 3px; }
+.repository-preview-modal-heading > span { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.repository-preview-modal-header h3 { margin: 0; color: var(--text); font-size: 16px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .repository-preview-modal-close { width: 40px; height: 40px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 50%; background: var(--surface-soft); color: var(--text); display: grid; place-items: center; font-size: 17px; cursor: pointer; }
 .repository-preview-modal-close:hover { border-color: rgba(239,68,68,.35); color: #ef4444; }
 .repository-preview-modal-body { min-height: 0; padding: 18px; overflow: auto; background: var(--surface-soft); }
@@ -2556,8 +2561,8 @@ body.login-page{
 .repository-preview-modal-body .repository-preview-docx { max-height: none; min-height: 100%; }
 body.repository-preview-modal-open { overflow: hidden; }
 @keyframes repository-modal-in {
-    from { opacity: 0; transform: translateY(12px) scale(.985); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0; transform: scale(.982); }
+    to { opacity: 1; transform: scale(1); }
 }
 .repository-preview-message { margin-bottom: 14px; padding: 11px 13px; border: 1px solid rgba(245,158,11,.28); border-radius: 12px; background: rgba(245,158,11,.09); color: var(--muted); font-size: 12px; line-height: 1.5; }
 .repository-preview-state { min-height: 300px; padding: 36px 20px; border: 1px dashed var(--line); border-radius: 16px; background: var(--surface-soft); color: var(--muted); display: grid; place-items: center; align-content: center; gap: 13px; text-align: center; }
@@ -2601,6 +2606,77 @@ body.repository-preview-modal-open { overflow: hidden; }
 .repository-detail-not-found > i { margin-bottom: 14px; color: var(--primary); font-size: 40px; }
 .repository-detail-not-found h1 { margin-bottom: 8px; color: var(--text); }
 .repository-detail-not-found .open-btn { margin-top: 20px; display: inline-flex; }
+.repository-pagination { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: center; gap: 14px; }
+.repository-pagination[hidden] { display: none; }
+.repository-pagination button { min-height: 40px; padding: 0 15px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--text); display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; font-weight: 800; cursor: pointer; }
+.repository-pagination button:hover:not(:disabled) { border-color: rgba(37,99,235,.35); background: var(--primary); color: #fff; }
+.repository-pagination button:disabled { opacity: .42; cursor: not-allowed; }
+.repository-pagination span { min-width: 112px; color: var(--muted); font-size: 12px; font-weight: 800; text-align: center; }
+.support-materials-page { padding-bottom: 40px; }
+.support-material-detail { --repository-accent: var(--project-thesis); }
+.support-materials-hero { margin-top: 18px; }
+.support-materials-tools { margin: 24px 0; grid-template-columns: minmax(0,1fr) minmax(220px,300px); align-items: end; }
+.support-materials-filter { display: grid; gap: 7px; }
+.support-materials-filter > span { color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.support-materials-filter select { width: 100%; height: 46px; padding: 0 40px 0 13px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); color: var(--text); font-size: 13px; cursor: pointer; }
+.support-materials-heading { margin: 28px 0 18px; }
+.support-materials-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.support-materials-grid .repository-card { min-width: 0; }
+.support-materials-grid .repository-meta { margin-top: 16px; }
+.support-material-header .project-status { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; }
+.support-material-description { white-space: normal; }
+.support-material-detail .repository-preview-header > div:first-child { min-width: 0; flex: 1 1 auto; }
+.support-material-detail .repository-preview-header h3 { max-width: 100%; overflow: hidden; overflow-wrap: normal; text-overflow: ellipsis; white-space: nowrap; }
+.support-material-detail .repository-detail-info { gap: 20px; }
+.support-material-detail .repository-detail-panel { transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.support-material-detail .repository-detail-panel:hover { border-color: rgba(var(--repository-accent),.22); box-shadow: 0 12px 28px rgba(15,23,42,.06); }
+.support-material-detail .repository-detail-data dt { display: inline-flex; align-items: center; gap: 6px; }
+.support-material-detail .repository-detail-data dt i { width: 13px; color: rgb(var(--repository-accent)); font-size: 10px; text-align: center; }
+.support-material-publisher { display: flex; align-items: center; gap: 13px; }
+.support-material-publisher-icon { width: 42px; height: 42px; flex: 0 0 auto; border-radius: 12px; background: rgba(var(--repository-accent),.1); color: rgb(var(--repository-accent)); display: grid; place-items: center; }
+.support-material-publisher > div { min-width: 0; display: grid; gap: 4px; }
+.support-material-publisher > div > span { color: var(--muted); font-size: 10px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.support-material-publisher strong { color: var(--text); font-size: 13px; line-height: 1.45; }
+.support-material-description-panel .repository-detail-panel-heading,
+.support-material-keywords-panel .repository-detail-panel-heading { margin-bottom: 12px; }
+.support-material-keywords-panel .repository-detail-keywords { margin-top: 0; }
+.support-material-files .repository-explorer-header { border-bottom: 0; }
+.support-material-main-file { justify-content: flex-start; }
+.support-material-main-icon { width: 68px; height: 68px; flex: 0 0 auto; border: 1px solid rgba(var(--repository-accent),.24); border-radius: 19px; background: linear-gradient(145deg,rgba(var(--repository-accent),.14),rgba(var(--repository-accent),.05)); color: rgb(var(--repository-accent)); display: grid; place-items: center; position: relative; font-size: 34px; box-shadow: 0 10px 25px rgba(var(--repository-accent),.13); }
+.support-material-main-icon i { transform: translateY(-5px); }
+.support-material-main-icon small { min-width: 30px; padding: 3px 5px; border: 2px solid var(--surface); border-radius: 6px; background: rgb(var(--repository-accent)); color: #fff; position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); font-size: 9px; font-weight: 900; line-height: 1; letter-spacing: .02em; text-align: center; box-shadow: 0 3px 8px rgba(var(--repository-accent),.24); }
+.support-material-main-file > div { min-width: 0; flex: 1 1 auto; }
+.support-material-main-file h2 { max-width: 100%; font-size: clamp(16px,2vw,22px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.support-material-files .repository-file-row { grid-template-columns: minmax(0,1.6fr) minmax(90px,.55fr) minmax(70px,.3fr) 82px; }
+.support-material-file-list { padding-top: 4px; }
+.support-material-file-list .repository-file-row { transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.support-material-file-list .repository-file-row:hover { background: var(--surface-soft); }
+.support-material-primary-file { border: 1px solid rgba(var(--repository-accent),.24); border-radius: 14px; background: rgba(var(--repository-accent),.04); }
+.support-material-additional-title { margin: 30px 4px 12px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--text); font-size: 15px; }
+.support-material-additional-file { margin-bottom: 8px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+.support-material-additional-file:last-child { margin-bottom: 0; border-bottom: 1px solid var(--line); }
+.support-material-additional-file:hover { border-color: rgba(var(--repository-accent),.24); transform: translateY(-1px); box-shadow: 0 8px 18px rgba(15,23,42,.05); }
+.support-material-file-copy { min-width: 0; display: grid; gap: 4px; }
+.support-material-additional-file .support-material-file-copy strong { display: -webkit-box; overflow: hidden; color: var(--text); font-size: 12px; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.support-material-file-copy small { color: var(--muted); font-size: 9px; font-weight: 700; }
+.support-material-extension-chip { width: fit-content; padding: 4px 7px; border: 1px solid rgba(var(--repository-accent),.16); border-radius: 7px; background: rgba(var(--repository-accent),.07); color: rgb(var(--repository-accent)); font-size: 9px; font-weight: 900; }
+.support-material-file-size { color: var(--muted); font-variant-numeric: tabular-nums; }
+.support-material-file-type { display: grid; gap: 3px; }
+.support-material-file-type strong { color: var(--text); font-size: 11px; }
+.support-material-file-type small { color: var(--muted); font-size: 9px; }
+.support-material-file-icon { width: 28px; height: 30px; flex: 0 0 auto; color: rgb(var(--repository-accent)); display: grid; place-items: center; position: relative; font-size: 21px; }
+.support-material-file-icon i { transform: translateY(-3px); }
+.support-material-file-icon small { min-width: 20px; padding: 2px 3px; border: 1px solid var(--surface); border-radius: 4px; background: rgb(var(--repository-accent)); color: #fff; position: absolute; left: 50%; bottom: 1px; transform: translateX(-50%); font-size: 6px; font-weight: 900; line-height: 1; text-align: center; }
+.repository-complete-download { min-height: 46px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 9px; font-size: 12px; font-weight: 800; text-align: center; transition: border-color .2s ease, background .2s ease, color .2s ease, transform .2s ease, box-shadow .2s ease; }
+.repository-complete-download i { color: rgb(var(--repository-accent)); }
+.repository-complete-download small { color: var(--muted); font-size: 10px; }
+.repository-complete-download:hover { border-color: rgba(var(--repository-accent),.35); background: var(--surface-soft); transform: translateY(-1px); box-shadow: 0 9px 20px rgba(15,23,42,.08); }
+.support-material-detail .open-btn,
+.support-material-detail .repository-file-action a,
+.support-material-detail .repository-file-action button,
+.support-material-detail .repository-file-entry { transition: color .18s ease, background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+body.dark-mode .support-materials-filter select,
+body.dark-mode .support-material-primary-file { background: var(--surface-soft); border-color: var(--line); }
 /* Final de detalle del repositorio */
 @media(min-width:1200px) and (min-height:1000px) {
     .repository-detail-info { position: sticky; top: 24px; }
@@ -2821,11 +2897,21 @@ body.dark-mode .repository-highlight {
     .repository-detail-skeleton,
     .repository-detail-layout { grid-template-columns: 1fr; }
     .repository-detail-info { position: static; }
+    .support-material-detail .repository-detail-layout { display: flex; flex-direction: column; gap: 18px; }
+    .support-material-detail .repository-detail-info { display: contents; }
+    .support-material-detail .repository-detail-info > .repository-detail-panel:first-child { order: 1; }
+    .support-material-detail .support-material-files { order: 2; }
+    .support-material-detail .support-material-publisher { order: 3; }
+    .support-material-detail .support-material-description-panel { order: 4; }
+    .support-material-detail .support-material-keywords-panel { order: 5; }
+    .support-material-detail .repository-detail-download { order: 6; }
+    .support-material-detail .repository-complete-download { order: 7; }
     .repository-skeleton-grid { grid-template-columns: 1fr; }
     .repository-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }
     .repository-grid { grid-template-columns: 1fr; }
     #repositoryGrid { grid-template-columns: repeat(2,minmax(0,1fr)); }
     .repository-support-grid { grid-template-columns: 1fr; }
+    .support-materials-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
     .repository-carousel-prev { left: 10px; }
     .repository-carousel-next { right: 10px; }
     .repository-card,
@@ -2836,12 +2922,14 @@ body.dark-mode .repository-highlight {
 @media(max-width:600px) {
     .repository-detail-header,
     .repository-explorer-header { align-items: flex-start; flex-direction: column; }
+    .support-material-main-file > div { width: 100%; }
     .repository-detail-favorite,
     .repository-explorer-header .open-btn { width: 100%; justify-content: center; }
     .repository-detail-header { padding: 21px 18px; }
     .repository-file-list { padding: 0 14px 14px; }
     .repository-preview { padding: 0 14px 14px; }
     .repository-preview-header { align-items: flex-start; flex-direction: column; }
+    .support-material-detail .repository-preview-header > div:first-child { width: 100%; }
     .repository-preview-actions { width: 100%; flex-direction: column; }
     .repository-preview-header .open-btn,
     .repository-preview-expand { width: 100%; justify-content: center; }
@@ -2853,6 +2941,7 @@ body.dark-mode .repository-highlight {
     .repository-preview-image-canvas { min-height: 300px; padding: 16px; }
     .repository-file-head { display: none; }
     .repository-file-row { margin-bottom: 8px; padding: 13px; border: 1px solid var(--line); border-radius: 14px; grid-template-columns: 1fr auto; gap: 7px 12px; }
+    .support-material-files .repository-file-row { grid-template-columns: 1fr auto; }
     .repository-file-row > :nth-child(2) { grid-column: 1; grid-row: 2; }
     .repository-file-row > :nth-child(3) { grid-column: 2; grid-row: 2; }
     .repository-file-row > :nth-child(4) { grid-column: 2; grid-row: 1; }
@@ -2865,6 +2954,8 @@ body.dark-mode .repository-highlight {
     .repository-support-row {
         grid-template-columns: 1fr;
     }
+    .support-materials-tools { grid-template-columns: 1fr; }
+    .support-materials-grid { grid-template-columns: 1fr; }
     .repository-filter-row {
         grid-template-columns: 1fr;
     }
@@ -2905,6 +2996,9 @@ body.dark-mode .repository-highlight {
 }
 @media(max-width:480px) {
     .repository-toast { right: 16px; bottom: 16px; }
+    .repository-pagination { gap: 8px; }
+    .repository-pagination button { min-width: 42px; padding: 0 10px; font-size: 0; }
+    .repository-pagination button i { font-size: 12px; }
 }
 
 @media(prefers-reduced-motion: reduce) {
@@ -2912,7 +3006,8 @@ body.dark-mode .repository-highlight {
     .repository-detail,
     .repository-card,
     .repository-preview-image-canvas img,
-    .repository-toast { scroll-behavior: auto; transition: none !important; animation: none !important; }
+    .repository-toast,
+    .repository-preview-modal-dialog { scroll-behavior: auto; transition: none !important; animation: none !important; }
 }
 
 .active-project-card {

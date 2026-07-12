@@ -174,7 +174,10 @@
                 <div class="repository-preview-modal" id="repositoryPreviewModal" hidden>
                     <section class="repository-preview-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="repositoryPreviewModalTitle">
                         <header class="repository-preview-modal-header">
-                            <h3 id="repositoryPreviewModalTitle">Vista ampliada</h3>
+                            <div class="repository-preview-modal-heading">
+                                <span>Vista previa del documento</span>
+                                <h3 id="repositoryPreviewModalTitle">Documento PDF</h3>
+                            </div>
                             <button class="repository-preview-modal-close" id="repositoryPreviewModalClose" type="button" aria-label="Cerrar vista ampliada">
                                 <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                             </button>

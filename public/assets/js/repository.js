@@ -26,6 +26,10 @@ const repositoryEmpty = document.querySelector("#repositoryEmpty");
 const repositoryEmptyTitle = document.querySelector("#repositoryEmptyTitle");
 const repositoryEmptyText = document.querySelector("#repositoryEmptyText");
 const repositoryShowAllProjects = document.querySelector("#repositoryShowAllProjects");
+const repositoryPagination = document.querySelector("#repositoryPagination");
+const repositoryPagePrevious = document.querySelector("#repositoryPagePrevious");
+const repositoryPageNext = document.querySelector("#repositoryPageNext");
+const repositoryPageInfo = document.querySelector("#repositoryPageInfo");
 const repositoryDropdowns = [...document.querySelectorAll("[data-dropdown]")];
 const repositorySupportPageSize = 4;
 const repositorySupportLimit = 12;
@@ -33,6 +37,8 @@ const repositorySupportDocumentLimit = repositorySupportLimit - 1;
 let repositorySupportCurrentPage = 0;
 let repositoryFavoritesOnly = false;
 let repositoryToastTimer = null;
+const repositoryProjectsPerPage = 20;
+let repositoryCurrentPage = 1;
 
 // Inicio de precarga estilo skeleton
 setTimeout(() => {
@@ -50,14 +56,14 @@ function normalizeRepositoryText(value) {
     return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
-function filterRepositoryProjects() {
+function filterRepositoryProjects(resetPage = true) {
     const searchValue = normalizeRepositoryText(repositorySearch?.value ?? "");
     const semesterValue = repositorySemester?.value ?? "all";
     const teacherValue = repositoryTeacher?.value ?? "all";
     const categoryValue = repositoryCategory?.value ?? "all";
     const typeValue = repositoryType?.value ?? "all";
     const paoValue = repositoryPao?.value ?? "all";
-    let visibleProjects = 0;
+    const matchingProjects = [];
 
     repositoryCards.forEach((card) => {
         const matchesSearch = normalizeRepositoryText(card.dataset.projectSearch ?? card.textContent ?? "").includes(searchValue);
@@ -69,26 +75,47 @@ function filterRepositoryProjects() {
         const matchesFavorite = !repositoryFavoritesOnly || card.dataset.favorite === "true";
         const isVisible = matchesSearch && matchesSemester && matchesTeacher && matchesCategory && matchesType && matchesPao && matchesFavorite;
 
-        card.hidden = !isVisible;
-        if (isVisible) {
-            visibleProjects += 1;
-        }
+        if (isVisible) matchingProjects.push(card);
     });
 
+    if (resetPage) repositoryCurrentPage = 1;
+    const totalPages = Math.max(1, Math.ceil(matchingProjects.length / repositoryProjectsPerPage));
+    repositoryCurrentPage = Math.min(repositoryCurrentPage, totalPages);
+    const pageStart = (repositoryCurrentPage - 1) * repositoryProjectsPerPage;
+    const pageProjects = matchingProjects.slice(pageStart, pageStart + repositoryProjectsPerPage);
+    repositoryCards.forEach((card) => {
+        card.hidden = !pageProjects.includes(card);
+    });
+
+    const firstVisible = matchingProjects.length === 0 ? 0 : pageStart + 1;
+    const lastVisible = Math.min(pageStart + repositoryProjectsPerPage, matchingProjects.length);
+
     if (repositoryCount) {
-        repositoryCount.textContent = `Mostrando ${visibleProjects} de ${repositoryCards.length} proyectos`;
+        repositoryCount.textContent = `Mostrando ${firstVisible}–${lastVisible} de ${matchingProjects.length} proyectos`;
     }
     if (repositoryEmpty) {
-        repositoryEmpty.hidden = visibleProjects !== 0;
+        repositoryEmpty.hidden = matchingProjects.length !== 0;
     }
     if (repositoryEmptyTitle && repositoryEmptyText && repositoryShowAllProjects) {
-        const favoritesAreEmpty = visibleProjects === 0 && repositoryFavoritesOnly;
-        repositoryEmptyTitle.textContent = favoritesAreEmpty ? "Aún no has guardado proyectos favoritos" : "No se encontraron proyectos";
+        const savedFavorites = repositoryCards.filter((card) => card.dataset.favorite === "true").length;
+        const favoritesAreEmpty = matchingProjects.length === 0 && repositoryFavoritesOnly && savedFavorites === 0;
+        const favoritesHaveNoMatches = matchingProjects.length === 0 && repositoryFavoritesOnly && savedFavorites > 0;
+        repositoryEmptyTitle.textContent = favoritesAreEmpty
+            ? "Aún no tienes proyectos favoritos"
+            : favoritesHaveNoMatches
+                ? "Ningún favorito coincide con tu búsqueda"
+                : "No se encontraron proyectos";
         repositoryEmptyText.textContent = favoritesAreEmpty
-            ? "Guarda proyectos con el corazón para encontrarlos rápidamente aquí."
-            : "Prueba con otros términos o modifica los filtros seleccionados.";
-        repositoryShowAllProjects.hidden = !favoritesAreEmpty;
+            ? "Cuando encuentres un proyecto que te interese, presiona el corazón para guardarlo y consultarlo fácilmente aquí."
+            : favoritesHaveNoMatches
+                ? "Prueba con otros términos o restablece los filtros para volver a ver tus proyectos guardados."
+                : "Prueba con otros términos o modifica los filtros seleccionados.";
+        repositoryShowAllProjects.hidden = !favoritesAreEmpty && !favoritesHaveNoMatches;
     }
+    if (repositoryPagination) repositoryPagination.hidden = matchingProjects.length <= repositoryProjectsPerPage;
+    if (repositoryPageInfo) repositoryPageInfo.textContent = `Página ${repositoryCurrentPage} de ${totalPages}`;
+    if (repositoryPagePrevious) repositoryPagePrevious.disabled = repositoryCurrentPage <= 1;
+    if (repositoryPageNext) repositoryPageNext.disabled = repositoryCurrentPage >= totalPages;
 }
 
 function updateRepositoryFavoritesCount() {
@@ -215,6 +242,18 @@ repositoryShowAllProjects?.addEventListener("click", () => {
     filterRepositoryProjects();
 });
 
+repositoryPagePrevious?.addEventListener("click", () => {
+    repositoryCurrentPage = Math.max(1, repositoryCurrentPage - 1);
+    filterRepositoryProjects(false);
+    repositoryResults?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+repositoryPageNext?.addEventListener("click", () => {
+    repositoryCurrentPage += 1;
+    filterRepositoryProjects(false);
+    repositoryResults?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
 function filterRepositorySupportDocuments() {
     const searchValue = normalizeRepositoryText(repositorySupportSearch?.value ?? "");
     const categoryValue = repositorySupportCategory?.value ?? "all";
@@ -267,7 +306,7 @@ function renderRepositorySupportCarousel(documents = getRepositorySupportMatches
         repositorySupportNext.disabled = !hasNextPage;
     }
     if (repositorySupportMore) {
-        repositorySupportMore.hidden = documents.length <= repositorySupportPageSize;
+        repositorySupportMore.hidden = documents.length <= repositorySupportDocumentLimit;
     }
 }
 

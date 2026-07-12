@@ -326,7 +326,10 @@ async function loadRepositoryPreview(path, trigger = null) {
         }
 
         if (repositoryPreviewType) repositoryPreviewType.textContent = preview.type_label;
-        if (repositoryPreviewTitle) repositoryPreviewTitle.textContent = preview.name;
+        if (repositoryPreviewTitle) {
+            repositoryPreviewTitle.textContent = preview.name;
+            repositoryPreviewTitle.title = preview.name;
+        }
         if (repositoryPreviewMeta) repositoryPreviewMeta.textContent = `${preview.type_label} · ${preview.size}${preview.language ? ` · ${preview.language}` : ""}`;
         if (repositoryPreviewDownload) repositoryPreviewDownload.href = preview.download_url;
         if (repositoryPreviewMessage && preview.message) {
