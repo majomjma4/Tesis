@@ -209,6 +209,12 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Se incorporaron estados para carpetas y ZIP vacíos, archivos inexistentes, ZIP dañados y rutas inválidas.
 - Se completó la quinta fase con descargas completas e individuales desde la pantalla de detalle.
 - Se agregaron acciones de descarga por archivo dentro del explorador.
+- Se completó la sexta fase con vistas previas integradas para PDF, imágenes, texto y código fuente.
+- Se incorporó lectura de texto, formato legible para JSON y visualización escapada de código con números de línea.
+- Se añadieron controles de zoom para imágenes y estados diferenciados para archivos vacíos, grandes o incompatibles.
+- Se completó la séptima fase con lectura integrada y segura de documentos DOCX.
+- La vista DOCX conserva títulos, párrafos, listas y tablas básicas dentro del diseño actual del repositorio.
+- Se completó la fase final de pulido con mejoras de teclado, foco, estados anunciables y movimiento reducido.
 - La pantalla de detalle mantiene modo oscuro, responsive y el layout principal de la plataforma.
 
 ### Mejoras Técnicas
@@ -233,6 +239,21 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Se creó `DownloadModel` para simular incrementos por sesión hasta disponer de persistencia global en MySQL.
 - El contador aumenta solo después de validar el ZIP completo y no cambia por descargas individuales, navegación o fallos.
 - Se probaron nombres con espacios, tildes, paréntesis y guiones, además de rutas inválidas y archivos inexistentes.
+- Se creó `FilePreviewService` para clasificar formatos, validar MIME y aplicar límites antes de generar una vista previa.
+- Los PDF y las imágenes se transmiten en línea desde el ZIP privado sin extracción permanente; texto y código se entregan como datos seguros.
+- Se bloquearon SVG y formatos ejecutables, y se impidió que archivos con extensiones falsas se representen como contenido confiable.
+- Se agregaron encabezados `nosniff`, CSP restrictiva, disposición `inline` controlada y caché deshabilitada para el contenido visualizable.
+- Se verificaron PDF, PNG, JSON, PHP, TXT, archivos vacíos, archivos grandes, formatos no compatibles, rutas transversales y métodos HTTP no permitidos.
+- Se creó `DocxPreviewService` para aislar la validación, apertura temporal y lectura estructurada de documentos Word.
+- La extracción se limita a `word/document.xml`; no se cargan relaciones externas, macros, scripts, objetos incrustados ni HTML activo.
+- El contenido DOCX se entrega como bloques de datos y se construye mediante nodos de texto seguros en el navegador.
+- Los archivos temporales se eliminan siempre al finalizar y nunca se almacenan dentro de `public`.
+- Se probaron documentos DOCX válidos y dañados, además del bloqueo de su transmisión directa mediante la ruta de contenido en línea.
+- Se incorporó navegación completa por teclado en los filtros personalizados con atributos ARIA sincronizados.
+- Las tarjetas pueden abrirse con Enter o barra espaciadora y las vistas previas restauran el foco al archivo de origen.
+- Se añadieron estados `aria-busy`, regiones dinámicas anunciables y límites accesibles en los controles de zoom.
+- Se agregó compatibilidad con `prefers-reduced-motion` sin modificar el diseño o posicionamiento existente.
+- Se ejecutaron pruebas de regresión sobre catálogo, CSRF, favoritos, exploración ZIP, visualizadores, descargas, respuestas 404 y UTF-8.
 
 ---
 

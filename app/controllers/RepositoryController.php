@@ -70,6 +70,8 @@ final class RepositoryController
             'filesActionUrl' => route('repository-files'),
             'projectDownloadUrl' => base_url('index.php?page=repository-download&id=' . urlencode((string) ($project['id'] ?? 0))),
             'fileDownloadActionUrl' => route('repository-file-download'),
+            'previewActionUrl' => route('repository-preview'),
+            'previewContentActionUrl' => route('repository-preview-content'),
         ]);
     }
 
@@ -145,6 +147,62 @@ final class RepositoryController
         if (isset($download['archive']) && $download['archive'] instanceof ZipArchive) {
             $download['archive']->close();
         }
+        exit;
+    }
+
+    public function preview(): void
+    {
+        $this->ensureSession();
+        header('Content-Type: application/json; charset=UTF-8');
+
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+            http_response_code(405);
+            $this->sendJson(false, 'Método no permitido.');
+        }
+
+        $project = $this->resolvePublishedProjectFromRequest();
+        $path = (string) ($_GET['path'] ?? '');
+        $file = (new ArchiveService())->openFileStream($project['archive']['path'], $path);
+        if (!$file['success']) {
+            http_response_code($file['status'] === 'invalid_path' ? 400 : ($file['status'] === 'not_found' ? 404 : 422));
+            $this->sendJson(false, $file['message']);
+        }
+
+        $encodedProjectId = rawurlencode((string) $project['id']);
+        $encodedPath = rawurlencode($file['path']);
+        $contentUrl = base_url('index.php?page=repository-preview-content&id=' . $encodedProjectId . '&path=' . $encodedPath);
+        $downloadUrl = base_url('index.php?page=repository-file-download&id=' . $encodedProjectId . '&path=' . $encodedPath);
+        $preview = (new FilePreviewService())->prepare($file, $contentUrl, $downloadUrl);
+        $this->closeArchiveFile($file);
+
+        $this->sendJson(true, $preview['message'], ['preview' => $preview]);
+    }
+
+    public function previewContent(): void
+    {
+        $this->ensureSession();
+        $project = $this->resolvePublishedProjectFromRequest();
+        $file = (new ArchiveService())->openFileStream($project['archive']['path'], (string) ($_GET['path'] ?? ''));
+        if (!$file['success']) {
+            http_response_code($file['status'] === 'invalid_path' ? 400 : ($file['status'] === 'not_found' ? 404 : 422));
+            $this->renderDownloadError($file['message']);
+        }
+
+        if (!(new FilePreviewService())->canStreamInline($file)) {
+            $this->closeArchiveFile($file);
+            http_response_code(415);
+            $this->renderDownloadError('Este formato no puede visualizarse dentro de la plataforma.');
+        }
+
+        session_write_close();
+        header('Content-Type: ' . $file['mime']);
+        header('Content-Length: ' . $file['size']);
+        header('Content-Disposition: inline; filename*=UTF-8\'\'' . rawurlencode($file['name']));
+        header('X-Content-Type-Options: nosniff');
+        header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
+        header('Cache-Control: private, no-store, max-age=0');
+        fpassthru($file['stream']);
+        $this->closeArchiveFile($file);
         exit;
     }
 
@@ -234,6 +292,16 @@ final class RepositoryController
         header('Content-Disposition: attachment; filename="' . $fallbackName . '"; filename*=UTF-8\'\'' . rawurlencode($fileName));
         header('X-Content-Type-Options: nosniff');
         header('Cache-Control: private, no-store, max-age=0');
+    }
+
+    private function closeArchiveFile(array $file): void
+    {
+        if (isset($file['stream']) && is_resource($file['stream'])) {
+            fclose($file['stream']);
+        }
+        if (isset($file['archive']) && $file['archive'] instanceof ZipArchive) {
+            $file['archive']->close();
+        }
     }
 
     private function renderDownloadError(string $message): never

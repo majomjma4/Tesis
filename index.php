@@ -16,6 +16,8 @@ require APP_PATH . '/models/RepositoryModel.php';
 require APP_PATH . '/models/FavoriteModel.php';
 require APP_PATH . '/models/DownloadModel.php';
 require APP_PATH . '/services/ArchiveService.php';
+require APP_PATH . '/services/FilePreviewService.php';
+require APP_PATH . '/services/DocxPreviewService.php';
 require APP_PATH . '/controllers/DashboardController.php';
 require APP_PATH . '/controllers/AuthController.php';
 require APP_PATH . '/controllers/DevController.php';
@@ -36,6 +38,8 @@ match ($page) {
     'repository-files' => (new RepositoryController())->files(),
     'repository-download' => (new RepositoryController())->downloadProject(),
     'repository-file-download' => (new RepositoryController())->downloadFile(),
+    'repository-preview' => (new RepositoryController())->preview(),
+    'repository-preview-content' => (new RepositoryController())->previewContent(),
     'repository-favorite' => (new RepositoryController())->toggleFavorite(),
     default => (new DashboardController())->index(),
 };

@@ -19,6 +19,8 @@
         data-favorite-csrf="<?= e($favoriteCsrfToken) ?>"
         data-files-url="<?= e($filesActionUrl) ?>"
         data-file-download-url="<?= e($fileDownloadActionUrl) ?>"
+        data-preview-url="<?= e($previewActionUrl) ?>"
+        data-preview-content-url="<?= e($previewContentActionUrl) ?>"
         style="display: none;"
     >
         <nav class="repository-detail-breadcrumb" aria-label="Ruta de navegación">
@@ -80,7 +82,7 @@
                 <a class="open-btn repository-detail-download" href="<?= e($projectDownloadUrl) ?>"><i class="fa-solid fa-download"></i> Descargar proyecto completo</a>
             </aside>
 
-            <main class="repository-explorer" aria-labelledby="repositoryExplorerTitle">
+            <main class="repository-explorer" aria-labelledby="repositoryExplorerTitle" aria-busy="false">
                 <header class="repository-explorer-header">
                     <div>
                         <span class="section-eyebrow">Archivo principal</span>
@@ -102,7 +104,7 @@
 
                 <div class="repository-explorer-notice"><i class="fa-solid fa-shield-halved"></i><span>Exploración de solo lectura. Ningún archivo del proyecto se ejecuta o modifica.</span></div>
 
-                <div class="repository-explorer-state repository-explorer-state--<?= e($archiveState['status']) ?>" id="repositoryExplorerState"<?= $archiveState['status'] === 'ready' ? ' hidden' : '' ?>>
+                <div class="repository-explorer-state repository-explorer-state--<?= e($archiveState['status']) ?>" id="repositoryExplorerState" role="status" aria-live="polite"<?= $archiveState['status'] === 'ready' ? ' hidden' : '' ?>>
                     <i class="fa-solid <?= $archiveState['status'] === 'empty' ? 'fa-folder-open' : 'fa-triangle-exclamation' ?>" aria-hidden="true"></i>
                     <p><?= e($archiveState['message']) ?></p>
                 </div>
@@ -115,7 +117,7 @@
                             <?php if ($item['kind'] === 'folder'): ?>
                                 <button class="repository-file-name repository-file-entry" type="button" role="cell" data-folder-path="<?= e($item['path']) ?>"><i class="fa-solid <?= e($item['icon']) ?> repository-file-icon--folder"></i><strong><?= e($item['name']) ?></strong></button>
                             <?php else: ?>
-                                <span class="repository-file-name" role="cell"><i class="fa-solid <?= e($item['icon']) ?> repository-file-icon--file"></i><strong><?= e($item['name']) ?></strong></span>
+                                <button class="repository-file-name repository-file-entry" type="button" role="cell" data-file-path="<?= e($item['path']) ?>"><i class="fa-solid <?= e($item['icon']) ?> repository-file-icon--file"></i><strong><?= e($item['name']) ?></strong></button>
                             <?php endif; ?>
                             <span role="cell"><?= e($item['type']) ?></span>
                             <span role="cell"><?= e($item['size']) ?></span>
@@ -127,6 +129,58 @@
                         </div>
                     <?php endforeach; ?>
                     </div>
+                </div>
+
+                <section class="repository-preview" id="repositoryPreview" aria-labelledby="repositoryPreviewTitle" aria-busy="false" hidden>
+                    <button class="repository-preview-back" id="repositoryPreviewBack" type="button"><i class="fa-solid fa-arrow-left"></i> Volver a archivos</button>
+                    <header class="repository-preview-header">
+                        <div>
+                            <span class="section-eyebrow" id="repositoryPreviewType">Archivo</span>
+                            <h3 id="repositoryPreviewTitle">Vista previa</h3>
+                            <p id="repositoryPreviewMeta"></p>
+                        </div>
+                        <div class="repository-preview-actions">
+                            <button class="repository-preview-expand" id="repositoryPreviewExpand" type="button" disabled>
+                                <i class="fa-solid fa-expand" aria-hidden="true"></i>
+                                <span>Ampliar vista</span>
+                            </button>
+                            <a class="open-btn" id="repositoryPreviewDownload" href="#"><i class="fa-solid fa-download"></i> Descargar archivo</a>
+                        </div>
+                    </header>
+
+                    <div class="repository-preview-message" id="repositoryPreviewMessage" hidden></div>
+
+                    <div class="repository-preview-state" id="repositoryPreviewState" role="status" aria-live="polite">
+                        <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                        <p>Preparando vista previa...</p>
+                    </div>
+
+                    <iframe class="repository-preview-pdf" id="repositoryPreviewPdf" title="Vista previa del documento PDF" hidden></iframe>
+
+                    <div class="repository-preview-image-shell" id="repositoryPreviewImageShell" hidden>
+                        <div class="repository-preview-image-tools">
+                            <button type="button" id="repositoryImageZoomOut" aria-label="Reducir imagen"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                            <button type="button" id="repositoryImageZoomReset">100%</button>
+                            <button type="button" id="repositoryImageZoomIn" aria-label="Ampliar imagen"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                        </div>
+                        <div class="repository-preview-image-canvas"><img id="repositoryPreviewImage" alt="" /></div>
+                    </div>
+
+                    <pre class="repository-preview-text" id="repositoryPreviewText" hidden></pre>
+                    <div class="repository-preview-code" id="repositoryPreviewCode" hidden></div>
+                    <article class="repository-preview-docx" id="repositoryPreviewDocx" aria-label="Contenido del documento de Word" hidden></article>
+                </section>
+
+                <div class="repository-preview-modal" id="repositoryPreviewModal" hidden>
+                    <section class="repository-preview-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="repositoryPreviewModalTitle">
+                        <header class="repository-preview-modal-header">
+                            <h3 id="repositoryPreviewModalTitle">Vista ampliada</h3>
+                            <button class="repository-preview-modal-close" id="repositoryPreviewModalClose" type="button" aria-label="Cerrar vista ampliada">
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </header>
+                        <div class="repository-preview-modal-body" id="repositoryPreviewModalBody"></div>
+                    </section>
                 </div>
             </main>
         </div>

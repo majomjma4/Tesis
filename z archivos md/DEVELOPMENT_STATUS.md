@@ -276,12 +276,27 @@ Implementado:
 - Favoritos compartidos entre catálogo y detalle mediante la misma acción protegida.
 - Búsqueda ampliada a título, descripción, autores, tutor, tipo, tecnologías, palabras clave, PAO y año.
 - Acción para limpiar conjuntamente la búsqueda, los filtros y el modo de favoritos.
+- Fase 6 completada con visualizadores integrados para PDF, imágenes, texto plano y código fuente.
+- Vista de código segura con contenido escapado, numeración de líneas y resaltado visual básico sin ejecutar archivos.
+- Controles de ampliación para imágenes y acceso de descarga disponible desde todos los estados de vista previa.
+- Estados informativos para archivos vacíos, demasiado grandes, incompatibles o con extensión y MIME inconsistentes.
+- Visualización en línea restringida a PDF e imágenes validadas, con `nosniff`, CSP restrictiva y almacenamiento en caché deshabilitado.
+- Fase 7 completada con vista previa segura de documentos DOCX dentro del explorador existente.
+- Extracción controlada de títulos, párrafos, listas y tablas desde `word/document.xml`, sin representar HTML del documento.
+- Archivos DOCX procesados temporalmente fuera del directorio público y eliminados al finalizar cada solicitud.
+- Contenido externo, relaciones, macros, scripts y objetos incrustados excluidos de la vista previa.
+- Estados diferenciados para documentos vacíos, dañados, demasiado grandes o sin estructura compatible.
+- Fase final de pulido completada con mejoras de accesibilidad y pruebas generales de regresión.
+- Desplegables navegables mediante flechas, Inicio, Fin y Escape, con roles y estados ARIA sincronizados.
+- Tarjetas de proyecto activables mediante Enter o barra espaciadora sin interferir con el botón de favoritos.
+- Restauración del foco al regresar desde una vista previa y estados de carga anunciables para tecnologías de asistencia.
+- Contadores dinámicos anunciables, límites de zoom reflejados en los controles y compatibilidad con la preferencia de movimiento reducido.
+- Verificación funcional de catálogo, CSRF, favoritos, detalle, ZIP, visualizadores, descargas, errores HTTP y codificación UTF-8.
 
 Pendiente:
 
 - Migración de favoritos desde sesión hacia usuarios autenticados y base de datos MySQL.
-- Visualizadores de archivos.
-- Descarga de documentos.
+- Migración de datos simulados y persistencia temporal hacia MySQL.
 - Vinculacion con archivos reales.
 - Persistencia en base de datos.
 
@@ -405,16 +420,17 @@ Las mejoras importantes relacionadas con arquitectura o estructura deberán eval
 
 # 20. Próximo Objetivo
 
-El siguiente paso inmediato acordado es continuar la evolución gradual del Repositorio Institucional con la Fase 6:
+La evolución funcional y visual planificada para el Repositorio Institucional se encuentra completada hasta esta etapa.
 
-- Visualización integrada de PDF.
-- Vista previa segura de imágenes.
-- Lectura de archivos de texto.
-- Visualización escapada de código fuente.
-- Estado informativo para formatos no compatibles.
-- Límites configurables para archivos grandes.
+El siguiente objetivo recomendado es iniciar la integración de infraestructura real:
 
-Después permanecerán pendientes la vista previa DOCX y el pulido final del repositorio. La conexión a MySQL, autenticación real, sesiones de usuario y control de roles continúan siendo objetivos prioritarios de infraestructura para reemplazar la persistencia temporal utilizada en favoritos y descargas.
+- Diseñar las tablas y relaciones del repositorio en MySQL.
+- Sustituir proyectos, tecnologías, favoritos y contadores simulados por consultas persistentes.
+- Vincular favoritos con usuarios autenticados.
+- Incorporar permisos y roles para consulta, publicación y descarga.
+- Reemplazar los ZIP de prueba por archivos administrados por el sistema.
+
+La autenticación real, las sesiones de usuario y el control de roles continúan siendo requisitos prioritarios para completar esta migración.
 
 ---
 

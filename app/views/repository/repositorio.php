@@ -45,7 +45,7 @@
                 <span class="section-eyebrow">Material complementario</span>
                 <h2 class="section-title" id="repositorySupportTitle">Guías y documentos de apoyo</h2>
             </div>
-            <span class="repository-count" id="repositorySupportCount"><?= count($supportDocuments) ?> documentos</span>
+            <span class="repository-count" id="repositorySupportCount" aria-live="polite"><?= count($supportDocuments) ?> documentos</span>
         </div>
 
         <div class="repository-section-divider" aria-hidden="true"></div>
@@ -151,7 +151,7 @@
                 <h2 class="section-title" id="repositoryResultsTitle">Proyectos disponibles</h2>
             </div>
             <div class="repository-catalog-summary">
-                <span class="repository-count" id="repositoryCount">Mostrando <?= count($projects) ?> de <?= count($projects) ?> proyectos</span>
+                <span class="repository-count" id="repositoryCount" aria-live="polite">Mostrando <?= count($projects) ?> de <?= count($projects) ?> proyectos</span>
                 <button class="repository-favorites-filter" id="repositoryFavoritesFilter" type="button" aria-pressed="false">
                     <i class="fa-regular fa-heart"></i>
                     <span>Favoritos</span>

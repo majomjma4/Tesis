@@ -183,7 +183,7 @@ repositoryCards.forEach((card) => {
     });
 
     const openProjectDetail = (event) => {
-        if (event.type === "keydown" && event.key !== "Enter") return;
+        if (event.type === "keydown" && !["Enter", " "].includes(event.key)) return;
         if (event.target.closest("button")) return;
         const projectUrl = card.dataset.projectUrl;
         if (!projectUrl) return;
@@ -313,6 +313,8 @@ function openRepositoryDropdown(dropdown) {
         trigger.setAttribute("aria-expanded", "true");
     }
     dropdown.classList.add("is-open");
+    const selectedOption = dropdown.querySelector("[data-dropdown-option].is-selected");
+    (selectedOption ?? dropdown.querySelector("[data-dropdown-option]"))?.focus();
 }
 
 function syncRepositoryDropdown(dropdown, value, label) {
@@ -328,7 +330,9 @@ function syncRepositoryDropdown(dropdown, value, label) {
         labelNode.textContent = label;
     }
     options.forEach((option) => {
-        option.classList.toggle("is-selected", option.dataset.value === value);
+        const isSelected = option.dataset.value === value;
+        option.classList.toggle("is-selected", isSelected);
+        option.setAttribute("aria-selected", String(isSelected));
     });
 }
 
@@ -336,6 +340,13 @@ repositoryDropdowns.forEach((dropdown) => {
     const trigger = dropdown.querySelector("[data-dropdown-trigger]");
     const menu = dropdown.querySelector("[data-dropdown-menu]");
     const options = [...dropdown.querySelectorAll("[data-dropdown-option]")];
+    const dropdownId = `repositoryDropdown${repositoryDropdowns.indexOf(dropdown) + 1}`;
+    if (menu) menu.id = dropdownId;
+    trigger?.setAttribute("aria-controls", dropdownId);
+    options.forEach((option) => {
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", String(option.classList.contains("is-selected")));
+    });
 
     trigger?.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -352,6 +363,17 @@ repositoryDropdowns.forEach((dropdown) => {
         openRepositoryDropdown(dropdown);
     });
 
+    trigger?.addEventListener("keydown", (event) => {
+        if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
+        event.preventDefault();
+        repositoryDropdowns.forEach((otherDropdown) => {
+            if (otherDropdown !== dropdown) closeRepositoryDropdown(otherDropdown);
+        });
+        openRepositoryDropdown(dropdown);
+        const target = event.key === "ArrowUp" ? options.at(-1) : options.find((option) => option.classList.contains("is-selected")) ?? options[0];
+        target?.focus();
+    });
+
     options.forEach((option) => {
         option.addEventListener("click", () => {
             syncRepositoryDropdown(dropdown, option.dataset.value ?? "all", option.textContent?.trim() ?? "");
@@ -360,6 +382,18 @@ repositoryDropdowns.forEach((dropdown) => {
     });
 
     menu?.addEventListener("keydown", (event) => {
+        const activeIndex = options.indexOf(document.activeElement);
+        if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+            event.preventDefault();
+            const nextIndex = event.key === "Home"
+                ? 0
+                : event.key === "End"
+                    ? options.length - 1
+                    : event.key === "ArrowDown"
+                        ? (activeIndex + 1 + options.length) % options.length
+                        : (activeIndex - 1 + options.length) % options.length;
+            options[nextIndex]?.focus();
+        }
         if (event.key === "Escape") {
             closeRepositoryDropdown(dropdown);
             trigger?.focus();
