@@ -8,6 +8,10 @@ const avatarButton = document.querySelector("#avatarButton");
 const avatarDropdown = document.querySelector("#avatarDropdown");
 const themeToggle = document.querySelector("#themeToggle");
 const bell = document.querySelector(".notification-icon");
+const topbarNotifications = document.querySelector(".topbar-notifications");
+const topbarNotificationsButton = document.querySelector("#topbarNotificationsButton");
+const topbarNotificationsPanel = document.querySelector("#topbarNotificationsPanel");
+const topbarNotificationsList = document.querySelector("#topbarNotificationsList");
 const logoutModal = document.querySelector("#logoutModal");
 const logoutCancelBtn = document.querySelector("#logoutCancelBtn");
 const logoutAcceptBtn = document.querySelector("#logoutAcceptBtn");
@@ -141,3 +145,126 @@ bell?.addEventListener("click", () => {
     }, 500);
 });
 // Final de efecto de notificaciones
+
+// Inicio de panel de notificaciones recientes
+let recentNotificationsLoaded = false;
+
+function closeTopbarNotifications() {
+    if (!topbarNotificationsPanel || !topbarNotificationsButton) return;
+    topbarNotificationsPanel.hidden = true;
+    topbarNotificationsButton.setAttribute("aria-expanded", "false");
+}
+
+function notificationIcon(type) {
+    return {
+        delivery: "fa-cloud-arrow-up",
+        observation: "fa-comment-dots",
+        status_change: "fa-circle-check",
+        review: "fa-triangle-exclamation",
+        reminder: "fa-clock",
+        tribunal: "fa-user-group",
+        repository: "fa-database",
+        comment: "fa-message",
+        system: "fa-gear",
+    }[type] || "fa-bell";
+}
+
+function safeRecentNotificationUrl(actionUrl) {
+    const notificationsUrl = topbarNotificationsPanel?.querySelector("footer a")?.href || "index.php?page=notifications";
+    if (!actionUrl) return notificationsUrl;
+
+    try {
+        const destination = new URL(actionUrl, window.location.href);
+        const applicationRoot = new URL(topbarNotificationsButton.dataset.listEndpoint, window.location.href).pathname.replace(/index\.php$/, "");
+        const isInternal = destination.origin === window.location.origin && destination.pathname.startsWith(applicationRoot);
+        return isInternal ? destination.href : notificationsUrl;
+    } catch {
+        return notificationsUrl;
+    }
+}
+
+function renderRecentNotifications(groups) {
+    if (!topbarNotificationsList) return;
+    const notifications = Object.values(groups || {}).flat().slice(0, 8);
+    topbarNotificationsList.replaceChildren();
+
+    if (!notifications.length) {
+        const empty = document.createElement("div");
+        empty.className = "topbar-notifications-empty";
+        empty.textContent = "No tienes notificaciones recientes.";
+        topbarNotificationsList.append(empty);
+        return;
+    }
+
+    notifications.forEach((notification) => {
+        const item = document.createElement("a");
+        item.className = `topbar-notification-item ${notification.is_read ? "is-read" : "is-unread"}`;
+        item.href = safeRecentNotificationUrl(notification.action_url);
+        item.setAttribute("aria-label", `${notification.title}. Abrir apartado relacionado`);
+
+        const icon = document.createElement("span");
+        icon.className = "topbar-notification-icon";
+        const glyph = document.createElement("i");
+        glyph.className = `fa-solid ${notificationIcon(notification.type)}`;
+        icon.append(glyph);
+
+        const copy = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = notification.title;
+        const description = document.createElement("p");
+        description.textContent = notification.description;
+        const time = document.createElement("small");
+        time.textContent = `${notification.date} · ${notification.time}`;
+        copy.append(title, description, time);
+
+        if (!notification.is_read) {
+            const dot = document.createElement("span");
+            dot.className = "topbar-notification-dot";
+            dot.setAttribute("aria-label", "No leída");
+            item.append(icon, copy, dot);
+        } else {
+            item.append(icon, copy);
+        }
+        topbarNotificationsList.append(item);
+    });
+}
+
+async function loadRecentNotifications() {
+    if (!topbarNotificationsButton || recentNotificationsLoaded) return;
+    try {
+        const response = await fetch(topbarNotificationsButton.dataset.listEndpoint, { credentials: "same-origin", headers: { "X-Requested-With": "XMLHttpRequest" } });
+        const payload = await response.json();
+        if (!response.ok || !payload.success) throw new Error();
+        renderRecentNotifications(payload.data.groups);
+        const count = document.querySelector(".notification-count");
+        if (count) { count.textContent = String(payload.data.counters.unread); count.hidden = payload.data.counters.unread === 0; }
+        recentNotificationsLoaded = true;
+    } catch {
+        if (topbarNotificationsList) {
+            topbarNotificationsList.replaceChildren();
+            const error = document.createElement("div");
+            error.className = "topbar-notifications-empty";
+            error.textContent = "No fue posible cargar las notificaciones.";
+            topbarNotificationsList.append(error);
+        }
+    }
+}
+
+topbarNotificationsButton?.addEventListener("click", async () => {
+    const willOpen = Boolean(topbarNotificationsPanel?.hidden);
+    if (topbarNotificationsPanel) topbarNotificationsPanel.hidden = !willOpen;
+    topbarNotificationsButton.setAttribute("aria-expanded", String(willOpen));
+    if (willOpen) await loadRecentNotifications();
+});
+
+document.addEventListener("click", (event) => {
+    if (!event.target.closest(".topbar-notifications")) closeTopbarNotifications();
+});
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && topbarNotificationsPanel && !topbarNotificationsPanel.hidden) {
+        closeTopbarNotifications();
+        topbarNotificationsButton?.focus();
+    }
+});
+// Final de panel de notificaciones recientes

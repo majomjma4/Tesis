@@ -3300,3 +3300,165 @@ body.dark-mode .upload-alert.error {
     color: var(--danger);
 }
 /* Final de estilos de proyectos */
+/* Inicio de panel de notificaciones de la barra superior */
+.topbar-notifications{
+    position:relative;
+}
+.topbar-notifications-panel{
+    position:absolute;
+    z-index:95;
+    top:calc(100% + 12px);
+    right:0;
+    width:min(390px,calc(100vw - 32px));
+    overflow:hidden;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:20px;
+    box-shadow:0 24px 55px rgba(15,23,42,.2);
+}
+.topbar-notifications-panel[hidden]{
+    display:none;
+}
+.topbar-notifications-panel header{
+    padding:17px 18px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(135deg,rgba(37,99,235,.08),rgba(16,185,129,.06));
+}
+.topbar-notifications-panel header span{
+    color:var(--blue);
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+}
+.topbar-notifications-panel header h2{
+    margin-top:2px;
+    font-size:18px;
+}
+.topbar-notifications-panel header>i{
+    color:var(--blue);
+    font-size:20px;
+}
+.topbar-notifications-list{
+    max-height:344px;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    scrollbar-width:thin;
+    scrollbar-color:rgba(100,116,139,.32) transparent;
+}
+.topbar-notifications-list::-webkit-scrollbar{
+    width:5px;
+}
+.topbar-notifications-list::-webkit-scrollbar-track{
+    background:transparent;
+}
+.topbar-notifications-list::-webkit-scrollbar-thumb{
+    background:rgba(100,116,139,.28);
+    border-radius:999px;
+}
+.topbar-notification-item{
+    position:relative;
+    min-height:86px;
+    padding:13px 16px;
+    display:grid;
+    grid-template-columns:40px minmax(0,1fr) 8px;
+    align-items:center;
+    gap:11px;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+    transition:background-color .18s ease;
+}
+.topbar-notification-item:hover,
+.topbar-notification-item:focus-visible{
+    background:var(--surface-soft);
+    outline:none;
+}
+.topbar-notification-item.is-read{
+    opacity:.72;
+    grid-template-columns:40px minmax(0,1fr);
+}
+.topbar-notification-icon{
+    width:40px;
+    height:40px;
+    display:grid;
+    place-items:center;
+    border-radius:12px;
+    background:rgba(37,99,235,.1);
+    color:var(--blue);
+}
+.topbar-notification-item strong{
+    display:block;
+    overflow:hidden;
+    color:var(--text);
+    font-size:13px;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+}
+.topbar-notification-item p{
+    margin:4px 0;
+    overflow:hidden;
+    color:var(--muted);
+    font-size:12px;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+}
+.topbar-notification-item small{
+    color:var(--muted);
+    font-size:10px;
+}
+.topbar-notification-dot{
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:var(--blue);
+    box-shadow:0 0 0 4px rgba(37,99,235,.1);
+}
+.topbar-notifications-loading,
+.topbar-notifications-empty{
+    min-height:100px;
+    padding:20px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    color:var(--muted);
+    font-size:13px;
+    text-align:center;
+}
+.topbar-notifications-panel footer{
+    padding:11px;
+    border-top:1px solid var(--line);
+    background:var(--surface);
+}
+.topbar-notifications-panel footer a{
+    min-height:42px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    border-radius:12px;
+    background:var(--primary);
+    color:white;
+    font-size:13px;
+    font-weight:800;
+    transition:.2s ease;
+}
+.topbar-notifications-panel footer a:hover{
+    background:var(--blue-dark);
+}
+html.theme-dark .topbar-notifications-list{
+    scrollbar-color:rgba(148,163,184,.4) transparent;
+}
+@media(max-width:600px){
+    .topbar-notifications-panel{
+        position:fixed;
+        top:76px;
+        right:16px;
+        left:16px;
+        width:auto;
+    }
+}
+/* Final de panel de notificaciones de la barra superior */

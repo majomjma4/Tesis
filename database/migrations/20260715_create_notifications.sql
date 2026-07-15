@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NOT NULL,
+    project_id BIGINT UNSIGNED NULL,
+    type ENUM('delivery','observation','status_change','review','reminder','system','tribunal','repository','comment') NOT NULL,
+    title VARCHAR(180) NOT NULL,
+    message TEXT NOT NULL,
+    action_url VARCHAR(500) NULL,
+    action_label VARCHAR(80) NULL,
+    metadata JSON NULL,
+    is_read TINYINT(1) NOT NULL DEFAULT 0,
+    read_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME NULL,
+    PRIMARY KEY (id),
+    INDEX idx_notifications_user (user_id),
+    INDEX idx_notifications_project (project_id),
+    INDEX idx_notifications_read (is_read),
+    INDEX idx_notifications_type (type),
+    INDEX idx_notifications_created (created_at),
+    INDEX idx_notifications_user_active_created (user_id, deleted_at, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

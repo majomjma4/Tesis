@@ -46,7 +46,7 @@
                     <span class="menu-icon"><i class="fa-solid fa-calendar-days"></i></span>
                     <span>Calendario</span>
                 </a>
-                <a href="#" class="menu-item <?= ($currentPage ?? '') === 'notifications' ? 'active' : '' ?>">
+                <a href="<?= e(route('notifications')) ?>" class="menu-item <?= ($currentPage ?? '') === 'notifications' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-bell"></i></span>
                     <span>Notificaciones</span>
                 </a>
@@ -83,10 +83,19 @@
                 <button class="icon-btn theme-toggle" id="themeToggle" type="button" aria-label="Cambiar modo claro u oscuro">
                     <i class="fa-solid fa-moon"></i>
                 </button>
-                <button class="notification-icon" type="button" aria-label="Ver notificaciones">
-                    <i class="fa-solid fa-bell"></i>
-                    <span class="notification-count">3</span>
-                </button>
+                <div class="topbar-notifications">
+                    <button class="notification-icon" id="topbarNotificationsButton" type="button" aria-label="Mostrar notificaciones recientes" aria-haspopup="dialog" aria-expanded="false" aria-controls="topbarNotificationsPanel" data-list-endpoint="<?= e(route('notifications/list')) ?>">
+                        <i class="fa-solid fa-bell"></i>
+                        <span class="notification-count" <?= empty($notificationUnreadCount) ? 'hidden' : '' ?>><?= e((string) ($notificationUnreadCount ?? 0)) ?></span>
+                    </button>
+                    <section class="topbar-notifications-panel" id="topbarNotificationsPanel" aria-label="Notificaciones recientes" hidden>
+                        <header><div><span>Actividad reciente</span><h2>Notificaciones</h2></div><i class="fa-regular fa-bell"></i></header>
+                        <div class="topbar-notifications-list" id="topbarNotificationsList">
+                            <div class="topbar-notifications-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Cargando...</span></div>
+                        </div>
+                        <footer><a href="<?= e(route('notifications')) ?>">Ver más notificaciones <i class="fa-solid fa-arrow-right"></i></a></footer>
+                    </section>
+                </div>
 
                 <div class="avatar-menu">
                     <button class="user-avatar" id="avatarButton" type="button" aria-label="Abrir menu de usuario" aria-expanded="false">
