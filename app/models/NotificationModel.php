@@ -17,7 +17,10 @@ final class NotificationModel
 
     public function getByUser(int $userId, array $filters = []): array
     {
-        $conditions = ['user_id = :user_id', !empty($filters['hidden']) ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL'];
+        $visibility = !empty($filters['trash'])
+            ? 'deleted_at IS NOT NULL'
+            : (!empty($filters['hidden']) ? 'archived_at IS NOT NULL AND deleted_at IS NULL' : 'archived_at IS NULL AND deleted_at IS NULL');
+        $conditions = ['user_id = :user_id', $visibility];
         $parameters = ['user_id' => $userId];
 
         $search = trim((string) ($filters['search'] ?? ''));
@@ -41,7 +44,7 @@ final class NotificationModel
         }
 
         $statement = $this->connection()->prepare(
-            'SELECT id, user_id, project_id, type, title, message, action_url, action_label, metadata, is_read, read_at, created_at, deleted_at
+            'SELECT id, user_id, project_id, type, title, message, action_url, action_label, metadata, is_read, read_at, created_at, archived_at, deleted_at
              FROM notifications WHERE ' . implode(' AND ', $conditions) . ' ORDER BY created_at DESC, id DESC'
         );
         $statement->execute($parameters);
@@ -53,7 +56,7 @@ final class NotificationModel
     {
         $statement = $this->connection()->prepare(
             'SELECT id, user_id, project_id, type, title, message, action_url, action_label, metadata, is_read, read_at, created_at
-             FROM notifications WHERE id = :id AND user_id = :user_id AND deleted_at IS NULL LIMIT 1'
+             FROM notifications WHERE id = :id AND user_id = :user_id AND archived_at IS NULL AND deleted_at IS NULL LIMIT 1'
         );
         $statement->execute(['id' => $notificationId, 'user_id' => $userId]);
         $notification = $statement->fetch();
@@ -68,7 +71,7 @@ final class NotificationModel
                     SUM(is_read = 0) AS unread,
                     SUM(DATE(created_at) = CURRENT_DATE()) AS today,
                     SUM(YEARWEEK(created_at, 1) = YEARWEEK(CURRENT_DATE(), 1)) AS week
-             FROM notifications WHERE user_id = :user_id AND deleted_at IS NULL'
+             FROM notifications WHERE user_id = :user_id AND archived_at IS NULL AND deleted_at IS NULL'
         );
         $statement->execute(['user_id' => $userId]);
         $row = $statement->fetch() ?: [];
@@ -95,7 +98,7 @@ final class NotificationModel
     {
         $statement = $this->connection()->prepare(
             'UPDATE notifications SET is_read = 1, read_at = NOW(), updated_at = NOW()
-             WHERE user_id = :user_id AND deleted_at IS NULL AND is_read = 0'
+             WHERE user_id = :user_id AND archived_at IS NULL AND deleted_at IS NULL AND is_read = 0'
         );
         $statement->execute(['user_id' => $userId]);
 
@@ -105,8 +108,8 @@ final class NotificationModel
     public function softDelete(int $notificationId, int $userId): bool
     {
         $statement = $this->connection()->prepare(
-            'UPDATE notifications SET deleted_at = NOW(), updated_at = NOW()
-             WHERE id = :id AND user_id = :user_id AND deleted_at IS NULL'
+            'UPDATE notifications SET archived_at = NOW(), updated_at = NOW()
+             WHERE id = :id AND user_id = :user_id AND archived_at IS NULL AND deleted_at IS NULL'
         );
         $statement->execute(['id' => $notificationId, 'user_id' => $userId]);
 
@@ -116,12 +119,77 @@ final class NotificationModel
     public function restore(int $notificationId, int $userId): bool
     {
         $statement = $this->connection()->prepare(
-            'UPDATE notifications SET deleted_at = NULL, updated_at = NOW()
-             WHERE id = :id AND user_id = :user_id AND deleted_at IS NOT NULL'
+            'UPDATE notifications SET archived_at = NULL, deleted_at = NULL, updated_at = NOW()
+             WHERE id = :id AND user_id = :user_id AND (archived_at IS NOT NULL OR deleted_at IS NOT NULL)'
         );
         $statement->execute(['id' => $notificationId, 'user_id' => $userId]);
 
         return $statement->rowCount() === 1;
+    }
+
+    public function deletePermanently(int $notificationId, int $userId): bool
+    {
+        $statement = $this->connection()->prepare(
+            'DELETE FROM notifications WHERE id = :id AND user_id = :user_id'
+        );
+        $statement->execute(['id' => $notificationId, 'user_id' => $userId]);
+
+        return $statement->rowCount() === 1;
+    }
+
+    public function moveToTrash(int $notificationId, int $userId): bool
+    {
+        $statement = $this->connection()->prepare(
+            'UPDATE notifications SET archived_at = NULL, deleted_at = NOW(), updated_at = NOW()
+             WHERE id = :id AND user_id = :user_id AND deleted_at IS NULL'
+        );
+        $statement->execute(['id' => $notificationId, 'user_id' => $userId]);
+
+        return $statement->rowCount() === 1;
+    }
+
+    public function purgeExpiredTrash(int $days = 30): int
+    {
+        $days = max(1, min($days, 365));
+        $statement = $this->connection()->prepare(
+            'DELETE FROM notifications WHERE deleted_at IS NOT NULL AND deleted_at < DATE_SUB(NOW(), INTERVAL :days DAY)'
+        );
+        $statement->bindValue('days', $days, PDO::PARAM_INT);
+        $statement->execute();
+
+        return $statement->rowCount();
+    }
+
+    public function emptyTrash(int $userId): int
+    {
+        $statement = $this->connection()->prepare('DELETE FROM notifications WHERE user_id = :user_id AND deleted_at IS NOT NULL');
+        $statement->execute(['user_id' => $userId]);
+        return $statement->rowCount();
+    }
+
+    public function restoreMany(array $notificationIds, int $userId): int
+    {
+        return $this->updateManyFromTrash($notificationIds, $userId, false);
+    }
+
+    public function deleteManyFromTrash(array $notificationIds, int $userId): int
+    {
+        return $this->updateManyFromTrash($notificationIds, $userId, true);
+    }
+
+    private function updateManyFromTrash(array $notificationIds, int $userId, bool $delete): int
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $notificationIds), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return 0;
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $sql = $delete
+            ? "DELETE FROM notifications WHERE user_id = ? AND deleted_at IS NOT NULL AND id IN ($placeholders)"
+            : "UPDATE notifications SET deleted_at = NULL, archived_at = NULL, updated_at = NOW() WHERE user_id = ? AND deleted_at IS NOT NULL AND id IN ($placeholders)";
+        $statement = $this->connection()->prepare($sql);
+        $statement->execute(array_merge([$userId], $ids));
+        return $statement->rowCount();
     }
 
     public function countUnread(int $userId): int
@@ -154,11 +222,18 @@ final class NotificationModel
                 'title' => $title,
                 'message' => $message,
                 'action_url' => $actionUrl,
-                'action_label' => $actionUrl === null ? null : 'Ver',
+                'action_label' => $actionUrl === null ? null : match ($type) {
+                    'repository' => 'Abrir repositorio',
+                    'observation', 'review', 'comment' => 'Revisar en el proyecto',
+                    'delivery' => 'Ver entrega',
+                    'tribunal' => 'Ver informacion del tribunal',
+                    default => 'Ir al proyecto',
+                },
                 'metadata' => ['project_name' => $projectName],
                 'is_read' => $isRead,
                 'read_at' => $isRead ? $now->modify($relativeDate)->format('Y-m-d H:i:s') : null,
                 'created_at' => $now->modify($relativeDate)->format('Y-m-d H:i:s'),
+                'archived_at' => null,
                 'deleted_at' => null,
                 'project_name' => $projectName,
             ];
@@ -170,7 +245,7 @@ final class NotificationModel
         $today = new DateTimeImmutable('today');
         $weekStart = $today->modify('monday this week');
 
-        $active = array_filter($notifications, static fn (array $item): bool => empty($item['deleted_at']));
+        $active = array_filter($notifications, static fn (array $item): bool => empty($item['archived_at']) && empty($item['deleted_at']));
         return [
             'unread' => count(array_filter($active, static fn (array $item): bool => !$item['is_read'])),
             'today' => count(array_filter($active, static fn (array $item): bool => new DateTimeImmutable($item['created_at']) >= $today)),

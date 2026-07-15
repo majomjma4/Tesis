@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     read_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    archived_at DATETIME NULL,
     deleted_at DATETIME NULL,
     PRIMARY KEY (id),
     INDEX idx_notifications_user (user_id),
@@ -19,5 +20,6 @@ CREATE TABLE IF NOT EXISTS notifications (
     INDEX idx_notifications_read (is_read),
     INDEX idx_notifications_type (type),
     INDEX idx_notifications_created (created_at),
+    INDEX idx_notifications_archived (archived_at),
     INDEX idx_notifications_user_active_created (user_id, deleted_at, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

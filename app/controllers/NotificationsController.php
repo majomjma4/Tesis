@@ -13,6 +13,7 @@ final class NotificationsController
 
         try {
             $model = new NotificationModel();
+            $model->purgeExpiredTrash();
             $notifications = $model->getByUser($this->currentUserId());
             $counters = $model->getCounters($this->currentUserId());
         } catch (Throwable $exception) {
@@ -44,21 +45,25 @@ final class NotificationsController
         $search = mb_strtolower(mb_substr(trim((string) ($_GET['search'] ?? '')), 0, 120));
         $type = (string) ($_GET['type'] ?? '');
         $hidden = filter_var($_GET['hidden'] ?? false, FILTER_VALIDATE_BOOL);
+        $trash = filter_var($_GET['trash'] ?? false, FILTER_VALIDATE_BOOL);
         $status = (string) ($_GET['status'] ?? '');
         $model = new NotificationModel();
 
         try {
-            $notifications = $model->getByUser($this->currentUserId(), ['search' => $search, 'type' => $type, 'status' => $status, 'hidden' => $hidden]);
+            $model->purgeExpiredTrash();
+            $notifications = $model->getByUser($this->currentUserId(), ['search' => $search, 'type' => $type, 'status' => $status, 'hidden' => $hidden, 'trash' => $trash]);
             $counters = $model->getCounters($this->currentUserId());
         } catch (Throwable $exception) {
             error_log('Notifications list fallback: ' . $exception->getMessage());
             $allNotifications = $this->demoNotifications();
-            $notifications = array_values(array_filter($allNotifications, static function (array $item) use ($search, $type, $status, $hidden): bool {
+            $notifications = array_values(array_filter($allNotifications, static function (array $item) use ($search, $type, $status, $hidden, $trash): bool {
                 $haystack = mb_strtolower($item['title'] . ' ' . $item['message'] . ' ' . $item['project_name']);
                 $matchesSearch = $search === '' || str_contains($haystack, $search);
                 $matchesType = $type === '' || $item['type'] === $type;
                 $matchesStatus = $status === '' || ($status === 'read' ? $item['is_read'] : !$item['is_read']);
-                $matchesVisibility = $hidden ? !empty($item['deleted_at']) : empty($item['deleted_at']);
+                $matchesVisibility = $trash
+                    ? !empty($item['deleted_at'])
+                    : ($hidden ? !empty($item['archived_at']) && empty($item['deleted_at']) : empty($item['archived_at']) && empty($item['deleted_at']));
                 return $matchesSearch && $matchesType && $matchesStatus && $matchesVisibility;
             }));
             $counters = $model->getDemoCounters($allNotifications);
@@ -109,13 +114,13 @@ final class NotificationsController
             }
             $model->softDelete($id, $userId);
             return ['notificationId' => $id, 'counters' => $model->getCounters($userId)];
-        }, 'Notificacion ocultada.', function () use ($id): array {
+        }, 'Notificacion archivada.', function () use ($id): array {
             $notifications = $this->demoNotifications();
             $exists = false;
             foreach ($notifications as &$notification) {
                 if ($notification['id'] === $id) {
                     $exists = true;
-                    $notification['deleted_at'] = date('Y-m-d H:i:s');
+                    $notification['archived_at'] = date('Y-m-d H:i:s');
                     break;
                 }
             }
@@ -150,12 +155,79 @@ final class NotificationsController
         }, 'Notificacion restaurada.', function () use ($id): array {
             $notifications = $this->demoNotifications();
             $index = $this->findDemoNotificationIndex($notifications, $id);
-            if ($index === null || empty($notifications[$index]['deleted_at'])) {
+            if ($index === null || (empty($notifications[$index]['archived_at']) && empty($notifications[$index]['deleted_at']))) {
                 $this->json(false, 'La notificacion oculta no existe.', [], 404);
             }
             $notifications[$index]['deleted_at'] = null;
             $this->saveDemoNotifications($notifications);
             return ['notificationId' => $id, 'counters' => (new NotificationModel())->getDemoCounters($notifications)];
+        });
+    }
+
+    public function destroy(): void
+    {
+        $this->requirePostAndCsrf();
+        $id = $this->notificationId();
+        $this->runJson(function (NotificationModel $model, int $userId) use ($id): array {
+            if (!$model->moveToTrash($id, $userId)) {
+                $this->json(false, 'La notificacion no existe.', [], 404);
+            }
+            return ['notificationId' => $id, 'counters' => $model->getCounters($userId)];
+        }, 'Notificacion movida a la papelera.', function () use ($id): array {
+            $notifications = $this->demoNotifications();
+            $index = $this->findDemoNotificationIndex($notifications, $id);
+            if ($index === null) {
+                $this->json(false, 'La notificacion no existe.', [], 404);
+            }
+            $notifications[$index]['archived_at'] = null;
+            $notifications[$index]['deleted_at'] = date('Y-m-d H:i:s');
+            $this->saveDemoNotifications($notifications);
+            return ['notificationId' => $id, 'counters' => (new NotificationModel())->getDemoCounters($notifications)];
+        });
+    }
+
+    public function emptyTrash(): void
+    {
+        $this->requirePostAndCsrf();
+        $this->runJson(function (NotificationModel $model, int $userId): array {
+            $deleted = $model->emptyTrash($userId);
+            return ['affected' => $deleted, 'counters' => $model->getCounters($userId)];
+        }, 'Papelera vaciada.', function (): array {
+            $notifications = $this->demoNotifications();
+            $before = count($notifications);
+            $notifications = array_values(array_filter($notifications, static fn (array $item): bool => empty($item['deleted_at'])));
+            $this->saveDemoNotifications($notifications);
+            return ['affected' => $before - count($notifications), 'counters' => (new NotificationModel())->getDemoCounters($notifications)];
+        });
+    }
+
+    public function trashBulk(): void
+    {
+        $this->requirePostAndCsrf();
+        $action = (string) ($_POST['bulk_action'] ?? '');
+        if (!in_array($action, ['restore', 'delete'], true)) {
+            $this->json(false, 'Accion masiva no valida.', [], 400);
+        }
+        $ids = $this->notificationIds();
+        $this->runJson(function (NotificationModel $model, int $userId) use ($action, $ids): array {
+            $affected = $action === 'restore' ? $model->restoreMany($ids, $userId) : $model->deleteManyFromTrash($ids, $userId);
+            return ['affected' => $affected, 'counters' => $model->getCounters($userId)];
+        }, $action === 'restore' ? 'Notificaciones restauradas.' : 'Notificaciones eliminadas definitivamente.', function () use ($action, $ids): array {
+            $notifications = $this->demoNotifications();
+            $affected = 0;
+            if ($action === 'delete') {
+                $notifications = array_values(array_filter($notifications, static function (array $item) use ($ids, &$affected): bool {
+                    if (!empty($item['deleted_at']) && in_array((int) $item['id'], $ids, true)) { $affected++; return false; }
+                    return true;
+                }));
+            } else {
+                foreach ($notifications as &$item) {
+                    if (!empty($item['deleted_at']) && in_array((int) $item['id'], $ids, true)) { $item['deleted_at'] = null; $item['archived_at'] = null; $affected++; }
+                }
+                unset($item);
+            }
+            $this->saveDemoNotifications($notifications);
+            return ['affected' => $affected, 'counters' => (new NotificationModel())->getDemoCounters($notifications)];
         });
     }
 
@@ -174,7 +246,7 @@ final class NotificationsController
             return [
                 'notificationId' => $id,
                 'url' => $url,
-                'detail' => $url === null ? $notification : null,
+                'detail' => $notification,
                 'counters' => $model->getCounters($userId),
             ];
         }, 'Notificacion abierta.', function () use ($id): array {
@@ -187,7 +259,7 @@ final class NotificationsController
             $notifications[$index]['read_at'] = date('Y-m-d H:i:s');
             $this->saveDemoNotifications($notifications);
             $url = $this->safeInternalUrl($notifications[$index]['action_url']);
-            return ['notificationId' => $id, 'url' => $url, 'detail' => $url === null ? $notifications[$index] : null, 'counters' => (new NotificationModel())->getDemoCounters($notifications)];
+            return ['notificationId' => $id, 'url' => $url, 'detail' => $notifications[$index], 'counters' => (new NotificationModel())->getDemoCounters($notifications)];
         });
     }
 
@@ -239,6 +311,13 @@ final class NotificationsController
         if (!isset($_SESSION['notification_demo_items']) || !is_array($_SESSION['notification_demo_items'])) {
             $_SESSION['notification_demo_items'] = (new NotificationModel())->getDemoNotifications();
         }
+        $expiration = new DateTimeImmutable('-30 days');
+        $_SESSION['notification_demo_items'] = array_values(array_filter($_SESSION['notification_demo_items'], static function (array $notification) use ($expiration): bool {
+            if (empty($notification['deleted_at'])) {
+                return true;
+            }
+            return new DateTimeImmutable($notification['deleted_at']) >= $expiration;
+        }));
         return $_SESSION['notification_demo_items'];
     }
 
@@ -282,6 +361,19 @@ final class NotificationsController
             $this->json(false, 'Identificador invalido.', [], 400);
         }
         return (int) $id;
+    }
+
+    private function notificationIds(): array
+    {
+        $submitted = $_POST['notification_ids'] ?? [];
+        if (!is_array($submitted)) {
+            $this->json(false, 'Seleccion no valida.', [], 400);
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', array_slice($submitted, 0, 100)), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            $this->json(false, 'Selecciona al menos una notificacion.', [], 400);
+        }
+        return $ids;
     }
 
     private function ensureSession(): void
@@ -365,12 +457,12 @@ final class NotificationsController
 
     private function filters(): array
     {
-        return ['all' => 'Todas', 'hidden' => 'Ocultas', 'delivery' => 'Entregas', 'observation' => 'Observaciones', 'status_change' => 'Cambios de estado', 'review' => 'Revision', 'reminder' => 'Recordatorios', 'system' => 'Sistema', 'tribunal' => 'Tribunal', 'repository' => 'Repositorio', 'comment' => 'Comentarios'];
+        return ['all' => 'Todas', 'unread' => 'No leidas', 'read' => 'Leidas', 'hidden' => 'Archivadas', 'trash' => 'Papelera', 'delivery' => 'Entregas', 'observation' => 'Observaciones', 'status_change' => 'Cambios de estado', 'review' => 'Revision', 'reminder' => 'Recordatorios', 'system' => 'Sistema', 'tribunal' => 'Tribunal', 'repository' => 'Repositorio', 'comment' => 'Comentarios'];
     }
 
     private function endpoints(): array
     {
-        $names = ['list', 'read', 'unread', 'read-all', 'delete', 'restore', 'counters', 'open'];
+        $names = ['list', 'read', 'unread', 'read-all', 'delete', 'restore', 'destroy', 'trash-empty', 'trash-bulk', 'counters', 'open'];
         return array_combine($names, array_map(static fn (string $name): string => route('notifications/' . $name), $names));
     }
 
