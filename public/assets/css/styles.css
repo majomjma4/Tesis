@@ -3359,6 +3359,19 @@ body.dark-mode .upload-alert.error {
     background:rgba(100,116,139,.28);
     border-radius:999px;
 }
+.topbar-notifications-section-title{
+    position:sticky;
+    top:0;
+    z-index:2;
+    padding:7px 16px;
+    background:color-mix(in srgb,var(--surface) 94%,var(--surface-soft));
+    border-bottom:1px solid var(--line);
+    color:var(--muted);
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+}
 .topbar-notification-item{
     position:relative;
     min-height:86px;

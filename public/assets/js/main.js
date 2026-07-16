@@ -196,37 +196,37 @@ function renderRecentNotifications(groups) {
         return;
     }
 
-    notifications.forEach((notification) => {
-        const item = document.createElement("a");
-        item.className = `topbar-notification-item ${notification.is_read ? "is-read" : "is-unread"}`;
-        item.href = safeRecentNotificationUrl(notification.action_url);
-        item.setAttribute("aria-label", `${notification.title}. Abrir apartado relacionado`);
+    function appendSection(sectionTitle, items) {
+        if (!items.length) return;
+        const heading = document.createElement("div");
+        heading.className = "topbar-notifications-section-title";
+        heading.textContent = sectionTitle;
+        topbarNotificationsList.append(heading);
 
-        const icon = document.createElement("span");
-        icon.className = "topbar-notification-icon";
-        const glyph = document.createElement("i");
-        glyph.className = `fa-solid ${notificationIcon(notification.type)}`;
-        icon.append(glyph);
+        items.forEach((notification) => {
+            const item = document.createElement("a");
+            item.className = `topbar-notification-item ${notification.is_read ? "is-read" : "is-unread"}`;
+            item.href = safeRecentNotificationUrl(notification.action_url);
+            item.setAttribute("aria-label", `${notification.title}. Abrir apartado relacionado`);
+            const icon = document.createElement("span"); icon.className = "topbar-notification-icon";
+            const glyph = document.createElement("i"); glyph.className = `fa-solid ${notificationIcon(notification.type)}`; icon.append(glyph);
+            const copy = document.createElement("div");
+            const title = document.createElement("strong"); title.textContent = notification.title;
+            const project = document.createElement("p"); project.textContent = notification.project || "Notificacion general";
+            const time = document.createElement("small");
+            const createdAt = new Date(String(notification.created_at || "").replace(" ", "T"));
+            const minutes = Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 60000));
+            time.textContent = minutes < 60 ? `Hace ${minutes} min` : (minutes < 1440 ? `Hace ${Math.floor(minutes / 60)} h` : `Hace ${Math.floor(minutes / 1440)} d`);
+            copy.append(title, project, time);
+            if (!notification.is_read) {
+                const dot = document.createElement("span"); dot.className = "topbar-notification-dot"; dot.setAttribute("aria-label", "No leída"); item.append(icon, copy, dot);
+            } else item.append(icon, copy);
+            topbarNotificationsList.append(item);
+        });
+    }
 
-        const copy = document.createElement("div");
-        const title = document.createElement("strong");
-        title.textContent = notification.title;
-        const description = document.createElement("p");
-        description.textContent = notification.description;
-        const time = document.createElement("small");
-        time.textContent = `${notification.date} · ${notification.time}`;
-        copy.append(title, description, time);
-
-        if (!notification.is_read) {
-            const dot = document.createElement("span");
-            dot.className = "topbar-notification-dot";
-            dot.setAttribute("aria-label", "No leída");
-            item.append(icon, copy, dot);
-        } else {
-            item.append(icon, copy);
-        }
-        topbarNotificationsList.append(item);
-    });
+    appendSection("Nuevas", notifications.filter((item) => !item.is_read));
+    appendSection("Anteriores", notifications.filter((item) => item.is_read));
 }
 
 async function loadRecentNotifications() {

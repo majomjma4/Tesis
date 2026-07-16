@@ -13,7 +13,6 @@ final class NotificationsController
 
         try {
             $model = new NotificationModel();
-            $model->purgeExpiredTrash();
             $notifications = $model->getByUser($this->currentUserId());
             $counters = $model->getCounters($this->currentUserId());
         } catch (Throwable $exception) {
@@ -29,8 +28,10 @@ final class NotificationsController
             'pageScript' => asset('js/notifications.js'),
             'summary' => $this->summaryCards($counters),
             'groups' => $this->groupNotifications($notifications),
-            'filters' => $this->filters(),
+            'statusFilters' => $this->statusFilters(),
+            'typeFilters' => $this->typeFilters(),
             'sidebarSummary' => ['unread' => $counters['unread'], 'read' => max(0, $counters['total'] - $counters['unread']), 'updated' => date('d/m/Y H:i')],
+            'sidebarActivity' => $this->activitySummary($notifications),
             'notificationUnreadCount' => $counters['unread'],
             'notificationCsrfToken' => $this->csrfToken(),
             'notificationEndpoints' => $this->endpoints(),
@@ -50,9 +51,9 @@ final class NotificationsController
         $model = new NotificationModel();
 
         try {
-            $model->purgeExpiredTrash();
             $notifications = $model->getByUser($this->currentUserId(), ['search' => $search, 'type' => $type, 'status' => $status, 'hidden' => $hidden, 'trash' => $trash]);
             $counters = $model->getCounters($this->currentUserId());
+            $sectionNotifications = ($hidden || $trash) ? $model->getByUser($this->currentUserId(), ['hidden' => $hidden, 'trash' => $trash]) : [];
         } catch (Throwable $exception) {
             error_log('Notifications list fallback: ' . $exception->getMessage());
             $allNotifications = $this->demoNotifications();
@@ -67,9 +68,15 @@ final class NotificationsController
                 return $matchesSearch && $matchesType && $matchesStatus && $matchesVisibility;
             }));
             $counters = $model->getDemoCounters($allNotifications);
+            $sectionNotifications = array_values(array_filter($allNotifications, static fn (array $item): bool => $trash ? !empty($item['deleted_at']) : ($hidden ? !empty($item['archived_at']) && empty($item['deleted_at']) : empty($item['archived_at']) && empty($item['deleted_at']))));
         }
 
-        $this->json(true, 'Notificaciones actualizadas.', ['notifications' => $notifications, 'groups' => $this->groupNotifications($notifications), 'counters' => $counters]);
+        $this->json(true, 'Notificaciones actualizadas.', [
+            'notifications' => $notifications,
+            'groups' => $this->groupNotifications($notifications),
+            'counters' => $counters,
+            'sectionCounters' => $this->sectionCounters($sectionNotifications, $counters, $hidden, $trash),
+        ]);
     }
 
     public function markRead(): void
@@ -455,9 +462,42 @@ final class NotificationsController
         ];
     }
 
-    private function filters(): array
+    private function statusFilters(): array
     {
-        return ['all' => 'Todas', 'unread' => 'No leidas', 'read' => 'Leidas', 'hidden' => 'Archivadas', 'trash' => 'Papelera', 'delivery' => 'Entregas', 'observation' => 'Observaciones', 'status_change' => 'Cambios de estado', 'review' => 'Revision', 'reminder' => 'Recordatorios', 'system' => 'Sistema', 'tribunal' => 'Tribunal', 'repository' => 'Repositorio', 'comment' => 'Comentarios'];
+        return ['all' => 'Todas', 'unread' => 'No leidas', 'read' => 'Leidas', 'hidden' => 'Archivadas', 'trash' => 'Papelera'];
+    }
+
+    private function typeFilters(): array
+    {
+        return ['all' => 'Todos', 'delivery' => 'Entregas', 'observation' => 'Observaciones', 'status_change' => 'Cambios de estado', 'review' => 'Revision', 'reminder' => 'Recordatorios', 'system' => 'Sistema', 'tribunal' => 'Tribunal', 'repository' => 'Repositorio', 'comment' => 'Comentarios'];
+    }
+
+    private function activitySummary(array $notifications): array
+    {
+        $counts = ['delivery' => 0, 'observation' => 0, 'status_change' => 0];
+        foreach ($notifications as $notification) {
+            if (array_key_exists($notification['type'], $counts)) $counts[$notification['type']]++;
+        }
+        return [
+            ['label' => 'Entregas', 'value' => $counts['delivery'], 'icon' => 'fa-cloud-arrow-up', 'tone' => 'blue'],
+            ['label' => 'Observaciones', 'value' => $counts['observation'], 'icon' => 'fa-comment-dots', 'tone' => 'warning'],
+            ['label' => 'Cambios de estado', 'value' => $counts['status_change'], 'icon' => 'fa-arrows-rotate', 'tone' => 'green'],
+        ];
+    }
+
+    private function sectionCounters(array $notifications, array $globalCounters, bool $hidden, bool $trash): array
+    {
+        if (!$hidden && !$trash) {
+            return $globalCounters;
+        }
+        $weekStart = new DateTimeImmutable('monday this week');
+        $expirationThreshold = new DateTimeImmutable('-23 days');
+        return [
+            'total' => count($notifications),
+            'unread' => count(array_filter($notifications, static fn (array $item): bool => !$item['is_read'])),
+            'week' => count(array_filter($notifications, static fn (array $item): bool => new DateTimeImmutable($item['created_at']) >= $weekStart)),
+            'expiring' => count(array_filter($notifications, static fn (array $item): bool => !empty($item['deleted_at']) && new DateTimeImmutable($item['deleted_at']) <= $expirationThreshold)),
+        ];
     }
 
     private function endpoints(): array

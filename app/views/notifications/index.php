@@ -80,18 +80,18 @@
             <input id="notificationSearch" type="search" placeholder="Buscar notificaciones..." autocomplete="off">
             <kbd>Ctrl K</kbd>
         </label>
-        <div class="notification-filter notification-filter-custom">
+        <div class="notification-filter notification-filter-custom" data-filter-control="status">
             <i class="fa-solid fa-sliders"></i>
-            <select id="notificationFilter" class="notification-filter-native" tabindex="-1" aria-hidden="true">
-                <?php foreach ($filters as $value => $label): ?>
+            <select id="notificationStatusFilter" class="notification-filter-native" tabindex="-1" aria-hidden="true">
+                <?php foreach ($statusFilters as $value => $label): ?>
                     <option value="<?= e($value) ?>"><?= e($label) ?></option>
                 <?php endforeach; ?>
             </select>
-            <button class="notification-filter-trigger" id="notificationFilterTrigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="notificationFilterMenu">
-                <span id="notificationFilterLabel">Todas</span><i class="fa-solid fa-chevron-down"></i>
+            <button class="notification-filter-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                <span>Estado: Todas</span><i class="fa-solid fa-chevron-down"></i>
             </button>
-            <div class="notification-filter-menu" id="notificationFilterMenu" role="listbox" aria-label="Filtrar notificaciones" hidden>
-                <?php foreach ($filters as $value => $label): ?>
+            <div class="notification-filter-menu" role="listbox" aria-label="Filtrar por estado" hidden>
+                <?php foreach ($statusFilters as $value => $label): ?>
                     <button type="button" role="option" data-filter-value="<?= e($value) ?>" aria-selected="<?= $value === 'all' ? 'true' : 'false' ?>">
                         <span class="filter-option-icon"><i class="fa-solid <?= $value === 'hidden' ? 'fa-box-archive' : ($value === 'trash' ? 'fa-trash-can' : ($value === 'unread' ? 'fa-eye-slash' : ($value === 'read' ? 'fa-eye' : ($value === 'all' ? 'fa-layer-group' : 'fa-bell')))) ?>"></i></span>
                         <span><?= e($label) ?></span><i class="fa-solid fa-check filter-option-check"></i>
@@ -99,7 +99,19 @@
                 <?php endforeach; ?>
             </div>
         </div>
-        <button class="clear-filter" id="clearNotificationFilters" type="button" aria-label="Limpiar filtros">
+        <div class="notification-filter notification-filter-custom" data-filter-control="type">
+            <i class="fa-solid fa-tags"></i>
+            <select id="notificationTypeFilter" class="notification-filter-native" tabindex="-1" aria-hidden="true">
+                <?php foreach ($typeFilters as $value => $label): ?><option value="<?= e($value) ?>"><?= e($label) ?></option><?php endforeach; ?>
+            </select>
+            <button class="notification-filter-trigger" type="button" aria-haspopup="listbox" aria-expanded="false"><span>Tipo: Todos</span><i class="fa-solid fa-chevron-down"></i></button>
+            <div class="notification-filter-menu" role="listbox" aria-label="Filtrar por tipo" hidden>
+                <?php foreach ($typeFilters as $value => $label): ?>
+                    <button type="button" role="option" data-filter-value="<?= e($value) ?>" aria-selected="<?= $value === 'all' ? 'true' : 'false' ?>"><span class="filter-option-icon"><i class="fa-solid fa-bell"></i></span><span><?= e($label) ?></span><i class="fa-solid fa-check filter-option-check"></i></button>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <button class="clear-filter" id="clearNotificationFilters" type="button" aria-label="Limpiar filtros" hidden>
             <i class="fa-solid fa-filter-circle-xmark"></i><span>Limpiar</span>
         </button>
     </section>
@@ -150,8 +162,8 @@
                                         <button class="mark-notification" data-notification-action="toggle-read" type="button" aria-pressed="<?= $notification['is_read'] ? 'true' : 'false' ?>" aria-label="<?= $notification['is_read'] ? 'Marcar como no leida' : 'Marcar como leida' ?>" title="<?= $notification['is_read'] ? 'Marcar como no leida' : 'Marcar como leida' ?>"><i class="fa-regular <?= $notification['is_read'] ? 'fa-eye' : 'fa-eye-slash' ?>"></i></button>
                                         <button class="more-notification" data-notification-action="menu" type="button" aria-label="Mas opciones" aria-haspopup="menu" aria-expanded="false" title="Mas opciones"><i class="fa-solid fa-ellipsis-vertical"></i></button>
                                         <div class="notification-context-menu" role="menu" hidden>
-                                            <button type="button" role="menuitem" class="danger" data-menu-action="delete"><i class="fa-solid fa-box-archive"></i><span>Archivar notificacion</span></button>
-                                            <button type="button" role="menuitem" class="danger" data-menu-action="destroy"><i class="fa-regular fa-trash-can"></i><span>Mover a la papelera</span></button>
+                                            <button type="button" role="menuitem" data-menu-action="delete"><i class="fa-solid fa-box-archive"></i><span><strong>Archivar</strong><small>Ocultar de la bandeja sin eliminar</small></span></button>
+                                            <button type="button" role="menuitem" class="danger" data-menu-action="destroy"><i class="fa-regular fa-trash-can"></i><span><strong>Mover a la papelera</strong><small>Se eliminara automaticamente en 30 dias</small></span></button>
                                         </div>
                                     </div>
                                 </div>
@@ -183,12 +195,12 @@
                 <div class="side-update"><i class="fa-solid fa-clock-rotate-left"></i><div><span>Ultima actualizacion</span><strong id="notificationLastUpdate"><?= e($sidebarSummary['updated']) ?></strong></div></div>
             </section>
             <section>
-                <div class="side-panel-heading compact"><span><i class="fa-solid fa-bolt"></i></span><div><small>Navegacion</small><h2>Accesos rapidos</h2></div></div>
-                <nav class="quick-links">
-                    <a href="<?= e(route('projects')) ?>"><span><i class="fa-solid fa-folder-open"></i>Ir al proyecto</span><i class="fa-solid fa-arrow-right"></i></a>
-                    <a href="<?= e(route('repository')) ?>"><span><i class="fa-solid fa-book-open"></i>Repositorio</span><i class="fa-solid fa-arrow-right"></i></a>
-                    <a href="#"><span><i class="fa-regular fa-calendar"></i>Calendario</span><i class="fa-solid fa-arrow-right"></i></a>
-                </nav>
+                <div class="side-panel-heading compact"><span><i class="fa-solid fa-chart-column"></i></span><div><small>Distribucion</small><h2>Actividad reciente</h2></div></div>
+                <div class="notification-activity-summary">
+                    <?php foreach ($sidebarActivity as $activity): ?>
+                        <div class="activity-summary-item tone-<?= e($activity['tone']) ?>"><span><i class="fa-solid <?= e($activity['icon']) ?>"></i><?= e($activity['label']) ?></span><strong><?= e((string) $activity['value']) ?></strong></div>
+                    <?php endforeach; ?>
+                </div>
             </section>
         </aside>
     </div>
@@ -203,7 +215,7 @@
             <div class="notification-message-context"><span id="notificationModalProject"></span><span id="notificationModalDate"></span><span id="notificationModalStatus"></span></div>
         </header>
         <div class="notification-message-body"><p id="notificationModalMessage"></p></div>
-        <div class="notification-modal-actions"><button class="notification-action secondary" type="button" data-modal-close>Cerrar</button><a class="notification-action primary" id="notificationModalDestination" href="#" hidden><span>Ir a la seccion relacionada</span><i class="fa-solid fa-arrow-up-right-from-square"></i></a></div>
+        <div class="notification-modal-actions"><button class="notification-action secondary" type="button" data-modal-close>Cerrar</button><button class="notification-action secondary" id="notificationModalMarkUnread" type="button"><i class="fa-regular fa-eye-slash"></i>Marcar como no leida</button><a class="notification-action primary" id="notificationModalDestination" href="#" hidden><span>Ir a la seccion relacionada</span><i class="fa-solid fa-arrow-up-right-from-square"></i></a></div>
     </section>
 </div>
 

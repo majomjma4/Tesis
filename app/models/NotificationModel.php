@@ -152,9 +152,9 @@ final class NotificationModel
     {
         $days = max(1, min($days, 365));
         $statement = $this->connection()->prepare(
-            'DELETE FROM notifications WHERE deleted_at IS NOT NULL AND deleted_at < DATE_SUB(NOW(), INTERVAL :days DAY)'
+            'DELETE FROM notifications WHERE deleted_at IS NOT NULL AND deleted_at < :cutoff'
         );
-        $statement->bindValue('days', $days, PDO::PARAM_INT);
+        $statement->bindValue('cutoff', (new DateTimeImmutable())->modify("-{$days} days")->format('Y-m-d H:i:s'));
         $statement->execute();
 
         return $statement->rowCount();
