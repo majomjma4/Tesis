@@ -42,7 +42,7 @@
                     <span class="menu-icon"><i class="fa-solid fa-book-open"></i></span>
                     <span>Repositorio</span>
                 </a>
-                <a href="#" class="menu-item <?= ($currentPage ?? '') === 'calendar' ? 'active' : '' ?>">
+                <a href="<?= e(route('calendar')) ?>" class="menu-item <?= ($currentPage ?? '') === 'calendar' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-calendar-days"></i></span>
                     <span>Calendario</span>
                 </a>
