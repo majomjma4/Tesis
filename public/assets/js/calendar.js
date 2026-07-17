@@ -1,7 +1,9 @@
 const calendarRoot = document.querySelector(".calendar-workspace");
 
 if (calendarRoot) {
-    const events = JSON.parse(calendarRoot.dataset.calendarEvents || "[]");
+    const seedEvents = JSON.parse(calendarRoot.dataset.calendarEvents || "[]");
+    const storageKey = "tesis-calendar-events-v1";
+    let events = loadEvents();
     const grid = document.querySelector("#calendarDaysGrid");
     const monthTitle = document.querySelector("#calendarMonthTitle");
     const agendaList = document.querySelector("#calendarAgendaList");
@@ -11,6 +13,36 @@ if (calendarRoot) {
     let visibleDate = new Date(today.getFullYear(), today.getMonth(), 1);
     let selectedDate = toDateKey(today);
     let activeFilter = "all";
+
+    const eventModal = document.querySelector("#calendarEventModal");
+    const eventForm = document.querySelector("#calendarEventForm");
+    const eventIdInput = document.querySelector("#calendarEventId");
+    const eventTitleInput = document.querySelector("#calendarEventTitle");
+    const eventDateInput = document.querySelector("#calendarEventDate");
+    const eventTimeInput = document.querySelector("#calendarEventTime");
+    const eventTypeInput = document.querySelector("#calendarEventType");
+    const eventDescriptionInput = document.querySelector("#calendarEventDescription");
+    const agendaPanel = document.querySelector("#calendarAgenda");
+    const agendaBackdrop = document.querySelector("#calendarAgendaBackdrop");
+    const openAgendaButton = document.querySelector("#calendarOpenAgendaBtn");
+    const compactAgenda = window.matchMedia("(max-width: 1180px)");
+    const typeLabels = { delivery: "Entrega", meeting: "Reunion", review: "Revision", deadline: "Fecha limite" };
+
+    function loadEvents() {
+        try {
+            const stored = localStorage.getItem(storageKey);
+            if (stored) return JSON.parse(stored);
+        } catch (error) {
+            console.warn("No fue posible leer las tareas guardadas.", error);
+        }
+        const initialEvents = seedEvents.map((event, index) => ({ ...event, id: `seed-${index + 1}` }));
+        try { localStorage.setItem(storageKey, JSON.stringify(initialEvents)); } catch (error) { console.warn("No fue posible guardar las tareas iniciales.", error); }
+        return initialEvents;
+    }
+
+    function saveEvents() {
+        try { localStorage.setItem(storageKey, JSON.stringify(events)); } catch (error) { console.warn("No fue posible guardar los cambios del calendario.", error); }
+    }
 
     function toDateKey(date) {
         const year = date.getFullYear();
@@ -67,6 +99,7 @@ if (calendarRoot) {
                 if (date.getMonth() !== month) visibleDate = new Date(date.getFullYear(), date.getMonth(), 1);
                 renderCalendar();
                 renderAgenda();
+                if (compactAgenda.matches) openAgendaPanel();
             });
             grid.appendChild(button);
         }
@@ -75,19 +108,87 @@ if (calendarRoot) {
     function renderAgenda() {
         const selected = dateFromKey(selectedDate);
         agendaDate.textContent = selected.toLocaleDateString("es-EC", { day: "numeric", month: "short" });
-        const selectedEvents = filteredEvents().filter((event) => event.date === selectedDate);
+        const selectedEvents = filteredEvents().filter((event) => event.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time));
         agendaList.innerHTML = "";
         if (!selectedEvents.length) {
-            agendaList.innerHTML = '<div class="calendar-empty"><i class="fa-regular fa-calendar-xmark"></i><strong>Dia despejado</strong><p>No hay actividades programadas.</p></div>';
+            agendaList.innerHTML = '<div class="calendar-empty"><i class="fa-regular fa-calendar-xmark"></i><strong>No hay nada para este dia</strong><p>Puedes aprovechar el espacio o agregar una nueva tarea.</p><button type="button" class="calendar-empty-add"><i class="fa-solid fa-plus"></i> Agregar tarea</button></div>';
+            agendaList.querySelector(".calendar-empty-add").addEventListener("click", () => openEventModal());
             return;
         }
         selectedEvents.forEach((event) => {
-            const eventDate = dateFromKey(event.date);
             const article = document.createElement("article");
             article.className = "calendar-agenda-item";
-            article.innerHTML = `<span class="agenda-accent ${event.type}"></span><div class="agenda-content"><span class="agenda-meta"><b>${event.typeLabel}</b> ${eventDate.toLocaleDateString("es-EC", { day: "numeric", month: "short" })} · ${event.time}</span><h3>${event.title}</h3><p>${event.description}</p></div>`;
+            const accent = document.createElement("span");
+            accent.className = `agenda-accent ${event.type}`;
+            const content = document.createElement("div");
+            content.className = "agenda-content";
+            const meta = document.createElement("span");
+            meta.className = "agenda-meta";
+            meta.textContent = `${typeLabels[event.type] || event.typeLabel} · ${event.time}`;
+            const title = document.createElement("h3");
+            title.textContent = event.title;
+            const description = document.createElement("p");
+            description.textContent = event.description || "Sin descripcion.";
+            const actions = document.createElement("div");
+            actions.className = "agenda-actions";
+            const editButton = document.createElement("button");
+            editButton.type = "button";
+            editButton.innerHTML = '<i class="fa-solid fa-pen"></i> Editar';
+            editButton.addEventListener("click", () => openEventModal(event));
+            const deleteButton = document.createElement("button");
+            deleteButton.type = "button";
+            deleteButton.className = "danger";
+            deleteButton.innerHTML = '<i class="fa-regular fa-trash-can"></i> Eliminar';
+            deleteButton.addEventListener("click", () => deleteEvent(event.id));
+            actions.append(editButton, deleteButton);
+            content.append(meta, title, description, actions);
+            article.append(accent, content);
             agendaList.appendChild(article);
         });
+    }
+
+    function openEventModal(event = null) {
+        eventForm.reset();
+        eventIdInput.value = event?.id || "";
+        eventTitleInput.value = event?.title || "";
+        eventDateInput.value = event?.date || selectedDate;
+        eventTimeInput.value = event?.time || "09:00";
+        eventTypeInput.value = event?.type || "delivery";
+        eventDescriptionInput.value = event?.description || "";
+        document.querySelector("#calendarModalTitle").textContent = event ? "Editar tarea" : "Nueva tarea";
+        eventModal.hidden = false;
+        document.body.classList.add("modal-open");
+        window.setTimeout(() => eventTitleInput.focus(), 0);
+    }
+
+    function closeEventModal() {
+        eventModal.hidden = true;
+        document.body.classList.remove("modal-open");
+    }
+
+    function openAgendaPanel() {
+        if (!compactAgenda.matches) return;
+        agendaPanel.classList.add("is-open");
+        agendaBackdrop.hidden = false;
+        document.body.classList.add("calendar-agenda-open");
+        openAgendaButton.setAttribute("aria-expanded", "true");
+        document.querySelector("#calendarAgendaClose").focus();
+    }
+
+    function closeAgendaPanel() {
+        agendaPanel.classList.remove("is-open");
+        agendaBackdrop.hidden = true;
+        document.body.classList.remove("calendar-agenda-open");
+        openAgendaButton.setAttribute("aria-expanded", "false");
+    }
+
+    function deleteEvent(id) {
+        const event = events.find((item) => item.id === id);
+        if (!event || !window.confirm(`¿Eliminar la tarea "${event.title}"?`)) return;
+        events = events.filter((item) => item.id !== id);
+        saveEvents();
+        renderCalendar();
+        renderAgenda();
     }
     function updateStats() {
         const prefix = `${visibleDate.getFullYear()}-${String(visibleDate.getMonth() + 1).padStart(2, "0")}`;
@@ -105,6 +206,42 @@ if (calendarRoot) {
         renderCalendar();
         renderAgenda();
     }));
+    document.querySelector("#calendarNewEventBtn").addEventListener("click", () => openEventModal());
+    openAgendaButton.addEventListener("click", openAgendaPanel);
+    document.querySelector("#calendarAgendaClose").addEventListener("click", closeAgendaPanel);
+    agendaBackdrop.addEventListener("click", closeAgendaPanel);
+    document.querySelector("#calendarModalClose").addEventListener("click", closeEventModal);
+    document.querySelector("#calendarModalCancel").addEventListener("click", closeEventModal);
+    eventModal.addEventListener("click", (event) => { if (event.target === eventModal) closeEventModal(); });
+    eventForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const id = eventIdInput.value || `event-${Date.now()}`;
+        const task = {
+            id,
+            title: eventTitleInput.value.trim(),
+            date: eventDateInput.value,
+            time: eventTimeInput.value,
+            type: eventTypeInput.value,
+            typeLabel: typeLabels[eventTypeInput.value],
+            description: eventDescriptionInput.value.trim(),
+        };
+        if (!task.title || !task.date || !task.time) return;
+        const index = events.findIndex((item) => item.id === id);
+        if (index >= 0) events[index] = task; else events.push(task);
+        selectedDate = task.date;
+        const taskDate = dateFromKey(task.date);
+        visibleDate = new Date(taskDate.getFullYear(), taskDate.getMonth(), 1);
+        saveEvents();
+        closeEventModal();
+        renderCalendar();
+        renderAgenda();
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        if (!eventModal.hidden) closeEventModal();
+        else if (agendaPanel.classList.contains("is-open")) closeAgendaPanel();
+    });
+    compactAgenda.addEventListener("change", (event) => { if (!event.matches) closeAgendaPanel(); });
     renderCalendar();
     renderAgenda();
 }
