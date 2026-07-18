@@ -10,7 +10,8 @@ final class ProjectsController
     public function index(): void
     {
         $projectModel = new ProjectModel();
-        $projects = $projectModel->getProjectsForUser(1);
+        $access = new ProjectAccessService();
+        $projects = $projectModel->getProjectsForUser($access->currentUserId());
 
         if (count($projects) === 1) {
             header('Location: ' . route('project-detail') . '&id=' . (int) $projects[0]['id']);
@@ -36,7 +37,8 @@ final class ProjectsController
         $tab = strtolower(trim((string) ($_GET['tab'] ?? 'summary')));
         $tab = in_array($tab, $allowedTabs, true) ? $tab : 'summary';
         $model = new ProjectModel();
-        $project = $id ? $model->findProjectForUser((int) $id, 1) : null;
+        $access = new ProjectAccessService();
+        $project = $id && $access->can('project.view') ? $model->findProjectForUser((int) $id, $access->currentUserId()) : null;
         $projectEvents = [];
         if ($project !== null) {
             $projectEvents = array_values(array_filter((new CalendarModel())->getEvents(), static fn (array $event): bool => (int) ($event['projectId'] ?? 0) === (int) $project['id']));
@@ -56,6 +58,7 @@ final class ProjectsController
             'activeTab' => $tab,
             'tabs' => $model->getDetailTabs(),
             'projectEvents' => $projectEvents,
+            'projectPermissions' => $access->permissions(),
         ]);
     }
 

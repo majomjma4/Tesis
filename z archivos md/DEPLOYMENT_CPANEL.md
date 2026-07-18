@@ -30,6 +30,7 @@ Importa mediante phpMyAdmin, en este orden:
 
 1. `database/migrations/20260715_create_notifications.sql`
 2. `database/migrations/20260716_add_notification_archive.sql`
+3. `database/migrations/20260718_create_academic_projects.sql`
 3. `database/seeds/notifications_demo.sql` solo si necesitas datos demostrativos.
 
 Las migraciones deben conservarse en el repositorio aunque ya se hayan ejecutado, porque permiten reconstruir y versionar la base de datos.

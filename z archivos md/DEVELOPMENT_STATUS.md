@@ -573,3 +573,19 @@ Pendiente:
 - Proyecto publicado enlazado con su entrada real del Repositorio.
 - Repositorio con retorno contextual a Documentos finales del seguimiento académico.
 - Eliminación de accesos genéricos y fragmentos antiguos del flujo integrado.
+
+## Preparación de infraestructura — Etapa 6
+
+- Migración MariaDB con 14 tablas para usuarios, roles, proyectos, participantes, etapas, entregas, archivos, observaciones, respuestas, comentarios, eventos y auditoría.
+- Relaciones mediante 29 claves foráneas e índices para consultas frecuentes.
+- Matriz backend de permisos para estudiante, tutor, cotutor, tribunal, coordinación y administración.
+- Identidad del módulo centralizada y compatible con sesión real o modo demostración.
+- Servicio de auditoría preparado para registrar estados anteriores y nuevos dentro de transacciones.
+- Servicio de archivos privados con validación de extensión, MIME, tamaño, nombre seguro y prevención de recorrido de rutas.
+- Directorio `storage/private` protegido contra acceso web y listado de archivos.
+
+Importante:
+
+- El contrato temporal continúa activo hasta importar la migración y completar el login real.
+- Las escrituras siguen deshabilitadas para evitar persistencia parcial o engañosa.
+- La activación definitiva requiere repositorios PDO, sesiones autenticadas y pruebas de permisos por rol.

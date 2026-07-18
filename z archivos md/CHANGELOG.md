@@ -35,6 +35,7 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Se desarrollaron las pestañas Entregas, Observaciones y Comentarios como espacios de consulta preparados para persistencia.
 - Se completaron Historial, Participantes, Calendario del proyecto y Documentos finales, incluyendo el filtrado real del Calendario global por proyecto.
 - Se integraron Dashboard, Notificaciones, Calendario y Repositorio con las rutas y pestañas del nuevo detalle de proyecto.
+- Se preparó la infraestructura de persistencia de proyectos con esquema MariaDB, permisos, auditoría y almacenamiento privado.
 
 ---
 
