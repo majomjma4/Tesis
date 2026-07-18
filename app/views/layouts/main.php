@@ -85,7 +85,7 @@
                     <i class="fa-solid fa-moon"></i>
                 </button>
                 <div class="topbar-notifications">
-                    <button class="notification-icon" id="topbarNotificationsButton" type="button" aria-label="Mostrar notificaciones recientes" aria-haspopup="dialog" aria-expanded="false" aria-controls="topbarNotificationsPanel" data-list-endpoint="<?= e(route('notifications/list')) ?>">
+                    <button class="notification-icon" id="topbarNotificationsButton" type="button" aria-label="Mostrar notificaciones recientes" aria-haspopup="dialog" aria-expanded="false" aria-controls="topbarNotificationsPanel" data-list-endpoint="<?= e(route('notifications/list')) ?>" data-open-endpoint="<?= e($notificationOpenEndpoint ?? route('notifications/open')) ?>" data-csrf-token="<?= e($notificationCsrfToken ?? '') ?>">
                         <i class="fa-solid fa-bell"></i>
                         <span class="notification-count" <?= empty($notificationUnreadCount) ? 'hidden' : '' ?>><?= e((string) ($notificationUnreadCount ?? 0)) ?></span>
                     </button>

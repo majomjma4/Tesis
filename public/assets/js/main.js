@@ -207,6 +207,7 @@ function renderRecentNotifications(groups) {
             const item = document.createElement("a");
             item.className = `topbar-notification-item ${notification.is_read ? "is-read" : "is-unread"}`;
             item.href = safeRecentNotificationUrl(notification.action_url);
+            item.dataset.notificationId = String(notification.id);
             item.setAttribute("aria-label", `${notification.title}. Abrir apartado relacionado`);
             const icon = document.createElement("span"); icon.className = "topbar-notification-icon";
             const glyph = document.createElement("i"); glyph.className = `fa-solid ${notificationIcon(notification.type)}`; icon.append(glyph);
@@ -229,6 +230,37 @@ function renderRecentNotifications(groups) {
     appendSection("Anteriores", notifications.filter((item) => item.is_read));
 }
 
+function updateTopbarNotificationCount(unread) {
+    const count = document.querySelector(".notification-count");
+    const value = Math.max(0, Number(unread) || 0);
+    if (!count) return;
+    count.textContent = String(value);
+    count.hidden = value === 0;
+}
+
+async function openRecentNotification(item) {
+    const endpoint = topbarNotificationsButton?.dataset.openEndpoint;
+    const token = topbarNotificationsButton?.dataset.csrfToken;
+    const notificationId = item.dataset.notificationId;
+    const fallbackUrl = item.href;
+    if (!endpoint || !token || !notificationId) {
+        window.location.assign(fallbackUrl);
+        return;
+    }
+
+    const body = new URLSearchParams({ notification_id: notificationId });
+    const response = await fetch(endpoint, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8", "X-CSRF-Token": token, "X-Requested-With": "XMLHttpRequest" },
+        body,
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) throw new Error(payload.message || "No fue posible abrir la notificacion.");
+    updateTopbarNotificationCount(payload.data.counters.unread);
+    window.location.assign(payload.data.url || fallbackUrl);
+}
+
 async function loadRecentNotifications() {
     if (!topbarNotificationsButton || recentNotificationsLoaded) return;
     try {
@@ -236,8 +268,7 @@ async function loadRecentNotifications() {
         const payload = await response.json();
         if (!response.ok || !payload.success) throw new Error();
         renderRecentNotifications(payload.data.groups);
-        const count = document.querySelector(".notification-count");
-        if (count) { count.textContent = String(payload.data.counters.unread); count.hidden = payload.data.counters.unread === 0; }
+        updateTopbarNotificationCount(payload.data.counters.unread);
         recentNotificationsLoaded = true;
     } catch {
         if (topbarNotificationsList) {
@@ -255,6 +286,19 @@ topbarNotificationsButton?.addEventListener("click", async () => {
     if (topbarNotificationsPanel) topbarNotificationsPanel.hidden = !willOpen;
     topbarNotificationsButton.setAttribute("aria-expanded", String(willOpen));
     if (willOpen) await loadRecentNotifications();
+});
+
+topbarNotificationsList?.addEventListener("click", async (event) => {
+    const item = event.target.closest(".topbar-notification-item");
+    if (!item) return;
+    event.preventDefault();
+    item.setAttribute("aria-busy", "true");
+    try {
+        await openRecentNotification(item);
+    } catch (error) {
+        item.removeAttribute("aria-busy");
+        console.error(error);
+    }
 });
 
 document.addEventListener("click", (event) => {

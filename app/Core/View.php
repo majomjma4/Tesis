@@ -16,6 +16,10 @@ final class View
             return;
         }
 
+        if ($layout === 'main') {
+            $data += self::notificationLayoutData();
+        }
+
         extract($data, EXTR_SKIP);
 
         // Captura la vista como contenido para insertarla dentro del layout.
@@ -24,5 +28,32 @@ final class View
         $content = ob_get_clean();
 
         require $layoutFile;
+    }
+
+    private static function notificationLayoutData(): array
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+
+        if (!isset($_SESSION['notification_csrf'])) {
+            $_SESSION['notification_csrf'] = bin2hex(random_bytes(32));
+        }
+
+        try {
+            $userId = (int) ($_SESSION['user_id'] ?? $_SESSION['notification_demo_user_id'] ?? 1);
+            $unread = (new NotificationModel())->countUnread($userId);
+        } catch (Throwable $exception) {
+            if (!isset($_SESSION['notification_demo_items']) || !is_array($_SESSION['notification_demo_items'])) {
+                $_SESSION['notification_demo_items'] = (new NotificationModel())->getDemoNotifications();
+            }
+            $unread = (new NotificationModel())->getDemoCounters($_SESSION['notification_demo_items'])['unread'];
+        }
+
+        return [
+            'notificationUnreadCount' => $unread,
+            'notificationCsrfToken' => (string) $_SESSION['notification_csrf'],
+            'notificationOpenEndpoint' => route('notifications/open'),
+        ];
     }
 }
