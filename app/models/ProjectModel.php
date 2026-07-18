@@ -11,7 +11,8 @@ final class ProjectModel
     /** Devuelve los expedientes visibles para el usuario indicado. */
     public function getProjectsForUser(int $userId): array
     {
-        return array_values(array_filter($this->projects(), static fn (array $project): bool => in_array($userId, $project['user_ids'], true)));
+        $projects = array_filter($this->projects(), static fn (array $project): bool => in_array($userId, $project['user_ids'], true));
+        return array_values(array_map(fn (array $project): array => $this->enrichProject($project), $projects));
     }
 
     /** Busca un expediente comprobando temporalmente su pertenencia. */
@@ -52,6 +53,45 @@ final class ProjectModel
             'calendar' => ['label' => 'Calendario', 'icon' => 'fa-calendar-days'],
             'final-documents' => ['label' => 'Documentos finales', 'icon' => 'fa-box-archive'],
         ];
+    }
+
+    /** Completa información derivada sin duplicarla en cada expediente simulado. */
+    private function enrichProject(array $project): array
+    {
+        $stageLabels = $project['type_key'] === 'community'
+            ? ['Registro', 'Planificación', 'Ejecución', 'Evaluación', 'Publicación']
+            : ['Registro', 'Desarrollo', 'Revisión', 'Tribunal y defensa', 'Cierre y publicación'];
+        $currentIndex = match ($project['status_key']) {
+            'review' => 2,
+            'approved' => 3,
+            'defense' => 3,
+            'published' => 4,
+            default => 1,
+        };
+        $project['stages'] = array_map(static fn (string $label, int $index): array => [
+            'label' => $label,
+            'state' => $index < $currentIndex ? 'completed' : ($index === $currentIndex ? 'current' : 'upcoming'),
+        ], $stageLabels, array_keys($stageLabels));
+        $project['progress'] = (int) round(($currentIndex / max(1, count($stageLabels) - 1)) * 100);
+        $nextMilestone = match ($project['status_key']) {
+            'review' => '22 Jul 2026',
+            'approved' => 'Por programar',
+            'defense' => '29 Jul 2026 · 10:00',
+            'published' => 'Expediente cerrado',
+            default => 'Por definir',
+        };
+        $project['key_dates'] = [
+            ['label' => 'Inicio del expediente', 'value' => '02 Jun 2026'],
+            ['label' => 'Última actividad', 'value' => preg_replace('/^.*·\s*/u', '', $project['last_activity'])],
+            ['label' => 'Próximo hito', 'value' => $nextMilestone],
+        ];
+        $project['academic_info'] = [
+            ['label' => 'Carrera', 'value' => $project['career']],
+            ['label' => 'Periodo', 'value' => $project['period']],
+            ['label' => 'Tipo', 'value' => $project['type']],
+            ['label' => 'Rol actual', 'value' => $project['role']],
+        ];
+        return $project;
     }
 
     private function projects(): array

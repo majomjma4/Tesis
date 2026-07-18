@@ -532,3 +532,14 @@ Pendiente:
 - Tarjetas con participantes limitados, etiquetas relevantes e información adaptada a cada etapa.
 - Estado vacío específico para búsquedas sin resultados y acción única para limpiar filtros.
 - Ajustes responsive y estados de foco visibles para controles interactivos.
+
+## Avance del detalle — Etapa 3
+
+- Resumen ejecutivo reorganizado en estructura principal y columna contextual.
+- Etapas derivadas del tipo y estado real del contrato temporal, sin porcentajes arbitrarios.
+- Última entrega y observaciones prioritarias con acceso a sus pestañas completas.
+- Actividad reciente con enlace al historial del expediente.
+- Siguiente acción adaptada al estado actual y navegación al área correspondiente.
+- Participantes, fechas clave e información académica visibles sin saturar la cabecera.
+- Estados vacíos orientativos para proyectos sin entregas, observaciones o actividad.
+- Diseño responsive y modo oscuro mediante estilos aislados del módulo.

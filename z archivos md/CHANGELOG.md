@@ -31,6 +31,7 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Se eliminó del flujo nuevo cualquier confirmación de guardado simulado.
 - Se completó el catálogo con búsqueda amplia, filtros combinables, ordenamiento y descripción de filtros activos.
 - Las tarjetas incorporan participantes y etiquetas limitadas sin sustituir el detalle del expediente.
+- Se completó el Resumen del detalle con etapas derivadas, entrega reciente, observaciones, actividad, siguiente acción, participantes y fechas clave.
 
 ---
 

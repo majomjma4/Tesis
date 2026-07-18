@@ -1,0 +1,234 @@
+/* Inicio del resumen ejecutivo del proyecto */
+.project-detail .summary-stages > header > strong {
+    align-self: flex-start;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 11px;
+}
+
+.summary-stage-list {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.summary-stage-list li {
+    position: relative;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface-soft);
+}
+
+.summary-stage-list li > span {
+    width: 27px;
+    height: 27px;
+    margin-bottom: 10px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    background: var(--line);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.summary-stage-list li strong,
+.summary-stage-list li small {
+    display: block;
+}
+
+.summary-stage-list li strong {
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.summary-stage-list li small {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 9px;
+}
+
+.summary-stage-list .is-completed > span {
+    background: #d1fae5;
+    color: #047857;
+}
+
+.summary-stage-list .is-current {
+    border-color: #60a5fa;
+    background: #eff6ff;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .08);
+}
+
+.summary-stage-list .is-current > span {
+    background: var(--primary);
+    color: #fff;
+}
+
+.summary-two-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.summary-delivery-file {
+    display: flex;
+    gap: 13px;
+    align-items: center;
+    padding: 14px;
+    border-radius: 14px;
+    background: var(--surface-soft);
+}
+
+.summary-delivery-file > i {
+    width: 43px;
+    height: 43px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: #fee2e2;
+    color: #dc2626;
+    font-size: 20px;
+}
+
+.summary-delivery-file strong {
+    font-size: 12px;
+}
+
+.summary-delivery-file p {
+    margin: 4px 0;
+    color: var(--muted);
+    font-size: 10px;
+}
+
+.summary-delivery-file span,
+.summary-observations li > span {
+    color: #b45309;
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.summary-observations ul {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.summary-observations li {
+    padding: 11px;
+    border-left: 3px solid var(--warning);
+    border-radius: 0 11px 11px 0;
+    background: var(--surface-soft);
+}
+
+.summary-observations li strong {
+    display: block;
+    margin: 4px 0;
+    font-size: 12px;
+}
+
+.summary-observations li p {
+    color: var(--muted);
+    font-size: 10px;
+}
+
+.summary-next-action {
+    position: relative;
+    overflow: hidden;
+    border-color: rgba(37, 99, 235, .3) !important;
+}
+
+.summary-next-action > i {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    color: #93c5fd;
+    font-size: 22px;
+}
+
+.summary-participants {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 13px;
+}
+
+.summary-participants > div {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.summary-participants b {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: var(--primary);
+    color: #fff;
+    font-size: 11px;
+}
+
+.summary-participants p,
+.summary-participants strong,
+.summary-participants small {
+    display: block;
+}
+
+.summary-participants strong {
+    font-size: 11px;
+}
+
+.summary-participants small {
+    color: var(--muted);
+    font-size: 9px;
+}
+
+.summary-key-dates div {
+    display: block !important;
+}
+
+.summary-key-dates dd {
+    margin-top: 3px;
+    text-align: left !important;
+}
+
+html.theme-dark .summary-stage-list .is-current {
+    background: #172554;
+}
+
+html.theme-dark .project-detail .summary-stages > header > strong {
+    background: #172554;
+    color: #93c5fd;
+}
+
+@media (max-width: 950px) {
+    .summary-stage-list {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 680px) {
+    .summary-two-columns,
+    .summary-stage-list {
+        grid-template-columns: 1fr;
+    }
+
+    .summary-stage-list li {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+    }
+
+    .summary-stage-list li > span {
+        flex: 0 0 27px;
+        margin: 0;
+    }
+}
+/* Final del resumen ejecutivo del proyecto */
