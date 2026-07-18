@@ -68,6 +68,7 @@ final class RepositoryController
             'pageScript' => asset('js/repository-detail.js'),
             'project' => $project,
             'repositoryUrl' => route('repository'),
+            'projectTrackingUrl' => !empty($project['source_project_id']) ? route('project-detail') . '&id=' . (int) $project['source_project_id'] . '&tab=final-documents' : null,
             'favoriteActionUrl' => route('repository-favorite'),
             'favoriteCsrfToken' => $this->getFavoriteCsrfToken(),
             'archiveState' => $archiveState,

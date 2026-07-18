@@ -64,14 +64,14 @@
                 <p><?= e($currentReport['description']) ?></p>
 
                 <div class="report-actions">
-                    <button class="upload-btn" type="button">
+                    <a class="upload-btn" href="<?= e($projectUrls['deliveries']) ?>">
                         <i class="fa-solid fa-upload"></i>
                         Subir nueva version
-                    </button>
-                    <button class="open-btn" type="button">
+                    </a>
+                    <a class="open-btn" href="<?= e($projectUrls['summary']) ?>">
                         <i class="fa-solid fa-folder-open"></i>
                         Ver informe completo
-                    </button>
+                    </a>
                 </div>
             </div>
 
@@ -104,18 +104,18 @@
 
             <div class="report-extra-row">
                 <div class="report-quick-actions" aria-label="Accesos rapidos del informe">
-                    <button type="button">
-                        <i class="fa-solid fa-download"></i>
-                        Descargar
-                    </button>
-                    <button type="button">
+                    <a href="<?= e($projectUrls['deliveries']) ?>">
+                        <i class="fa-solid fa-file-lines"></i>
+                        Entregas
+                    </a>
+                    <a href="<?= e($projectUrls['history']) ?>">
                         <i class="fa-solid fa-clock-rotate-left"></i>
                         Historial
-                    </button>
-                    <button type="button">
+                    </a>
+                    <a href="<?= e($projectUrls['observations']) ?>">
                         <i class="fa-solid fa-pen-to-square"></i>
                         Observaciones
-                    </button>
+                    </a>
                 </div>
 
                 <div class="report-team" aria-label="Integrantes del proyecto">
@@ -169,10 +169,10 @@
                     </article>
                 <?php endforeach; ?>
 
-                <button class="open-btn ghost-btn" type="button">
+                <a class="open-btn ghost-btn" href="<?= e($projectUrls['notifications']) ?>">
                     Ver alertas
                     <i class="fa-solid fa-arrow-right"></i>
-                </button>
+                </a>
             </section>
         </aside>
         <!-- Final de notificaciones -->
@@ -187,10 +187,10 @@
                     <span class="section-eyebrow">Pendientes por corregir</span>
                     <h2 class="section-title">Observaciones accionables</h2>
                 </div>
-                <button class="open-btn ghost-btn compact-action" type="button">
+                <a class="open-btn ghost-btn compact-action" href="<?= e($projectUrls['observations']) ?>">
                     Revisar todas
                     <i class="fa-solid fa-arrow-right"></i>
-                </button>
+                </a>
             </div>
 
             <?php foreach ($observations as $observation): ?>
@@ -221,10 +221,10 @@
                 </article>
             <?php endforeach; ?>
 
-            <button class="open-btn ghost-btn" type="button">
+            <a class="open-btn ghost-btn" href="<?= e($projectUrls['calendar']) ?>">
                 Ver plan
                 <i class="fa-solid fa-arrow-right"></i>
-            </button>
+            </a>
         </section>
     </div>
     <!-- Final de seguimiento rapido -->

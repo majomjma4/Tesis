@@ -31,7 +31,7 @@ if (calendarRoot) {
     function addDays(date, amount) { const result = new Date(date); result.setDate(result.getDate() + amount); return result; }
     function isOverdue(event) { return !event.completed && fromKey(event.date) < today; }
     function sortEvents(items) { const priorities = { high: 0, medium: 1, low: 2 }; return [...items].sort((a, b) => { if (sortMode === 'priority') return (priorities[a.priority] ?? 1) - (priorities[b.priority] ?? 1) || `${a.date} ${a.title}`.localeCompare(`${b.date} ${b.title}`, 'es'); if (sortMode === 'completed') return Number(a.completed) - Number(b.completed) || `${a.date} ${a.title}`.localeCompare(`${b.date} ${b.title}`, 'es'); return `${a.date} ${a.title}`.localeCompare(`${b.date} ${b.title}`, 'es'); }); }
-    function eventDestination(event) { if (event.type === 'review') return { url: `${projectUrl}#project-history`, label: 'Ir al historial' }; if (event.type === 'delivery' || event.type === 'deadline') return { url: `${projectUrl}#project-delivery`, label: 'Ir a entregas' }; return { url: `${projectUrl}#project-overview`, label: 'Ir al proyecto' }; }
+    function eventDestination(event) { const id = Number(event.projectId || 0); if (!id) return { url: projectUrl, label: 'Ir a Mis proyectos' }; const tab = event.type === 'review' ? 'observations' : (event.type === 'delivery' || event.type === 'deadline' ? 'deliveries' : 'calendar'); return { url: `${projectUrl}&id=${id}&tab=${tab}`, label: tab === 'observations' ? 'Ir a observaciones' : (tab === 'deliveries' ? 'Ir a entregas' : 'Ir al proyecto') }; }
     function filteredEvents() {
         return sortEvents(events.filter((event) => {
             if (projectFilterId && Number(event.projectId || 0) !== projectFilterId) return false;

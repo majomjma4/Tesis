@@ -30,6 +30,7 @@
         </nav>
 
         <a class="repository-detail-back" href="<?= e($repositoryUrl) ?>"><i class="fa-solid fa-arrow-left"></i> Volver al repositorio</a>
+        <?php if (!empty($projectTrackingUrl)): ?><a class="repository-detail-back" href="<?= e($projectTrackingUrl) ?>"><i class="fa-solid fa-diagram-project"></i> Ver seguimiento académico</a><?php endif; ?>
 
         <header class="repository-detail-header">
             <div>

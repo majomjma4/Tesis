@@ -209,23 +209,24 @@ final class NotificationModel
     {
         $now = new DateTimeImmutable();
         $items = [
-            ['delivery', 'Nueva entrega registrada', 'María Fernanda subió el Informe final v3 para revisión.', 'Sistema de gestión documental para proyectos de titulación', '-20 minutes', false, 'index.php?page=projects'],
-            ['observation', 'Se registraron observaciones', 'Tu tutor agregó 4 observaciones en el capítulo de metodología.', 'Plataforma web para seguimiento de prácticas preprofesionales', '-2 hours', false, 'index.php?page=projects'],
-            ['status_change', 'Proyecto aprobado', 'El perfil del proyecto superó la etapa de revisión académica.', 'Aplicación móvil de apoyo al aprendizaje inclusivo', '-3 hours', false, 'index.php?page=projects'],
-            ['repository', 'Repositorio actualizado', 'Los documentos públicos del proyecto ya están disponibles.', 'Sistema de gestión documental para proyectos de titulación', '-4 hours', true, 'index.php?page=repository-detail&id=1'],
-            ['review', 'Requiere correcciones', 'La entrega fue devuelta con ajustes pendientes antes de continuar.', 'Análisis predictivo de permanencia estudiantil', '-1 day', false, 'index.php?page=projects'],
-            ['comment', 'Nuevo comentario', 'El tutor dejó una recomendación en el apartado de resultados.', 'Aplicación móvil de apoyo al aprendizaje inclusivo', '-1 day -3 hours', true, 'index.php?page=projects'],
-            ['tribunal', 'Tribunal asignado', 'Se confirmaron los tres docentes que evaluarán tu proyecto.', 'Sistema de gestión documental para proyectos de titulación', '-3 days', true, 'index.php?page=projects'],
+            ['delivery', 'Nueva entrega registrada', 'María Fernanda subió el Informe final v3 para revisión.', 'Sistema de Gestión Documental Académica', '-20 minutes', false, 'index.php?page=project-detail&id=1&tab=deliveries'],
+            ['observation', 'Se registraron observaciones', 'Tu tutor agregó observaciones en el capítulo de metodología.', 'Sistema de Gestión Documental Académica', '-2 hours', false, 'index.php?page=project-detail&id=1&tab=observations'],
+            ['status_change', 'Proyecto aprobado', 'El perfil del proyecto superó la etapa de revisión académica.', 'Aplicación móvil de apoyo al aprendizaje inclusivo', '-3 hours', false, 'index.php?page=project-detail&id=2&tab=summary'],
+            ['repository', 'Repositorio actualizado', 'Los documentos públicos del proyecto ya están disponibles.', 'Portal comunitario para alfabetización digital', '-4 hours', true, 'index.php?page=repository-detail&id=3'],
+            ['review', 'Requiere correcciones', 'La entrega fue devuelta con ajustes pendientes antes de continuar.', 'Sistema de Gestión Documental Académica', '-1 day', false, 'index.php?page=project-detail&id=1&tab=observations'],
+            ['comment', 'Nuevo comentario', 'El tutor dejó una recomendación general para el equipo.', 'Aplicación móvil de apoyo al aprendizaje inclusivo', '-1 day -3 hours', true, 'index.php?page=project-detail&id=2&tab=comments'],
+            ['tribunal', 'Tribunal asignado', 'Se confirmaron los tres docentes que evaluarán tu proyecto.', 'Plataforma para seguimiento de prácticas preprofesionales', '-3 days', true, 'index.php?page=project-detail&id=3&tab=participants'],
             ['reminder', 'Recordatorio de entrega', 'Faltan 3 días para cargar la versión corregida del documento.', 'Análisis predictivo de permanencia estudiantil', '-4 days', false, null],
-            ['delivery', 'Nueva versión subida', 'La versión 2.1 quedó registrada correctamente en el historial.', 'Plataforma web para seguimiento de prácticas preprofesionales', '-8 days', true, 'index.php?page=projects'],
+            ['delivery', 'Nueva versión subida', 'La versión 2.1 quedó registrada correctamente en el historial.', 'Plataforma para seguimiento de prácticas preprofesionales', '-8 days', true, 'index.php?page=project-detail&id=3&tab=deliveries'],
         ];
 
         return array_map(static function (array $item, int $index) use ($now): array {
             [$type, $title, $message, $projectName, $relativeDate, $isRead, $actionUrl] = $item;
+            preg_match('/[?&]id=(\d+)/', (string) $actionUrl, $projectMatch);
             return [
                 'id' => $index + 1,
                 'user_id' => 1,
-                'project_id' => $index % 4 + 1,
+                'project_id' => $type === 'repository' ? 4 : (isset($projectMatch[1]) ? (int) $projectMatch[1] : null),
                 'type' => $type,
                 'title' => $title,
                 'message' => $message,

@@ -17,7 +17,7 @@ final class CalendarController
             'bodyClass' => 'dashboard-page calendar-page',
             'pageScript' => asset('js/calendar.js'),
             'calendarEvents' => $calendar->getEvents(),
-            'projectsUrl' => route('projects'),
+            'projectsUrl' => route('project-detail'),
             'projectFilterId' => $projectFilterId,
         ]);
     }

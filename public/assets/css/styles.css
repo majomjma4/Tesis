@@ -727,7 +727,8 @@ body.modal-open{
     gap:10px;
     min-width:0;
 }
-.report-quick-actions button{
+.report-quick-actions button,
+.report-quick-actions a{
     background:var(--surface-soft);
     color:var(--text);
     border:1px solid var(--line);
@@ -740,7 +741,8 @@ body.modal-open{
     gap:9px;
     transition:.25s ease;
 }
-.report-quick-actions button:hover{
+.report-quick-actions button:hover,
+.report-quick-actions a:hover{
     color:var(--blue);
     border-color:rgba(37,99,235,.28);
     transform:translateY(-2px);

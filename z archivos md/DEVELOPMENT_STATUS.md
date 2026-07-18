@@ -563,3 +563,13 @@ Pendiente:
 - Preservación de `projectId` al normalizar y guardar eventos del calendario.
 - Documentos finales con estados de publicación y acceso al Repositorio cuando corresponde.
 - Estados vacíos reales para eventos, tribunal y documentos aún no disponibles.
+
+## Integraciones del módulo — Etapa 5
+
+- Dashboard enlazado con Resumen, Entregas, Observaciones, Historial, Calendario y Notificaciones.
+- Notificaciones temporales y semilla SQL dirigidas a `project-detail&id={id}&tab={tab}`.
+- Identificadores de proyecto alineados con el destino de cada notificación.
+- Calendario global dirigido a la pestaña correspondiente según entrega, revisión, fecha límite o reunión.
+- Proyecto publicado enlazado con su entrada real del Repositorio.
+- Repositorio con retorno contextual a Documentos finales del seguimiento académico.
+- Eliminación de accesos genéricos y fragmentos antiguos del flujo integrado.

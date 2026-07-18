@@ -71,7 +71,8 @@ final class RepositoryModel
                 'type_slug' => 'vinculacion',
                 'downloads' => 76,
                 'technologies' => ['PHP', 'Vue', 'MariaDB', 'Bootstrap'],
-                'keywords' => ['Comunidad', 'Registro', 'Impacto social', 'Vinculación']
+                'keywords' => ['Comunidad', 'Registro', 'Impacto social', 'Vinculación'],
+                'source_project_id' => 4,
             ],
             [
                 'id' => 4,

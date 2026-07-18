@@ -21,6 +21,14 @@ final class DashboardController
             'processDates' => $dashboard->getProcessDates(),
             'notifications' => $dashboard->getNotifications(),
             'reminders' => $dashboard->getReminders(),
+            'projectUrls' => [
+                'summary' => route('project-detail') . '&id=1&tab=summary',
+                'deliveries' => route('project-detail') . '&id=1&tab=deliveries',
+                'observations' => route('project-detail') . '&id=1&tab=observations',
+                'history' => route('project-detail') . '&id=1&tab=history',
+                'calendar' => route('project-detail') . '&id=1&tab=calendar',
+                'notifications' => route('notifications'),
+            ],
         ]);
     }
 }
