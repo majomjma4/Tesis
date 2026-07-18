@@ -21,6 +21,14 @@ setTimeout(() => {
     }
     if (projectsContent) {
         projectsContent.style.display = "grid";
+        const hashTarget = window.location.hash ? document.querySelector(window.location.hash) : null;
+        if (hashTarget) {
+            window.setTimeout(() => {
+                hashTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+                hashTarget.classList.add("project-target-highlight");
+                window.setTimeout(() => hashTarget.classList.remove("project-target-highlight"), 2200);
+            }, 120);
+        }
         // Agregar clase show para animar entrada
         setTimeout(() => {
             const cards = projectsContent.querySelectorAll(

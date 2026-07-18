@@ -42,7 +42,7 @@
                     <span class="menu-icon"><i class="fa-solid fa-book-open"></i></span>
                     <span>Repositorio</span>
                 </a>
-                <a href="#" class="menu-item <?= ($currentPage ?? '') === 'calendar' ? 'active' : '' ?>">
+                <a href="<?= e(route('calendar')) ?>" class="menu-item <?= ($currentPage ?? '') === 'calendar' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-calendar-days"></i></span>
                     <span>Calendario</span>
                 </a>
@@ -78,7 +78,8 @@
             <div class="topbar-right">
                 <button class="topbar-action-btn" type="button">
                     <i class="fa-solid fa-plus"></i>
-                    Nuevo proyecto
+                    <span class="topbar-action-label">Nuevo proyecto</span>
+                    <span class="topbar-action-label-short">Nuevo</span>
                 </button>
                 <button class="icon-btn theme-toggle" id="themeToggle" type="button" aria-label="Cambiar modo claro u oscuro">
                     <i class="fa-solid fa-moon"></i>

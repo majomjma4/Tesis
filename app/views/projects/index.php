@@ -27,7 +27,7 @@
         <div class="left-column projects-main-column">
             
             <!-- Ficha del Proyecto Principal -->
-            <section class="project-card active-project-card" aria-label="Información detallada del proyecto">
+            <section class="project-card active-project-card" id="project-overview" aria-label="Información detallada del proyecto">
                 <div class="project-card-top">
                     <div>
                         <span class="section-eyebrow"><?= e($project['career']) ?></span>
@@ -79,7 +79,7 @@
             </section>
             
             <!-- Historial de Versiones Documentales -->
-            <section class="timeline-section" style="margin-top: 28px;" aria-label="Historial de entregas documentales">
+            <section class="timeline-section" id="project-history" style="margin-top: 28px;" aria-label="Historial de entregas documentales">
                 <div class="section-heading compact-heading" style="margin-bottom: 20px;">
                     <div>
                         <span class="section-eyebrow">Trazabilidad documental</span>
@@ -160,7 +160,7 @@
         <aside class="right-column projects-side-column">
             
             <!-- Formulario de Nueva Entrega -->
-            <section class="reminders-panel upload-version-panel" aria-label="Nueva entrega de documento">
+            <section class="reminders-panel upload-version-panel" id="project-delivery" aria-label="Nueva entrega de documento">
                 <div class="panel-heading">
                     <h2><i class="fa-solid fa-cloud-arrow-up"></i> Entregar Versión</h2>
                     <span>Formulario</span>

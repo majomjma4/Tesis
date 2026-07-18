@@ -216,18 +216,35 @@ Pendiente:
 
 Estado:
 
-En desarrollo
+Funcional con persistencia temporal
 
 Implementado:
 
-- Diseño visual.
+- Gestión completa de eventos mediante modelo, controlador, vista y endpoint JSON.
+- Persistencia temporal en `storage/calendar/events.json` hasta la migración a MySQL.
+- Creación, edición, eliminación, finalización y reapertura de eventos.
+- Vistas intercambiables de mes, semana y lista, con conservación de la vista elegida mediante almacenamiento local.
+- Creación rápida al hacer doble clic sobre una fecha vacía.
+- Reprogramación mediante arrastre entre fechas.
+- Confirmación visual de eliminación y opción temporal para deshacerla.
+- Detalle completo del recordatorio y navegación contextual hacia el apartado relacionado del proyecto.
+- Clasificación por entrega, reunión, revisión y fecha límite.
+- Prioridades alta, media y baja, con filtros específicos y ordenamiento en la vista de lista.
+- Ordenamiento por proximidad, prioridad y eventos completados al final.
+- Identificación visual de eventos vencidos.
+- Búsqueda, filtros activos, limpieza conjunta y estados vacíos orientativos.
+- Indicadores interactivos para eventos del mes, próximos siete días y progreso mensual.
+- Cantidad completada, porcentaje y barra visual de progreso mensual.
+- Agenda del día y sección independiente de próximos eventos.
+- Diseño responsive, modo oscuro y navegación táctil entre periodos en dispositivos móviles.
+- Selectores visuales personalizados y diálogos propios para las acciones principales.
 
 Pendiente:
 
-- Eventos.
-- Recordatorios.
-- Integración con proyectos.
-- Persistencia.
+- Sustituir el archivo JSON por persistencia definitiva en MySQL.
+- Relacionar los eventos con identificadores reales de proyectos y usuarios autenticados.
+- Generar recordatorios automáticamente desde entregas, revisiones y fechas límite reales del sistema.
+- Incorporar permisos por rol cuando se implemente la autenticación definitiva.
 
 ---
 

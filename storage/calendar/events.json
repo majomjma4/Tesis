@@ -1,0 +1,35 @@
+[
+    {
+        "id": "demo-1",
+        "title": "Reunión con el tutor",
+        "date": "2026-07-17",
+        "type": "meeting",
+        "priority": "high",
+        "description": "Revisar observaciones y definir el siguiente avance.",
+        "completed": false,
+        "updatedAt": "2026-07-18T05:40:24+02:00"
+    },
+    {
+        "id": "demo-2",
+        "title": "Entrega del avance",
+        "date": "2026-07-20",
+        "type": "delivery",
+        "priority": "high",
+        "projectId": 0,
+        "description": "Subir la versión corregida del documento.",
+        "completed": false,
+        "updatedAt": "2026-07-18T05:34:26+02:00"
+    },
+    {
+        "id": "demo-3",
+        "title": "Revisión de referencias",
+        "date": "2026-07-24",
+        "time": "10:00",
+        "type": "review",
+        "priority": "medium",
+        "location": "Biblioteca",
+        "description": "Validar citas, bibliografía y anexos.",
+        "completed": false,
+        "updatedAt": "2026-07-17T06:58:40+02:00"
+    }
+]

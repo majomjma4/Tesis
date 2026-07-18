@@ -264,6 +264,39 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 ---
 
+# [v0.7.0] - 17/07/2026
+
+## Calendario Académico Funcional
+
+### Calendario
+
+- Se convirtió la pantalla de Calendario en un módulo MVC funcional con persistencia temporal mediante JSON.
+- Se implementó la creación, edición, eliminación, finalización, reapertura y consulta detallada de eventos.
+- Se incorporaron vistas de mes, semana y lista dentro del mismo espacio de navegación.
+- Se habilitó la reprogramación de eventos mediante arrastre y la creación rápida con doble clic sobre fechas vacías.
+- Se añadieron eventos vencidos, prioridades, filtros, búsqueda, ordenamiento y estados vacíos contextuales.
+- Se incorporó la opción de deshacer eliminaciones durante unos segundos.
+- Se conectaron los recordatorios con apartados relacionados de los proyectos mediante acciones contextuales.
+
+### Experiencia de Usuario
+
+- Se añadieron indicadores interactivos para eventos mensuales, próximos siete días y progreso del mes.
+- El progreso mensual ahora muestra porcentaje, cantidad completada y una barra visual.
+- Se incorporaron una agenda diaria y una sección de próximos eventos.
+- Se reemplazaron confirmaciones y selectores básicos por diálogos y desplegables visuales propios.
+- Se conserva la vista seleccionada después de recargar la página.
+- Se añadió navegación táctil horizontal entre periodos en dispositivos móviles.
+- Se mejoró la adaptación responsive de controles, tarjetas, acciones y barra superior.
+
+### Mejoras Técnicas
+
+- Se creó la ruta JSON `calendar-events` para las operaciones del calendario.
+- Se centralizó la normalización y persistencia temporal de eventos en `CalendarModel`.
+- Se mantuvo la separación entre modelo, controlador, vista y comportamiento JavaScript.
+- La migración de eventos hacia MySQL y su asociación definitiva con usuarios y proyectos permanece pendiente.
+
+---
+
 Las siguientes versiones del CHANGELOG se actualizarán únicamente cuando se complete una funcionalidad importante del sistema.
 
 Ejemplos:

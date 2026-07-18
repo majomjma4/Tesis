@@ -11,6 +11,7 @@ require APP_PATH . '/helpers.php';
 require APP_PATH . '/Core/View.php';
 require APP_PATH . '/Core/Database.php';
 require APP_PATH . '/models/DashboardModel.php';
+require APP_PATH . '/models/CalendarModel.php';
 require APP_PATH . '/models/AuthModel.php';
 require APP_PATH . '/models/ProjectModel.php';
 require APP_PATH . '/models/RepositoryModel.php';
@@ -23,6 +24,7 @@ require APP_PATH . '/services/ArchiveService.php';
 require APP_PATH . '/services/FilePreviewService.php';
 require APP_PATH . '/services/DocxPreviewService.php';
 require APP_PATH . '/controllers/DashboardController.php';
+require APP_PATH . '/controllers/CalendarController.php';
 require APP_PATH . '/controllers/AuthController.php';
 require APP_PATH . '/controllers/DevController.php';
 require APP_PATH . '/controllers/ProjectsController.php';
@@ -38,6 +40,8 @@ match ($page) {
     'logout' => (new AuthController())->logout(),
     'dev-reload' => (new DevController())->reloadStamp(),
     'dashboard', 'home', 'inicio' => (new DashboardController())->index(),
+    'calendar', 'calendario' => (new CalendarController())->index(),
+    'calendar-events' => (new CalendarController())->events(),
     'projects', 'proyectos', 'mis-proyectos' => (new ProjectsController())->index(),
     'repository', 'repositorio' => (new RepositoryController())->index(),
     'repository-detail', 'detalle-repositorio' => (new RepositoryController())->detail(),

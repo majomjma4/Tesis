@@ -537,6 +537,7 @@ Cada módulo deberá tener responsabilidades claramente definidas.
 Los módulos actuales son:
 
 - Inicio (Dashboard)
+- Calendario y seguimiento de fechas académicas
 - Gestión de proyectos
 - Gestión documental
 - Revisión documental
