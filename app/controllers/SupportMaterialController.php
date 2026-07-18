@@ -70,6 +70,7 @@ final class SupportMaterialController
         $this->sendJson(true, $preview['message'], ['preview' => $preview]);
     }
 
+
     public function previewContent(): void
     {
         $this->ensureSession();
