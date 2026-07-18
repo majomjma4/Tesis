@@ -10,6 +10,9 @@
         }
     </script>
     <link rel="stylesheet" href="<?= e(asset('css/styles.css')) ?>">
+    <?php foreach (($pageStyles ?? []) as $pageStyle): ?>
+        <link rel="stylesheet" href="<?= e($pageStyle) ?>">
+    <?php endforeach; ?>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell')) ?>">
@@ -76,11 +79,11 @@
             </div>
 
             <div class="topbar-right">
-                <button class="topbar-action-btn" type="button">
+                <a class="topbar-action-btn" href="<?= e(route('new-project')) ?>">
                     <i class="fa-solid fa-plus"></i>
                     <span class="topbar-action-label">Nuevo proyecto</span>
                     <span class="topbar-action-label-short">Nuevo</span>
-                </button>
+                </a>
                 <button class="icon-btn theme-toggle" id="themeToggle" type="button" aria-label="Cambiar modo claro u oscuro">
                     <i class="fa-solid fa-moon"></i>
                 </button>

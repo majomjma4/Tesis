@@ -18,6 +18,20 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 ---
 
+# [En desarrollo] - 18/07/2026
+
+## Separación estructural del módulo de proyectos
+
+- Se separó el catálogo “Mis proyectos” del seguimiento detallado de un expediente.
+- Se incorporaron rutas independientes para catálogo, detalle y Nuevo proyecto.
+- Se añadió el comportamiento específico para cero, uno y varios proyectos.
+- Se implementaron tarjetas contextuales según la etapa académica.
+- Se preparó el detalle con navegación por pestañas, incluyendo comentarios generales.
+- Se aislaron los estilos y scripts para evitar ampliar los selectores globales.
+- Se eliminó del flujo nuevo cualquier confirmación de guardado simulado.
+
+---
+
 # [v0.1.0] - 02/06/2026
 
 ## Inicio del Proyecto

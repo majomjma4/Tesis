@@ -31,6 +31,8 @@ match ($page) {
     'calendar', 'calendario' => (new CalendarController())->index(),
     'calendar-events' => (new CalendarController())->events(),
     'projects', 'proyectos', 'mis-proyectos' => (new ProjectsController())->index(),
+    'project-detail', 'detalle-proyecto' => (new ProjectsController())->detail(),
+    'new-project', 'nuevo-proyecto' => (new ProjectsController())->create(),
     'repository', 'repositorio' => (new RepositoryController())->index(),
     'repository-detail', 'detalle-repositorio' => (new RepositoryController())->detail(),
     'repository-files' => (new RepositoryController())->files(),

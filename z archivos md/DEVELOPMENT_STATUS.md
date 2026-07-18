@@ -496,3 +496,29 @@ Pendiente:
 - Configurar dominio, HTTPS y credenciales reales en el proveedor seleccionado.
 - Confirmar las extensiones PHP disponibles en la cuenta de cPanel.
 - Ejecutar pruebas de aceptación en el servidor final.
+
+---
+
+# 23. Módulos Mis proyectos y Detalle del proyecto
+
+Estado: Fase 0 completada y base funcional en desarrollo.
+
+Implementado:
+
+- Separación estructural entre catálogo, detalle y registro de un nuevo proyecto.
+- Rutas `projects`, `project-detail` y `new-project`.
+- Redirección automática al detalle cuando el usuario posee exactamente un proyecto.
+- Estados diferenciados para cero, uno y varios proyectos.
+- Contrato temporal centralizado en `ProjectModel`, identificado como simulado.
+- Tarjetas contextuales para revisión, aprobación, defensa y publicación.
+- Detalle por identificador con validación de pestañas y estado 404.
+- Pestaña independiente de comentarios generales con relación opcional preparada.
+- CSS y JavaScript aislados para catálogo y detalle.
+- Ruta de Nuevo proyecto con estado pendiente, sin formulario ni guardado ficticio.
+
+Pendiente:
+
+- Persistencia real, autenticación, pertenencia y permisos por rol.
+- Formularios backend para entregas, comentarios, observaciones y estados.
+- Desarrollo completo de historial, participantes, calendario y documentos finales.
+- Integración por identificador y pestaña con Dashboard, Notificaciones, Calendario y Repositorio.

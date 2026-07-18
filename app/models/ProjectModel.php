@@ -2,112 +2,106 @@
 
 declare(strict_types=1);
 
+/**
+ * Contrato temporal del módulo de proyectos.
+ * Los datos son simulados, no representan persistencia ni permisos definitivos.
+ */
 final class ProjectModel
 {
-    /**
-     * Obtiene el detalle extendido del proyecto activo del estudiante.
-     */
-    public function getProjectDetails(): array
+    /** Devuelve los expedientes visibles para el usuario indicado. */
+    public function getProjectsForUser(int $userId): array
     {
+        return array_values(array_filter($this->projects(), static fn (array $project): bool => in_array($userId, $project['user_ids'], true)));
+    }
+
+    /** Busca un expediente comprobando temporalmente su pertenencia. */
+    public function findProjectForUser(int $projectId, int $userId): ?array
+    {
+        foreach ($this->getProjectsForUser($userId) as $project) {
+            if ($project['id'] === $projectId) {
+                return $project;
+            }
+        }
+        return null;
+    }
+
+    public function getProjectMetrics(array $projects): array
+    {
+        $counts = ['active' => 0, 'review' => 0, 'changes' => 0, 'finished' => 0];
+        foreach ($projects as $project) {
+            $bucket = $project['metric_bucket'];
+            if (isset($counts[$bucket])) $counts[$bucket]++;
+        }
         return [
-            'id' => 1,
-            'title' => 'Sistema de Gestión Documental Académica',
-            'description' => 'Diseño e implementación de una plataforma web institucional para el seguimiento, revisión y gestión documental de proyectos académicos en la carrera de Desarrollo de Software.',
-            'semester' => 'Séptimo semestre',
-            'tutor' => 'Ing. Tutor Asignado',
-            'career' => 'Tecnología Superior en Desarrollo de Software',
-            'line_of_research' => 'Desarrollo de Software y Tecnologías Emergentes',
-            'status_class' => 'revision',
-            'status_label' => 'En revisión',
-            'created_at' => '02 Jun 2026',
-            'last_activity' => '04 Jul 2026',
-            'team' => [
-                ['initial' => 'C', 'name' => 'Carlos Martínez', 'role' => 'Líder del Proyecto', 'email' => 'carlos.martinez@libertador.edu.ec'],
-                ['initial' => 'A', 'name' => 'Andrés Pérez', 'role' => 'Integrante', 'email' => 'andres.perez@libertador.edu.ec'],
-                ['initial' => 'L', 'name' => 'Lucía Gómez', 'role' => 'Integrante', 'email' => 'lucia.gomez@libertador.edu.ec']
-            ]
+            ['key' => 'active', 'label' => 'Activos', 'icon' => 'fa-folder-open', 'count' => $counts['active']],
+            ['key' => 'review', 'label' => 'En revisión', 'icon' => 'fa-magnifying-glass', 'count' => $counts['review']],
+            ['key' => 'changes', 'label' => 'Requieren cambios', 'icon' => 'fa-triangle-exclamation', 'count' => $counts['changes']],
+            ['key' => 'finished', 'label' => 'Finalizados', 'icon' => 'fa-circle-check', 'count' => $counts['finished']],
         ];
     }
 
-    /**
-     * Obtiene el historial de entregas documentales (versiones) para el proyecto.
-     * Diseñado para simular el avance gradual del proyecto durante el semestre.
-     */
-    public function getDocumentHistory(): array
+    public function getDetailTabs(): array
     {
         return [
-            [
-                'version' => 4,
-                'file_name' => 'Informe_actualizado_v4.pdf',
-                'file_size' => '2.4 MB',
-                'phase' => 'Avance de Marco Metodológico e Instrumentos',
-                'delivery_date' => '03 Jul 2026',
-                'delivery_time' => '16:30',
-                'submitted_by' => 'Carlos Martínez',
-                'status_class' => 'revision',
-                'status_label' => 'En revisión',
-                'feedback' => 'El tutor se encuentra evaluando la metodología ampliada y la justificación de las técnicas de recolección de datos presentadas en esta entrega.',
-                'observations' => []
-            ],
-            [
-                'version' => 3,
-                'file_name' => 'Informe_Proyecto_v3.pdf',
-                'file_size' => '2.1 MB',
-                'phase' => 'Marco Teórico y Propuesta Conceptual',
-                'delivery_date' => '24 Jun 2026',
-                'delivery_time' => '11:15',
-                'submitted_by' => 'Carlos Martínez',
-                'status_class' => 'changes',
-                'status_label' => 'Requiere cambios',
-                'feedback' => 'El marco metodológico está muy genérico. Se deben detallar más los instrumentos de recolección de datos y unificar las referencias bajo formato APA 7 para validar el avance.',
-                'observations' => [
-                    'Marco metodológico: Ampliar la descripción del enfoque utilizado y justificar la técnica de recolección de datos.',
-                    'Formato de referencias: Unificar el formato de citas y referencias bibliográficas antes del siguiente envío.'
-                ]
-            ],
-            [
-                'version' => 2,
-                'file_name' => 'Propuesta_Ajustada_v2.pdf',
-                'file_size' => '1.8 MB',
-                'phase' => 'Ajuste de Objetivos y Alcance',
-                'delivery_date' => '12 Jun 2026',
-                'delivery_time' => '09:40',
-                'submitted_by' => 'Carlos Martínez',
-                'status_class' => 'approved',
-                'status_label' => 'Aprobado con observaciones',
-                'feedback' => 'Objetivos generales y específicos replanteados correctamente de acuerdo a la retroalimentación anterior. Se autoriza continuar con el desarrollo del marco teórico.',
-                'observations' => [
-                    'Detallar de mejor manera los alcances del sistema web en la sección de delimitación para evitar desvíos en el desarrollo.'
-                ]
-            ],
-            [
-                'version' => 1,
-                'file_name' => 'Propuesta_Tema_Proyecto_v1.pdf',
-                'file_size' => '1.2 MB',
-                'phase' => 'Propuesta Inicial de Tema',
-                'delivery_date' => '02 Jun 2026',
-                'delivery_time' => '15:20',
-                'submitted_by' => 'Carlos Martínez',
-                'status_class' => 'approved',
-                'status_label' => 'Aprobado',
-                'feedback' => 'El tema es viable y pertinente para la carrera de Desarrollo de Software. Propuesta inicial aprobada para la estructuración formal del informe.',
-                'observations' => []
-            ]
+            'summary' => ['label' => 'Resumen', 'icon' => 'fa-chart-pie'],
+            'deliveries' => ['label' => 'Entregas', 'icon' => 'fa-file-arrow-up'],
+            'observations' => ['label' => 'Observaciones', 'icon' => 'fa-list-check'],
+            'comments' => ['label' => 'Comentarios', 'icon' => 'fa-comments'],
+            'history' => ['label' => 'Historial', 'icon' => 'fa-clock-rotate-left'],
+            'participants' => ['label' => 'Participantes', 'icon' => 'fa-users'],
+            'calendar' => ['label' => 'Calendario', 'icon' => 'fa-calendar-days'],
+            'final-documents' => ['label' => 'Documentos finales', 'icon' => 'fa-box-archive'],
         ];
     }
 
-    /**
-     * Fases académicas disponibles para nuevas entregas.
-     */
-    public function getCareerPhases(): array
+    private function projects(): array
     {
+        $common = [
+            'user_ids' => [1], 'career' => 'Tecnología Superior en Desarrollo de Software',
+            'period' => '2026-I', 'role' => 'Estudiante líder',
+            'participants' => [
+                ['initial' => 'C', 'name' => 'Carlos Martínez', 'role' => 'Líder'],
+                ['initial' => 'A', 'name' => 'Andrés Pérez', 'role' => 'Integrante'],
+                ['initial' => 'L', 'name' => 'Lucía Gómez', 'role' => 'Integrante'],
+            ],
+        ];
+
         return [
-            ['id' => 'phase_1', 'label' => 'Propuesta de Tema (Fase I)'],
-            ['id' => 'phase_2', 'label' => 'Marco Teórico (Fase II)'],
-            ['id' => 'phase_3', 'label' => 'Marco Metodológico (Fase III)'],
-            ['id' => 'phase_4', 'label' => 'Propuesta Técnica y Desarrollo (Fase IV)'],
-            ['id' => 'phase_5', 'label' => 'Pruebas e Implantación (Fase V)'],
-            ['id' => 'phase_6', 'label' => 'Informe Final Completo']
+            $common + [
+                'id' => 1, 'type' => 'Trabajo de titulación', 'type_key' => 'thesis', 'status' => 'En revisión', 'status_key' => 'review', 'metric_bucket' => 'review',
+                'title' => 'Sistema de Gestión Documental Académica', 'subtitle' => 'Seguimiento, revisión y publicación de proyectos académicos.',
+                'tutor' => 'Ing. Tutor Asignado', 'last_activity' => 'Revisión del tutor · 17 Jul 2026', 'stage' => 'Revisión académica', 'progress' => 58,
+                'context' => ['Última entrega' => 'Informe metodológico · v4', 'Próxima revisión' => '22 Jul 2026', 'Observaciones pendientes' => '2 de prioridad alta'],
+                'action_label' => 'Continuar seguimiento', 'next_action' => 'Atender las observaciones de metodología y referencias.',
+                'latest_delivery' => ['version' => 'v4', 'title' => 'Informe metodológico', 'date' => '16 Jul 2026', 'status' => 'En revisión'],
+                'observations' => [
+                    ['title' => 'Marco metodológico', 'text' => 'Ampliar el enfoque y justificar los instrumentos.', 'status' => 'Pendiente'],
+                    ['title' => 'Referencias', 'text' => 'Unificar citas y bibliografía en formato APA 7.', 'status' => 'Pendiente'],
+                ],
+                'activities' => [['title' => 'Versión 4 registrada', 'date' => '16 Jul'], ['title' => 'Tutor inició la revisión', 'date' => '17 Jul']],
+                'comments' => [['author' => 'Ing. Tutor Asignado', 'date' => '17 Jul 2026', 'text' => 'Revisaremos primero metodología. Este comentario es general y no está asociado a un archivo.', 'relation' => null]],
+            ],
+            $common + [
+                'id' => 2, 'type' => 'Proyecto integrador', 'type_key' => 'integrator', 'status' => 'Aprobado', 'status_key' => 'approved', 'metric_bucket' => 'active',
+                'title' => 'Aplicación móvil de apoyo al aprendizaje inclusivo', 'subtitle' => 'Herramientas accesibles para acompañamiento académico.',
+                'tutor' => 'Msc. Elena Ruiz', 'last_activity' => 'Proyecto aprobado · 12 Jul 2026', 'stage' => 'Preparación final', 'progress' => 76,
+                'context' => ['Fecha de aprobación' => '12 Jul 2026', 'Documentos pendientes' => 'Ejecutable y anexos', 'Siguiente etapa' => 'Asignación de tribunal'],
+                'action_label' => 'Preparar documentos finales', 'next_action' => 'Completar los documentos requeridos para tribunal.', 'latest_delivery' => null, 'observations' => [], 'activities' => [], 'comments' => [],
+            ],
+            $common + [
+                'id' => 3, 'type' => 'Trabajo de titulación', 'type_key' => 'thesis', 'status' => 'En defensa', 'status_key' => 'defense', 'metric_bucket' => 'active',
+                'title' => 'Plataforma para seguimiento de prácticas preprofesionales', 'subtitle' => 'Control académico de convenios, evidencias y evaluaciones.',
+                'tutor' => 'Ing. Pablo Torres', 'last_activity' => 'Defensa programada · 15 Jul 2026', 'stage' => 'Defensa', 'progress' => 91,
+                'context' => ['Tribunal asignado' => '3 docentes', 'Fecha programada' => '29 Jul 2026 · 10:00', 'Evaluación' => 'Pendiente'],
+                'action_label' => 'Ver defensa', 'next_action' => 'Preparar la presentación y evidencias.', 'latest_delivery' => null, 'observations' => [], 'activities' => [], 'comments' => [],
+            ],
+            $common + [
+                'id' => 4, 'type' => 'Proyecto de vinculación', 'type_key' => 'community', 'status' => 'Publicado', 'status_key' => 'published', 'metric_bucket' => 'finished',
+                'title' => 'Portal comunitario para alfabetización digital', 'subtitle' => 'Recursos tecnológicos para comunidades rurales.',
+                'tutor' => 'Msc. Diana Vega', 'last_activity' => 'Publicado en repositorio · 03 Jul 2026', 'stage' => 'Publicado', 'progress' => 100,
+                'context' => ['Fecha de publicación' => '03 Jul 2026', 'Repositorio' => 'Disponible públicamente', 'Categoría' => 'Vinculación · Inclusión digital'],
+                'action_label' => 'Ver en repositorio', 'repository_id' => 1, 'next_action' => 'El expediente se encuentra concluido y publicado.', 'latest_delivery' => null, 'observations' => [], 'activities' => [], 'comments' => [],
+            ],
         ];
     }
 }
