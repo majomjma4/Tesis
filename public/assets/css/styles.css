@@ -2712,7 +2712,7 @@ body.repository-preview-modal-open { overflow: hidden; }
 .support-material-additional-file:last-child { margin-bottom: 0; border-bottom: 1px solid var(--line); }
 .support-material-additional-file:hover { border-color: rgba(var(--repository-accent),.24); transform: translateY(-1px); box-shadow: 0 8px 18px rgba(15,23,42,.05); }
 .support-material-file-copy { min-width: 0; display: grid; gap: 4px; }
-.support-material-additional-file .support-material-file-copy strong { display: -webkit-box; overflow: hidden; color: var(--text); font-size: 12px; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.support-material-additional-file .support-material-file-copy strong { display: -webkit-box; overflow: hidden; color: var(--text); font-size: 12px; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 .support-material-file-copy small { color: var(--muted); font-size: 9px; font-weight: 700; }
 .support-material-extension-chip { width: fit-content; padding: 4px 7px; border: 1px solid rgba(var(--repository-accent),.16); border-radius: 7px; background: rgba(var(--repository-accent),.07); color: rgb(var(--repository-accent)); font-size: 9px; font-weight: 900; }
 .support-material-file-size { color: var(--muted); font-variant-numeric: tabular-nums; }
