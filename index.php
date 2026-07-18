@@ -6,33 +6,17 @@ define('ROOT_PATH', __DIR__);
 define('APP_PATH', ROOT_PATH . '/app');
 
 // Inicio de carga de configuración y dependencias
-// Define la base de la aplicación e incorpora helpers, núcleo, modelos, servicios y controladores.
+// Define la base de la aplicación e incorpora helpers y el cargador central de clases.
 $config = require APP_PATH . '/config/app.php';
 
 require APP_PATH . '/helpers.php';
-require APP_PATH . '/Core/View.php';
-require APP_PATH . '/Core/Database.php';
-require APP_PATH . '/models/DashboardModel.php';
-require APP_PATH . '/models/CalendarModel.php';
-require APP_PATH . '/models/AuthModel.php';
-require APP_PATH . '/models/ProjectModel.php';
-require APP_PATH . '/models/RepositoryModel.php';
-require APP_PATH . '/models/FavoriteModel.php';
-require APP_PATH . '/models/DownloadModel.php';
-require APP_PATH . '/models/SupportMaterialModel.php';
-require APP_PATH . '/models/SupportMaterialDownloadModel.php';
-require APP_PATH . '/models/NotificationModel.php';
-require APP_PATH . '/services/ArchiveService.php';
-require APP_PATH . '/services/FilePreviewService.php';
-require APP_PATH . '/services/DocxPreviewService.php';
-require APP_PATH . '/controllers/DashboardController.php';
-require APP_PATH . '/controllers/CalendarController.php';
-require APP_PATH . '/controllers/AuthController.php';
-require APP_PATH . '/controllers/DevController.php';
-require APP_PATH . '/controllers/ProjectsController.php';
-require APP_PATH . '/controllers/RepositoryController.php';
-require APP_PATH . '/controllers/SupportMaterialController.php';
-require APP_PATH . '/controllers/NotificationsController.php';
+require APP_PATH . '/Core/Autoloader.php';
+Autoloader::register();
+
+if (($config['environment'] ?? 'production') === 'production') {
+    ini_set('display_errors', '0');
+    ini_set('log_errors', '1');
+}
 // Final de carga de configuración y dependencias
 
 // Inicio del enrutamiento principal

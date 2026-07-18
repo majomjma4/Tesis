@@ -21,7 +21,7 @@
     <aside class="sidebar" id="sidebar" aria-label="Menu principal">
         <div>
             <div class="logo-area">
-                <img src="<?= e(asset('img/logo2.webp')) ?>" alt="Logo Instituto Superior Tecnologico El Libertador">
+                <img src="<?= e(asset('img/Logo2.webp')) ?>" alt="Logo Instituto Superior Tecnologico El Libertador">
                 <h1>
                     Instituto Superior Tecnologico<br>
                     "El Libertador"

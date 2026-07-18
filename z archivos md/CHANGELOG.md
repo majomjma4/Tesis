@@ -297,6 +297,32 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 ---
 
+# [v0.7.1] - 17/07/2026
+
+## Organización MVC y Preparación para cPanel
+
+### Arquitectura
+
+- Se incorporó carga automática de clases para núcleo, controladores, modelos y servicios.
+- Se simplificó el Front Controller eliminando la carga manual de cada clase.
+- Se retiraron accesos heredados que duplicaban rutas de la aplicación MVC.
+- Se corrigió la capitalización de recursos para servidores Linux.
+
+### Producción y seguridad
+
+- Se añadieron configuraciones locales ignoradas por Git para aplicación y base de datos.
+- Se protegieron configuración, almacenamiento, SQL, scripts y documentación frente al acceso web directo.
+- Se deshabilita la exposición de errores y la autorecarga cuando el entorno está configurado como producción.
+- Se añadieron ejemplos de configuración PHP segura para cPanel.
+
+### Despliegue
+
+- Se incorporó una guía completa de instalación en cPanel.
+- Se añadió un generador reproducible del paquete ZIP para producción.
+- El paquete excluye Git, herramientas internas y credenciales locales, y utiliza rutas compatibles con Linux.
+
+---
+
 Las siguientes versiones del CHANGELOG se actualizarán únicamente cuando se complete una funcionalidad importante del sistema.
 
 Ejemplos:

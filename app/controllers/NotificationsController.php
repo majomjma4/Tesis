@@ -433,7 +433,7 @@ final class NotificationsController
             return null;
         }
         $path = ltrim((string) ($parts['path'] ?? ''), '/');
-        if (!in_array($path, ['index.php', 'notificaciones.php'], true)) {
+        if ($path !== 'index.php') {
             return null;
         }
         return base_url($url);

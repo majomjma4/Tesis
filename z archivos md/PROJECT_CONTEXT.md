@@ -106,6 +106,12 @@ Todo nuevo desarrollo deberá integrarse correctamente con la arquitectura exist
 
 - Apache (XAMPP)
 
+## Servidor de producción previsto
+
+- Hosting Linux administrado mediante cPanel.
+- Apache con protección `.htaccess`.
+- Configuración local no versionada para aplicación y MySQL.
+
 ## Control de versiones
 
 - Git

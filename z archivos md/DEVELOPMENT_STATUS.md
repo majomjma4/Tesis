@@ -472,3 +472,27 @@ Este documento deberá actualizarse cuando:
 - Cambie el estado de desarrollo de algún módulo.
 
 Su objetivo es reflejar el estado real del proyecto en todo momento.
+
+---
+
+# 22. Arquitectura y Despliegue
+
+Estado:
+
+Preparado para pruebas en cPanel
+
+Implementado:
+
+- Front Controller único con carga automática de clases MVC y servicios.
+- Configuración local de aplicación y MySQL excluida del control de versiones.
+- Protección Apache para directorios privados y desactivación del listado de carpetas.
+- Modo de producción sin errores visibles ni autorecarga de desarrollo.
+- Generador de paquete ZIP compatible con Linux y libre de secretos locales.
+- Guía de despliegue, importación SQL, permisos, HTTPS y verificación posterior.
+
+Pendiente:
+
+- Crear la base MySQL definitiva de todos los módulos.
+- Configurar dominio, HTTPS y credenciales reales en el proveedor seleccionado.
+- Confirmar las extensiones PHP disponibles en la cuenta de cPanel.
+- Ejecutar pruebas de aceptación en el servidor final.

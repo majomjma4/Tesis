@@ -6,6 +6,12 @@ final class DevController
 {
     public function reloadStamp(): void
     {
+        $config = $GLOBALS['config'] ?? [];
+        if (empty($config['dev_autoreload']) || ($config['environment'] ?? 'production') === 'production') {
+            http_response_code(404);
+            exit;
+        }
+
         // Endpoint usado solo en desarrollo para detectar cambios y recargar la pagina.
         header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: no-store, no-cache, must-revalidate');

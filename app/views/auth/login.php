@@ -3,7 +3,7 @@
     <section class="login-intro" aria-label="Informacion institucional">
         <!-- Inicio de marca institucional -->
         <div class="institution-brand">
-            <img src="<?= e(asset('img/logo2.webp')) ?>" alt="Logo Instituto Superior Tecnologico El Libertador">
+            <img src="<?= e(asset('img/Logo2.webp')) ?>" alt="Logo Instituto Superior Tecnologico El Libertador">
             <div>
                 <span>Instituto Superior Tecnologico</span>
                 <strong>El Libertador</strong>

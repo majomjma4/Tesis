@@ -1,0 +1,7 @@
+display_errors = Off
+log_errors = On
+expose_php = Off
+session.cookie_httponly = On
+session.cookie_samesite = Lax
+; Activa esta opción únicamente cuando el dominio ya utilice HTTPS.
+; session.cookie_secure = On

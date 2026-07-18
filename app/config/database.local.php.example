@@ -1,0 +1,14 @@
+<?php
+
+declare(strict_types=1);
+
+// Copia este archivo como database.local.php en el servidor y completa las credenciales de cPanel.
+return [
+    'enabled' => true,
+    'host' => 'localhost',
+    'port' => '3306',
+    'name' => 'usuario_cpanel_tesis',
+    'user' => 'usuario_cpanel_app',
+    'password' => 'CAMBIAR_POR_UNA_CLAVE_SEGURA',
+    'charset' => 'utf8mb4',
+];
