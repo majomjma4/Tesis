@@ -91,6 +91,20 @@ final class ProjectModel
             ['label' => 'Tipo', 'value' => $project['type']],
             ['label' => 'Rol actual', 'value' => $project['role']],
         ];
+        $project['deliveries'] = $project['latest_delivery'] === null ? [] : [
+            $project['latest_delivery'] + [
+                'stage' => $project['stage'], 'author' => $project['participants'][0]['name'],
+                'file' => 'Informe_metodologico_v4.pdf', 'size' => '2.4 MB',
+                'comment' => 'Versión preparada para la revisión académica del tutor.',
+            ],
+            ['version' => 'v3', 'title' => 'Marco teórico y propuesta', 'date' => '24 Jun 2026', 'status' => 'Requiere cambios', 'stage' => 'Desarrollo', 'author' => $project['participants'][0]['name'], 'file' => 'Informe_proyecto_v3.pdf', 'size' => '2.1 MB', 'comment' => 'Entrega anterior conservada como parte de la trazabilidad.'],
+        ];
+        $project['observations'] = array_map(static fn (array $observation, int $index): array => $observation + [
+            'id' => $index + 1, 'author' => 'Ing. Tutor Asignado', 'role' => 'Tutor',
+            'date' => '17 Jul 2026', 'delivery' => 'Informe metodológico · v4',
+            'category' => $index === 0 ? 'Metodología' : 'Formato', 'location' => $index === 0 ? 'Página 28' : 'Referencias',
+            'responses' => $index === 0 ? [['author' => 'Carlos Martínez', 'date' => '18 Jul 2026', 'text' => 'La corrección está en preparación para la siguiente versión.']] : [],
+        ], $project['observations'], array_keys($project['observations']));
         return $project;
     }
 

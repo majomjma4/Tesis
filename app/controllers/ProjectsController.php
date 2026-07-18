@@ -46,7 +46,7 @@ final class ProjectsController
             'currentPage' => 'projects',
             'title' => ($project['title'] ?? 'Proyecto no encontrado') . ' | Gestión Académica',
             'bodyClass' => 'project-detail-page',
-            'pageStyles' => [asset('css/project-detail.css'), asset('css/project-summary.css')],
+            'pageStyles' => [asset('css/project-detail.css'), asset('css/project-summary.css'), asset('css/project-workspace.css')],
             'pageScript' => asset('js/project-detail.js'),
             'project' => $project,
             'activeTab' => $tab,

@@ -543,3 +543,13 @@ Pendiente:
 - Participantes, fechas clave e información académica visibles sin saturar la cabecera.
 - Estados vacíos orientativos para proyectos sin entregas, observaciones o actividad.
 - Diseño responsive y modo oscuro mediante estilos aislados del módulo.
+
+## Avance de espacios de trabajo — Etapa 4A
+
+- Entregas presentadas como versiones inmutables con etapa, autor, archivo, fecha, estado y comentario.
+- Conservación visible de versiones anteriores dentro de la trazabilidad temporal.
+- Observaciones con autor, rol, entrega, ubicación, categoría, estado y respuestas relacionadas.
+- Comentarios generales separados de las observaciones formales.
+- Relación opcional de comentarios con entrega, archivo u observación preparada en la interfaz.
+- Estados vacíos diferenciados para proyectos sin entregas, observaciones o comentarios.
+- Acciones de escritura deshabilitadas y explicadas hasta contar con persistencia, CSRF y permisos reales.
