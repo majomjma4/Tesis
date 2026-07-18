@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 final class View
 {
+    // Inicio de renderizado de vistas
+    // Valida archivos, incorpora datos globales y compone la vista dentro de su layout.
     public static function render(string $view, array $data = [], string $layout = 'main'): void
     {
         // Construye las rutas internas de la vista y del layout solicitado.
@@ -29,7 +31,10 @@ final class View
 
         require $layoutFile;
     }
+    // Final de renderizado de vistas
 
+    // Inicio de datos globales de notificaciones
+    // Mantiene contador, protección CSRF y endpoint disponibles en todas las pantallas principales.
     private static function notificationLayoutData(): array
     {
         if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -56,4 +61,5 @@ final class View
             'notificationOpenEndpoint' => route('notifications/open'),
         ];
     }
+    // Final de datos globales de notificaciones
 }

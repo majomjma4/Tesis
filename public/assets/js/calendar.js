@@ -22,6 +22,8 @@ if (calendarRoot) {
     let pendingDelete = null;
     let activeDetailEvent = null;
 
+    // Inicio de utilidades de fechas y filtrado
+    // Convierte fechas, detecta vencimientos y construye la colección visible según filtros y orden.
     function dateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
     function fromKey(key) { const [year, month, day] = key.split('-').map(Number); return new Date(year, month - 1, day); }
     function startOfWeek(date) { const result = new Date(date); result.setDate(result.getDate() - ((result.getDay() + 6) % 7)); result.setHours(0, 0, 0, 0); return result; }
@@ -40,6 +42,10 @@ if (calendarRoot) {
             return matchesType && matchesPriority && matchesScope && (!searchTerm || text.includes(searchTerm));
         }));
     }
+    // Final de utilidades de fechas y filtrado
+
+    // Inicio de comunicación y mensajes
+    // Centraliza las solicitudes al endpoint y la retroalimentación temporal para el usuario.
     async function request(method, payload) {
         const response = await fetch(endpoint, { method, headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: payload ? JSON.stringify(payload) : undefined });
         const result = await response.json().catch(() => ({ success: false, message: 'El servidor devolvió una respuesta inválida.' }));
@@ -51,6 +57,10 @@ if (calendarRoot) {
         if (action) { const button = document.createElement('button'); button.type = 'button'; button.textContent = action.label; button.addEventListener('click', async () => { button.disabled = true; await action.handler(); element.hidden = true; }); element.append(button); }
         element.hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => { element.hidden = true; }, action ? 6000 : 3200);
     }
+    // Final de comunicación y mensajes
+
+    // Inicio de construcción de componentes del calendario
+    // Crea eventos arrastrables, tarjetas, acciones y estados vacíos reutilizados por las vistas.
     function createChip(event) {
         const chip = document.createElement('span');
         chip.className = `calendar-event-chip ${event.type}${event.completed ? ' completed' : ''}${isOverdue(event) ? ' overdue' : ''}`;
@@ -119,6 +129,10 @@ if (calendarRoot) {
     function actionButton(icon, label, handler, danger = false) { const button = document.createElement('button'); button.type = 'button'; if (danger) button.className = 'danger'; button.innerHTML = `<i class="fa-solid ${icon}"></i> ${label}`; button.addEventListener('click', handler); return button; }
     function navigationButton(event) { const destination = eventDestination(event), link = document.createElement('a'); link.className = 'agenda-go-link'; link.href = destination.url; link.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Ir'; link.title = destination.label; link.setAttribute('aria-label', `${destination.label}: ${event.title}`); return link; }
     function emptyState(icon, title, message, showClear = false) { const state = document.createElement('div'); state.className = 'calendar-empty calendar-empty-guided'; state.innerHTML = `<i class="fa-solid ${icon}"></i><strong></strong><p></p>`; state.querySelector('strong').textContent = title; state.querySelector('p').textContent = message; if (showClear) { const button = document.createElement('button'); button.className = 'calendar-empty-add'; button.type = 'button'; button.innerHTML = '<i class="fa-solid fa-filter-circle-xmark"></i> Limpiar filtros'; button.addEventListener('click', clearFilters); state.append(button); } return state; }
+    // Final de construcción de componentes del calendario
+
+    // Inicio de renderizado y navegación
+    // Sincroniza las vistas, agenda, indicadores, filtros y desplazamiento entre periodos.
     function renderAgenda() {
         const date = fromKey(selectedDate), list = $('#calendarAgendaList'), items = filteredEvents().filter((event) => event.date === selectedDate); list.innerHTML = '';
         $('#calendarAgendaTitle').textContent = date.toLocaleDateString('es-EC', { weekday: 'long' }); $('#calendarAgendaDate').textContent = date.toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -152,6 +166,10 @@ if (calendarRoot) {
     function navigate(direction) { if (activeView !== 'week') visibleDate = new Date(visibleDate.getFullYear(), visibleDate.getMonth() + direction, 1); else { const date = fromKey(selectedDate); date.setDate(date.getDate() + direction * 7); selectedDate = dateKey(date); visibleDate = new Date(date.getFullYear(), date.getMonth(), 1); } renderAll(); }
     function clearFilters() { clearQuickScope(); activeFilter = 'all'; activePriority = 'all'; searchTerm = ''; $('#calendarSearch').value = ''; $$('.calendar-filter[data-filter]').forEach((item) => item.classList.toggle('active', item.dataset.filter === 'all')); $$('.calendar-priority-filter').forEach((item) => item.classList.remove('active')); renderAll(); $('#calendarSearch').focus(); }
     function applyQuickScope(scope) { quickScope = scope; activeFilter = 'all'; activePriority = 'all'; searchTerm = ''; $('#calendarSearch').value = ''; if (scope === 'week') visibleDate = new Date(today.getFullYear(), today.getMonth(), 1); $$('.calendar-filter[data-filter]').forEach((item) => item.classList.toggle('active', item.dataset.filter === 'all')); $$('.calendar-priority-filter').forEach((item) => item.classList.remove('active')); activeView = 'list'; $$('.calendar-view-switcher button').forEach((button) => { const selected = button.dataset.view === 'list'; button.classList.toggle('active', selected); button.setAttribute('aria-selected', String(selected)); }); $$('.calendar-stat-action').forEach((button) => { const selected = button.dataset.scope === scope; button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected)); }); renderAll(); $('.calendar-board').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    // Final de renderizado y navegación
+
+    // Inicio de selectores personalizados
+    // Mejora la presentación y accesibilidad de los campos nativos sin alterar sus valores.
     function syncSelectStyles() { $$('.calendar-select-wrap').forEach((wrap) => { const select = wrap.querySelector('select'); wrap.dataset.value = select?.value || ''; wrap._syncCustom?.(); }); }
     function closeCustomSelects(except = null) { $$('.calendar-select-wrap.is-open').forEach((wrap) => { if (wrap === except) return; wrap.classList.remove('is-open'); wrap.querySelector('.calendar-select-menu').hidden = true; wrap.querySelector('.calendar-select-trigger').setAttribute('aria-expanded', 'false'); }); }
     function initCustomSelects() {
@@ -169,6 +187,10 @@ if (calendarRoot) {
         });
         document.addEventListener('click', () => closeCustomSelects());
     }
+    // Final de selectores personalizados
+
+    // Inicio de diálogos y persistencia de eventos
+    // Controla formularios, detalles, agenda móvil y operaciones que modifican recordatorios.
     function openModal(event = null) {
         $('#calendarEventForm').reset(); $('#calendarEventId').value = event?.id || ''; $('#calendarEventTitle').value = event?.title || ''; $('#calendarEventDate').value = event?.date || selectedDate; $('#calendarEventType').value = event?.type || 'delivery'; $('#calendarEventPriority').value = event?.priority || 'medium'; $('#calendarEventDescription').value = event?.description || ''; $('#calendarDescriptionCount').textContent = (event?.description || '').length; $('#calendarModalTitle').textContent = event ? 'Editar evento' : 'Nuevo evento'; syncSelectStyles(); $('#calendarEventModal').hidden = false; document.body.classList.add('modal-open'); setTimeout(() => $('#calendarEventTitle').focus(), 0);
     }
@@ -183,7 +205,10 @@ if (calendarRoot) {
     async function saveOne(event, render = true) { const result = await request('POST', event); const index = events.findIndex((item) => item.id === result.data.id); if (index >= 0) events[index] = result.data; else events.push(result.data); if (render) renderAll(); return result.data; }
     async function moveEvent(id, newDate) { const event = events.find((item) => item.id === id); if (!event || event.date === newDate) return; const previous = event.date; event.date = newDate; renderAll(); try { await saveOne(event); selectedDate = newDate; renderAll(); toast(`Evento movido al ${fromKey(newDate).toLocaleDateString('es-EC', { day: 'numeric', month: 'long' })}.`); } catch (error) { event.date = previous; renderAll(); toast(error.message, true); } }
     async function toggleComplete(event) { try { await saveOne({ ...event, completed: !event.completed }); toast(event.completed ? 'Evento reabierto.' : 'Evento completado. ¡Buen trabajo!'); } catch (error) { toast(error.message, true); } }
+    // Final de diálogos y persistencia de eventos
 
+    // Inicio de eventos de interacción
+    // Conecta controles, teclado, gestos táctiles y envío del formulario con la lógica anterior.
     $('#calendarPrevBtn').addEventListener('click', () => navigate(-1)); $('#calendarNextBtn').addEventListener('click', () => navigate(1)); $('#calendarTodayBtn').addEventListener('click', () => { clearQuickScope(); selectedDate = dateKey(today); visibleDate = new Date(today.getFullYear(), today.getMonth(), 1); renderAll(); });
     $$('.calendar-stat-action').forEach((button) => button.addEventListener('click', () => applyQuickScope(button.dataset.scope)));
     $$('.calendar-view-switcher button').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view))); $$('.calendar-filter[data-filter]').forEach((button) => button.addEventListener('click', () => { clearQuickScope(); activeFilter = button.dataset.filter; $$('.calendar-filter[data-filter]').forEach((item) => item.classList.toggle('active', item === button)); renderAll(); }));
@@ -211,4 +236,5 @@ if (calendarRoot) {
     initCustomSelects();
     $$('.calendar-view-switcher button').forEach((button) => { const selected = button.dataset.view === activeView; button.classList.toggle('active', selected); button.setAttribute('aria-selected', String(selected)); });
     renderAll();
+    // Final de eventos de interacción
 }

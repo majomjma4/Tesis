@@ -6,6 +6,8 @@ final class Database
 {
     private static ?PDO $connection = null;
 
+    // Inicio de conexión compartida a MySQL
+    // Crea una sola instancia PDO y configura errores, resultados y consultas preparadas.
     public static function connection(): PDO
     {
         if (self::$connection instanceof PDO) {
@@ -28,4 +30,5 @@ final class Database
 
         return self::$connection;
     }
+    // Final de conexión compartida a MySQL
 }

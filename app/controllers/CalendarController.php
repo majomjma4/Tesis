@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 final class CalendarController
 {
+    // Inicio de presentación del calendario
+    // Prepara los eventos y las rutas contextuales requeridas por la vista principal.
     public function index(): void
     {
         $calendar = new CalendarModel();
@@ -17,7 +19,10 @@ final class CalendarController
             'projectsUrl' => route('projects'),
         ]);
     }
+    // Final de presentación del calendario
 
+    // Inicio de operaciones asíncronas de eventos
+    // Atiende la consulta, creación, actualización y eliminación solicitada por JavaScript.
     public function events(): void
     {
         header('Content-Type: application/json; charset=utf-8');
@@ -46,10 +51,14 @@ final class CalendarController
             $this->json(false, $error->getMessage(), null, $error instanceof InvalidArgumentException ? 422 : 500);
         }
     }
+    // Final de operaciones asíncronas de eventos
 
+    // Inicio de construcción de respuestas JSON
+    // Unifica el formato y el código HTTP devuelto por el endpoint del calendario.
     private function json(bool $success, string $message, mixed $data = null, int $status = 200): void
     {
         http_response_code($status);
         echo json_encode(['success' => $success, 'message' => $message, 'data' => $data], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
+    // Final de construcción de respuestas JSON
 }

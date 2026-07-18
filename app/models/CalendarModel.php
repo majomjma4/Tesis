@@ -12,6 +12,8 @@ final class CalendarModel
         $this->ensureStorage();
     }
 
+    // Inicio de gestión pública de eventos
+    // Expone las operaciones de lectura, guardado y eliminación sobre el almacenamiento temporal.
     public function getEvents(): array
     {
         $contents = @file_get_contents($this->storageFile);
@@ -46,7 +48,10 @@ final class CalendarModel
         $this->write($remaining);
         return true;
     }
+    // Final de gestión pública de eventos
 
+    // Inicio de normalización de eventos
+    // Valida campos permitidos, limita textos y construye la estructura persistible.
     private function normalize(array $data, string $id): array
     {
         $types = ['delivery', 'meeting', 'review', 'deadline'];
@@ -73,7 +78,10 @@ final class CalendarModel
             'updatedAt' => date(DATE_ATOM),
         ];
     }
+    // Final de normalización de eventos
 
+    // Inicio de almacenamiento temporal
+    // Prepara el archivo inicial y centraliza su escritura segura mediante bloqueo exclusivo.
     private function ensureStorage(): void
     {
         $directory = dirname($this->storageFile);
@@ -98,4 +106,5 @@ final class CalendarModel
             throw new RuntimeException('No fue posible guardar el calendario.');
         }
     }
+    // Final de almacenamiento temporal
 }
