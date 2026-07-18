@@ -78,7 +78,8 @@
             <div class="topbar-right">
                 <button class="topbar-action-btn" type="button">
                     <i class="fa-solid fa-plus"></i>
-                    Nuevo proyecto
+                    <span class="topbar-action-label">Nuevo proyecto</span>
+                    <span class="topbar-action-label-short">Nuevo</span>
                 </button>
                 <button class="icon-btn theme-toggle" id="themeToggle" type="button" aria-label="Cambiar modo claro u oscuro">
                     <i class="fa-solid fa-moon"></i>

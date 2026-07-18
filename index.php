@@ -38,6 +38,7 @@ match ($page) {
     'dev-reload' => (new DevController())->reloadStamp(),
     'dashboard', 'home', 'inicio' => (new DashboardController())->index(),
     'calendar', 'calendario' => (new CalendarController())->index(),
+    'calendar-events' => (new CalendarController())->events(),
     'projects', 'proyectos', 'mis-proyectos' => (new ProjectsController())->index(),
     'repository', 'repositorio' => (new RepositoryController())->index(),
     'repository-detail', 'detalle-repositorio' => (new RepositoryController())->detail(),
