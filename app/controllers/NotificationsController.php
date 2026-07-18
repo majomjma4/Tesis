@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 final class NotificationsController
 {
+    // Inicio de presentación y consulta de notificaciones
+    // Prepara la pantalla principal y responde listados filtrados con sus contadores actualizados.
     public function index(): void
     {
         $this->ensureSession();
@@ -78,7 +80,10 @@ final class NotificationsController
             'sectionCounters' => $this->sectionCounters($sectionNotifications, $counters, $hidden, $trash),
         ]);
     }
+    // Final de presentación y consulta de notificaciones
 
+    // Inicio de gestión del estado de lectura
+    // Marca notificaciones individuales o múltiples y devuelve el resumen global resultante.
     public function markRead(): void
     {
         $this->changeReadState(true);
@@ -110,7 +115,10 @@ final class NotificationsController
             return ['updated' => $updated, 'counters' => (new NotificationModel())->getDemoCounters($notifications)];
         });
     }
+    // Final de gestión del estado de lectura
 
+    // Inicio de archivado, papelera y restauración
+    // Coordina el ciclo reversible de ocultar, restaurar y eliminar notificaciones.
     public function delete(): void
     {
         $this->requirePostAndCsrf();
@@ -237,7 +245,10 @@ final class NotificationsController
             return ['affected' => $affected, 'counters' => (new NotificationModel())->getDemoCounters($notifications)];
         });
     }
+    // Final de archivado, papelera y restauración
 
+    // Inicio de apertura contextual
+    // Marca la notificación como leída y entrega únicamente una ruta interna validada.
     public function open(): void
     {
         $this->requirePostAndCsrf();
@@ -269,7 +280,10 @@ final class NotificationsController
             return ['notificationId' => $id, 'url' => $url, 'detail' => $notifications[$index], 'counters' => (new NotificationModel())->getDemoCounters($notifications)];
         });
     }
+    // Final de apertura contextual
 
+    // Inicio de operaciones compartidas y respaldo demostrativo
+    // Unifica cambios de estado, respuestas con MySQL y persistencia temporal cuando la conexión no está activa.
     private function changeReadState(bool $read): void
     {
         $this->requirePostAndCsrf();
@@ -342,7 +356,10 @@ final class NotificationsController
         }
         return null;
     }
+    // Final de operaciones compartidas y respaldo demostrativo
 
+    // Inicio de validación de solicitudes
+    // Protege métodos, CSRF, identificadores, sesión y navegación interna antes de ejecutar acciones.
     private function requirePostAndCsrf(): void
     {
         $this->requireMethod('POST');
@@ -421,7 +438,10 @@ final class NotificationsController
         }
         return base_url($url);
     }
+    // Final de validación de solicitudes
 
+    // Inicio de transformación para la interfaz
+    // Agrupa, presenta y resume los registros crudos en estructuras consumibles por la vista.
     private function groupNotifications(array $notifications): array
     {
         $groups = ['Hoy' => [], 'Ayer' => [], 'Esta semana' => [], 'Anteriores' => []];
@@ -505,7 +525,10 @@ final class NotificationsController
         $names = ['list', 'read', 'unread', 'read-all', 'delete', 'restore', 'destroy', 'trash-empty', 'trash-bulk', 'counters', 'open'];
         return array_combine($names, array_map(static fn (string $name): string => route('notifications/' . $name), $names));
     }
+    // Final de transformación para la interfaz
 
+    // Inicio de respuestas JSON
+    // Mantiene un contrato uniforme para todas las operaciones asíncronas del módulo.
     private function json(bool $success, string $message, array $data = [], int $status = 200): never
     {
         http_response_code($status);
@@ -513,4 +536,5 @@ final class NotificationsController
         echo json_encode(['success' => $success, 'message' => $message, 'data' => $data], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
+    // Final de respuestas JSON
 }

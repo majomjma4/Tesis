@@ -10,6 +10,8 @@ final class NotificationModel
     {
     }
 
+    // Inicio de acceso y consulta de notificaciones
+    // Centraliza la conexión y recupera registros, detalles y contadores limitados al usuario actual.
     private function connection(): PDO
     {
         return $this->db ?? Database::connection();
@@ -83,7 +85,10 @@ final class NotificationModel
             'total' => (int) ($row['total'] ?? 0),
         ];
     }
+    // Final de acceso y consulta de notificaciones
 
+    // Inicio de cambios de estado y ciclo de eliminación
+    // Gestiona lectura, archivado, papelera, restauración y eliminación individual o masiva.
     public function markAsRead(int $notificationId, int $userId): bool
     {
         return $this->updateReadState($notificationId, $userId, true);
@@ -191,7 +196,10 @@ final class NotificationModel
         $statement->execute(array_merge([$userId], $ids));
         return $statement->rowCount();
     }
+    // Final de cambios de estado y ciclo de eliminación
 
+    // Inicio de soporte demostrativo
+    // Proporciona datos y contadores temporales mientras la base de datos no está habilitada.
     public function countUnread(int $userId): int
     {
         return $this->getCounters($userId)['unread'];
@@ -253,7 +261,10 @@ final class NotificationModel
             'total' => count($active),
         ];
     }
+    // Final de soporte demostrativo
 
+    // Inicio de creación y normalización de registros
+    // Inserta nuevas notificaciones y transforma los resultados SQL en estructuras seguras para la aplicación.
     public function createNotification(int $userId, string $type, string $title, string $message, ?int $projectId = null, ?string $actionUrl = null, array $metadata = []): int
     {
         if (!in_array($type, self::TYPES, true)) {
@@ -305,4 +316,5 @@ final class NotificationModel
 
         return $row;
     }
+    // Final de creación y normalización de registros
 }

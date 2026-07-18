@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 final class ArchiveService
 {
+    // Inicio de acceso público al archivo ZIP
+    // Lista directorios o abre archivos internos después de validar el contenedor y la ruta solicitada.
     public function listDirectory(string $zipPath, string $requestedPath = ''): array
     {
         $normalizedPath = $this->normalizeInternalPath($requestedPath);
@@ -123,7 +125,10 @@ final class ArchiveService
             return $this->downloadError('unreadable', 'No fue posible abrir el contenido del proyecto.');
         }
     }
+    // Final de acceso público al archivo ZIP
 
+    // Inicio de validación y lectura del contenedor
+    // Normaliza rutas e intercambia entre ZipArchive y PharData sin permitir recorridos inseguros.
     private function normalizeInternalPath(string $path): ?string
     {
         if (str_contains($path, "\0")) {
@@ -237,7 +242,10 @@ final class ArchiveService
         $trimmed = rtrim($entryPath, '/');
         return $this->normalizeInternalPath($trimmed);
     }
+    // Final de validación y lectura del contenedor
 
+    // Inicio de construcción del explorador
+    // Organiza entradas, breadcrumbs, metadatos, tipos, iconos y MIME consumidos por la interfaz.
     private function buildDirectory(array $entries, string $currentPath): array
     {
         $prefix = $currentPath === '' ? '' : $currentPath . '/';
@@ -376,7 +384,10 @@ final class ArchiveService
             default => 'application/octet-stream',
         };
     }
+    // Final de construcción del explorador
 
+    // Inicio de respuestas de error
+    // Devuelve estructuras uniformes para errores de navegación y descarga del archivo privado.
     private function error(string $status, string $message): array
     {
         return [
@@ -394,4 +405,5 @@ final class ArchiveService
     {
         return ['success' => false, 'status' => $status, 'message' => $message];
     }
+    // Final de respuestas de error
 }

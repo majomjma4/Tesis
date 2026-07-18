@@ -6,6 +6,8 @@ final class SupportMaterialController
 {
     private const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'pptx', 'png', 'jpg', 'jpeg', 'webp', 'txt', 'zip'];
 
+    // Inicio de presentación de materiales
+    // Prepara el catálogo y el detalle con contadores, rutas y datos listos para sus vistas.
     public function index(): void
     {
         $this->ensureSession();
@@ -48,7 +50,10 @@ final class SupportMaterialController
             'downloadActionUrl' => route('support-material-download'),
         ]);
     }
+    // Final de presentación de materiales
 
+    // Inicio de vistas previas seguras
+    // Clasifica el archivo y transmite en línea únicamente los formatos autorizados.
     public function preview(): void
     {
         $this->ensureGetJson();
@@ -88,7 +93,10 @@ final class SupportMaterialController
         fclose($stream);
         exit;
     }
+    // Final de vistas previas seguras
 
+    // Inicio de descarga de materiales
+    // Valida el recurso, actualiza el contador correspondiente y transmite el archivo solicitado.
     public function download(): void
     {
         $this->ensureSession();
@@ -108,7 +116,10 @@ final class SupportMaterialController
         fclose($stream);
         exit;
     }
+    // Final de descarga de materiales
 
+    // Inicio de resolución segura de archivos
+    // Comprueba identificadores, extensiones, ubicación privada, MIME y apertura del flujo de lectura.
     private function resolveFileRequest(bool $jsonResponse = false): array
     {
         $materialId = filter_var($_GET['material_id'] ?? $_GET['id'] ?? null, FILTER_VALIDATE_INT);
@@ -149,7 +160,10 @@ final class SupportMaterialController
             default => 'application/octet-stream',
         };
     }
+    // Final de resolución segura de archivos
 
+    // Inicio de validación de solicitudes y respuestas
+    // Centraliza sesión, método HTTP y formatos de error o respuesta JSON del controlador.
     private function ensureSession(): void
     {
         if (session_status() !== PHP_SESSION_ACTIVE) session_start();
@@ -192,4 +206,5 @@ final class SupportMaterialController
         echo json_encode(['success' => $success, 'message' => $message, 'data' => $data], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
+    // Final de validación de solicitudes y respuestas
 }

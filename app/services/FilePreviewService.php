@@ -22,6 +22,8 @@ final class FilePreviewService
         'gif' => 'image/gif',
     ];
 
+    // Inicio de preparación de vistas previas
+    // Clasifica contenido seguro, aplica límites y construye la respuesta apropiada para cada formato.
     public function prepare(array $file, string $contentUrl, string $downloadUrl): array
     {
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -145,7 +147,10 @@ final class FilePreviewService
 
         return $this->unsupported($base, $extension, 'Este formato no puede visualizarse dentro de la plataforma.');
     }
+    // Final de preparación de vistas previas
 
+    // Inicio de validación para transmisión en línea
+    // Comprueba MIME real y permite únicamente formatos compatibles con una representación segura.
     public function canStreamInline(array $file): bool
     {
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -178,7 +183,10 @@ final class FilePreviewService
             'application/x-empty', 'application/octet-stream',
         ], true);
     }
+    // Final de validación para transmisión en línea
 
+    // Inicio de respuestas y metadatos auxiliares
+    // Construye estados no compatibles, límites, nombres de tipo y lenguajes para el visor.
     private function unsupported(array $base, string $extension, string $message): array
     {
         return array_merge($base, [
@@ -225,4 +233,5 @@ final class FilePreviewService
             default => $extension === '' ? 'Texto' : strtoupper($extension),
         };
     }
+    // Final de respuestas y metadatos auxiliares
 }

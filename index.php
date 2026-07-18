@@ -5,6 +5,8 @@ declare(strict_types=1);
 define('ROOT_PATH', __DIR__);
 define('APP_PATH', ROOT_PATH . '/app');
 
+// Inicio de carga de configuración y dependencias
+// Define la base de la aplicación e incorpora helpers, núcleo, modelos, servicios y controladores.
 $config = require APP_PATH . '/config/app.php';
 
 require APP_PATH . '/helpers.php';
@@ -31,8 +33,10 @@ require APP_PATH . '/controllers/ProjectsController.php';
 require APP_PATH . '/controllers/RepositoryController.php';
 require APP_PATH . '/controllers/SupportMaterialController.php';
 require APP_PATH . '/controllers/NotificationsController.php';
+// Final de carga de configuración y dependencias
 
-// Front controller: centraliza las rutas principales de la aplicacion.
+// Inicio del enrutamiento principal
+// Resuelve los alias de cada pantalla y dirige la solicitud al controlador correspondiente.
 $page = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 
 match ($page) {
@@ -70,3 +74,4 @@ match ($page) {
     'notifications/open' => (new NotificationsController())->open(),
     default => (new DashboardController())->index(),
 };
+// Final del enrutamiento principal

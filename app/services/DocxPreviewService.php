@@ -10,6 +10,8 @@ final class DocxPreviewService
     private const BLOCK_LIMIT = 1000;
     private const WORD_NAMESPACE = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
+    // Inicio de extracción segura de DOCX
+    // Valida el paquete, limita su contenido y devuelve bloques estructurados sin ejecutar elementos activos.
     public function extract(array $file): array
     {
         if ((int) $file['size'] > self::FILE_LIMIT) {
@@ -68,7 +70,10 @@ final class DocxPreviewService
             }
         }
     }
+    // Final de extracción segura de DOCX
 
+    // Inicio de lectura y transformación del documento
+    // Recupera document.xml y convierte párrafos, listas y tablas en datos simples para la vista.
     private function readEntry(string $archivePath, string $entryPath, int $limit): ?string
     {
         if (class_exists('ZipArchive')) {
@@ -182,9 +187,13 @@ final class DocxPreviewService
         }
         return trim(implode('', $parts));
     }
+    // Final de lectura y transformación del documento
 
+    // Inicio de respuestas de error DOCX
+    // Mantiene un formato uniforme ante paquetes dañados, vacíos o no compatibles.
     private function error(string $status, string $message): array
     {
         return ['status' => $status, 'message' => $message, 'blocks' => [], 'truncated' => false];
     }
+    // Final de respuestas de error DOCX
 }
