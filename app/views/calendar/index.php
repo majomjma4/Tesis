@@ -25,7 +25,7 @@
 
 <!-- Inicio del espacio de trabajo del calendario -->
 <!-- Contiene navegación, filtros, vistas intercambiables y agenda contextual. -->
-<div class="calendar-workspace" data-calendar-events='<?= e($eventPayload ?: '[]') ?>' data-events-url="<?= e(route('calendar-events')) ?>" data-project-url="<?= e($projectsUrl) ?>">
+<div class="calendar-workspace" data-calendar-events='<?= e($eventPayload ?: '[]') ?>' data-events-url="<?= e(route('calendar-events')) ?>" data-project-url="<?= e($projectsUrl) ?>" data-project-filter="<?= (int) ($projectFilterId ?? 0) ?>">
     <section class="calendar-board" aria-label="Calendario mensual">
         <header class="calendar-toolbar">
             <div class="calendar-navigation">

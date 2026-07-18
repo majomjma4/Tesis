@@ -553,3 +553,13 @@ Pendiente:
 - Relación opcional de comentarios con entrega, archivo u observación preparada en la interfaz.
 - Estados vacíos diferenciados para proyectos sin entregas, observaciones o comentarios.
 - Acciones de escritura deshabilitadas y explicadas hasta contar con persistencia, CSRF y permisos reales.
+
+## Avance de espacios de trabajo — Etapa 4B
+
+- Historial cronológico de solo lectura con usuario, rol, acción, detalle y fecha.
+- Participantes agrupados en Estudiantes, Tutoría y Tribunal, con datos académicos de asignación.
+- Calendario del proyecto conectado a la fuente global mediante `projectId`.
+- Enlace al Calendario global con filtro `project_id` aplicado realmente por JavaScript.
+- Preservación de `projectId` al normalizar y guardar eventos del calendario.
+- Documentos finales con estados de publicación y acceso al Repositorio cuando corresponde.
+- Estados vacíos reales para eventos, tribunal y documentos aún no disponibles.

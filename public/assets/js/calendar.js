@@ -5,6 +5,7 @@ if (calendarRoot) {
     const $$ = (selector) => [...document.querySelectorAll(selector)];
     const endpoint = calendarRoot.dataset.eventsUrl;
     const projectUrl = calendarRoot.dataset.projectUrl || '';
+    const projectFilterId = Number(calendarRoot.dataset.projectFilter || 0);
     const typeLabels = { delivery: 'Entrega', meeting: 'Reunión', review: 'Revisión', deadline: 'Fecha límite' };
     const priorityLabels = { low: 'Baja', medium: 'Media', high: 'Alta' };
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -33,6 +34,7 @@ if (calendarRoot) {
     function eventDestination(event) { if (event.type === 'review') return { url: `${projectUrl}#project-history`, label: 'Ir al historial' }; if (event.type === 'delivery' || event.type === 'deadline') return { url: `${projectUrl}#project-delivery`, label: 'Ir a entregas' }; return { url: `${projectUrl}#project-overview`, label: 'Ir al proyecto' }; }
     function filteredEvents() {
         return sortEvents(events.filter((event) => {
+            if (projectFilterId && Number(event.projectId || 0) !== projectFilterId) return false;
             const matchesType = activeFilter === 'all' || (activeFilter === 'pending' ? !event.completed : event.type === activeFilter);
             const matchesPriority = activePriority === 'all' || event.priority === activePriority;
             const text = `${event.title} ${event.description || ''}`.toLocaleLowerCase('es');

@@ -33,6 +33,7 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Las tarjetas incorporan participantes y etiquetas limitadas sin sustituir el detalle del expediente.
 - Se completó el Resumen del detalle con etapas derivadas, entrega reciente, observaciones, actividad, siguiente acción, participantes y fechas clave.
 - Se desarrollaron las pestañas Entregas, Observaciones y Comentarios como espacios de consulta preparados para persistencia.
+- Se completaron Historial, Participantes, Calendario del proyecto y Documentos finales, incluyendo el filtrado real del Calendario global por proyecto.
 
 ---
 

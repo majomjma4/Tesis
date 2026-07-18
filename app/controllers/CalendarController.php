@@ -9,6 +9,7 @@ final class CalendarController
     public function index(): void
     {
         $calendar = new CalendarModel();
+        $projectFilterId = filter_var($_GET['project_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0;
 
         View::render('calendar/index', [
             'currentPage' => 'calendar',
@@ -17,6 +18,7 @@ final class CalendarController
             'pageScript' => asset('js/calendar.js'),
             'calendarEvents' => $calendar->getEvents(),
             'projectsUrl' => route('projects'),
+            'projectFilterId' => $projectFilterId,
         ]);
     }
     // Final de presentación del calendario

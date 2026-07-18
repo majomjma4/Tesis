@@ -73,6 +73,7 @@ final class CalendarModel
             'date' => $date,
             'type' => $type,
             'priority' => $priority,
+            'projectId' => max(0, (int) ($data['projectId'] ?? 0)),
             'description' => mb_substr(trim(strip_tags((string) ($data['description'] ?? ''))), 0, 300),
             'completed' => filter_var($data['completed'] ?? false, FILTER_VALIDATE_BOOLEAN),
             'updatedAt' => date(DATE_ATOM),

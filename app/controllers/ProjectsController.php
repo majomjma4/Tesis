@@ -37,6 +37,10 @@ final class ProjectsController
         $tab = in_array($tab, $allowedTabs, true) ? $tab : 'summary';
         $model = new ProjectModel();
         $project = $id ? $model->findProjectForUser((int) $id, 1) : null;
+        $projectEvents = [];
+        if ($project !== null) {
+            $projectEvents = array_values(array_filter((new CalendarModel())->getEvents(), static fn (array $event): bool => (int) ($event['projectId'] ?? 0) === (int) $project['id']));
+        }
 
         if ($project === null) {
             http_response_code(404);
@@ -46,11 +50,12 @@ final class ProjectsController
             'currentPage' => 'projects',
             'title' => ($project['title'] ?? 'Proyecto no encontrado') . ' | Gestión Académica',
             'bodyClass' => 'project-detail-page',
-            'pageStyles' => [asset('css/project-detail.css'), asset('css/project-summary.css'), asset('css/project-workspace.css')],
+            'pageStyles' => [asset('css/project-detail.css'), asset('css/project-summary.css'), asset('css/project-workspace.css'), asset('css/project-completion.css')],
             'pageScript' => asset('js/project-detail.js'),
             'project' => $project,
             'activeTab' => $tab,
             'tabs' => $model->getDetailTabs(),
+            'projectEvents' => $projectEvents,
         ]);
     }
 

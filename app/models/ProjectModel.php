@@ -105,6 +105,24 @@ final class ProjectModel
             'category' => $index === 0 ? 'Metodología' : 'Formato', 'location' => $index === 0 ? 'Página 28' : 'Referencias',
             'responses' => $index === 0 ? [['author' => 'Carlos Martínez', 'date' => '18 Jul 2026', 'text' => 'La corrección está en preparación para la siguiente versión.']] : [],
         ], $project['observations'], array_keys($project['observations']));
+        $project['participant_groups'] = [
+            ['label' => 'Estudiantes', 'members' => array_map(static fn (array $member): array => $member + ['email' => strtolower($member['initial']) . '.estudiante@libertador.edu.ec', 'status' => 'Activo', 'assigned_at' => '02 Jun 2026'], $project['participants'])],
+            ['label' => 'Tutoría', 'members' => $project['tutor'] ? [['initial' => mb_substr($project['tutor'], 0, 1, 'UTF-8'), 'name' => $project['tutor'], 'role' => 'Tutor', 'email' => 'tutoria@libertador.edu.ec', 'status' => 'Activo', 'assigned_at' => '05 Jun 2026']] : []],
+            ['label' => 'Tribunal', 'members' => in_array($project['status_key'], ['defense', 'published'], true) ? [
+                ['initial' => 'J1', 'name' => 'Msc. Ana Morales', 'role' => 'Jurado 1', 'email' => 'ana.morales@libertador.edu.ec', 'status' => 'Asignado', 'assigned_at' => '15 Jul 2026'],
+                ['initial' => 'J2', 'name' => 'Ing. Luis Paredes', 'role' => 'Jurado 2', 'email' => 'luis.paredes@libertador.edu.ec', 'status' => 'Asignado', 'assigned_at' => '15 Jul 2026'],
+                ['initial' => 'J3', 'name' => 'Msc. Rosa León', 'role' => 'Jurado 3', 'email' => 'rosa.leon@libertador.edu.ec', 'status' => 'Asignado', 'assigned_at' => '15 Jul 2026'],
+            ] : []],
+        ];
+        $project['history'] = [
+            ['type' => 'Estado', 'icon' => 'fa-arrows-rotate', 'user' => $project['tutor'], 'role' => 'Tutor', 'action' => 'Actualizó el estado del proyecto', 'detail' => $project['status'], 'date' => preg_replace('/^.*·\s*/u', '', $project['last_activity'])],
+            ...array_map(static fn (array $activity): array => ['type' => 'Actividad', 'icon' => 'fa-circle-check', 'user' => 'Sistema académico', 'role' => 'Sistema', 'action' => $activity['title'], 'detail' => 'Registro incorporado a la trazabilidad.', 'date' => $activity['date']], $project['activities']),
+        ];
+        $project['final_documents'] = $project['status_key'] === 'published' ? [
+            ['label' => 'Informe definitivo', 'file' => 'Informe_final_aprobado.pdf', 'format' => 'PDF', 'status' => 'Publicado'],
+            ['label' => 'Código fuente', 'file' => 'Codigo_fuente_final.zip', 'format' => 'ZIP', 'status' => 'Publicado'],
+            ['label' => 'Anexos', 'file' => 'Anexos_proyecto.pdf', 'format' => 'PDF', 'status' => 'Publicado'],
+        ] : [];
         return $project;
     }
 
