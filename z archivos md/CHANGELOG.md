@@ -29,6 +29,8 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Se preparó el detalle con navegación por pestañas, incluyendo comentarios generales.
 - Se aislaron los estilos y scripts para evitar ampliar los selectores globales.
 - Se eliminó del flujo nuevo cualquier confirmación de guardado simulado.
+- Se completó el catálogo con búsqueda amplia, filtros combinables, ordenamiento y descripción de filtros activos.
+- Las tarjetas incorporan participantes y etiquetas limitadas sin sustituir el detalle del expediente.
 
 ---
 

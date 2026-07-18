@@ -58,7 +58,7 @@ final class ProjectModel
     {
         $common = [
             'user_ids' => [1], 'career' => 'Tecnología Superior en Desarrollo de Software',
-            'period' => '2026-I', 'role' => 'Estudiante líder',
+            'period' => '2026-I', 'role' => 'Estudiante líder', 'tags' => [], 'technologies' => [],
             'participants' => [
                 ['initial' => 'C', 'name' => 'Carlos Martínez', 'role' => 'Líder'],
                 ['initial' => 'A', 'name' => 'Andrés Pérez', 'role' => 'Integrante'],
@@ -70,6 +70,7 @@ final class ProjectModel
             $common + [
                 'id' => 1, 'type' => 'Trabajo de titulación', 'type_key' => 'thesis', 'status' => 'En revisión', 'status_key' => 'review', 'metric_bucket' => 'review',
                 'title' => 'Sistema de Gestión Documental Académica', 'subtitle' => 'Seguimiento, revisión y publicación de proyectos académicos.',
+                'tags' => ['Gestión académica', 'Trazabilidad'], 'technologies' => ['PHP', 'MariaDB'], 'activity_order' => 4,
                 'tutor' => 'Ing. Tutor Asignado', 'last_activity' => 'Revisión del tutor · 17 Jul 2026', 'stage' => 'Revisión académica', 'progress' => 58,
                 'context' => ['Última entrega' => 'Informe metodológico · v4', 'Próxima revisión' => '22 Jul 2026', 'Observaciones pendientes' => '2 de prioridad alta'],
                 'action_label' => 'Continuar seguimiento', 'next_action' => 'Atender las observaciones de metodología y referencias.',
@@ -84,6 +85,7 @@ final class ProjectModel
             $common + [
                 'id' => 2, 'type' => 'Proyecto integrador', 'type_key' => 'integrator', 'status' => 'Aprobado', 'status_key' => 'approved', 'metric_bucket' => 'active',
                 'title' => 'Aplicación móvil de apoyo al aprendizaje inclusivo', 'subtitle' => 'Herramientas accesibles para acompañamiento académico.',
+                'tags' => ['Accesibilidad', 'Educación'], 'technologies' => ['Flutter'], 'activity_order' => 3,
                 'tutor' => 'Msc. Elena Ruiz', 'last_activity' => 'Proyecto aprobado · 12 Jul 2026', 'stage' => 'Preparación final', 'progress' => 76,
                 'context' => ['Fecha de aprobación' => '12 Jul 2026', 'Documentos pendientes' => 'Ejecutable y anexos', 'Siguiente etapa' => 'Asignación de tribunal'],
                 'action_label' => 'Preparar documentos finales', 'next_action' => 'Completar los documentos requeridos para tribunal.', 'latest_delivery' => null, 'observations' => [], 'activities' => [], 'comments' => [],
@@ -91,13 +93,15 @@ final class ProjectModel
             $common + [
                 'id' => 3, 'type' => 'Trabajo de titulación', 'type_key' => 'thesis', 'status' => 'En defensa', 'status_key' => 'defense', 'metric_bucket' => 'active',
                 'title' => 'Plataforma para seguimiento de prácticas preprofesionales', 'subtitle' => 'Control académico de convenios, evidencias y evaluaciones.',
+                'tags' => ['Prácticas', 'Evaluación'], 'technologies' => ['Laravel'], 'activity_order' => 2,
                 'tutor' => 'Ing. Pablo Torres', 'last_activity' => 'Defensa programada · 15 Jul 2026', 'stage' => 'Defensa', 'progress' => 91,
                 'context' => ['Tribunal asignado' => '3 docentes', 'Fecha programada' => '29 Jul 2026 · 10:00', 'Evaluación' => 'Pendiente'],
                 'action_label' => 'Ver defensa', 'next_action' => 'Preparar la presentación y evidencias.', 'latest_delivery' => null, 'observations' => [], 'activities' => [], 'comments' => [],
             ],
             $common + [
                 'id' => 4, 'type' => 'Proyecto de vinculación', 'type_key' => 'community', 'status' => 'Publicado', 'status_key' => 'published', 'metric_bucket' => 'finished',
-                'title' => 'Portal comunitario para alfabetización digital', 'subtitle' => 'Recursos tecnológicos para comunidades rurales.',
+                'title' => 'Portal comunitario para alfabetización digital', 'subtitle' => 'Recursos tecnológicos para comunidades rurales.', 'period' => '2025-II',
+                'tags' => ['Vinculación', 'Inclusión digital'], 'technologies' => ['WordPress'], 'activity_order' => 1,
                 'tutor' => 'Msc. Diana Vega', 'last_activity' => 'Publicado en repositorio · 03 Jul 2026', 'stage' => 'Publicado', 'progress' => 100,
                 'context' => ['Fecha de publicación' => '03 Jul 2026', 'Repositorio' => 'Disponible públicamente', 'Categoría' => 'Vinculación · Inclusión digital'],
                 'action_label' => 'Ver en repositorio', 'repository_id' => 1, 'next_action' => 'El expediente se encuentra concluido y publicado.', 'latest_delivery' => null, 'observations' => [], 'activities' => [], 'comments' => [],

@@ -21,7 +21,7 @@ final class ProjectsController
             'currentPage' => 'projects',
             'title' => 'Mis Proyectos | Gestión Documental Académica',
             'bodyClass' => 'projects-page',
-            'pageStyles' => [asset('css/projects.css')],
+            'pageStyles' => [asset('css/projects.css'), asset('css/projects-catalog.css')],
             'pageScript' => asset('js/projects.js'),
             'projects' => $projects,
             'metrics' => $projectModel->getProjectMetrics($projects),

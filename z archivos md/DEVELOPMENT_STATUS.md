@@ -522,3 +522,13 @@ Pendiente:
 - Formularios backend para entregas, comentarios, observaciones y estados.
 - Desarrollo completo de historial, participantes, calendario y documentos finales.
 - Integración por identificador y pestaña con Dashboard, Notificaciones, Calendario y Repositorio.
+
+## Avance del catálogo — Etapa 2
+
+- Búsqueda por título, subtítulo, tipo, tutor, carrera, periodo, etiquetas y tecnologías.
+- Filtros combinables por métrica, estado, tipo y periodo académico.
+- Orden por actividad reciente, título y porcentaje de progreso.
+- Descripción accesible y dinámica de los filtros activos.
+- Tarjetas con participantes limitados, etiquetas relevantes e información adaptada a cada etapa.
+- Estado vacío específico para búsquedas sin resultados y acción única para limpiar filtros.
+- Ajustes responsive y estados de foco visibles para controles interactivos.
