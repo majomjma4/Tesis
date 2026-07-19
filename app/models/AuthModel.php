@@ -7,7 +7,7 @@ final class AuthModel
     public function findActiveUserByLogin(string $login): ?array
     {
         $statement = Database::connection()->prepare(
-            "SELECT id, email, username, password_hash, full_name, must_change_password, password_warning_count, temporary_password_expires_at, session_version FROM users WHERE status = 'active' AND email = :email_login LIMIT 1"
+            "SELECT id, email, username, password_hash, full_name, must_change_password, password_warning_count, temporary_password_expires_at, session_version FROM users WHERE status = 'active' AND deleted_at IS NULL AND purged_at IS NULL AND email = :email_login LIMIT 1"
         );
         $normalizedLogin = mb_strtolower(trim($login));
         $statement->execute(['email_login' => $normalizedLogin]);
@@ -35,7 +35,7 @@ final class AuthModel
 
     public function sessionIdentity(int $userId): ?array
     {
-        $statement=Database::connection()->prepare("SELECT id,email,full_name,status,must_change_password,password_warning_count,temporary_password_expires_at,session_version FROM users WHERE id=:id LIMIT 1");
+        $statement=Database::connection()->prepare("SELECT id,email,full_name,status,must_change_password,password_warning_count,temporary_password_expires_at,session_version FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL LIMIT 1");
         $statement->execute(['id'=>$userId]); $user=$statement->fetch();
         if(!$user)return null;
         $roles=Database::connection()->prepare('SELECT r.code FROM roles r INNER JOIN user_roles ur ON ur.role_id=r.id WHERE ur.user_id=:id');$roles->execute(['id'=>$userId]);$user['roles']=array_column($roles->fetchAll(),'code');

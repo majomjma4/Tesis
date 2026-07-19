@@ -683,3 +683,16 @@ Estado: completada.
 - Entrega transaccional: todos los destinatarios reciben el aviso o no se registra ninguno.
 - Emisor, alcance, cantidad de destinatarios y fecha conservados en auditoría.
 - Historial resumido de envíos sin exponer el contenido privado de las bandejas personales.
+
+## Administrador — Fase 9
+
+Estado: completada.
+
+- Papelera unificada de usuarios y proyectos con conservación durante 60 días.
+- Revocación inmediata del acceso al eliminar una cuenta, sin eliminar sus proyectos.
+- Motivo, fecha y Administrador responsable registrados en MariaDB y auditoría.
+- Restauración de cuentas y expedientes durante el plazo disponible.
+- Contador individual de días restantes y detección de elementos vencidos.
+- Purga manual protegida por confirmación y limitada a registros con más de 60 días.
+- Usuarios vencidos anonimizados como registros históricos para conservar relaciones académicas.
+- Proyectos vencidos eliminados definitivamente mediante sus relaciones normalizadas.

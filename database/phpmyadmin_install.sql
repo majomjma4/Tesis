@@ -27,6 +27,10 @@ CREATE TABLE users (
   status ENUM('active','inactive','blocked') NOT NULL DEFAULT 'active',
   last_login_at DATETIME NULL,
   session_version INT UNSIGNED NOT NULL DEFAULT 1,
+  deleted_at DATETIME NULL,
+  deleted_by BIGINT UNSIGNED NULL,
+  deletion_reason VARCHAR(500) NULL,
+  purged_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -155,6 +159,8 @@ CREATE TABLE projects (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted_at DATETIME NULL,
+  deleted_by BIGINT UNSIGNED NULL,
+  deletion_reason VARCHAR(500) NULL,
   INDEX idx_projects_status (status),
   INDEX idx_projects_period (academic_period_id),
   INDEX idx_projects_type (project_type_id),

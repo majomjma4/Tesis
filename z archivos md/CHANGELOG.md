@@ -433,3 +433,10 @@ Cada nueva versión deberá registrar únicamente los cambios relevantes realiza
 - Se incorporó el envío administrativo a usuarios, proyectos, roles o toda la plataforma.
 - Los avisos globales requieren tipo Sistema y confirmación adicional.
 - Cada operación registra emisor, alcance y destinatarios en la auditoría administrativa.
+
+## Administrador — Papelera de 60 días
+
+- Se añadió eliminación reversible y restauración para usuarios y proyectos.
+- Las cuentas eliminadas pierden acceso sin afectar proyectos o auditorías relacionadas.
+- La purga procesa únicamente elementos vencidos y anonimiza las cuentas históricas.
+- Se incorporaron metadatos de eliminación y una migración reproducible para MariaDB.

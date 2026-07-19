@@ -8,7 +8,7 @@ final class AdminUserModel
 
     public function listing(array $filters=[]): array
     {
-        $where=[];$params=[];
+        $where=['u.deleted_at IS NULL','u.purged_at IS NULL'];$params=[];
         if(($filters['search']??'')!==''){$where[]='(u.full_name LIKE :search OR u.email LIKE :search OR COALESCE(sp.institutional_code,tp.institutional_code,\'\') LIKE :search)';$params['search']='%'.$filters['search'].'%';}
         if(in_array($filters['role']??'',self::ROLES,true)){$where[]='r.code=:role';$params['role']=$filters['role'];}
         if(in_array($filters['status']??'',self::STATUSES,true)){$where[]='u.status=:status';$params['status']=$filters['status'];}
