@@ -20,6 +20,15 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 # [En desarrollo] - 18/07/2026
 
+## Datos de prueba del Administrador
+
+- Se añadió `scripts/seed_admin_demo.php`, un cargador idempotente para validar el panel administrativo con MariaDB.
+- El conjunto incluye seis estudiantes, tres docentes y siete proyectos distribuidos entre todos los estados administrativos, incluida la papelera.
+- Se incorporaron participantes, matrículas, asignaturas, entregas, observaciones, conversación, fechas, notificaciones y auditoría demostrativa.
+- El cargador genera seis archivos privados válidos en PDF, DOCX y ZIP sin almacenarlos como BLOB ni incorporarlos al repositorio Git.
+- Las cuentas demostrativas usan temporalmente `Istel2026+`; la cuenta administradora existente no se modifica.
+- Los avisos primero y segundo de contraseña temporal son compactos y descartables; el tercero bloquea únicamente a estudiantes y docentes. El Administrador queda exento de esta política.
+
 ## Administrador — Fase 1
 
 - Se activó la autenticación obligatoria en el entorno local y la validación de la cuenta contra MariaDB en cada solicitud.

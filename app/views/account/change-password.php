@@ -1,5 +1,5 @@
-<main class="admin-access-shell">
-    <nav aria-label="Migas de pan"><a href="<?= e(route('dashboard')) ?>">Inicio</a><i class="fa-solid fa-chevron-right"></i><span>Cambiar contraseña</span></nav>
+<main class="admin-access-shell<?= $forcedPasswordChange ? ' forced-password-shell' : '' ?>">
+    <?php if (!$forcedPasswordChange): ?><nav aria-label="Migas de pan"><a href="<?= e(route('dashboard')) ?>">Inicio</a><i class="fa-solid fa-chevron-right"></i><span>Cambiar contraseña</span></nav><?php endif; ?>
     <section class="admin-access-card">
         <span class="admin-access-icon"><i class="fa-solid fa-shield-halved"></i></span>
         <p class="admin-access-eyebrow">Seguridad de la cuenta</p><h1><?= $forcedPasswordChange ? 'Actualiza tu contraseña para continuar' : 'Cambiar contraseña' ?></h1>

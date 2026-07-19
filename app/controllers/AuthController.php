@@ -18,9 +18,13 @@ final class AuthController
             else {
                 $user = $auth->findActiveUserByLogin($login);
                 if ($user && password_verify((string) $_POST['password'], (string) $user['password_hash'])) {
-                    if ((bool)$user['must_change_password']) $user['password_warning_count']=$auth->registerTemporaryPasswordWarning((int)$user['id']);
+                    $requiresTemporaryPasswordChange = (bool)$user['must_change_password']
+                        && !in_array('administrator', $user['roles'] ?? [], true);
+                    if ($requiresTemporaryPasswordChange) {
+                        $user['password_warning_count'] = $auth->registerTemporaryPasswordWarning((int)$user['id']);
+                    }
                     $session->login($user); $auth->recordLogin((int) $user['id']);
-                    header('Location: ' . (($user['password_warning_count']??0)>=3 ? route('change-password') : route('dashboard'))); exit;
+                    header('Location: ' . ($requiresTemporaryPasswordChange && ($user['password_warning_count'] ?? 0) >= 3 ? route('change-password') : route('dashboard'))); exit;
                 }
                 $error = 'Usuario o contraseña incorrectos.';
             }

@@ -27,7 +27,8 @@ final class AccountController
             elseif(!(new AuthModel())->changePassword((int)$session->userId(),$current,$new))$error='La contraseña actual no es correcta.';
             else { $identity=(new AuthModel())->sessionIdentity((int)$session->userId());$session->refresh($identity);$success='Contraseña actualizada. Las demás sesiones fueron cerradas.'; }
         }
-        View::render('account/change-password',['currentPage'=>'profile','title'=>'Cambiar contraseña | Administración','bodyClass'=>'account-page','pageStyles'=>[asset('css/admin-access.css')],'passwordCsrfToken'=>$session->csrfToken('change_password'),'passwordError'=>$error,'passwordSuccess'=>$success,'forcedPasswordChange'=>$session->mustChangePassword()]);
+        $forcedPasswordChange=$session->mustChangePassword()&&!in_array('administrator',$session->roles(),true);
+        View::render('account/change-password',['currentPage'=>'profile','title'=>'Cambiar contraseña | Administración','bodyClass'=>'account-page','pageStyles'=>[asset('css/admin-access.css')],'passwordCsrfToken'=>$session->csrfToken('change_password'),'passwordError'=>$error,'passwordSuccess'=>$success,'forcedPasswordChange'=>$forcedPasswordChange]);
     }
 
     public function forbidden(): void

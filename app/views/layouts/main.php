@@ -124,8 +124,16 @@
                 </div>
             </div>
         </header>
-        <?php if (!empty($layoutMustChangePassword) && (int)($layoutPasswordWarningCount ?? 0) < 3): ?>
-        <aside class="password-warning-banner" role="status"><i class="fa-solid fa-shield-halved"></i><div><strong>Tu cuenta usa una contraseña temporal</strong><span>Aviso <?= (int)$layoutPasswordWarningCount ?> de 3. En el tercer acceso deberás cambiarla para continuar.</span></div><a href="<?= e(route('change-password')) ?>">Cambiar ahora</a></aside>
+        <?php if (!empty($layoutMustChangePassword) && !in_array('administrator', $layoutUserRoles ?? [], true) && (int)($layoutPasswordWarningCount ?? 0) < 3): ?>
+        <aside class="password-warning-banner" role="status" data-password-warning data-warning-key="<?= e(hash('sha256', ($layoutUserEmail ?? '') . ':' . (int)$layoutPasswordWarningCount)) ?>">
+            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+            <div><strong>Tu contraseña sigue siendo temporal</strong><span>Aviso <?= (int)$layoutPasswordWarningCount ?> de 3</span></div>
+            <div class="password-warning-actions">
+                <a href="<?= e(route('change-password')) ?>">Cambiar ahora</a>
+                <button type="button" data-password-warning-dismiss>Recordármelo más tarde</button>
+            </div>
+            <button type="button" class="password-warning-close" data-password-warning-dismiss aria-label="Cerrar aviso"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+        </aside>
         <?php endif; ?>
         <!-- Final de barra superior -->
 

@@ -330,3 +330,17 @@ document.addEventListener("keydown", (event) => {
     }
 });
 // Final de panel de notificaciones recientes
+
+// Inicio de aviso descartable de contraseña temporal
+const temporaryPasswordWarning = document.querySelector("[data-password-warning]");
+if (temporaryPasswordWarning) {
+    const storageKey = `temporary-password-warning:${temporaryPasswordWarning.dataset.warningKey || "current"}`;
+    if (sessionStorage.getItem(storageKey) === "dismissed") temporaryPasswordWarning.hidden = true;
+    temporaryPasswordWarning.querySelectorAll("[data-password-warning-dismiss]").forEach((button) => {
+        button.addEventListener("click", () => {
+            sessionStorage.setItem(storageKey, "dismissed");
+            temporaryPasswordWarning.hidden = true;
+        });
+    });
+}
+// Final de aviso descartable de contraseña temporal

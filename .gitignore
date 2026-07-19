@@ -1,6 +1,7 @@
 /storage/repository/*.zip
 /storage/support-materials/*
 !/storage/support-materials/.gitkeep
+/storage/private/projects/*
 /app/config/database.local.php
 /app/config/app.local.php
 /dist/
