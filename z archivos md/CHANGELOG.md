@@ -465,3 +465,9 @@ Cada nueva versión deberá registrar únicamente los cambios relevantes realiza
 - Se normalizaron los rechazos CSRF a `403` y se reforzaron las cookies de sesión.
 - Se corrigió el CSS de Configuración y se validaron PHP, JavaScript y reglas responsive del módulo.
 - Quedaron completadas las trece fases definidas para el rol Administrador.
+
+## Preparación de pruebas de aceptación
+
+- Se documentó la siguiente sesión para probar manualmente la experiencia administrativa.
+- La carga de usuarios, proyectos y documentos de prueba queda pendiente hasta realizarla de forma controlada.
+- No se incorporaron datos ficticios adicionales a MariaDB durante el cierre de esta jornada.
