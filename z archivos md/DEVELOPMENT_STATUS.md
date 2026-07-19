@@ -636,3 +636,16 @@ Estado: completada.
 - Creación atómica dentro de una transacción: una fila inválida impide toda la importación.
 - Contraseña temporal `Istel2026+`, cambio obligatorio y vencimiento en siete días.
 - Registro resumido de la importación en la auditoría administrativa.
+
+## Administrador — Fase 5
+
+Estado: completada.
+
+- Catálogo administrativo de proyectos conectado exclusivamente a MariaDB.
+- Indicadores y filtros por texto, estado, tipo y periodo académico.
+- Creación real de expedientes con código único, tipo, carrera, periodo, tutor y estado.
+- Edición transaccional de los datos principales del proyecto.
+- Tutores disponibles obtenidos de los perfiles docentes habilitados.
+- Envío reversible a Papelera con motivo obligatorio, sin eliminar archivos ni participantes.
+- Registro de creación, modificación y eliminación en la auditoría del proyecto.
+- Experiencia administrativa separada de los datos temporales de Estudiante y Docente.

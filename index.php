@@ -34,6 +34,8 @@ match ($page) {
     'admin-user-status' => (new AdminController())->changeUserStatus(),
     'admin-user-password' => (new AdminController())->resetUserPassword(),
     'admin-users-import' => (new AdminController())->importUsers(),
+    'admin-project-save' => (new AdminController())->saveProject(),
+    'admin-project-trash' => (new AdminController())->trashProject(),
     'admin-academic' => (new AdminController())->module('academic'),
     'admin-reports' => (new AdminController())->module('reports'),
     'admin-settings' => (new AdminController())->module('settings'),

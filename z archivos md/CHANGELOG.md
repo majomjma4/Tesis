@@ -408,3 +408,10 @@ Cada nueva versión deberá registrar únicamente los cambios relevantes realiza
 - Admite CSV, TXT y contenido pegado con validación previa por fila.
 - Las cuentas se crean de manera transaccional en las tablas normalizadas de usuarios, roles y perfiles.
 - No se realizan escrituras durante la vista previa ni importaciones parciales cuando existen errores.
+
+## Administrador — Gestión de proyectos
+
+- Se agregó un catálogo administrativo de proyectos con datos reales de MariaDB.
+- El Administrador puede crear, editar, asignar tutor, cambiar estado y enviar expedientes a Papelera.
+- Las operaciones de escritura son transaccionales y generan entradas en `project_audit_log`.
+- Los proyectos enviados a Papelera conservan sus relaciones y documentos para una restauración posterior.

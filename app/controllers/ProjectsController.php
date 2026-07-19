@@ -9,6 +9,10 @@ final class ProjectsController
      */
     public function index(): void
     {
+        if (in_array('administrator', (new AuthSessionService())->roles(), true)) {
+            (new AdminController())->projects();
+            return;
+        }
         $projectModel = new ProjectModel();
         $access = new ProjectAccessService();
         $projects = $projectModel->getProjectsForUser($access->currentUserId());
