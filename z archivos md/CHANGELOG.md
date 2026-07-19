@@ -421,3 +421,9 @@ Cada nueva versión deberá registrar únicamente los cambios relevantes realiza
 - Se habilitaron periodos, carreras, tipos de proyecto, líneas de investigación y asignaturas desde MariaDB.
 - Se añadió el avance semestral transaccional con confirmación administrativa e historial de matrículas.
 - Los catálogos académicos quedan disponibles para los formularios y desplegables de los demás módulos.
+
+## Administrador — Publicación en repositorio
+
+- Se habilitó el panel administrativo de publicaciones con proyectos y archivos de MariaDB.
+- Se impide publicar expedientes sin aprobación o sin documentos finales.
+- Publicar y retirar son operaciones transaccionales, reversibles y auditadas.

@@ -660,3 +660,14 @@ Estado: completada.
 - Cierre del periodo anterior, activación del siguiente y conservación del historial de matrículas.
 - Estudiantes de décimo semestre marcados como completados sin generar un nivel inexistente.
 - Trazabilidad de cambios académicos en la auditoría administrativa.
+
+## Administrador — Fase 7
+
+Estado: completada.
+
+- Panel de publicación conectado a proyectos y archivos reales de MariaDB.
+- Clasificación de expedientes elegibles, publicados e incompletos.
+- Publicación restringida a proyectos aprobados o finalizados con al menos un documento.
+- Retiro reversible de publicaciones sin eliminar el expediente ni sus archivos.
+- Fecha de publicación y estado institucional actualizados dentro de una transacción.
+- Registro de publicación y retiro en la auditoría del proyecto.

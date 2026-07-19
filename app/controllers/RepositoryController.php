@@ -10,6 +10,10 @@ final class RepositoryController
     public function index(): void
     {
         $this->ensureSession();
+        if (in_array('administrator', (new AuthSessionService())->roles(), true)) {
+            (new AdminController())->repository();
+            return;
+        }
         $repositoryModel = new RepositoryModel();
         $favoriteModel = new FavoriteModel();
         $downloadModel = new DownloadModel();

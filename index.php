@@ -38,6 +38,7 @@ match ($page) {
     'admin-project-trash' => (new AdminController())->trashProject(),
     'admin-academic-save' => (new AdminController())->saveAcademic(),
     'admin-academic-promote' => (new AdminController())->promoteAcademicPeriod(),
+    'admin-repository-publish' => (new AdminController())->publishProject(),
     'admin-academic' => (new AdminController())->academic(),
     'admin-reports' => (new AdminController())->module('reports'),
     'admin-settings' => (new AdminController())->module('settings'),
