@@ -19,9 +19,14 @@ CREATE TABLE users (
   email VARCHAR(190) NOT NULL UNIQUE,
   username VARCHAR(80) NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
+  must_change_password TINYINT(1) NOT NULL DEFAULT 0,
+  password_warning_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  temporary_password_expires_at DATETIME NULL,
+  password_changed_at DATETIME NULL,
   full_name VARCHAR(180) NOT NULL,
   status ENUM('active','inactive','blocked') NOT NULL DEFAULT 'active',
   last_login_at DATETIME NULL,
+  session_version INT UNSIGNED NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

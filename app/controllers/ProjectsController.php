@@ -53,7 +53,8 @@ final class ProjectsController
         }
 
         if ($project === null) {
-            http_response_code(404);
+            (new ErrorController())->notFound();
+            return;
         }
 
         View::render('projects/detail', [

@@ -319,7 +319,7 @@ a{
     visibility:visible;
     transform:translateY(0);
 }
-.avatar-dropdown button{
+.avatar-dropdown button,.avatar-dropdown>a{
     width:100%;
     background:transparent;
     color:var(--text);
@@ -328,10 +328,13 @@ a{
     border-radius:11px;
     cursor:pointer;
     transition:.2s ease;
+    display:block;
+    text-decoration:none;
 }
-.avatar-dropdown button:hover{
+.avatar-dropdown button:hover,.avatar-dropdown>a:hover{
     background:var(--surface-soft);
 }
+.avatar-dropdown-identity{padding:10px 12px 12px;border-bottom:1px solid var(--line);margin-bottom:5px}.avatar-dropdown-identity strong,.avatar-dropdown-identity small{display:block;overflow:hidden;text-overflow:ellipsis}.avatar-dropdown-identity small{color:var(--muted);margin-top:3px}.password-warning-banner{display:flex;align-items:center;gap:13px;margin:18px 32px 0;padding:12px 15px;border:1px solid rgba(245,158,11,.3);border-radius:13px;background:rgba(245,158,11,.1);color:var(--text)}.password-warning-banner>i{color:#d97706}.password-warning-banner div{display:grid;gap:2px;flex:1}.password-warning-banner span{color:var(--muted);font-size:.86rem}.password-warning-banner a{color:var(--blue);font-weight:800;white-space:nowrap}.sidebar>div:first-child{min-height:0;overflow-y:auto;scrollbar-width:thin}@media(max-width:650px){.password-warning-banner{margin:12px 14px 0;align-items:flex-start;flex-wrap:wrap}.password-warning-banner a{margin-left:30px}}
 .avatar-dropdown .danger-option{
     color:var(--danger);
     font-weight:700;

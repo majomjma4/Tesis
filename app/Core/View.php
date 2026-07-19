@@ -59,6 +59,11 @@ final class View
             'notificationUnreadCount' => $unread,
             'notificationCsrfToken' => (string) $_SESSION['notification_csrf'],
             'notificationOpenEndpoint' => route('notifications/open'),
+            'layoutUserName' => (new AuthSessionService())->name(),
+            'layoutUserEmail' => (new AuthSessionService())->email(),
+            'layoutUserRoles' => (new AuthSessionService())->roles(),
+            'layoutPasswordWarningCount' => (new AuthSessionService())->passwordWarningCount(),
+            'layoutMustChangePassword' => (new AuthSessionService())->mustChangePassword(),
         ];
     }
     // Final de datos globales de notificaciones

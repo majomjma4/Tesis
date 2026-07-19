@@ -17,7 +17,11 @@ final class AuthController
             elseif (!filter_var($login, FILTER_VALIDATE_EMAIL) || (string) ($_POST['password'] ?? '') === '') $error = 'Completa un correo válido y la contraseña.';
             else {
                 $user = $auth->findActiveUserByLogin($login);
-                if ($user && password_verify((string) $_POST['password'], (string) $user['password_hash'])) { $session->login($user); $auth->recordLogin((int) $user['id']); header('Location: ' . route('dashboard')); exit; }
+                if ($user && password_verify((string) $_POST['password'], (string) $user['password_hash'])) {
+                    if ((bool)$user['must_change_password']) $user['password_warning_count']=$auth->registerTemporaryPasswordWarning((int)$user['id']);
+                    $session->login($user); $auth->recordLogin((int) $user['id']);
+                    header('Location: ' . (($user['password_warning_count']??0)>=3 ? route('change-password') : route('dashboard'))); exit;
+                }
                 $error = 'Usuario o contraseña incorrectos.';
             }
         }

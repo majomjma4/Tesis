@@ -4,10 +4,18 @@ declare(strict_types=1);
 final class RouteAccessService
 {
     private const PUBLIC_ROUTES = ['login', 'logout', 'dev-reload'];
+    private const ADMIN_ROUTES = ['admin-users','admin-academic','admin-reports','admin-settings','admin-trash'];
     public function enforce(string $page): void
     {
         $config = $GLOBALS['config'] ?? [];
         if (!($config['auth_required'] ?? false) || in_array($page, self::PUBLIC_ROUTES, true)) return;
-        if (!(new AuthSessionService())->isAuthenticated()) { header('Location: ' . route('login')); exit; }
+        $session=new AuthSessionService();
+        if (!$session->isAuthenticated()) { header('Location: ' . route('login')); exit; }
+        try { $identity=(new AuthModel())->sessionIdentity((int)$session->userId()); } catch(Throwable){ $identity=null; }
+        if(!$identity||$identity['status']!=='active'||(int)$identity['session_version']!==(int)($_SESSION['session_version']??0)){ $session->logout();header('Location: '.route('login'));exit; }
+        $session->refresh($identity);
+        $expired=!empty($identity['temporary_password_expires_at'])&&strtotime((string)$identity['temporary_password_expires_at'])<=time();
+        if((bool)$identity['must_change_password']&&((int)$identity['password_warning_count']>=3||$expired)&&!in_array($page,['change-password','logout'],true)){header('Location: '.route('change-password'));exit;}
+        if(in_array($page,self::ADMIN_ROUTES,true)&&!in_array('administrator',$identity['roles'],true)){header('Location: '.route('forbidden'));exit;}
     }
 }

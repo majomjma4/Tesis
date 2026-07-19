@@ -20,6 +20,15 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 # [En desarrollo] - 18/07/2026
 
+## Administrador — Fase 1
+
+- Se activó la autenticación obligatoria en el entorno local y la validación de la cuenta contra MariaDB en cada solicitud.
+- Se incorporó navegación exclusiva del Administrador, identidad real en la cabecera y accesos base a sus módulos.
+- Se añadió control de versión de sesión para bloquear cuentas o cerrar sesiones anteriores después de cambiar la contraseña.
+- Las contraseñas temporales muestran dos avisos y obligan el cambio en el tercer acceso o al vencer siete días.
+- Se implementó cambio seguro de contraseña con CSRF, reglas de complejidad, `password_hash()` e invalidación de sesiones.
+- Se añadió una respuesta 403 y protección de rutas administrativas en el servidor.
+
 ## Nuevo proyecto y simplificación del seguimiento
 
 - Se simplificaron “Mis proyectos” y el detalle para priorizar una acción principal y divulgación progresiva.

@@ -40,8 +40,12 @@
                 </a>
                 <a href="<?= e(route('projects')) ?>" class="menu-item <?= ($currentPage ?? '') === 'projects' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-folder-open"></i></span>
-                    <span>Mis proyectos</span>
+                    <span>Proyectos</span>
                 </a>
+                <?php if (in_array('administrator', $layoutUserRoles ?? [], true)): ?>
+                <a href="<?= e(route('admin-users')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-users' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-users"></i></span><span>Usuarios</span></a>
+                <a href="<?= e(route('admin-academic')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-academic' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-graduation-cap"></i></span><span>Académico</span></a>
+                <?php endif; ?>
                 <a href="<?= e(route('repository')) ?>" class="menu-item <?= ($currentPage ?? '') === 'repository' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-book-open"></i></span>
                     <span>Repositorio</span>
@@ -54,6 +58,11 @@
                     <span class="menu-icon"><i class="fa-solid fa-bell"></i></span>
                     <span>Notificaciones</span>
                 </a>
+                <?php if (in_array('administrator', $layoutUserRoles ?? [], true)): ?>
+                <a href="<?= e(route('admin-reports')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-reports' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-chart-column"></i></span><span>Reportes</span></a>
+                <a href="<?= e(route('admin-settings')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-settings' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-gear"></i></span><span>Configuración</span></a>
+                <a href="<?= e(route('admin-trash')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-trash' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-regular fa-trash-can"></i></span><span>Papelera</span></a>
+                <?php endif; ?>
             </nav>
         </div>
 
@@ -75,8 +84,8 @@
             </button>
 
             <div class="welcome">
-                <h2>Bienvenido, Usuario</h2>
-                <p>Continua gestionando tus proyectos academicos.</p>
+                <h2>Hola, <?= e(explode(' ', trim($layoutUserName ?? 'Usuario'))[0] ?: 'Usuario') ?></h2>
+                <p><?= in_array('administrator', $layoutUserRoles ?? [], true) ? 'Panel de administración del sistema.' : 'Continúa gestionando tus proyectos académicos.' ?></p>
             </div>
 
             <div class="topbar-right">
@@ -104,16 +113,19 @@
 
                 <div class="avatar-menu">
                     <button class="user-avatar" id="avatarButton" type="button" aria-label="Abrir menu de usuario" aria-expanded="false">
-                        U
+                        <?= e(mb_strtoupper(mb_substr($layoutUserName ?? 'U', 0, 1, 'UTF-8'), 'UTF-8')) ?>
                     </button>
                     <div class="avatar-dropdown" id="avatarDropdown">
-                        <button type="button">Cambiar correo electrónico</button>
-                        <button type="button">Cambiar contraseña</button>
+                        <div class="avatar-dropdown-identity"><strong><?= e($layoutUserName ?? 'Usuario') ?></strong><small><?= e($layoutUserEmail ?? '') ?></small></div>
+                        <a href="<?= e(route('change-password')) ?>">Cambiar contraseña</a>
                         <button type="button" class="danger-option js-logout-trigger">Cerrar sesión</button>
                     </div>
                 </div>
             </div>
         </header>
+        <?php if (!empty($layoutMustChangePassword) && (int)($layoutPasswordWarningCount ?? 0) < 3): ?>
+        <aside class="password-warning-banner" role="status"><i class="fa-solid fa-shield-halved"></i><div><strong>Tu cuenta usa una contraseña temporal</strong><span>Aviso <?= (int)$layoutPasswordWarningCount ?> de 3. En el tercer acceso deberás cambiarla para continuar.</span></div><a href="<?= e(route('change-password')) ?>">Cambiar ahora</a></aside>
+        <?php endif; ?>
         <!-- Final de barra superior -->
 
         <section class="app-global-skeleton" id="appGlobalSkeleton" aria-label="Cargando contenido" aria-live="polite">

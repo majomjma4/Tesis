@@ -27,6 +27,13 @@ $page = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 match ($page) {
     'login' => (new AuthController())->login(),
     'logout' => (new AuthController())->logout(),
+    'change-password' => (new AccountController())->changePassword(),
+    'forbidden' => (new AccountController())->forbidden(),
+    'admin-users' => (new AdminController())->module('users'),
+    'admin-academic' => (new AdminController())->module('academic'),
+    'admin-reports' => (new AdminController())->module('reports'),
+    'admin-settings' => (new AdminController())->module('settings'),
+    'admin-trash' => (new AdminController())->module('trash'),
     'dev-reload' => (new DevController())->reloadStamp(),
     'dashboard', 'home', 'inicio' => (new DashboardController())->index(),
     'calendar', 'calendario' => (new CalendarController())->index(),
@@ -59,6 +66,6 @@ match ($page) {
     'notifications/trash-bulk' => (new NotificationsController())->trashBulk(),
     'notifications/counters' => (new NotificationsController())->counters(),
     'notifications/open' => (new NotificationsController())->open(),
-    default => (new DashboardController())->index(),
+    default => (new ErrorController())->notFound(),
 };
 // Final del enrutamiento principal
