@@ -9,6 +9,10 @@ final class NotificationsController
     public function index(): void
     {
         $this->ensureSession();
+        if (in_array('administrator', (new AuthSessionService())->roles(), true)) {
+            (new AdminController())->notifications();
+            return;
+        }
         $error = null;
         $notifications = [];
         $counters = ['unread' => 0, 'today' => 0, 'week' => 0, 'total' => 0];

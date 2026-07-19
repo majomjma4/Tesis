@@ -671,3 +671,15 @@ Estado: completada.
 - Retiro reversible de publicaciones sin eliminar el expediente ni sus archivos.
 - Fecha de publicación y estado institucional actualizados dentro de una transacción.
 - Registro de publicación y retiro en la auditoría del proyecto.
+
+## Administrador — Fase 8
+
+Estado: completada.
+
+- Centro administrativo para notificaciones dirigidas con datos reales de MariaDB.
+- Destinatarios por usuario, participantes de un proyecto, rol o toda la plataforma.
+- Alcance de proyecto calculado con creador, tutor y participantes activos, sin duplicados.
+- Comunicados globales restringidos al tipo Sistema y protegidos por doble confirmación.
+- Entrega transaccional: todos los destinatarios reciben el aviso o no se registra ninguno.
+- Emisor, alcance, cantidad de destinatarios y fecha conservados en auditoría.
+- Historial resumido de envíos sin exponer el contenido privado de las bandejas personales.

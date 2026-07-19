@@ -39,6 +39,7 @@ match ($page) {
     'admin-academic-save' => (new AdminController())->saveAcademic(),
     'admin-academic-promote' => (new AdminController())->promoteAcademicPeriod(),
     'admin-repository-publish' => (new AdminController())->publishProject(),
+    'admin-notification-send' => (new AdminController())->sendNotification(),
     'admin-academic' => (new AdminController())->academic(),
     'admin-reports' => (new AdminController())->module('reports'),
     'admin-settings' => (new AdminController())->module('settings'),

@@ -427,3 +427,9 @@ Cada nueva versión deberá registrar únicamente los cambios relevantes realiza
 - Se habilitó el panel administrativo de publicaciones con proyectos y archivos de MariaDB.
 - Se impide publicar expedientes sin aprobación o sin documentos finales.
 - Publicar y retirar son operaciones transaccionales, reversibles y auditadas.
+
+## Administrador — Notificaciones dirigidas
+
+- Se incorporó el envío administrativo a usuarios, proyectos, roles o toda la plataforma.
+- Los avisos globales requieren tipo Sistema y confirmación adicional.
+- Cada operación registra emisor, alcance y destinatarios en la auditoría administrativa.

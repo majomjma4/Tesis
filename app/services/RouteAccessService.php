@@ -4,7 +4,7 @@ declare(strict_types=1);
 final class RouteAccessService
 {
     private const PUBLIC_ROUTES = ['login', 'logout', 'dev-reload'];
-    private const ADMIN_ROUTES = ['admin-users','admin-user-save','admin-user-status','admin-user-password','admin-users-import','admin-project-save','admin-project-trash','admin-academic','admin-academic-save','admin-academic-promote','admin-repository-publish','admin-reports','admin-settings','admin-trash'];
+    private const ADMIN_ROUTES = ['admin-users','admin-user-save','admin-user-status','admin-user-password','admin-users-import','admin-project-save','admin-project-trash','admin-academic','admin-academic-save','admin-academic-promote','admin-repository-publish','admin-notification-send','admin-reports','admin-settings','admin-trash'];
     public function enforce(string $page): void
     {
         $config = $GLOBALS['config'] ?? [];
