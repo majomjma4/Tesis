@@ -458,3 +458,10 @@ Cada nueva versión deberá registrar únicamente los cambios relevantes realiza
 - Se añadió una pantalla de perfil conectada a la cuenta autenticada.
 - Nombre y correo pueden actualizarse tras verificar la contraseña actual.
 - Los cambios refrescan la sesión actual, invalidan las demás y generan auditoría.
+
+## Administrador — Cierre de seguridad y regresión
+
+- Se verificaron todas las pantallas administrativas mediante una sesión real contra XAMPP y MariaDB.
+- Se normalizaron los rechazos CSRF a `403` y se reforzaron las cookies de sesión.
+- Se corrigió el CSS de Configuración y se validaron PHP, JavaScript y reglas responsive del módulo.
+- Quedaron completadas las trece fases definidas para el rol Administrador.

@@ -535,6 +535,7 @@ final class NotificationsController
     // Mantiene un contrato uniforme para todas las operaciones asíncronas del módulo.
     private function json(bool $success, string $message, array $data = [], int $status = 200): never
     {
+        $status = $status === 419 ? 403 : $status;
         http_response_code($status);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['success' => $success, 'message' => $message, 'data' => $data], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
