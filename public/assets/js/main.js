@@ -344,3 +344,39 @@ if (temporaryPasswordWarning) {
     });
 }
 // Final de aviso descartable de contraseña temporal
+
+// Inicio de selectores personalizados
+(() => {
+    const instances = [];
+    let active = null;
+    const close = (focus = false) => { if (!active) return; const { button, panel } = active; panel.remove(); button.setAttribute("aria-expanded", "false"); button.closest(".custom-select")?.classList.remove("is-open"); active = null; if (focus) button.focus(); };
+    const position = (button, panel) => {
+        const rect = button.getBoundingClientRect(), margin = 8;
+        panel.style.width = `${Math.min(Math.max(rect.width, 220), window.innerWidth - margin * 2)}px`;
+        panel.style.left = `${Math.min(Math.max(margin, rect.left), window.innerWidth - panel.offsetWidth - margin)}px`;
+        const below = window.innerHeight - rect.bottom - margin, height = Math.min(panel.scrollHeight, 300);
+        const above = below < Math.min(height, 190) && rect.top > below;
+        panel.style.maxHeight = `${Math.max(140, above ? rect.top - margin * 2 : below)}px`;
+        panel.style.top = `${above ? Math.max(margin, rect.top - Math.min(height, rect.top - margin * 2) - 6) : rect.bottom + 6}px`;
+    };
+    document.querySelectorAll(".app-shell select:not([multiple]):not([data-native-select])").forEach((select, index) => {
+        if (select.closest(".calendar-select-wrap, .project-wizard")) return;
+        const wrapper = document.createElement("span"); wrapper.className = "custom-select"; select.parentNode.insertBefore(wrapper, select); wrapper.append(select); select.classList.add("custom-select-native");
+        const button = document.createElement("button"); button.type = "button"; button.className = "custom-select-trigger"; button.setAttribute("aria-haspopup", "listbox"); button.setAttribute("aria-expanded", "false"); button.setAttribute("aria-controls", `customSelectPanel${index}`); button.innerHTML = '<span></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>'; wrapper.append(button);
+        const sync = () => { const option = select.options[select.selectedIndex]; button.querySelector("span").textContent = option?.textContent.trim() || "Selecciona una opción"; button.disabled = select.disabled; button.classList.toggle("is-placeholder", !select.value); };
+        const open = () => {
+            if (button.disabled) return; if (active?.select === select) return close(true); close(); sync();
+            const panel = document.createElement("div"); panel.id = `customSelectPanel${index}`; panel.className = "custom-select-panel"; panel.setAttribute("role", "listbox"); panel.setAttribute("aria-label", select.getAttribute("aria-label") || "Opciones");
+            [...select.options].forEach(option => { const item = document.createElement("button"); item.type = "button"; item.className = "custom-select-option"; item.disabled = option.disabled; item.setAttribute("role", "option"); item.setAttribute("aria-selected", String(option.selected)); item.innerHTML = '<span></span><i class="fa-solid fa-check" aria-hidden="true"></i>'; item.querySelector("span").textContent = option.textContent.trim(); item.addEventListener("click", () => { select.value = option.value; select.dispatchEvent(new Event("input", { bubbles: true })); select.dispatchEvent(new Event("change", { bubbles: true })); sync(); close(true); }); panel.append(item); });
+            document.body.append(panel); wrapper.classList.add("is-open"); button.setAttribute("aria-expanded", "true"); active = { select, button, panel }; position(button, panel); panel.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+        };
+        button.addEventListener("click", open);
+        button.addEventListener("keydown", event => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); open(); return; } if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); if (active?.select !== select) open(); const options = [...(active?.panel.querySelectorAll(".custom-select-option:not(:disabled)") || [])]; options[Math.max(0, options.findIndex(option => option.getAttribute("aria-selected") === "true"))]?.focus(); } });
+        select.addEventListener("change", sync); select.form?.addEventListener("reset", () => setTimeout(sync)); sync(); instances.push({ sync });
+    });
+    document.addEventListener("click", event => { if (active && !event.target.closest(".custom-select-panel") && !event.target.closest(".custom-select-trigger")) close(); });
+    document.addEventListener("keydown", event => { if (!active) return; if (event.key === "Escape") { event.preventDefault(); close(true); } if (["ArrowDown", "ArrowUp"].includes(event.key) && event.target.closest(".custom-select-panel")) { event.preventDefault(); const options = [...active.panel.querySelectorAll(".custom-select-option:not(:disabled)")], current = options.indexOf(document.activeElement), next = event.key === "ArrowDown" ? Math.min(options.length - 1, current + 1) : Math.max(0, current - 1); options[next]?.focus(); } });
+    window.addEventListener("resize", () => close()); window.addEventListener("scroll", () => close(), true);
+    new MutationObserver(() => instances.forEach(({ sync }) => sync())).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden", "disabled", "selected"] });
+})();
+// Final de selectores personalizados

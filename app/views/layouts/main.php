@@ -13,6 +13,7 @@
     <?php foreach (($pageStyles ?? []) as $pageStyle): ?>
         <link rel="stylesheet" href="<?= e($pageStyle) ?>">
     <?php endforeach; ?>
+    <link rel="stylesheet" href="<?= e(asset('css/admin-controls.css')) ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell app-page-loading')) ?>">
@@ -170,6 +171,7 @@
     <?php foreach (($pageScripts ?? []) as $additionalPageScript): ?>
         <script src="<?= e($additionalPageScript) ?>"></script>
     <?php endforeach; ?>
+    <script src="<?= e(asset('js/admin-action-menus.js')) ?>"></script>
     <?php if (!empty($GLOBALS['config']['dev_autoreload'])): ?>
         <script src="<?= e(asset('js/dev-reload.js')) ?>" data-endpoint="<?= e(route('dev-reload')) ?>" defer></script>
     <?php endif; ?>
