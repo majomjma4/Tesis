@@ -158,6 +158,9 @@
     <?php if (!empty($pageScript)): ?>
         <script src="<?= e($pageScript) ?>"></script>
     <?php endif; ?>
+    <?php foreach (($pageScripts ?? []) as $additionalPageScript): ?>
+        <script src="<?= e($additionalPageScript) ?>"></script>
+    <?php endforeach; ?>
     <?php if (!empty($GLOBALS['config']['dev_autoreload'])): ?>
         <script src="<?= e(asset('js/dev-reload.js')) ?>" data-endpoint="<?= e(route('dev-reload')) ?>" defer></script>
     <?php endif; ?>

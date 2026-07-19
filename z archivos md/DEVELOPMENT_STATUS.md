@@ -621,3 +621,18 @@ Estado: completada.
 - Protección CSRF, validación de correos duplicados y protección de la cuenta administrativa propia.
 - Auditoría administrativa con actor, acción, entidad, fecha, IP y agente de usuario.
 - Actividad de usuarios integrada al Dashboard administrativo.
+
+## Administrador — Fase 4
+
+Estado: completada.
+
+- Importación masiva de Estudiantes y Docentes desde archivos CSV/TXT o texto pegado.
+- Lectura de columnas separadas por coma, punto y coma o tabulación.
+- Vista previa obligatoria con resultado y error específico por fila.
+- Validación de correos e identificaciones duplicadas tanto en la lista como en MariaDB.
+- Límite de 500 usuarios y 1 MB por operación.
+- Configuración común de carrera, periodo y semestre para grupos de estudiantes.
+- Opción para incorporar docentes a los selectores de tutores.
+- Creación atómica dentro de una transacción: una fila inválida impide toda la importación.
+- Contraseña temporal `Istel2026+`, cambio obligatorio y vencimiento en siete días.
+- Registro resumido de la importación en la auditoría administrativa.

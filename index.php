@@ -33,6 +33,7 @@ match ($page) {
     'admin-user-save' => (new AdminController())->saveUser(),
     'admin-user-status' => (new AdminController())->changeUserStatus(),
     'admin-user-password' => (new AdminController())->resetUserPassword(),
+    'admin-users-import' => (new AdminController())->importUsers(),
     'admin-academic' => (new AdminController())->module('academic'),
     'admin-reports' => (new AdminController())->module('reports'),
     'admin-settings' => (new AdminController())->module('settings'),

@@ -401,3 +401,10 @@ Cada nueva versión deberá registrar únicamente los cambios relevantes realiza
 - Se incorporaron alta, edición, filtros, activación, bloqueo y restablecimiento seguro de contraseñas.
 - Los perfiles de estudiantes y docentes se guardan en sus tablas normalizadas dentro de transacciones.
 - Se agregó `admin_audit_log` y su migración reproducible para conservar trazabilidad administrativa.
+
+## Administrador — Importación masiva
+
+- Se añadió un asistente de tres pasos para configurar, revisar y crear usuarios en lote.
+- Admite CSV, TXT y contenido pegado con validación previa por fila.
+- Las cuentas se crean de manera transaccional en las tablas normalizadas de usuarios, roles y perfiles.
+- No se realizan escrituras durante la vista previa ni importaciones parciales cuando existen errores.

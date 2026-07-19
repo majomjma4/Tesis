@@ -11,7 +11,7 @@ final class AdminController
         try { $users=$model->listing($filters); $summary=$model->summary(); $catalogs=$model->catalogs(); }
         catch(Throwable $exception){ error_log('Admin users error: '.$exception->getMessage());$error='No fue posible consultar los usuarios.';$users=[];$summary=['total'=>0,'active'=>0,'blocked'=>0,'students'=>0,'teachers'=>0,'administrators'=>0];$catalogs=['careers'=>[],'periods'=>[]]; }
         $session=new AuthSessionService();
-        View::render('admin/users',['currentPage'=>'admin-users','title'=>'Usuarios | Administración','bodyClass'=>'admin-users-page','pageStyles'=>[asset('css/admin-users.css')],'pageScript'=>asset('js/admin-users.js'),'users'=>$users,'userSummary'=>$summary,'catalogs'=>$catalogs,'filters'=>$filters,'adminUserCsrf'=>$session->csrfToken('admin_users'),'adminUserEndpoints'=>['save'=>route('admin-user-save'),'status'=>route('admin-user-status'),'password'=>route('admin-user-password')],'adminUsersError'=>$error]);
+        View::render('admin/users',['currentPage'=>'admin-users','title'=>'Usuarios | Administración','bodyClass'=>'admin-users-page','pageStyles'=>[asset('css/admin-users.css'),asset('css/admin-user-import.css')],'pageScript'=>asset('js/admin-users.js'),'pageScripts'=>[asset('js/admin-user-import.js')],'users'=>$users,'userSummary'=>$summary,'catalogs'=>$catalogs,'filters'=>$filters,'adminUserCsrf'=>$session->csrfToken('admin_users'),'adminUserEndpoints'=>['save'=>route('admin-user-save'),'status'=>route('admin-user-status'),'password'=>route('admin-user-password'),'import'=>route('admin-users-import')],'adminUsersError'=>$error]);
     }
 
     public function saveUser(): void
@@ -41,6 +41,15 @@ final class AdminController
         try{(new AdminUserModel())->resetPassword($id,'Istel2026+',(int)$session->userId());$this->json(true,'Contraseña temporal restablecida. El usuario deberá cambiarla.');}
         catch(InvalidArgumentException $exception){$this->json(false,$exception->getMessage(),[],422);}
         catch(Throwable $exception){error_log('Admin password reset: '.$exception->getMessage());$this->json(false,'No fue posible restablecer la contraseña.',[],500);}
+    }
+
+    public function importUsers(): void
+    {
+        $this->requirePost();$session=$this->sessionAndCsrf();$content=trim((string)($_POST['content']??''));
+        if(isset($_FILES['file'])&&($_FILES['file']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_NO_FILE){$file=$_FILES['file'];if(($file['error']??UPLOAD_ERR_OK)!==UPLOAD_ERR_OK)$this->json(false,'No fue posible leer el archivo.',[],422);$extension=mb_strtolower(pathinfo((string)$file['name'],PATHINFO_EXTENSION));if(!in_array($extension,['csv','txt'],true))$this->json(false,'Utiliza un archivo CSV o TXT.',[],422);if((int)$file['size']>1048576)$this->json(false,'El archivo no puede superar 1 MB.',[],422);$content=(string)file_get_contents((string)$file['tmp_name']);}
+        try{$model=new AdminUserModel();$config=['role'=>(string)($_POST['role']??''),'career_id'=>(int)($_POST['career_id']??0),'academic_period_id'=>(int)($_POST['academic_period_id']??0),'semester'=>(int)($_POST['semester']??0),'can_tutor'=>isset($_POST['can_tutor'])?1:0];$preview=$model->previewImport($content,$config);if(($_POST['mode']??'preview')==='import'){$result=$model->bulkImport($content,$config,(int)$session->userId());$this->json(true,$result['created'].' usuarios fueron creados correctamente.',$result);} $this->json(true,'Vista previa generada.',$preview);}
+        catch(InvalidArgumentException $exception){$this->json(false,$exception->getMessage(),[],422);}
+        catch(Throwable $exception){error_log('Admin bulk import: '.$exception->getMessage());$this->json(false,'No fue posible procesar la lista.',[],500);}
     }
 
     public function module(string $section): void

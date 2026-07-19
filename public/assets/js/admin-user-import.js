@@ -1,0 +1,18 @@
+(()=>{
+    const modal=document.querySelector('#importUsersModal'),form=document.querySelector('#importUsersForm'),config=document.querySelector('#adminUsersConfig');
+    if(!modal||!form||!config)return;
+    const preview=document.querySelector('#importPreview'),body=document.querySelector('#importPreviewBody'),summary=document.querySelector('#importPreviewSummary'),message=document.querySelector('#importMessage'),execute=document.querySelector('#executeImportButton'),review=document.querySelector('#previewImportButton');
+    let previewReady=false;
+    const showRoleFields=()=>{const student=form.role.value==='student';form.querySelectorAll('.import-student').forEach(el=>el.hidden=!student);form.querySelectorAll('.import-teacher').forEach(el=>el.hidden=student);previewReady=false;execute.hidden=true;preview.hidden=true;};
+    const close=()=>{modal.hidden=true;form.reset();showRoleFields();message.hidden=true;};
+    const payload=async mode=>{const data=new FormData(form);data.set('mode',mode);const file=form.file.files[0];if(file&&form.content.value.trim()==='')data.set('content',await file.text());data.delete('file');return data;};
+    const send=async mode=>{const response=await fetch(config.dataset.import,{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},body:await payload(mode)});const result=await response.json().catch(()=>({success:false,message:'La respuesta del servidor no es válida.'}));if(!response.ok||!result.success)throw new Error(result.message||'No fue posible procesar la lista.');return result;};
+    document.querySelector('#importUsersButton')?.addEventListener('click',()=>{modal.hidden=false;showRoleFields();form.role.focus();});
+    document.querySelectorAll('[data-close-import]').forEach(button=>button.addEventListener('click',close));
+    modal.addEventListener('click',event=>{if(event.target===modal)close();});
+    form.role.addEventListener('change',showRoleFields);
+    form.addEventListener('input',event=>{if(!event.target.closest('#importPreview')){previewReady=false;execute.hidden=true;}});
+    review.addEventListener('click',async()=>{review.disabled=true;message.hidden=true;try{const result=await send('preview'),data=result.data;body.textContent='';data.rows.forEach(row=>{const tr=document.createElement('tr');[row.line,row.name,row.email,row.code].forEach(value=>{const td=document.createElement('td');td.textContent=String(value);tr.appendChild(td);});const status=document.createElement('td');status.className=row.valid?'import-row-valid':'import-row-invalid';status.textContent=row.valid?'Correcto':row.error;tr.appendChild(status);body.appendChild(tr);});summary.textContent=`${data.valid} correctos · ${data.invalid} con errores`;preview.hidden=false;previewReady=data.invalid===0&&data.total>0;execute.hidden=!previewReady;form.querySelectorAll('.import-steps span').forEach((step,index)=>step.classList.toggle('active',index===1));}catch(error){message.className='users-message error';message.textContent=error.message;message.hidden=false;}finally{review.disabled=false;}});
+    execute.addEventListener('click',async()=>{if(!previewReady)return;execute.disabled=true;message.hidden=true;try{const result=await send('import');message.className='users-message success';message.textContent=result.message;message.hidden=false;form.querySelectorAll('.import-steps span').forEach((step,index)=>step.classList.toggle('active',index===2));setTimeout(()=>location.reload(),800);}catch(error){message.className='users-message error';message.textContent=error.message;message.hidden=false;}finally{execute.disabled=false;}});
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!modal.hidden)close();});
+})();
