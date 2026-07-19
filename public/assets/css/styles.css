@@ -1943,6 +1943,35 @@ html.login-root{
 .input-wrap input::placeholder{
     color:#94a3b8;
 }
+.password-toggle{
+    flex:0 0 38px;
+    width:38px;
+    height:38px;
+    margin-right:-8px;
+    display:grid;
+    place-items:center;
+    border:0;
+    border-radius:10px;
+    background:transparent;
+    color:var(--muted);
+    cursor:pointer;
+    transition:background .18s ease,color .18s ease;
+}
+.password-toggle:hover{
+    background:rgba(37,99,235,.1);
+    color:var(--blue);
+}
+.password-toggle:focus-visible,
+.login-submit:focus-visible,
+.forgot-link:focus-visible{
+    outline:3px solid rgba(37,99,235,.3);
+    outline-offset:3px;
+}
+.password-toggle i{
+    width:auto;
+    color:inherit;
+    pointer-events:none;
+}
 .form-group.invalid .input-wrap{
     border-color:var(--danger);
     box-shadow:0 0 0 4px rgba(239,68,68,.1);
@@ -1988,6 +2017,9 @@ html.login-root{
 .login-submit:hover{
     transform:translateY(-2px);
     box-shadow:0 16px 28px rgba(37,99,235,.26);
+}
+.login-submit:active{
+    transform:translateY(0);
 }
 .access-note{
     margin-top:20px;

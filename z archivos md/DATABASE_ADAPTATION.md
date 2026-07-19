@@ -24,6 +24,7 @@ La aplicación queda preparada para MariaDB, InnoDB, `utf8mb4`, PDO y consultas 
 - Los archivos permanecen fuera de `public`; la base guarda metadatos y rutas relativas, nunca BLOB.
 - Las vistas no ejecutan SQL. El acceso se realiza mediante servicios y repositorios.
 - Los permisos visibles nunca sustituyen la validación del servidor.
+- Los únicos roles globales iniciales son Estudiante, Docente y Administrador. Tutor, líder o miembro de tribunal son funciones internas de un proyecto, no roles de acceso independientes.
 
 ## Convivencia temporal
 

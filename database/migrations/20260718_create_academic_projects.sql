@@ -207,8 +207,7 @@ CREATE TABLE IF NOT EXISTS project_audit_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT IGNORE INTO roles (code, name) VALUES
-('student', 'Estudiante'), ('tutor', 'Tutor'), ('cotutor', 'Cotutor'),
-('jury', 'Miembro de tribunal'), ('coordinator', 'Coordinación académica'), ('administrator', 'Administrador');
+('student', 'Estudiante'), ('teacher', 'Docente'), ('administrator', 'Administrador');
 
 INSERT IGNORE INTO project_types (code, name) VALUES
 ('thesis', 'Trabajo de titulación'), ('integrator', 'Proyecto integrador'),

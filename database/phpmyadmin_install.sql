@@ -347,9 +347,7 @@ CREATE TABLE project_downloads (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO roles (code, name) VALUES
-('student','Estudiante'),('tutor','Tutor'),('cotutor','Cotutor'),
-('jury','Miembro de tribunal'),('coordinator','Coordinación académica'),
-('administrator','Administrador');
+('student','Estudiante'),('teacher','Docente'),('administrator','Administrador');
 
 INSERT INTO project_types (code, name) VALUES
 ('thesis','Trabajo de titulación'),('pis','Proyecto integrador de saberes'),

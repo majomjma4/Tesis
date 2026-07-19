@@ -7,10 +7,7 @@ final class ProjectAccessService
 {
     private const PERMISSIONS = [
         'student' => ['project.view', 'project.create', 'delivery.create', 'observation.reply', 'observation.address', 'comment.create', 'calendar.manage'],
-        'tutor' => ['project.view', 'project.create', 'delivery.review', 'observation.create', 'observation.resolve', 'comment.create', 'status.review'],
-        'cotutor' => ['project.view', 'project.create', 'delivery.review', 'observation.create', 'comment.create'],
-        'jury' => ['project.view', 'delivery.review', 'observation.create', 'observation.resolve', 'comment.create', 'defense.evaluate'],
-        'coordinator' => ['project.view', 'project.create', 'participant.manage', 'status.manage', 'final_document.validate', 'repository.publish', 'audit.view'],
+        'teacher' => ['project.view', 'project.create', 'delivery.review', 'observation.create', 'observation.resolve', 'comment.create', 'status.review', 'defense.evaluate'],
         'administrator' => ['*'],
     ];
 
@@ -22,7 +19,7 @@ final class ProjectAccessService
     public function currentRole(): string
     {
         $roles = $this->currentRoles();
-        foreach (['administrator', 'coordinator', 'tutor', 'cotutor', 'jury', 'student'] as $priority) if (in_array($priority, $roles, true)) return $priority;
+        foreach (['administrator', 'teacher', 'student'] as $priority) if (in_array($priority, $roles, true)) return $priority;
         return 'student';
     }
 
@@ -51,8 +48,8 @@ final class ProjectAccessService
         $role = $this->currentRole();
         $actorType = match ($role) {
             'student' => 'student',
-            'tutor', 'cotutor' => 'teacher',
-            'coordinator', 'administrator' => 'management',
+            'teacher' => 'teacher',
+            'administrator' => 'management',
             default => 'restricted',
         };
         return ['role' => $role, 'actor_type' => $actorType, 'can_create' => $this->can('project.create'),

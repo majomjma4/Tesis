@@ -32,7 +32,7 @@
         <header class="login-panel-header">
             <span>Acceso institucional</span>
             <h2>Iniciar sesión</h2>
-            <p>Ingresa con tu correo o usuario asignado por la institucion.</p>
+            <p>Ingresa con el correo y la contraseña asignada por el Instituto.</p>
         </header>
         <!-- Final de encabezado del formulario -->
 
@@ -48,10 +48,10 @@
             <input type="hidden" name="_csrf" value="<?= e($loginCsrfToken ?? '') ?>">
             <!-- Inicio de campo de usuario -->
             <div class="form-group" id="userGroup">
-                <label for="user">Correo o usuario asignado</label>
+                <label for="user">Correo electrónico</label>
                 <div class="input-wrap">
                     <i class="fa-solid fa-user"></i>
-                    <input type="text" id="user" name="user" autocomplete="username" placeholder="correo@ejemplo.com" value="<?= e($loginValue ?? '') ?>">
+                    <input type="email" id="user" name="user" autocomplete="email" inputmode="email" placeholder="nombre@correo.com" value="<?= e($loginValue ?? '') ?>">
                 </div>
                 <span class="field-error">Este campo es obligatorio.</span>
             </div>
@@ -59,10 +59,13 @@
 
             <!-- Inicio de campo de contrasena -->
             <div class="form-group" id="passwordGroup">
-                <label for="password">Contraseña</label>
+                <label for="password">Contraseña asignada</label>
                 <div class="input-wrap">
                     <i class="fa-solid fa-lock"></i>
-                    <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Ingresa tu contrasena">
+                    <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Ingresa tu contraseña asignada">
+                    <button class="password-toggle" id="passwordToggle" type="button" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña">
+                        <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                    </button>
                 </div>
                 <span class="field-error">Este campo es obligatorio.</span>
             </div>

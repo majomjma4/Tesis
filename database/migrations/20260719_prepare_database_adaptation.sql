@@ -76,6 +76,8 @@ CREATE TABLE IF NOT EXISTS academic_subjects (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Los códigos quedan alineados con ProjectDraftService y el formulario.
+INSERT IGNORE INTO roles (code, name) VALUES ('student','Estudiante'),('teacher','Docente'),('administrator','Administrador');
+DELETE FROM roles WHERE code NOT IN ('student','teacher','administrator');
 UPDATE project_types SET code = 'pis', name = 'Proyecto integrador de saberes' WHERE code = 'integrator';
 UPDATE project_types SET code = 'practice', name = 'Prácticas preprofesionales' WHERE code = 'internship';
 

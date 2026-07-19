@@ -7,9 +7,10 @@ final class AuthModel
     public function findActiveUserByLogin(string $login): ?array
     {
         $statement = Database::connection()->prepare(
-            "SELECT id, email, username, password_hash, full_name FROM users WHERE status = 'active' AND (email = :login OR username = :login) LIMIT 1"
+            "SELECT id, email, username, password_hash, full_name FROM users WHERE status = 'active' AND email = :email_login LIMIT 1"
         );
-        $statement->execute(['login' => mb_strtolower(trim($login))]);
+        $normalizedLogin = mb_strtolower(trim($login));
+        $statement->execute(['email_login' => $normalizedLogin]);
         $user = $statement->fetch();
         if (!$user) return null;
         $roles = Database::connection()->prepare('SELECT r.code FROM roles r INNER JOIN user_roles ur ON ur.role_id = r.id WHERE ur.user_id = :user_id ORDER BY r.id');
