@@ -415,3 +415,9 @@ Cada nueva versión deberá registrar únicamente los cambios relevantes realiza
 - El Administrador puede crear, editar, asignar tutor, cambiar estado y enviar expedientes a Papelera.
 - Las operaciones de escritura son transaccionales y generan entradas en `project_audit_log`.
 - Los proyectos enviados a Papelera conservan sus relaciones y documentos para una restauración posterior.
+
+## Administrador — Gestión académica
+
+- Se habilitaron periodos, carreras, tipos de proyecto, líneas de investigación y asignaturas desde MariaDB.
+- Se añadió el avance semestral transaccional con confirmación administrativa e historial de matrículas.
+- Los catálogos académicos quedan disponibles para los formularios y desplegables de los demás módulos.

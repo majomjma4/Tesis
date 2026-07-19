@@ -649,3 +649,14 @@ Estado: completada.
 - Envío reversible a Papelera con motivo obligatorio, sin eliminar archivos ni participantes.
 - Registro de creación, modificación y eliminación en la auditoría del proyecto.
 - Experiencia administrativa separada de los datos temporales de Estudiante y Docente.
+
+## Administrador — Fase 6
+
+Estado: completada.
+
+- Gestión real de periodos académicos, carreras, tipos de proyecto, líneas de investigación y asignaturas.
+- Asignación de carrera, periodo, semestre y docente responsable a cada asignatura.
+- Avance semestral confirmado por el Administrador, ejecutado dentro de una transacción.
+- Cierre del periodo anterior, activación del siguiente y conservación del historial de matrículas.
+- Estudiantes de décimo semestre marcados como completados sin generar un nivel inexistente.
+- Trazabilidad de cambios académicos en la auditoría administrativa.
