@@ -10,14 +10,6 @@
             <a href="<?= e(route('new-project')) ?>"><i class="fa-solid fa-plus"></i> Crear mi primer proyecto</a>
         </section>
     <?php else: ?>
-        <section class="projects-metrics" aria-label="Resumen y filtros por estado">
-            <?php foreach ($metrics as $metric): ?>
-                <button type="button" class="projects-metric" data-metric="<?= e($metric['key']) ?>" aria-pressed="false">
-                    <span><i class="fa-solid <?= e($metric['icon']) ?>"></i></span><strong><?= (int) $metric['count'] ?></strong><small><?= e($metric['label']) ?></small>
-                </button>
-            <?php endforeach; ?>
-        </section>
-
         <section class="projects-toolbar" aria-label="Buscar y filtrar proyectos">
             <label class="projects-search"><i class="fa-solid fa-magnifying-glass"></i><span class="sr-only">Buscar proyectos</span><input type="search" data-project-search placeholder="Buscar por título, tutor, tipo o periodo"></label>
             <label><span class="sr-only">Estado</span><select data-project-status><option value="">Todos los estados</option><option value="review">En revisión</option><option value="approved">Aprobado</option><option value="defense">En defensa</option><option value="published">Publicado</option></select></label>
@@ -31,16 +23,31 @@
         <section class="projects-grid" data-project-grid aria-label="Catálogo de proyectos">
             <?php foreach ($projects as $project):
                 $search = mb_strtolower(implode(' ', array_merge([$project['title'], $project['subtitle'], $project['type'], $project['tutor'], $project['period'], $project['career']], $project['tags'], $project['technologies'])), 'UTF-8');
-                $actionUrl = !empty($project['repository_id']) ? route('repository-detail') . '&id=' . (int) $project['repository_id'] : route('project-detail') . '&id=' . (int) $project['id'];
+                $actionUrl = route('project-detail') . '&id=' . (int) $project['id'];
+                $cardAction = 'Abrir proyecto';
+                $phaseContext = [];
+                if ($project['status_key'] === 'review') {
+                    $phaseContext = ['Última entrega' => $project['latest_delivery']['version'] ?? 'Sin entregas', 'Observaciones pendientes' => count($project['observations'])];
+                    $cardAction = 'Atender revisión'; $actionUrl .= '&tab=review';
+                } elseif ($project['status_key'] === 'approved') {
+                    $phaseContext = ['Aprobación' => $project['key_dates'][1]['value'] ?? 'Registrada', 'Documentos finales' => $project['final_documents'] ? 'Disponibles' : 'Pendientes'];
+                    $cardAction = 'Preparar documentos'; $actionUrl .= '&tab=documents';
+                } elseif ($project['status_key'] === 'defense') {
+                    $phaseContext = ['Fecha' => $project['key_dates'][2]['value'] ?? 'Por programar', 'Evaluación' => 'En proceso'];
+                    $cardAction = 'Consultar evaluación'; $actionUrl .= '&tab=information';
+                } elseif ($project['status_key'] === 'published') {
+                    $phaseContext = ['Publicación' => $project['key_dates'][1]['value'] ?? 'Publicada', 'Disponibilidad' => 'Repositorio institucional'];
+                    $cardAction = 'Ver publicación';
+                    if (!empty($project['repository_id'])) $actionUrl = route('repository-detail') . '&id=' . (int) $project['repository_id'];
+                } else $phaseContext = ['Etapa' => $project['stage'], 'Expediente' => $project['status']];
             ?>
                 <article class="projects-card" data-project-card data-search="<?= e($search) ?>" data-status="<?= e($project['status_key']) ?>" data-type="<?= e($project['type_key']) ?>" data-period="<?= e($project['period']) ?>" data-metric="<?= e($project['metric_bucket']) ?>" data-title="<?= e($project['title']) ?>" data-progress="<?= (int) $project['progress'] ?>" data-activity="<?= (int) $project['activity_order'] ?>">
                     <header><span class="projects-type"><?= e($project['type']) ?></span><span class="projects-status is-<?= e($project['status_key']) ?>"><?= e($project['status']) ?></span></header>
-                    <div class="projects-card-title"><h2><?= e($project['title']) ?></h2><p><?= e($project['subtitle']) ?></p></div>
-                    <dl class="projects-core"><div><dt><i class="fa-solid fa-chalkboard-user"></i> Tutor o responsable</dt><dd><?= e($project['tutor'] ?: 'Por asignar') ?></dd></div><div><dt><i class="fa-regular fa-clock"></i> Última actividad</dt><dd><?= e($project['last_activity']) ?></dd></div></dl>
-                    <?php if ($project['progress'] < 100): ?><div class="projects-progress"><div><span><?= e($project['stage']) ?></span><strong><?= (int) $project['progress'] ?>%</strong></div><progress value="<?= (int) $project['progress'] ?>" max="100"><?= (int) $project['progress'] ?>%</progress></div><?php endif; ?>
-                    <dl class="projects-context"><?php foreach ($project['context'] as $label => $value): ?><div><dt><?= e($label) ?></dt><dd><?= e($value) ?></dd></div><?php endforeach; ?></dl>
-                    <div class="projects-card-meta"><div class="projects-people" aria-label="<?= count($project['participants']) ?> participantes"><?php foreach (array_slice($project['participants'], 0, 3) as $member): ?><span title="<?= e($member['name'] . ' · ' . $member['role']) ?>"><?= e($member['initial']) ?></span><?php endforeach; ?><small><?= count($project['participants']) ?> participantes</small></div><div class="projects-tags"><?php foreach (array_slice($project['tags'], 0, 2) as $tag): ?><span><?= e($tag) ?></span><?php endforeach; ?></div></div>
-                    <footer><a href="<?= e($actionUrl) ?>"><?= e($project['action_label']) ?> <i class="fa-solid fa-arrow-right"></i></a></footer>
+                    <div class="projects-card-title"><h2><?= e($project['title']) ?></h2></div>
+                    <div class="project-card-tutor"><i class="fa-solid fa-chalkboard-user"></i><span><small>Tutor</small><strong><?= e($project['tutor'] ?: 'Por asignar') ?></strong></span><em><?= e($project['period']) ?></em></div>
+                    <dl class="project-card-context"><?php foreach ($phaseContext as $label => $value): ?><div><dt><?= e($label) ?></dt><dd><?= e((string) $value) ?></dd></div><?php endforeach; ?></dl>
+                    <div class="project-card-activity"><span><i class="fa-regular fa-clock"></i> Última actividad</span><strong><?= e($project['last_activity']) ?></strong></div>
+                    <footer><a href="<?= e($actionUrl) ?>"><?= e($cardAction) ?> <i class="fa-solid fa-arrow-right"></i></a></footer>
                 </article>
             <?php endforeach; ?>
         </section>

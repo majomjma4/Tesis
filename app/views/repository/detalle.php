@@ -124,6 +124,7 @@
                             <span role="cell"><?= e($item['size']) ?></span>
                             <span class="repository-file-action" role="cell">
                                 <?php if ($item['kind'] === 'file'): ?>
+                                    <button type="button" class="repository-file-preview-action" data-file-path="<?= e($item['path']) ?>" aria-label="Ver <?= e($item['name']) ?>"><i class="fa-solid fa-eye"></i><span>Ver</span></button>
                                     <a href="<?= e($fileDownloadActionUrl . '&id=' . rawurlencode((string) $project['id']) . '&path=' . rawurlencode($item['path'])) ?>" aria-label="Descargar <?= e($item['name']) ?>"><i class="fa-solid fa-download"></i></a>
                                 <?php endif; ?>
                             </span>

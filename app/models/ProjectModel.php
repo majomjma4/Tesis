@@ -44,14 +44,11 @@ final class ProjectModel
     public function getDetailTabs(): array
     {
         return [
-            'summary' => ['label' => 'Resumen', 'icon' => 'fa-chart-pie'],
-            'deliveries' => ['label' => 'Entregas', 'icon' => 'fa-file-arrow-up'],
-            'observations' => ['label' => 'Observaciones', 'icon' => 'fa-list-check'],
-            'comments' => ['label' => 'Comentarios', 'icon' => 'fa-comments'],
-            'history' => ['label' => 'Historial', 'icon' => 'fa-clock-rotate-left'],
-            'participants' => ['label' => 'Participantes', 'icon' => 'fa-users'],
-            'calendar' => ['label' => 'Calendario', 'icon' => 'fa-calendar-days'],
-            'final-documents' => ['label' => 'Documentos finales', 'icon' => 'fa-box-archive'],
+            'summary' => ['label' => 'Resumen', 'icon' => 'fa-house'],
+            'documents' => ['label' => 'Documentos', 'icon' => 'fa-folder-open'],
+            'review' => ['label' => 'Revisión', 'icon' => 'fa-list-check'],
+            'activity' => ['label' => 'Actividad', 'icon' => 'fa-clock-rotate-left'],
+            'information' => ['label' => 'Información', 'icon' => 'fa-circle-info'],
         ];
     }
 
@@ -94,10 +91,11 @@ final class ProjectModel
         $project['deliveries'] = $project['latest_delivery'] === null ? [] : [
             $project['latest_delivery'] + [
                 'stage' => $project['stage'], 'author' => $project['participants'][0]['name'],
-                'file' => 'Informe_metodologico_v4.pdf', 'size' => '2.4 MB',
+                'file' => 'Documento.pdf', 'preview_path' => 'Vista Previa/Documento.pdf', 'size' => '2.4 MB',
                 'comment' => 'Versión preparada para la revisión académica del tutor.',
             ],
-            ['version' => 'v3', 'title' => 'Marco teórico y propuesta', 'date' => '24 Jun 2026', 'status' => 'Requiere cambios', 'stage' => 'Desarrollo', 'author' => $project['participants'][0]['name'], 'file' => 'Informe_proyecto_v3.pdf', 'size' => '2.1 MB', 'comment' => 'Entrega anterior conservada como parte de la trazabilidad.'],
+            ['version' => 'v3', 'title' => 'Marco teórico y propuesta', 'date' => '24 Jun 2026', 'status' => 'Requiere cambios', 'stage' => 'Desarrollo', 'author' => $project['participants'][0]['name'], 'file' => 'Informe_v3.docx', 'preview_path' => 'Vista Previa/Informe.docx', 'size' => '1.8 MB', 'comment' => 'Documento de Word conservado como versión anterior.'],
+            ['version' => 'v2', 'title' => 'Código y anexos', 'date' => '10 Jun 2026', 'status' => 'Archivada', 'stage' => 'Desarrollo', 'author' => $project['participants'][0]['name'], 'file' => 'respaldo.zip', 'preview_path' => 'respaldo.zip', 'size' => '3.6 MB', 'comment' => 'Paquete navegable con archivos complementarios del proyecto.'],
         ];
         $project['observations'] = array_map(static fn (array $observation, int $index): array => $observation + [
             'id' => $index + 1, 'author' => 'Ing. Tutor Asignado', 'role' => 'Tutor',
@@ -149,10 +147,15 @@ final class ProjectModel
                 'latest_delivery' => ['version' => 'v4', 'title' => 'Informe metodológico', 'date' => '16 Jul 2026', 'status' => 'En revisión'],
                 'observations' => [
                     ['title' => 'Marco metodológico', 'text' => 'Ampliar el enfoque y justificar los instrumentos.', 'status' => 'Pendiente'],
-                    ['title' => 'Referencias', 'text' => 'Unificar citas y bibliografía en formato APA 7.', 'status' => 'Pendiente'],
+                    ['title' => 'Referencias', 'text' => 'Unificar citas y bibliografía en formato APA 7.', 'status' => 'Atendida'],
+                    ['title' => 'Formato de anexos', 'text' => 'La estructura de anexos fue revisada y aprobada.', 'status' => 'Resuelta'],
                 ],
-                'activities' => [['title' => 'Versión 4 registrada', 'date' => '16 Jul'], ['title' => 'Tutor inició la revisión', 'date' => '17 Jul']],
-                'comments' => [['author' => 'Ing. Tutor Asignado', 'date' => '17 Jul 2026', 'text' => 'Revisaremos primero metodología. Este comentario es general y no está asociado a un archivo.', 'relation' => null]],
+                'activities' => [['title' => 'Versión 4 registrada', 'date' => '16 Jul'], ['title' => 'Tutor inició la revisión', 'date' => '17 Jul'], ['title' => 'Equipo confirmó la recepción', 'date' => '18 Jul']],
+                'comments' => [
+                    ['author' => 'Ing. Tutor Asignado', 'date' => '17 Jul 2026 · 09:20', 'text' => 'Revisaremos primero metodología. Este comentario es general y no está asociado a un archivo.', 'relation' => null],
+                    ['author' => 'Carlos Martínez', 'date' => '17 Jul 2026 · 11:05', 'text' => 'Entendido. El equipo organizará los cambios y preparará una nueva versión.', 'relation' => null],
+                    ['author' => 'Lucía Gómez', 'date' => '18 Jul 2026 · 08:40', 'text' => 'Ya actualicé la bibliografía compartida para que todos trabajemos con el mismo formato.', 'relation' => null],
+                ],
             ],
             $common + [
                 'id' => 2, 'type' => 'Proyecto integrador', 'type_key' => 'integrator', 'status' => 'Aprobado', 'status_key' => 'approved', 'metric_bucket' => 'active',

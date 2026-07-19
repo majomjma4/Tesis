@@ -26,9 +26,41 @@ final class Database
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::MYSQL_ATTR_INIT_COMMAND => "SET time_zone = '+00:00'",
         ]);
 
         return self::$connection;
+    }
+
+    public static function isEnabled(): bool
+    {
+        $config = require APP_PATH . '/config/database.php';
+        return (bool) ($config['enabled'] ?? false);
+    }
+
+    public static function transaction(callable $operation): mixed
+    {
+        $connection = self::connection();
+        $connection->beginTransaction();
+        try {
+            $result = $operation($connection);
+            $connection->commit();
+            return $result;
+        } catch (Throwable $exception) {
+            if ($connection->inTransaction()) $connection->rollBack();
+            throw $exception;
+        }
+    }
+
+    public static function healthCheck(): array
+    {
+        if (!self::isEnabled()) return ['enabled' => false, 'connected' => false, 'message' => 'Base de datos deshabilitada.'];
+        try {
+            $version = (string) self::connection()->query('SELECT VERSION()')->fetchColumn();
+            return ['enabled' => true, 'connected' => true, 'version' => $version, 'message' => 'Conexión disponible.'];
+        } catch (Throwable $exception) {
+            return ['enabled' => true, 'connected' => false, 'message' => 'No fue posible conectar con MariaDB.'];
+        }
     }
     // Final de conexión compartida a MySQL
 }

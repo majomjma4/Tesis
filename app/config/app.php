@@ -11,6 +11,7 @@ $config = [
     'base_url' => $baseUrl,
     'environment' => getenv('APP_ENV') ?: 'development',
     'dev_autoreload' => filter_var(getenv('DEV_AUTORELOAD') ?: 'true', FILTER_VALIDATE_BOOL),
+    'auth_required' => filter_var(getenv('AUTH_REQUIRED') ?: 'false', FILTER_VALIDATE_BOOL),
 ];
 
 $localFile = __DIR__ . '/app.local.php';

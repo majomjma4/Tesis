@@ -2,6 +2,8 @@
 
 # Estado Actual del Desarrollo
 
+> Actualización técnica: 18/07/2026. El proyecto está preparado para iniciar la integración controlada con MariaDB; la persistencia continúa deshabilitada.
+
 Versión del documento: 1.0
 
 Última actualización: 11/07/2026

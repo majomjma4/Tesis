@@ -20,6 +20,24 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 # [En desarrollo] - 18/07/2026
 
+## Nuevo proyecto y simplificación del seguimiento
+
+- Se simplificaron “Mis proyectos” y el detalle para priorizar una acción principal y divulgación progresiva.
+- El detalle quedó organizado en Resumen, Documentos, Revisión, Actividad e Información.
+- Se incorporó navegación estable, conservación del desplazamiento, skeleton global y vistas seguras para PDF, DOCX y ZIP.
+- Se implementó Nuevo proyecto en cinco pasos con campos condicionales, equipo por semestre, etiquetas, archivos y confirmación.
+- El borrador se valida mediante JavaScript y PHP sin simular una creación mientras la persistencia está deshabilitada.
+- Se añadió guardado temporal versionado en `sessionStorage`, excluyendo archivos y tokens CSRF.
+
+## Preparación para MariaDB y autenticación
+
+- Se adoptó MariaDB con InnoDB, `utf8mb4`, PDO, consultas preparadas y archivos privados fuera de la base.
+- Se añadieron carreras, periodos, perfiles, matrículas, líneas de investigación, asignaturas, favoritos, descargas y secuencias de códigos.
+- Se alinearon los tipos `thesis`, `pis`, `practice` y `community` entre interfaz y esquema.
+- Se prepararon sesiones autenticadas, CSRF de login, múltiples roles y protección de rutas activable.
+- Se incorporaron repositorios PDO, catálogos institucionales y generación transaccional de códigos únicos.
+- La base permanece deshabilitada hasta importar las migraciones, crear el primer administrador y probar la integración.
+
 ## Separación estructural del módulo de proyectos
 
 - Se separó el catálogo “Mis proyectos” del seguimiento detallado de un expediente.

@@ -21,16 +21,12 @@ function updateFieldState(input) {
 
 // Inicio de envio del formulario
 loginForm?.addEventListener("submit", (event) => {
-    event.preventDefault();
-
     updateFieldState(userInput);
     updateFieldState(passwordInput);
 
     const hasEmptyFields = !userInput.value.trim() || !passwordInput.value.trim();
     loginAlert?.classList.remove("show");
 
-    if (!hasEmptyFields) {
-        window.location.href = loginForm.dataset.dashboardUrl;
-    }
+    if (hasEmptyFields) event.preventDefault();
 });
 // Final de envio del formulario

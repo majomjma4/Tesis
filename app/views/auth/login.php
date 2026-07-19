@@ -37,20 +37,21 @@
         <!-- Final de encabezado del formulario -->
 
         <!-- Inicio de alerta de validacion -->
-        <div class="login-alert" id="loginAlert" role="alert" aria-live="polite">
+        <div class="login-alert<?= !empty($loginError) ? ' show' : '' ?>" id="loginAlert" role="alert" aria-live="polite">
             <i class="fa-solid fa-circle-exclamation"></i>
-            <span>Usuario o contraseña incorrectos.</span>
+            <span><?= e($loginError ?? 'Revisa los campos indicados.') ?></span>
         </div>
         <!-- Final de alerta de validacion -->
 
         <!-- Inicio de formulario de inicio de sesion -->
-        <form class="login-form" id="loginForm" data-dashboard-url="<?= e(route('dashboard')) ?>" novalidate>
+        <form class="login-form" id="loginForm" method="post" action="<?= e(route('login')) ?>" novalidate>
+            <input type="hidden" name="_csrf" value="<?= e($loginCsrfToken ?? '') ?>">
             <!-- Inicio de campo de usuario -->
             <div class="form-group" id="userGroup">
                 <label for="user">Correo o usuario asignado</label>
                 <div class="input-wrap">
                     <i class="fa-solid fa-user"></i>
-                    <input type="text" id="user" name="user" autocomplete="username" placeholder="correo@ejemplo.com">
+                    <input type="text" id="user" name="user" autocomplete="username" placeholder="correo@ejemplo.com" value="<?= e($loginValue ?? '') ?>">
                 </div>
                 <span class="field-error">Este campo es obligatorio.</span>
             </div>

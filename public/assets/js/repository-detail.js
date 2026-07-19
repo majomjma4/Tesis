@@ -43,7 +43,7 @@ setTimeout(() => {
         repositoryDetailContent.style.display = "block";
         requestAnimationFrame(() => repositoryDetailContent.classList.add("is-loaded"));
     }
-}, 600);
+}, 0);
 
 function showRepositoryDetailToast(message) {
     if (!repositoryDetailToast) return;
@@ -145,6 +145,12 @@ function renderRepositoryFileRows(items) {
         actionCell.className = "repository-file-action";
         actionCell.setAttribute("role", "cell");
         if (item.kind === "file") {
+            const previewButton = document.createElement("button");
+            previewButton.type = "button";
+            previewButton.className = "repository-file-preview-action";
+            previewButton.dataset.filePath = item.path;
+            previewButton.setAttribute("aria-label", `Ver ${item.name}`);
+            previewButton.innerHTML = '<i class="fa-solid fa-eye" aria-hidden="true"></i><span>Ver</span>';
             const link = document.createElement("a");
             const downloadUrl = repositoryDetailContent?.dataset.fileDownloadUrl ?? "";
             const projectId = repositoryDetailContent?.dataset.projectId ?? "";
@@ -154,7 +160,7 @@ function renderRepositoryFileRows(items) {
             downloadIcon.className = "fa-solid fa-download";
             downloadIcon.setAttribute("aria-hidden", "true");
             link.append(downloadIcon);
-            actionCell.append(link);
+            actionCell.append(previewButton, link);
         }
         row.append(nameCell, typeCell, sizeCell, actionCell);
         repositoryFileRows.append(row);

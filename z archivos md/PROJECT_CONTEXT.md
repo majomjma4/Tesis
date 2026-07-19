@@ -96,7 +96,11 @@ Todo nuevo desarrollo deberá integrarse correctamente con la arquitectura exist
 
 ## Base de datos
 
-- MySQL
+- MariaDB con motor InnoDB
+- Codificación `utf8mb4`
+- Conexión PDO y consultas preparadas
+- Modelo relacional normalizado
+- Archivos privados fuera de la base de datos; nunca BLOB
 
 ## Arquitectura
 

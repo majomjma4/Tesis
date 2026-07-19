@@ -22,10 +22,9 @@ final class ProjectsController
             'currentPage' => 'projects',
             'title' => 'Mis Proyectos | Gestión Documental Académica',
             'bodyClass' => 'projects-page',
-            'pageStyles' => [asset('css/projects.css'), asset('css/projects-catalog.css')],
+            'pageStyles' => [asset('css/projects.css'), asset('css/projects-catalog.css'), asset('css/project-simplified.css')],
             'pageScript' => asset('js/projects.js'),
             'projects' => $projects,
-            'metrics' => $projectModel->getProjectMetrics($projects),
         ]);
     }
 
@@ -33,9 +32,18 @@ final class ProjectsController
     public function detail(): void
     {
         $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $allowedTabs = ['summary', 'deliveries', 'observations', 'comments', 'history', 'participants', 'calendar', 'final-documents'];
-        $tab = strtolower(trim((string) ($_GET['tab'] ?? 'summary')));
+        $legacyTabs = ['deliveries' => 'documents', 'final-documents' => 'documents', 'observations' => 'review', 'comments' => 'review', 'history' => 'activity', 'calendar' => 'activity', 'participants' => 'information', 'more' => 'information'];
+        $allowedTabs = ['summary', 'documents', 'review', 'activity', 'information'];
+        $requestedTab = strtolower(trim((string) ($_GET['tab'] ?? 'summary')));
+        $tab = $legacyTabs[$requestedTab] ?? $requestedTab;
         $tab = in_array($tab, $allowedTabs, true) ? $tab : 'summary';
+        $reviewView = strtolower(trim((string) ($_GET['view'] ?? ($requestedTab === 'comments' ? 'conversation' : 'observations'))));
+        $reviewView = in_array($reviewView, ['observations', 'conversation'], true) ? $reviewView : 'observations';
+        $activityView = strtolower(trim((string) ($_GET['view'] ?? ($requestedTab === 'calendar' ? 'calendar' : 'history'))));
+        $activityView = in_array($activityView, ['history', 'calendar'], true) ? $activityView : 'history';
+        $observationFilter = strtolower(trim((string) ($_GET['filter'] ?? 'pending')));
+        $observationFilter = in_array($observationFilter, ['pending', 'addressed', 'resolved', 'all'], true) ? $observationFilter : 'pending';
+        $selectedObservationId = filter_var($_GET['observation'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 1;
         $model = new ProjectModel();
         $access = new ProjectAccessService();
         $project = $id && $access->can('project.view') ? $model->findProjectForUser((int) $id, $access->currentUserId()) : null;
@@ -52,10 +60,15 @@ final class ProjectsController
             'currentPage' => 'projects',
             'title' => ($project['title'] ?? 'Proyecto no encontrado') . ' | Gestión Académica',
             'bodyClass' => 'project-detail-page',
-            'pageStyles' => [asset('css/project-detail.css'), asset('css/project-summary.css'), asset('css/project-workspace.css'), asset('css/project-completion.css')],
+            'pageStyles' => [asset('css/project-simplified.css')],
             'pageScript' => asset('js/project-detail.js'),
             'project' => $project,
             'activeTab' => $tab,
+            'legacySection' => in_array($requestedTab, ['history', 'participants', 'calendar'], true) ? $requestedTab : null,
+            'reviewView' => $reviewView,
+            'activityView' => $activityView,
+            'observationFilter' => $observationFilter,
+            'selectedObservationId' => $selectedObservationId,
             'tabs' => $model->getDetailTabs(),
             'projectEvents' => $projectEvents,
             'projectPermissions' => $access->permissions(),
@@ -65,11 +78,31 @@ final class ProjectsController
     /** Mantiene accesible la ruta global mientras se construye el formulario definitivo. */
     public function create(): void
     {
-        View::render('projects/create-pending', [
+        if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+        $access = new ProjectAccessService();
+        $policy = $access->projectCreationPolicy();
+        if (!$policy['can_create']) http_response_code(403);
+        if (!isset($_SESSION['project_draft_csrf'])) $_SESSION['project_draft_csrf'] = bin2hex(random_bytes(32));
+        $draftService = new ProjectDraftService();
+        $fileService = new PrivateProjectFileService();
+        $draft = $draftService->normalize([], $policy); $errors = []; $validated = false; $confirmation = null;
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && $policy['can_create']) {
+            $draft = $draftService->normalize($_POST, $policy);
+            if (!hash_equals((string) $_SESSION['project_draft_csrf'], (string) ($_POST['_csrf'] ?? ''))) $errors['_form'] = 'La sesión del formulario venció. Recarga la página e inténtalo nuevamente.';
+            $errors += $draftService->validate($draft, $policy);
+            $fileResult = $draftService->validateFiles($_FILES['files'] ?? [], $fileService);
+            $errors += $fileResult['errors'];
+            if ($errors === []) { $validated = true; $confirmation = $draftService->confirmation($draft, $fileResult['valid']); }
+        }
+        View::render('projects/new', [
             'currentPage' => 'projects',
             'title' => 'Nuevo proyecto | Gestión Académica',
-            'bodyClass' => 'projects-page',
-            'pageStyles' => [asset('css/projects.css')],
+            'bodyClass' => 'project-wizard-page',
+            'pageStyles' => [asset('css/project-wizard.css')],
+            'pageScript' => asset('js/project-wizard.js'),
+            'creationPolicy' => $policy, 'catalogs' => $draftService->catalogs(), 'fieldContract' => $draftService->fieldContract(),
+            'fileLimits' => $fileService->limits(), 'draft' => $draft, 'errors' => $errors, 'draftValidated' => $validated,
+            'confirmation' => $confirmation, 'projectDraftCsrf' => (string) $_SESSION['project_draft_csrf'],
         ]);
     }
 }
