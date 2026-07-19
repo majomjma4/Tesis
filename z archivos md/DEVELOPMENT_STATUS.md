@@ -696,3 +696,15 @@ Estado: completada.
 - Purga manual protegida por confirmación y limitada a registros con más de 60 días.
 - Usuarios vencidos anonimizados como registros históricos para conservar relaciones académicas.
 - Proyectos vencidos eliminados definitivamente mediante sus relaciones normalizadas.
+
+## Administrador — Fase 10
+
+Estado: completada.
+
+- Reportes administrativos por rango de fechas con indicadores reales de MariaDB.
+- Conteos de usuarios, proyectos, entregas y acciones auditadas.
+- Distribución actual de usuarios por rol y proyectos por estado.
+- Cronología unificada de auditoría administrativa y auditoría de proyectos.
+- Exportaciones CSV de usuarios, proyectos y eventos de auditoría.
+- Archivos UTF-8, delimitados para hojas de cálculo y protegidos contra inyección de fórmulas.
+- Consultas y exportaciones de solo lectura, sin modificar información institucional.

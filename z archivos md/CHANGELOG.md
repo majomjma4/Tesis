@@ -440,3 +440,9 @@ Cada nueva versión deberá registrar únicamente los cambios relevantes realiza
 - Las cuentas eliminadas pierden acceso sin afectar proyectos o auditorías relacionadas.
 - La purga procesa únicamente elementos vencidos y anonimiza las cuentas históricas.
 - Se incorporaron metadatos de eliminación y una migración reproducible para MariaDB.
+
+## Administrador — Auditoría y reportes
+
+- Se incorporaron indicadores y actividad auditada filtrables por fechas.
+- Se unificó la lectura de `admin_audit_log` y `project_audit_log`.
+- Se añadieron exportaciones CSV seguras para usuarios, proyectos y auditoría.
