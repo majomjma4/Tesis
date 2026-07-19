@@ -28,6 +28,7 @@ match ($page) {
     'login' => (new AuthController())->login(),
     'logout' => (new AuthController())->logout(),
     'change-password' => (new AccountController())->changePassword(),
+    'profile' => (new AccountController())->profile(),
     'forbidden' => (new AccountController())->forbidden(),
     'admin-users' => (new AdminController())->users(),
     'admin-user-save' => (new AdminController())->saveUser(),

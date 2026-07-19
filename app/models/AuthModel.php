@@ -4,6 +4,17 @@ declare(strict_types=1);
 
 final class AuthModel
 {
+    public function profile(int $userId):array
+    {
+        $q=Database::connection()->prepare('SELECT id,full_name,email,created_at,last_login_at,password_changed_at FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL');$q->execute(['id'=>$userId]);$profile=$q->fetch();if(!$profile)throw new RuntimeException('La cuenta no existe.');$r=Database::connection()->prepare('SELECT roles.code FROM roles INNER JOIN user_roles ON user_roles.role_id=roles.id WHERE user_roles.user_id=:id');$r->execute(['id'=>$userId]);$profile['roles']=array_column($r->fetchAll(),'code');return $profile;
+    }
+
+    public function updateProfile(int $userId,string $name,string $email,string $password):void
+    {
+        if(mb_strlen($name)<3||mb_strlen($name)>180)throw new InvalidArgumentException('Ingresa tu nombre completo.');if(!filter_var($email,FILTER_VALIDATE_EMAIL))throw new InvalidArgumentException('Ingresa un correo válido.');
+        Database::transaction(function(PDO $db)use($userId,$name,$email,$password):void{$q=$db->prepare('SELECT full_name,email,password_hash FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL FOR UPDATE');$q->execute(['id'=>$userId]);$before=$q->fetch();if(!$before||!password_verify($password,(string)$before['password_hash']))throw new InvalidArgumentException('La contraseña actual no es correcta.');$duplicate=$db->prepare('SELECT id FROM users WHERE email=:email AND id<>:id LIMIT 1');$duplicate->execute(['email'=>$email,'id'=>$userId]);if($duplicate->fetch())throw new InvalidArgumentException('Ese correo ya está asociado a otra cuenta.');$db->prepare('UPDATE users SET full_name=:name,email=:email,session_version=session_version+1 WHERE id=:id')->execute(['name'=>$name,'email'=>$email,'id'=>$userId]);$audit=$db->prepare("INSERT INTO admin_audit_log(actor_user_id,action,entity_type,entity_id,details) VALUES(:id,'profile_updated','user',:id2,:details)");$audit->execute(['id'=>$userId,'id2'=>$userId,'details'=>json_encode(['previous_name'=>$before['full_name'],'previous_email'=>$before['email'],'new_name'=>$name,'new_email'=>$email],JSON_UNESCAPED_UNICODE)]);});
+    }
+
     public function findActiveUserByLogin(string $login): ?array
     {
         $statement = Database::connection()->prepare(

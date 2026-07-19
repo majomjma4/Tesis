@@ -452,3 +452,9 @@ Cada nueva versión deberá registrar únicamente los cambios relevantes realiza
 - Se añadió `system_settings` con una migración reproducible y valores iniciales seguros.
 - Los límites y formatos de archivos privados dejaron de estar fijados exclusivamente en el código.
 - La validación conserva restricciones MIME y valores de respaldo ante fallos de configuración.
+
+## Administrador — Perfil
+
+- Se añadió una pantalla de perfil conectada a la cuenta autenticada.
+- Nombre y correo pueden actualizarse tras verificar la contraseña actual.
+- Los cambios refrescan la sesión actual, invalidan las demás y generan auditoría.

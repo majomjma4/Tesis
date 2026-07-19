@@ -117,6 +117,7 @@
                     </button>
                     <div class="avatar-dropdown" id="avatarDropdown">
                         <div class="avatar-dropdown-identity"><strong><?= e($layoutUserName ?? 'Usuario') ?></strong><small><?= e($layoutUserEmail ?? '') ?></small></div>
+                        <a href="<?= e(route('profile')) ?>">Mi perfil</a>
                         <a href="<?= e(route('change-password')) ?>">Cambiar contraseña</a>
                         <button type="button" class="danger-option js-logout-trigger">Cerrar sesión</button>
                     </div>

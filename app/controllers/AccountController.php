@@ -3,6 +3,18 @@ declare(strict_types=1);
 
 final class AccountController
 {
+    public function profile():void
+    {
+        $session=new AuthSessionService();$model=new AuthModel();$error=null;$success=null;
+        if(($_SERVER['REQUEST_METHOD']??'GET')==='POST'){
+            $name=trim((string)($_POST['full_name']??''));$email=mb_strtolower(trim((string)($_POST['email']??'')));$password=(string)($_POST['current_password']??'');
+            if(!$session->validateCsrf('profile',(string)($_POST['_csrf']??'')))$error='La sesión del formulario venció.';
+            else try{$model->updateProfile((int)$session->userId(),$name,$email,$password);$identity=$model->sessionIdentity((int)$session->userId());if(!$identity)throw new RuntimeException('La cuenta dejó de estar disponible.');$session->refresh($identity);$success='Perfil actualizado correctamente.';}catch(InvalidArgumentException $e){$error=$e->getMessage();}catch(Throwable $e){error_log('Profile update: '.$e->getMessage());$error='No fue posible actualizar el perfil.';}
+        }
+        try{$profile=$model->profile((int)$session->userId());}catch(Throwable $e){$profile=['full_name'=>$session->name(),'email'=>$session->email(),'created_at'=>null,'last_login_at'=>null,'password_changed_at'=>null,'roles'=>$session->roles()];$error??='No fue posible consultar todos los datos del perfil.';}
+        View::render('account/profile',['currentPage'=>'profile','title'=>'Mi perfil | Administración','bodyClass'=>'account-profile-page','pageStyles'=>[asset('css/account-profile.css')],'profile'=>$profile,'profileError'=>$error,'profileSuccess'=>$success,'profileCsrf'=>$session->csrfToken('profile')]);
+    }
+
     public function changePassword(): void
     {
         $session=new AuthSessionService();$error=null;$success=null;

@@ -720,3 +720,16 @@ Estado: completada.
 - Servicio de archivos privados conectado a la configuración, con valores seguros de respaldo.
 - Reglas críticas de Papelera, contraseña temporal y almacenamiento visibles pero protegidas.
 - Cambios de configuración registrados en la auditoría administrativa.
+
+## Administrador — Fase 12
+
+Estado: completada.
+
+- Perfil administrativo conectado a la identidad real de MariaDB.
+- Consulta de nombre, correo, rol, fecha de creación, último acceso y cambio de contraseña.
+- Actualización de nombre y correo protegida por CSRF y contraseña actual.
+- Validación de correo duplicado y longitudes antes de escribir.
+- Refresco inmediato de la identidad en cabecera y menú de usuario.
+- Invalidación de las demás sesiones mediante incremento de versión.
+- Modificaciones del perfil registradas en auditoría.
+- Acceso independiente al flujo seguro de cambio de contraseña.
