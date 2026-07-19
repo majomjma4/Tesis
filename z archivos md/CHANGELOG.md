@@ -387,3 +387,17 @@ Ejemplos:
 - Configuración del sistema.
 
 Cada nueva versión deberá registrar únicamente los cambios relevantes realizados desde la versión anterior.
+
+## Administrador — Dashboard conectado a MariaDB
+
+- Se incorporó un inicio administrativo diferenciado del dashboard estudiantil.
+- Los indicadores de usuarios, proyectos, alertas, actividad y fechas se obtienen mediante PDO desde MariaDB.
+- Se añadieron accesos rápidos y estados vacíos que reflejan la información realmente disponible.
+- Se mantuvo una jerarquía visual simplificada y adaptable a escritorio, tableta y móvil.
+
+## Administrador — Gestión de usuarios
+
+- Se sustituyó la pantalla pendiente por una gestión funcional de cuentas conectada a MariaDB.
+- Se incorporaron alta, edición, filtros, activación, bloqueo y restablecimiento seguro de contraseñas.
+- Los perfiles de estudiantes y docentes se guardan en sus tablas normalizadas dentro de transacciones.
+- Se agregó `admin_audit_log` y su migración reproducible para conservar trazabilidad administrativa.

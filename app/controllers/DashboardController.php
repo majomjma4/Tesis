@@ -6,8 +6,28 @@ final class DashboardController
 {
     public function index(): void
     {
-        // Los datos del dashboard se mantienen fuera de la vista para respetar MVC.
         $dashboard = new DashboardModel();
+
+        if (in_array('administrator', (new AuthSessionService())->roles(), true)) {
+            $error = null;
+            try {
+                $adminDashboard = $dashboard->getAdminDashboard();
+            } catch (Throwable $exception) {
+                error_log('Admin dashboard error: ' . $exception->getMessage());
+                $error = 'No fue posible consultar los indicadores administrativos en este momento.';
+                $adminDashboard = $dashboard->emptyAdminDashboard();
+            }
+
+            View::render('dashboard/admin', [
+                'currentPage' => 'dashboard',
+                'title' => 'Inicio administrativo | Gestión Documental Académica',
+                'bodyClass' => 'admin-dashboard-page',
+                'pageStyles' => [asset('css/admin-dashboard.css')],
+                'dashboard' => $adminDashboard,
+                'dashboardError' => $error,
+            ]);
+            return;
+        }
 
         View::render('dashboard/index', [
             'currentPage' => 'dashboard',

@@ -4,6 +4,95 @@ declare(strict_types=1);
 
 final class DashboardModel
 {
+    public function getAdminDashboard(): array
+    {
+        $connection = Database::connection();
+        return [
+            'users' => $this->adminUserSummary($connection),
+            'projects' => $this->adminProjectSummary($connection),
+            'activity' => $this->adminActivity($connection),
+            'alerts' => $this->adminAlerts($connection),
+            'dates' => $this->adminUpcomingDates($connection),
+        ];
+    }
+
+    public function emptyAdminDashboard(): array
+    {
+        return [
+            'users' => ['total' => 0, 'active' => 0, 'blocked' => 0, 'recent' => 0],
+            'projects' => ['total' => 0, 'items' => []],
+            'activity' => [],
+            'alerts' => [],
+            'dates' => [],
+        ];
+    }
+
+    private function adminUserSummary(PDO $connection): array
+    {
+        $row = $connection->query("SELECT COUNT(*) total, SUM(status='active') active, SUM(status='blocked') blocked, SUM(created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 30 DAY)) recent FROM users")->fetch() ?: [];
+        return [
+            'total' => (int) ($row['total'] ?? 0),
+            'active' => (int) ($row['active'] ?? 0),
+            'blocked' => (int) ($row['blocked'] ?? 0),
+            'recent' => (int) ($row['recent'] ?? 0),
+        ];
+    }
+
+    private function adminProjectSummary(PDO $connection): array
+    {
+        $statement = $connection->query("SELECT status, COUNT(*) total FROM projects WHERE deleted_at IS NULL GROUP BY status ORDER BY total DESC, status");
+        $labels = ['development'=>'En desarrollo','review'=>'En revisión','under_review'=>'En revisión','changes_required'=>'Requiere cambios','approved'=>'Aprobado','completed'=>'Finalizado','published'=>'Publicado','draft'=>'Borrador'];
+        $items = [];
+        $total = 0;
+        foreach ($statement->fetchAll() as $row) {
+            $count = (int) $row['total'];
+            $total += $count;
+            $status = (string) $row['status'];
+            $items[] = ['status'=>$status, 'label'=>$labels[$status] ?? ucfirst(str_replace('_', ' ', $status)), 'count'=>$count];
+        }
+        return ['total'=>$total, 'items'=>$items];
+    }
+
+    private function adminActivity(PDO $connection): array
+    {
+        $statement = $connection->query("SELECT action, detail, created_at, full_name, project_id FROM (SELECT pal.action,COALESCE(pal.reason,p.title) detail,pal.created_at,u.full_name,p.id project_id FROM project_audit_log pal LEFT JOIN users u ON u.id=pal.user_id INNER JOIN projects p ON p.id=pal.project_id UNION ALL SELECT aal.action,CONCAT('Cuenta de ',COALESCE(target.full_name,'usuario')) detail,aal.created_at,actor.full_name,NULL project_id FROM admin_audit_log aal LEFT JOIN users actor ON actor.id=aal.actor_user_id LEFT JOIN users target ON aal.entity_type='user' AND target.id=aal.entity_id) activity ORDER BY created_at DESC LIMIT 6");
+        return array_map(static fn(array $row): array => [
+            'action' => ucfirst(str_replace('_', ' ', (string) $row['action'])),
+            'detail' => (string) $row['detail'],
+            'user' => (string) ($row['full_name'] ?: 'Sistema'),
+            'date' => date('d/m/Y H:i', strtotime((string) $row['created_at'])),
+            'url' => $row['project_id'] ? route('project-detail') . '&id=' . (int) $row['project_id'] : route('admin-users'),
+        ], $statement->fetchAll());
+    }
+
+    private function adminAlerts(PDO $connection): array
+    {
+        $counts = [
+            'blocked' => (int) $connection->query("SELECT COUNT(*) FROM users WHERE status='blocked'")->fetchColumn(),
+            'observations' => (int) $connection->query("SELECT COUNT(*) FROM project_observations WHERE status='pending'")->fetchColumn(),
+            'trash' => (int) $connection->query("SELECT COUNT(*) FROM projects WHERE deleted_at IS NOT NULL")->fetchColumn(),
+            'temporary' => (int) $connection->query("SELECT COUNT(*) FROM users WHERE must_change_password=1 AND temporary_password_expires_at IS NOT NULL AND temporary_password_expires_at <= CURRENT_TIMESTAMP")->fetchColumn(),
+        ];
+        $alerts = [];
+        if ($counts['blocked'] > 0) $alerts[] = ['tone'=>'danger','icon'=>'fa-user-lock','title'=>'Cuentas bloqueadas','text'=>$counts['blocked'].' '.($counts['blocked'] === 1 ? 'cuenta requiere' : 'cuentas requieren').' revisión.','url'=>route('admin-users')];
+        if ($counts['temporary'] > 0) $alerts[] = ['tone'=>'warning','icon'=>'fa-key','title'=>'Contraseñas temporales vencidas','text'=>$counts['temporary'].' '.($counts['temporary'] === 1 ? 'usuario no puede' : 'usuarios no pueden').' continuar sin cambiarla.','url'=>route('admin-users')];
+        if ($counts['observations'] > 0) $alerts[] = ['tone'=>'warning','icon'=>'fa-comment-dots','title'=>'Observaciones pendientes','text'=>$counts['observations'].' observaciones siguen abiertas en proyectos.','url'=>route('projects')];
+        if ($counts['trash'] > 0) $alerts[] = ['tone'=>'neutral','icon'=>'fa-trash-can','title'=>'Proyectos en papelera','text'=>$counts['trash'].' '.($counts['trash'] === 1 ? 'proyecto permanece' : 'proyectos permanecen').' pendiente de restauración o purga.','url'=>route('admin-trash')];
+        return array_slice($alerts, 0, 4);
+    }
+
+    private function adminUpcomingDates(PDO $connection): array
+    {
+        $sql = "SELECT label, event_date, kind FROM (SELECT CONCAT('Inicio de ', name) label, starts_on event_date, 'period' kind FROM academic_periods WHERE starts_on >= CURRENT_DATE UNION ALL SELECT CONCAT('Cierre de ', name), ends_on, 'period' FROM academic_periods WHERE ends_on >= CURRENT_DATE UNION ALL SELECT title, event_date, 'event' FROM project_events WHERE event_date >= CURRENT_DATE AND is_completed=0) dates ORDER BY event_date ASC LIMIT 5";
+        $rows = $connection->query($sql)->fetchAll();
+        return array_map(static fn(array $row): array => [
+            'label'=>(string)$row['label'],
+            'date'=>date('d M Y', strtotime((string)$row['event_date'])),
+            'days'=>max(0, (int) floor((strtotime((string)$row['event_date']) - strtotime(date('Y-m-d'))) / 86400)),
+            'kind'=>(string)$row['kind'],
+        ], $rows);
+    }
+
     public function getSummary(): array
     {
         // Resumen superior enfocado en decisiones rapidas del estudiante.

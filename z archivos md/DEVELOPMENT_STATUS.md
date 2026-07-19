@@ -593,3 +593,31 @@ Importante:
 - El contrato temporal continúa activo hasta importar la migración y completar el login real.
 - Las escrituras siguen deshabilitadas para evitar persistencia parcial o engañosa.
 - La activación definitiva requiere repositorios PDO, sesiones autenticadas y pruebas de permisos por rol.
+
+## Administrador — Fase 2
+
+Estado: completada.
+
+- Dashboard exclusivo para el rol Administrador.
+- Indicadores reales de usuarios activos, bloqueados, totales y registrados durante los últimos 30 días.
+- Distribución de proyectos por estado, excluyendo la papelera.
+- Actividad reciente consultada desde la auditoría de proyectos.
+- Alertas de cuentas bloqueadas, contraseñas temporales vencidas, observaciones pendientes y proyectos eliminados.
+- Próximas fechas combinadas desde periodos académicos y eventos de proyectos.
+- Acciones rápidas hacia Usuarios, Proyectos y Académico.
+- Estados vacíos honestos y manejo visible de fallos de consulta, sin datos simulados.
+
+## Administrador — Fase 3
+
+Estado: completada.
+
+- Listado real de Estudiantes, Docentes y Administradores desde MariaDB.
+- Búsqueda por nombre, correo o identificación y filtros por rol y estado.
+- Creación y edición transaccional de cuentas y perfiles académicos.
+- Asignación de carrera, periodo y semestre para estudiantes.
+- Configuración de título y disponibilidad como tutor para docentes.
+- Activación y bloqueo de accesos con cierre de sesiones existentes.
+- Restablecimiento a contraseña temporal `Istel2026+`, cambio obligatorio y vencimiento a siete días.
+- Protección CSRF, validación de correos duplicados y protección de la cuenta administrativa propia.
+- Auditoría administrativa con actor, acción, entidad, fecha, IP y agente de usuario.
+- Actividad de usuarios integrada al Dashboard administrativo.
