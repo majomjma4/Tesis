@@ -708,3 +708,15 @@ Estado: completada.
 - Exportaciones CSV de usuarios, proyectos y eventos de auditoría.
 - Archivos UTF-8, delimitados para hojas de cálculo y protegidos contra inyección de fórmulas.
 - Consultas y exportaciones de solo lectura, sin modificar información institucional.
+
+## Administrador — Fase 11
+
+Estado: completada.
+
+- Configuración institucional persistida en la tabla `system_settings` de MariaDB.
+- Nombre institucional editable con validación de longitud.
+- Límites individuales y totales de archivos configurables dentro de rangos seguros.
+- Formatos habilitables restringidos a PDF, DOCX y ZIP con validación MIME por extensión.
+- Servicio de archivos privados conectado a la configuración, con valores seguros de respaldo.
+- Reglas críticas de Papelera, contraseña temporal y almacenamiento visibles pero protegidas.
+- Cambios de configuración registrados en la auditoría administrativa.

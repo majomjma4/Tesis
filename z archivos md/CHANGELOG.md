@@ -446,3 +446,9 @@ Cada nueva versión deberá registrar únicamente los cambios relevantes realiza
 - Se incorporaron indicadores y actividad auditada filtrables por fechas.
 - Se unificó la lectura de `admin_audit_log` y `project_audit_log`.
 - Se añadieron exportaciones CSV seguras para usuarios, proyectos y auditoría.
+
+## Administrador — Configuración del sistema
+
+- Se añadió `system_settings` con una migración reproducible y valores iniciales seguros.
+- Los límites y formatos de archivos privados dejaron de estar fijados exclusivamente en el código.
+- La validación conserva restricciones MIME y valores de respaldo ante fallos de configuración.
