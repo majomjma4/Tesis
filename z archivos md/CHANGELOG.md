@@ -20,6 +20,16 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 # [En desarrollo] - 18/07/2026
 
+## Rediseño del Index administrativo
+
+- Se reorganizó el inicio del Administrador en tres zonas: resumen institucional, pendientes prioritarios y contexto operativo.
+- Las métricas distinguen proyectos realmente activos y excluyen cuentas eliminadas o purgadas.
+- Las contraseñas vencidas del Administrador dejaron de generar alertas incoherentes con su política de acceso.
+- Métricas, alertas y estados de proyectos funcionan como accesos directos a los módulos o filtros correspondientes.
+- Se eliminaron acciones rápidas repetidas y se compactaron actividad y agenda.
+- La auditoría presenta nombres comprensibles en español y las barras incorporan semántica accesible.
+- Se añadieron fecha de actualización, navegación por teclado, foco visible y adaptación específica para móvil y tablet.
+
 ## Datos de prueba del Administrador
 
 - Se añadió `scripts/seed_admin_demo.php`, un cargador idempotente para validar el panel administrativo con MariaDB.

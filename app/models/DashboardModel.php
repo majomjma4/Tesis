@@ -13,6 +13,7 @@ final class DashboardModel
             'activity' => $this->adminActivity($connection),
             'alerts' => $this->adminAlerts($connection),
             'dates' => $this->adminUpcomingDates($connection),
+            'updated_at' => date('Y-m-d H:i:s'),
         ];
     }
 
@@ -20,16 +21,17 @@ final class DashboardModel
     {
         return [
             'users' => ['total' => 0, 'active' => 0, 'blocked' => 0, 'recent' => 0],
-            'projects' => ['total' => 0, 'items' => []],
+            'projects' => ['total' => 0, 'active' => 0, 'items' => []],
             'activity' => [],
             'alerts' => [],
             'dates' => [],
+            'updated_at' => date('Y-m-d H:i:s'),
         ];
     }
 
     private function adminUserSummary(PDO $connection): array
     {
-        $row = $connection->query("SELECT COUNT(*) total, SUM(status='active') active, SUM(status='blocked') blocked, SUM(created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 30 DAY)) recent FROM users")->fetch() ?: [];
+        $row = $connection->query("SELECT COUNT(*) total, SUM(status='active') active, SUM(status='blocked') blocked, SUM(status='active' AND created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 30 DAY)) recent FROM users WHERE deleted_at IS NULL AND purged_at IS NULL")->fetch() ?: [];
         return [
             'total' => (int) ($row['total'] ?? 0),
             'active' => (int) ($row['active'] ?? 0),
@@ -40,24 +42,22 @@ final class DashboardModel
 
     private function adminProjectSummary(PDO $connection): array
     {
-        $statement = $connection->query("SELECT status, COUNT(*) total FROM projects WHERE deleted_at IS NULL GROUP BY status ORDER BY total DESC, status");
-        $labels = ['development'=>'En desarrollo','review'=>'En revisión','under_review'=>'En revisión','changes_required'=>'Requiere cambios','approved'=>'Aprobado','completed'=>'Finalizado','published'=>'Publicado','draft'=>'Borrador'];
-        $items = [];
-        $total = 0;
-        foreach ($statement->fetchAll() as $row) {
-            $count = (int) $row['total'];
-            $total += $count;
-            $status = (string) $row['status'];
-            $items[] = ['status'=>$status, 'label'=>$labels[$status] ?? ucfirst(str_replace('_', ' ', $status)), 'count'=>$count];
-        }
-        return ['total'=>$total, 'items'=>$items];
+        $row=$connection->query("SELECT COUNT(*) total,SUM(status IN ('development','under_review','changes_required')) active,SUM(status='development') development,SUM(status='under_review') review,SUM(status='changes_required') attention,SUM(status IN ('approved','completed','published')) finished FROM projects WHERE deleted_at IS NULL")->fetch()?:[];
+        $items=[
+            ['status'=>'development','label'=>'En desarrollo','count'=>(int)($row['development']??0),'url'=>route('projects').'&status=development'],
+            ['status'=>'under_review','label'=>'En revisión','count'=>(int)($row['review']??0),'url'=>route('projects').'&status=under_review'],
+            ['status'=>'changes_required','label'=>'Requieren cambios','count'=>(int)($row['attention']??0),'url'=>route('projects').'&status=changes_required'],
+            ['status'=>'finished','label'=>'Cerrados o publicados','count'=>(int)($row['finished']??0),'url'=>route('projects')],
+        ];
+        return ['total'=>(int)($row['total']??0),'active'=>(int)($row['active']??0),'items'=>$items];
     }
 
     private function adminActivity(PDO $connection): array
     {
         $statement = $connection->query("SELECT action, detail, created_at, full_name, project_id FROM (SELECT pal.action,COALESCE(pal.reason,p.title) detail,pal.created_at,u.full_name,p.id project_id FROM project_audit_log pal LEFT JOIN users u ON u.id=pal.user_id INNER JOIN projects p ON p.id=pal.project_id UNION ALL SELECT aal.action,CONCAT('Cuenta de ',COALESCE(target.full_name,'usuario')) detail,aal.created_at,actor.full_name,NULL project_id FROM admin_audit_log aal LEFT JOIN users actor ON actor.id=aal.actor_user_id LEFT JOIN users target ON aal.entity_type='user' AND target.id=aal.entity_id) activity ORDER BY created_at DESC LIMIT 6");
+        $labels=['project_created'=>'Proyecto creado','project_updated'=>'Proyecto actualizado','project_trashed'=>'Proyecto enviado a la papelera','project_restored'=>'Proyecto restaurado','project_published'=>'Proyecto publicado','project_unpublished'=>'Publicación retirada','delivery_submitted'=>'Entrega registrada','users_bulk_imported'=>'Usuarios importados','user_created'=>'Usuario creado','user_updated'=>'Usuario actualizado','user_trashed'=>'Usuario enviado a la papelera','user_restored'=>'Usuario restaurado','password_reset'=>'Contraseña restablecida','notification_sent'=>'Notificación enviada','demo_users_imported'=>'Usuarios de prueba importados','demo_teacher_updated'=>'Docente de prueba actualizado','demo_catalog_configured'=>'Catálogo configurado'];
         return array_map(static fn(array $row): array => [
-            'action' => ucfirst(str_replace('_', ' ', (string) $row['action'])),
+            'action' => $labels[(string)$row['action']] ?? 'Actividad administrativa',
             'detail' => (string) $row['detail'],
             'user' => (string) ($row['full_name'] ?: 'Sistema'),
             'date' => date('d/m/Y H:i', strtotime((string) $row['created_at'])),
@@ -68,16 +68,16 @@ final class DashboardModel
     private function adminAlerts(PDO $connection): array
     {
         $counts = [
-            'blocked' => (int) $connection->query("SELECT COUNT(*) FROM users WHERE status='blocked'")->fetchColumn(),
-            'observations' => (int) $connection->query("SELECT COUNT(*) FROM project_observations WHERE status='pending'")->fetchColumn(),
-            'trash' => (int) $connection->query("SELECT COUNT(*) FROM projects WHERE deleted_at IS NOT NULL")->fetchColumn(),
-            'temporary' => (int) $connection->query("SELECT COUNT(*) FROM users WHERE must_change_password=1 AND temporary_password_expires_at IS NOT NULL AND temporary_password_expires_at <= CURRENT_TIMESTAMP")->fetchColumn(),
+            'blocked' => (int) $connection->query("SELECT COUNT(*) FROM users WHERE status='blocked' AND deleted_at IS NULL AND purged_at IS NULL")->fetchColumn(),
+            'observations' => (int) $connection->query("SELECT COUNT(*) FROM project_observations o INNER JOIN projects p ON p.id=o.project_id WHERE o.status='pending' AND p.deleted_at IS NULL")->fetchColumn(),
+            'trash' => (int) $connection->query("SELECT (SELECT COUNT(*) FROM projects WHERE deleted_at IS NOT NULL)+(SELECT COUNT(*) FROM users WHERE deleted_at IS NOT NULL AND purged_at IS NULL)")->fetchColumn(),
+            'temporary' => (int) $connection->query("SELECT COUNT(*) FROM users u WHERE u.must_change_password=1 AND u.deleted_at IS NULL AND u.purged_at IS NULL AND u.temporary_password_expires_at IS NOT NULL AND u.temporary_password_expires_at <= CURRENT_TIMESTAMP AND NOT EXISTS(SELECT 1 FROM user_roles ur INNER JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.code='administrator')")->fetchColumn(),
         ];
         $alerts = [];
-        if ($counts['blocked'] > 0) $alerts[] = ['tone'=>'danger','icon'=>'fa-user-lock','title'=>'Cuentas bloqueadas','text'=>$counts['blocked'].' '.($counts['blocked'] === 1 ? 'cuenta requiere' : 'cuentas requieren').' revisión.','url'=>route('admin-users')];
-        if ($counts['temporary'] > 0) $alerts[] = ['tone'=>'warning','icon'=>'fa-key','title'=>'Contraseñas temporales vencidas','text'=>$counts['temporary'].' '.($counts['temporary'] === 1 ? 'usuario no puede' : 'usuarios no pueden').' continuar sin cambiarla.','url'=>route('admin-users')];
-        if ($counts['observations'] > 0) $alerts[] = ['tone'=>'warning','icon'=>'fa-comment-dots','title'=>'Observaciones pendientes','text'=>$counts['observations'].' observaciones siguen abiertas en proyectos.','url'=>route('projects')];
-        if ($counts['trash'] > 0) $alerts[] = ['tone'=>'neutral','icon'=>'fa-trash-can','title'=>'Proyectos en papelera','text'=>$counts['trash'].' '.($counts['trash'] === 1 ? 'proyecto permanece' : 'proyectos permanecen').' pendiente de restauración o purga.','url'=>route('admin-trash')];
+        if ($counts['blocked'] > 0) $alerts[] = ['tone'=>'danger','icon'=>'fa-user-lock','title'=>'Cuentas bloqueadas','text'=>$counts['blocked'].' '.($counts['blocked'] === 1 ? 'cuenta requiere' : 'cuentas requieren').' revisión.','count'=>$counts['blocked'],'url'=>route('admin-users').'&status=blocked'];
+        if ($counts['temporary'] > 0) $alerts[] = ['tone'=>'warning','icon'=>'fa-key','title'=>'Contraseñas vencidas','text'=>$counts['temporary'].' '.($counts['temporary'] === 1 ? 'persona debe' : 'personas deben').' actualizar su acceso.','count'=>$counts['temporary'],'url'=>route('admin-users')];
+        if ($counts['observations'] > 0) $alerts[] = ['tone'=>'warning','icon'=>'fa-comment-dots','title'=>'Observaciones pendientes','text'=>$counts['observations'].' observaciones siguen abiertas.','count'=>$counts['observations'],'url'=>route('projects')];
+        if ($counts['trash'] > 0) $alerts[] = ['tone'=>'neutral','icon'=>'fa-trash-can','title'=>'Elementos en papelera','text'=>$counts['trash'].' '.($counts['trash'] === 1 ? 'elemento permanece' : 'elementos permanecen').' recuperables.','count'=>$counts['trash'],'url'=>route('admin-trash')];
         return array_slice($alerts, 0, 4);
     }
 
