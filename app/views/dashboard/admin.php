@@ -1,6 +1,5 @@
 <section class="admin-dashboard-heading">
     <div><span>Administración</span><h1>Panorama institucional</h1><p>Información actualizada directamente desde MariaDB.</p></div>
-    <a href="<?= e(route('new-project')) ?>"><i class="fa-solid fa-plus"></i> Nuevo proyecto</a>
 </section>
 
 <?php if ($dashboardError): ?><div class="admin-dashboard-error" role="alert"><i class="fa-solid fa-triangle-exclamation"></i><span><?= e($dashboardError) ?></span></div><?php endif; ?>
