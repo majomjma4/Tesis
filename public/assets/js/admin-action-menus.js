@@ -28,3 +28,25 @@
     window.addEventListener('scroll', close, true);
     window.addEventListener('resize', close);
 })();
+
+// El acceso global de la cabecera abre el formulario administrativo sin duplicar botones.
+(() => {
+    if (!document.body.classList.contains('admin-projects-page')) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('action') !== 'new') return;
+    const modal = document.querySelector('#apModal');
+    const form = document.querySelector('#apForm');
+    if (!modal || !form) return;
+    form.reset();
+    form.elements.id.value = '';
+    document.querySelector('#apTitle').textContent = 'Nuevo proyecto';
+    modal.hidden = false;
+    form.elements.title.focus();
+    const clearAction = () => {
+        const clean = new URL(window.location.href);
+        clean.searchParams.delete('action');
+        history.replaceState(null, '', clean);
+    };
+    form.addEventListener('submit', clearAction, { capture: true });
+    modal.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', clearAction));
+})();

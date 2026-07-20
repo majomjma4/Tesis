@@ -90,7 +90,7 @@
             </div>
 
             <div class="topbar-right">
-                <a class="topbar-action-btn" href="<?= e(in_array('administrator', $layoutUserRoles ?? [], true) ? route('projects') : route('new-project')) ?>">
+                <a class="topbar-action-btn" href="<?= e(in_array('administrator', $layoutUserRoles ?? [], true) ? route('projects') . '&action=new' : route('new-project')) ?>">
                     <i class="fa-solid fa-plus"></i>
                     <span class="topbar-action-label">Nuevo proyecto</span>
                     <span class="topbar-action-label-short">Nuevo</span>
