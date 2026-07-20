@@ -47,7 +47,7 @@ final class DashboardModel
             ['status'=>'development','label'=>'En desarrollo','count'=>(int)($row['development']??0),'url'=>route('projects').'&status=development'],
             ['status'=>'under_review','label'=>'En revisión','count'=>(int)($row['review']??0),'url'=>route('projects').'&status=under_review'],
             ['status'=>'changes_required','label'=>'Requieren cambios','count'=>(int)($row['attention']??0),'url'=>route('projects').'&status=changes_required'],
-            ['status'=>'finished','label'=>'Cerrados o publicados','count'=>(int)($row['finished']??0),'url'=>route('projects')],
+            ['status'=>'finished','label'=>'Cerrados o publicados','count'=>(int)($row['finished']??0),'url'=>route('projects').'&group=finished'],
         ];
         return ['total'=>(int)($row['total']??0),'active'=>(int)($row['active']??0),'items'=>$items];
     }
@@ -56,11 +56,11 @@ final class DashboardModel
     {
         $statement = $connection->query("SELECT action, detail, created_at, full_name, project_id FROM (SELECT pal.action,COALESCE(pal.reason,p.title) detail,pal.created_at,u.full_name,p.id project_id FROM project_audit_log pal LEFT JOIN users u ON u.id=pal.user_id INNER JOIN projects p ON p.id=pal.project_id UNION ALL SELECT aal.action,CONCAT('Cuenta de ',COALESCE(target.full_name,'usuario')) detail,aal.created_at,actor.full_name,NULL project_id FROM admin_audit_log aal LEFT JOIN users actor ON actor.id=aal.actor_user_id LEFT JOIN users target ON aal.entity_type='user' AND target.id=aal.entity_id) activity ORDER BY created_at DESC LIMIT 6");
         $labels=['project_created'=>'Proyecto creado','project_updated'=>'Proyecto actualizado','project_trashed'=>'Proyecto enviado a la papelera','project_restored'=>'Proyecto restaurado','project_published'=>'Proyecto publicado','project_unpublished'=>'Publicación retirada','delivery_submitted'=>'Entrega registrada','users_bulk_imported'=>'Usuarios importados','user_created'=>'Usuario creado','user_updated'=>'Usuario actualizado','user_trashed'=>'Usuario enviado a la papelera','user_restored'=>'Usuario restaurado','password_reset'=>'Contraseña restablecida','notification_sent'=>'Notificación enviada','demo_users_imported'=>'Usuarios de prueba importados','demo_teacher_updated'=>'Docente de prueba actualizado','demo_catalog_configured'=>'Catálogo configurado'];
-        return array_map(static fn(array $row): array => [
+        return array_map(fn(array $row): array => [
             'action' => $labels[(string)$row['action']] ?? 'Actividad administrativa',
             'detail' => (string) $row['detail'],
             'user' => (string) ($row['full_name'] ?: 'Sistema'),
-            'date' => date('d/m/Y H:i', strtotime((string) $row['created_at'])),
+            'date' => $this->relativeAdminTime((string)$row['created_at']),
             'url' => $row['project_id'] ? route('project-detail') . '&id=' . (int) $row['project_id'] : route('admin-users'),
         ], $statement->fetchAll());
     }
@@ -76,7 +76,7 @@ final class DashboardModel
         $alerts = [];
         if ($counts['blocked'] > 0) $alerts[] = ['tone'=>'danger','icon'=>'fa-user-lock','title'=>'Cuentas bloqueadas','text'=>$counts['blocked'].' '.($counts['blocked'] === 1 ? 'cuenta requiere' : 'cuentas requieren').' revisión.','count'=>$counts['blocked'],'url'=>route('admin-users').'&status=blocked'];
         if ($counts['temporary'] > 0) $alerts[] = ['tone'=>'warning','icon'=>'fa-key','title'=>'Contraseñas vencidas','text'=>$counts['temporary'].' '.($counts['temporary'] === 1 ? 'persona debe' : 'personas deben').' actualizar su acceso.','count'=>$counts['temporary'],'url'=>route('admin-users')];
-        if ($counts['observations'] > 0) $alerts[] = ['tone'=>'warning','icon'=>'fa-comment-dots','title'=>'Observaciones pendientes','text'=>$counts['observations'].' observaciones siguen abiertas.','count'=>$counts['observations'],'url'=>route('projects')];
+        if ($counts['observations'] > 0) $alerts[] = ['tone'=>'warning','icon'=>'fa-comment-dots','title'=>'Observaciones pendientes','text'=>$counts['observations'].' observaciones siguen abiertas.','count'=>$counts['observations'],'url'=>route('projects').'&attention=observations'];
         if ($counts['trash'] > 0) $alerts[] = ['tone'=>'neutral','icon'=>'fa-trash-can','title'=>'Elementos en papelera','text'=>$counts['trash'].' '.($counts['trash'] === 1 ? 'elemento permanece' : 'elementos permanecen').' recuperables.','count'=>$counts['trash'],'url'=>route('admin-trash')];
         return array_slice($alerts, 0, 4);
     }
@@ -85,12 +85,27 @@ final class DashboardModel
     {
         $sql = "SELECT label, event_date, kind FROM (SELECT CONCAT('Inicio de ', name) label, starts_on event_date, 'period' kind FROM academic_periods WHERE starts_on >= CURRENT_DATE UNION ALL SELECT CONCAT('Cierre de ', name), ends_on, 'period' FROM academic_periods WHERE ends_on >= CURRENT_DATE UNION ALL SELECT title, event_date, 'event' FROM project_events WHERE event_date >= CURRENT_DATE AND is_completed=0) dates ORDER BY event_date ASC LIMIT 5";
         $rows = $connection->query($sql)->fetchAll();
-        return array_map(static fn(array $row): array => [
+        return array_map(fn(array $row): array => [
             'label'=>(string)$row['label'],
-            'date'=>date('d M Y', strtotime((string)$row['event_date'])),
+            'date'=>$this->spanishShortDate((string)$row['event_date']),
             'days'=>max(0, (int) floor((strtotime((string)$row['event_date']) - strtotime(date('Y-m-d'))) / 86400)),
             'kind'=>(string)$row['kind'],
         ], $rows);
+    }
+
+    private function relativeAdminTime(string $value):string
+    {
+        $timestamp=strtotime($value);if(!$timestamp)return 'Fecha no disponible';$seconds=max(0,time()-$timestamp);
+        if($seconds<60)return 'Ahora';if($seconds<3600){$minutes=(int)floor($seconds/60);return 'Hace '.$minutes.' '.($minutes===1?'minuto':'minutos');}
+        if($seconds<86400){$hours=(int)floor($seconds/3600);return 'Hace '.$hours.' '.($hours===1?'hora':'horas');}
+        if($seconds<604800){$days=(int)floor($seconds/86400);return 'Hace '.$days.' '.($days===1?'día':'días');}
+        return $this->spanishShortDate(date('Y-m-d',$timestamp));
+    }
+
+    private function spanishShortDate(string $value):string
+    {
+        $timestamp=strtotime($value);if(!$timestamp)return 'Sin fecha';$months=[1=>'ene',2=>'feb',3=>'mar',4=>'abr',5=>'may',6=>'jun',7=>'jul',8=>'ago',9=>'sep',10=>'oct',11=>'nov',12=>'dic'];
+        return (int)date('j',$timestamp).' '.$months[(int)date('n',$timestamp)].' '.date('Y',$timestamp);
     }
 
     public function getSummary(): array

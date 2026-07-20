@@ -29,6 +29,9 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Se eliminaron acciones rápidas repetidas y se compactaron actividad y agenda.
 - La auditoría presenta nombres comprensibles en español y las barras incorporan semántica accesible.
 - Se añadieron fecha de actualización, navegación por teclado, foco visible y adaptación específica para móvil y tablet.
+- Las alertas de observaciones y el grupo de proyectos cerrados abren filtros SQL exactos y muestran el contexto activo en Proyectos.
+- Fechas y actividad utilizan expresiones naturales en español, y “Situaciones pendientes” aclara que el indicador suma incidencias administrativas.
+- El skeleton del Index replica la nueva distribución de tres métricas y se adapta a escritorio, tablet y móvil.
 
 ## Datos de prueba del Administrador
 
