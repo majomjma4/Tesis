@@ -143,7 +143,7 @@
             <div class="app-skeleton-toolbar"><span class="app-skeleton-block"></span><span class="app-skeleton-block"></span><span class="app-skeleton-block compact"></span></div>
             <div class="app-skeleton-grid"><?php for ($i = 0; $i < 4; $i++): ?><article><span class="app-skeleton-block icon"></span><span class="app-skeleton-block line strong"></span><span class="app-skeleton-block line"></span><span class="app-skeleton-block line short"></span></article><?php endfor; ?></div>
         </section>
-        <div class="app-page-content" id="appPageContent"><?= $content ?></div>
+        <div class="app-page-content" id="appPageContent"><?= $content ?><?php if(!empty($pagePagination)): $pagination=$pagePagination;require APP_PATH.'/views/components/pagination.php';endif;?></div>
     </main>
     <!-- Final de contenido principal -->
 

@@ -29,6 +29,13 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Las cuentas demostrativas usan temporalmente `Istel2026+`; la cuenta administradora existente no se modifica.
 - Los avisos primero y segundo de contraseña temporal son compactos y descartables; el tercero bloquea únicamente a estudiantes y docentes. El Administrador queda exento de esta política.
 
+## Paginación administrativa
+
+- Usuarios, Proyectos, Repositorio, Papelera, Notificaciones dirigidas y Auditoría consultan páginas reales desde MariaDB mediante `LIMIT` y `OFFSET`.
+- Se añadió un componente común con tamaños de 10, 25, 50 o 100 resultados, rango visible, total, navegación numérica y adaptación móvil.
+- Las búsquedas, filtros, fechas y pestañas se conservan al avanzar entre páginas; al aplicar filtros nuevos se vuelve automáticamente a la primera.
+- Los catálogos institucionales pequeños permanecen completos porque su volumen es controlado y no se benefician de paginación.
+
 ## Administrador — Fase 1
 
 - Se activó la autenticación obligatoria en el entorno local y la validación de la cuenta contra MariaDB en cada solicitud.

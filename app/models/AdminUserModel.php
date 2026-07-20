@@ -6,14 +6,15 @@ final class AdminUserModel
     private const ROLES=['student','teacher','administrator'];
     private const STATUSES=['active','inactive','blocked'];
 
-    public function listing(array $filters=[]): array
+    public function listing(array $filters=[],array $pagination=[]): array
     {
         $where=['u.deleted_at IS NULL','u.purged_at IS NULL'];$params=[];
         if(($filters['search']??'')!==''){$where[]='(u.full_name LIKE :search OR u.email LIKE :search OR COALESCE(sp.institutional_code,tp.institutional_code,\'\') LIKE :search)';$params['search']='%'.$filters['search'].'%';}
         if(in_array($filters['role']??'',self::ROLES,true)){$where[]='r.code=:role';$params['role']=$filters['role'];}
         if(in_array($filters['status']??'',self::STATUSES,true)){$where[]='u.status=:status';$params['status']=$filters['status'];}
-        $sql="SELECT u.id,u.full_name,u.email,u.status,u.must_change_password,u.last_login_at,u.created_at,r.code role_code,COALESCE(sp.institutional_code,tp.institutional_code,'') institutional_code,sp.career_id,c.name career_name,se.academic_period_id,se.semester,tp.academic_title,tp.can_tutor FROM users u INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id LEFT JOIN student_profiles sp ON sp.user_id=u.id LEFT JOIN careers c ON c.id=sp.career_id LEFT JOIN student_enrollments se ON se.student_id=u.id AND se.status='active' LEFT JOIN teacher_profiles tp ON tp.user_id=u.id".($where?' WHERE '.implode(' AND ',$where):'').' ORDER BY u.created_at DESC,u.full_name LIMIT 250';
-        $statement=Database::connection()->prepare($sql);$statement->execute($params);return $statement->fetchAll();
+        $from=" FROM users u INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id LEFT JOIN student_profiles sp ON sp.user_id=u.id LEFT JOIN careers c ON c.id=sp.career_id LEFT JOIN student_enrollments se ON se.student_id=u.id AND se.status='active' LEFT JOIN teacher_profiles tp ON tp.user_id=u.id".($where?' WHERE '.implode(' AND ',$where):'');
+        $sql="SELECT u.id,u.full_name,u.email,u.status,u.must_change_password,u.last_login_at,u.created_at,r.code role_code,COALESCE(sp.institutional_code,tp.institutional_code,'') institutional_code,sp.career_id,c.name career_name,se.academic_period_id,se.semester,tp.academic_title,tp.can_tutor".$from.' ORDER BY u.created_at DESC,u.full_name';
+        return PaginationService::run(Database::connection(),'SELECT COUNT(DISTINCT u.id)'.$from,$sql,$params,$pagination?:PaginationService::request());
     }
 
     public function summary(): array
