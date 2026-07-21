@@ -6,7 +6,7 @@
     font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 }
 :root{
-    --app-shell-gutter:max(0px, calc((100vw - 1900px) / 2));
+    --app-shell-gutter:max(0px, calc((100vw - 1950px) / 2));
     --primary:#0f3d91;
     --primary-dark:#0d2f70;
     --accent:#10b981;
@@ -30,7 +30,7 @@
     --radius:18px;
 }
 body{
-    background:var(--bg);
+    background:linear-gradient(90deg, #143E83 0 var(--app-shell-gutter), var(--bg) var(--app-shell-gutter) 100%);
     color:var(--text);
     display:flex;
     min-height:100vh;
