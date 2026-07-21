@@ -755,7 +755,6 @@ Resultado: experiencia del rol Administrador completada en sus trece fases y pre
 - Ejecutar pruebas manuales completas del rol Administrador en escritorio y móvil.
 - Revisar navegación, claridad visual, formularios, mensajes y estados vacíos.
 - Registrar y corregir los cambios detectados durante las pruebas de aceptación.
-- Crear usuarios de prueba para Estudiante y Docente mediante los flujos administrativos.
 - Crear proyectos de prueba y verificar asignaciones, estados, auditoría y notificaciones.
 - Subir documentos controlados en PDF, DOCX y ZIP para comprobar límites, almacenamiento privado y visualización.
 - Verificar publicación, restauración y reportes usando únicamente datos identificados como pruebas.

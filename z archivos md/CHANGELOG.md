@@ -20,6 +20,14 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 # [En desarrollo] - 18/07/2026
 
+## Respaldo transportable y cuentas de prueba
+
+- Se incorporó `database/snapshot.sql` con la estructura y los datos actuales de MariaDB para trasladar el entorno mediante Git.
+- Se añadieron scripts PowerShell para exportar el estado actual y restaurarlo después de clonar el repositorio.
+- Se documentó el proceso de respaldo, restauración y manejo privado del snapshot.
+- Se crearon cuentas activas de prueba para los roles Estudiante y Docente, con sus perfiles y relaciones académicas requeridas.
+- Se verificaron las credenciales de ambas cuentas y se actualizó el snapshot después de los cambios.
+
 ## Rediseño del Index administrativo
 
 - Se reorganizó el inicio del Administrador en tres zonas: resumen institucional, pendientes prioritarios y contexto operativo.
