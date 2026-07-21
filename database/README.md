@@ -8,10 +8,12 @@ XAMPP y ejecutar desde la raiz del proyecto:
 powershell -ExecutionPolicy Bypass -File .\scripts\import_database.ps1
 ```
 
-La importacion elimina y recrea la base `tesis`. Para usar otras credenciales:
+La importacion elimina y recrea la base `tesis`. Para usar otras credenciales
+sin exponer la contrasena como texto plano:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\import_database.ps1 -User usuario -Password clave
+$credencial = Get-Credential -UserName usuario
+.\scripts\import_database.ps1 -Credential $credencial
 ```
 
 Luego se debe copiar `app/config/database.local.php.example` como

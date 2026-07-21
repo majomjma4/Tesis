@@ -2,7 +2,7 @@ param(
     [string]$HostName = '127.0.0.1',
     [int]$Port = 3306,
     [string]$User = 'root',
-    [string]$Password = '',
+    [PSCredential]$Credential,
     [string]$MariaDbBin = 'C:\xampp\mysql\bin'
 )
 
@@ -16,7 +16,10 @@ if (-not (Test-Path -LiteralPath $mysqlTool)) {
 
 Write-Warning 'La importacion reemplazara por completo la base de datos tesis.'
 try {
-    if ($Password) { $env:MYSQL_PWD = $Password }
+    if ($Credential) {
+        $User = $Credential.UserName
+        $env:MYSQL_PWD = $Credential.GetNetworkCredential().Password
+    }
     & $mysqlTool `
         "--host=$HostName" `
         "--port=$Port" `

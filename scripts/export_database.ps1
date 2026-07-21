@@ -3,7 +3,7 @@ param(
     [string]$HostName = '127.0.0.1',
     [int]$Port = 3306,
     [string]$User = 'root',
-    [string]$Password = '',
+    [PSCredential]$Credential,
     [string]$MariaDbBin = 'C:\xampp\mysql\bin'
 )
 
@@ -16,13 +16,17 @@ if (-not (Test-Path -LiteralPath $dumpTool)) {
 }
 
 try {
-    if ($Password) { $env:MYSQL_PWD = $Password }
+    if ($Credential) {
+        $User = $Credential.UserName
+        $env:MYSQL_PWD = $Credential.GetNetworkCredential().Password
+    }
     & $dumpTool `
         "--host=$HostName" `
         "--port=$Port" `
         "--user=$User" `
         '--default-character-set=utf8mb4' `
         '--single-transaction' `
+        '--skip-dump-date' `
         '--routines' `
         '--events' `
         '--triggers' `
