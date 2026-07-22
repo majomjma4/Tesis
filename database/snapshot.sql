@@ -180,7 +180,7 @@ CREATE TABLE `notifications` (
   KEY `idx_notifications_project` (`project_id`),
   CONSTRAINT `fk_notifications_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_notifications_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -189,7 +189,7 @@ CREATE TABLE `notifications` (
 
 LOCK TABLES `notifications` WRITE;
 /*!40000 ALTER TABLE `notifications` DISABLE KEYS */;
-INSERT INTO `notifications` VALUES (10,24,22,'observation','Tienes observaciones nuevas','Revisa los comentarios registrados por tu tutora.','index.php?page=project-detail&id=22','Abrir proyecto','{\"demo\":true}',0,NULL,'2026-07-18 21:16:28','2026-07-19 21:16:28',NULL,NULL),(11,22,25,'status_change','Proyecto aprobado','El proyecto está listo para cargar sus documentos finales.','index.php?page=project-detail&id=25','Abrir proyecto','{\"demo\":true}',0,NULL,'2026-07-18 21:16:28','2026-07-19 21:16:28',NULL,NULL),(12,21,27,'repository','Proyecto publicado','El proyecto ya se encuentra publicado en el repositorio.','index.php?page=project-detail&id=27','Abrir proyecto','{\"demo\":true}',0,NULL,'2026-07-18 21:16:28','2026-07-19 21:16:28',NULL,NULL);
+INSERT INTO `notifications` VALUES (10,24,22,'observation','Tienes observaciones nuevas','Revisa los comentarios registrados por tu tutora.','index.php?page=project-detail&id=22','Abrir proyecto','{\"demo\":true}',0,NULL,'2026-07-18 21:16:28','2026-07-19 21:16:28',NULL,NULL),(11,22,25,'status_change','Proyecto aprobado','El proyecto está listo para cargar sus documentos finales.','index.php?page=project-detail&id=25','Abrir proyecto','{\"demo\":true}',0,NULL,'2026-07-18 21:16:28','2026-07-19 21:16:28',NULL,NULL),(12,21,27,'repository','Proyecto publicado','El proyecto ya se encuentra publicado en el repositorio.','index.php?page=project-detail&id=27','Abrir proyecto','{\"demo\":true}',0,NULL,'2026-07-18 21:16:28','2026-07-19 21:16:28',NULL,NULL),(13,68,NULL,'system','Bienvenido al entorno de pruebas','Tu cuenta de estudiante esta lista para probar las funciones de la plataforma.','index.php?page=dashboard','Ir al inicio','{\"source\": \"test_setup\"}',0,NULL,'2026-07-21 19:30:21','2026-07-21 19:30:21',NULL,NULL),(14,68,NULL,'reminder','Revisa tus actividades pendientes','Consulta el panel para familiarizarte con entregas, observaciones y fechas academicas.','index.php?page=dashboard','Revisar panel','{\"source\": \"test_setup\"}',0,NULL,'2026-07-21 19:30:21','2026-07-21 19:30:21',NULL,NULL),(15,69,NULL,'review','Cuenta docente preparada','Tu cuenta docente esta lista para revisar proyectos y registrar observaciones de prueba.','index.php?page=dashboard','Ir al inicio','{\"source\": \"test_setup\"}',0,NULL,'2026-07-21 19:30:21','2026-07-21 19:30:21',NULL,NULL);
 /*!40000 ALTER TABLE `notifications` ENABLE KEYS */;
 UNLOCK TABLES;
 

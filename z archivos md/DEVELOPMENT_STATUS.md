@@ -275,7 +275,10 @@ Implementado:
 - Skeleton loader para la precarga del repositorio.
 - Diseño claro y oscuro consistente con las tarjetas del Dashboard.
 - Distribución responsive del catálogo en cuatro columnas para escritorio, dos para tablet y una para móvil.
-- Contenedor general centrado en pantallas superiores a 1900 px sin alterar las proporciones internas del contenido.
+- Contenedor general centrado en pantallas de 1950 px en adelante sin alterar las proporciones internas del contenido.
+- Listados principales protegidos contra crecimiento indefinido mediante páginas configurables de 10, 25, 50 o 100 registros.
+- Bandeja personal de notificaciones paginada en sus vistas activa, archivada y papelera, con filtros y contadores SQL.
+- Catálogo `Mis proyectos` paginado después de aplicar búsqueda, filtros y ordenamiento.
 - Fase 1 de evolución del catálogo completada con contador descriptivo, colores por tipo, tecnologías, descargas y acción visual para explorar proyectos.
 - Favoritos funcionales con persistencia temporal por sesión, aislamiento entre sesiones, filtro, contador y mensajes visuales.
 - Acción de favoritos mediante POST con validación de proyecto publicado, token CSRF y respuestas JSON consistentes.

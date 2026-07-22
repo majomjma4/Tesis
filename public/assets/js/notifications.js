@@ -14,6 +14,7 @@ const restoreSelectedButton = document.querySelector("#restoreSelectedNotificati
 const deleteSelectedButton = document.querySelector("#deleteSelectedNotifications");
 const emptyTrashButton = document.querySelector("#emptyNotificationTrash");
 const groupsContainer = document.querySelector("#notificationGroups");
+const paginationContainer = document.querySelector("#notificationPagination");
 const emptyState = document.querySelector("#notificationsEmpty");
 const errorState = document.querySelector("#notificationsLoadError");
 const refreshButton = document.querySelector("#refreshNotifications");
@@ -29,6 +30,12 @@ let pendingDeleteMode = "archive";
 let pendingBulkIds = [];
 let returnFocus = null;
 let currentDetailId = null;
+let paginationState = (() => {
+    try { return JSON.parse(paginationContainer?.dataset.pagination || "{}"); }
+    catch { return {}; }
+})();
+let currentPage = Number(paginationState.page || 1);
+let notificationsPerPage = Number(paginationState.per_page || 25);
 
 function normalize(value) {
     return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -168,11 +175,47 @@ function renderGroups(groups, sectionCounters = {}) {
         const h2 = document.createElement("h2"); h2.textContent = name;
         const count = document.createElement("span"); count.textContent = `${notifications.length} ${notifications.length === 1 ? "novedad" : "novedades"}`; heading.append(h2, count);
         const list = document.createElement("div"); list.className = "notification-list"; notifications.forEach((item) => list.append(createRow(item))); section.append(heading, list);
-        groupsContainer?.insertBefore(section, emptyState);
+        groupsContainer?.insertBefore(section, paginationContainer || emptyState);
     });
     if (emptyState) { emptyState.hidden = total > 0; emptyState.querySelector("h2").textContent = searchInput?.value || statusFilter?.value !== "all" || typeFilter?.value !== "all" ? "No se encontraron notificaciones con los filtros seleccionados." : "No tienes notificaciones por el momento."; }
     updateContextualCards(sectionCounters);
     updateTrashSelection();
+}
+
+function renderPagination(pagination = {}) {
+    if (!paginationContainer) return;
+    paginationState = pagination;
+    currentPage = Number(pagination.page || 1);
+    notificationsPerPage = Number(pagination.per_page || 25);
+    paginationContainer.replaceChildren();
+    const total = Number(pagination.total || 0);
+    paginationContainer.hidden = total === 0;
+    if (!total) return;
+
+    const summary = document.createElement("p");
+    summary.innerHTML = `Mostrando <strong>${pagination.from}</strong>–<strong>${pagination.to}</strong> de <strong>${total}</strong>`;
+    const sizeLabel = document.createElement("label");
+    sizeLabel.append(document.createTextNode("Por pagina "));
+    const size = document.createElement("select");
+    size.setAttribute("aria-label", "Notificaciones por pagina");
+    [10, 25, 50, 100].forEach((value) => {
+        const option = document.createElement("option"); option.value = value; option.textContent = value; option.selected = value === notificationsPerPage; size.append(option);
+    });
+    size.addEventListener("change", () => { notificationsPerPage = Number(size.value); currentPage = 1; loadNotifications(); });
+    sizeLabel.append(size);
+
+    const pages = document.createElement("div"); pages.className = "notification-pagination-pages";
+    const addButton = (label, page, disabled = false, current = false) => {
+        const button = document.createElement("button"); button.type = "button"; button.textContent = label; button.disabled = disabled; button.classList.toggle("is-current", current); button.setAttribute("aria-label", current ? `Pagina ${page}, actual` : `Ir a la pagina ${page}`); if (current) button.setAttribute("aria-current", "page");
+        button.addEventListener("click", () => { currentPage = page; loadNotifications(); groupsContainer?.scrollIntoView({ behavior: "smooth", block: "start" }); }); pages.append(button);
+    };
+    addButton("‹", currentPage - 1, currentPage <= 1);
+    const pageCount = Number(pagination.pages || 1);
+    const start = Math.max(1, Math.min(currentPage - 2, pageCount - 4));
+    const end = Math.min(pageCount, start + 4);
+    for (let page = start; page <= end; page++) addButton(String(page), page, false, page === currentPage);
+    addButton("›", currentPage + 1, currentPage >= pageCount);
+    paginationContainer.append(summary, sizeLabel, pages);
 }
 
 function selectedTrashIds() {
@@ -222,10 +265,10 @@ async function loadNotifications(showMessage = false) {
     refreshButton?.setAttribute("disabled", ""); refreshButton?.querySelector("i")?.classList.add("is-spinning");
     const showingHidden = statusFilter?.value === "hidden";
     const showingTrash = statusFilter?.value === "trash";
-    const params = new URLSearchParams({ search: searchInput?.value || "", type: typeFilter?.value === "all" ? "" : typeFilter?.value || "", status: ["read", "unread"].includes(statusFilter?.value) ? statusFilter.value : "", hidden: showingHidden ? "1" : "0", trash: showingTrash ? "1" : "0" });
+    const params = new URLSearchParams({ search: searchInput?.value || "", type: typeFilter?.value === "all" ? "" : typeFilter?.value || "", status: ["read", "unread"].includes(statusFilter?.value) ? statusFilter.value : "", hidden: showingHidden ? "1" : "0", trash: showingTrash ? "1" : "0", notification_page: String(currentPage), notifications_per_page: String(notificationsPerPage) });
     try {
         const payload = await request(`${endpoints.list}&${params}`, { signal: requestController.signal });
-        updateCounters(payload.data.counters); renderGroups(payload.data.groups, payload.data.sectionCounters); if (errorState) errorState.hidden = true;
+        updateCounters(payload.data.counters); renderGroups(payload.data.groups, payload.data.sectionCounters); renderPagination(payload.data.pagination); if (errorState) errorState.hidden = true;
         if (showMessage) showToast(payload.message);
     } catch (error) {
         if (error.name !== "AbortError") { if (errorState) errorState.hidden = false; showToast(error.message, true); }
@@ -236,7 +279,7 @@ async function loadNotifications(showMessage = false) {
 
 function debounce(callback, delay) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => callback(...args), delay); }; }
 const debouncedLoad = debounce(() => loadNotifications(), 300);
-searchInput?.addEventListener("input", () => { updateFilterState(); debouncedLoad(); });
+searchInput?.addEventListener("input", () => { currentPage = 1; updateFilterState(); debouncedLoad(); });
 
 function closeFilterMenus(restoreFocus = false) {
     filterControls.forEach((control) => { const menu = control.querySelector(".notification-filter-menu"); const trigger = control.querySelector(".notification-filter-trigger"); menu.hidden = true; trigger.setAttribute("aria-expanded", "false"); if (restoreFocus && control.contains(document.activeElement)) trigger.focus(); });
@@ -262,7 +305,7 @@ function selectFilter(control, value, requestUpdate = true) {
     select.value = value;
     menu.querySelectorAll("[data-filter-value]").forEach((option) => option.setAttribute("aria-selected", String(option.dataset.filterValue === value)));
     closeFilterMenus(); updateFilterState();
-    if (requestUpdate) loadNotifications();
+    if (requestUpdate) { currentPage = 1; loadNotifications(); }
 }
 
 filterControls.forEach((control) => {
@@ -272,10 +315,11 @@ filterControls.forEach((control) => {
     menu.addEventListener("keydown", (event) => { const options = [...menu.querySelectorAll("[data-filter-value]")]; const current = options.indexOf(document.activeElement); if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); options[(current + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length]?.focus(); } if (event.key === "Home") { event.preventDefault(); options[0]?.focus(); } if (event.key === "End") { event.preventDefault(); options.at(-1)?.focus(); } if (["Enter", " "].includes(event.key)) { event.preventDefault(); document.activeElement?.click(); } });
 });
 
-function clearAllFilters() { searchInput.value = ""; filterControls.forEach((control) => selectFilter(control, "all", false)); updateFilterState(); loadNotifications(); searchInput.focus(); }
+function clearAllFilters() { searchInput.value = ""; currentPage = 1; filterControls.forEach((control) => selectFilter(control, "all", false)); updateFilterState(); loadNotifications(); searchInput.focus(); }
 clearFiltersButton?.addEventListener("click", clearAllFilters);
 document.querySelector("#clearActiveNotificationFilter")?.addEventListener("click", clearAllFilters);
 updateFilterState();
+renderPagination(paginationState);
 selectAllTrash?.addEventListener("change", () => { document.querySelectorAll(".trash-notification-checkbox").forEach((checkbox) => { checkbox.checked = selectAllTrash.checked; }); updateTrashSelection(); });
 groupsContainer?.addEventListener("change", (event) => { if (event.target.matches(".trash-notification-checkbox")) updateTrashSelection(); });
 refreshButton?.addEventListener("click", () => loadNotifications(true));

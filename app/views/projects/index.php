@@ -51,6 +51,7 @@
                 </article>
             <?php endforeach; ?>
         </section>
+        <nav class="projects-pagination" data-project-pagination aria-label="Paginación de proyectos"></nav>
         <section class="projects-empty" data-project-empty hidden><span><i class="fa-solid fa-filter-circle-xmark"></i></span><h2>No encontramos proyectos</h2><p>Prueba con otra búsqueda o limpia los filtros aplicados.</p><button type="button" data-project-clear>Limpiar búsqueda y filtros</button></section>
     <?php endif; ?>
 </div>

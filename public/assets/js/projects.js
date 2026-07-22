@@ -10,7 +10,10 @@
     const grid = root.querySelector('[data-project-grid]');
     const empty = root.querySelector('[data-project-empty]');
     const report = root.querySelector('[data-filter-status]');
+    const pagination = root.querySelector('[data-project-pagination]');
     let appliedSort = null;
+    let currentPage = 1;
+    let perPage = 25;
     const initialParams = new URLSearchParams(window.location.search);
     if (search) search.value = initialParams.get('q') || '';
     if (status && [...status.options].some(option => option.value === initialParams.get('status'))) status.value = initialParams.get('status');
@@ -87,7 +90,31 @@
     }
     [status, type, period, sort].forEach(enhanceSelect);
 
-    function update() {
+    function renderPagination(total) {
+        if (!pagination) return;
+        pagination.replaceChildren();
+        pagination.hidden = total === 0;
+        if (!total) return;
+        const pages = Math.max(1, Math.ceil(total / perPage));
+        currentPage = Math.min(currentPage, pages);
+        const from = (currentPage - 1) * perPage + 1;
+        const to = Math.min(currentPage * perPage, total);
+        const summary = document.createElement('p'); summary.textContent = `Mostrando ${from}–${to} de ${total}`;
+        const sizeLabel = document.createElement('label'); sizeLabel.append(document.createTextNode('Por pagina '));
+        const size = document.createElement('select'); size.setAttribute('aria-label', 'Proyectos por pagina');
+        [10, 25, 50, 100].forEach(value => { const option = document.createElement('option'); option.value = value; option.textContent = value; option.selected = value === perPage; size.append(option); });
+        size.addEventListener('change', () => { perPage = Number(size.value); currentPage = 1; update(false); }); sizeLabel.append(size);
+        const controls = document.createElement('div'); controls.className = 'projects-pagination-pages';
+        const button = (label, page, disabled = false, active = false) => { const item = document.createElement('button'); item.type = 'button'; item.textContent = label; item.disabled = disabled; item.classList.toggle('is-current', active); if (active) item.setAttribute('aria-current', 'page'); item.addEventListener('click', () => { currentPage = page; update(false); grid?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }); controls.append(item); };
+        button('‹', currentPage - 1, currentPage === 1);
+        const start = Math.max(1, Math.min(currentPage - 2, pages - 4));
+        for (let page = start; page <= Math.min(pages, start + 4); page++) button(String(page), page, false, page === currentPage);
+        button('›', currentPage + 1, currentPage === pages);
+        pagination.append(summary, sizeLabel, controls);
+    }
+
+    function update(resetPage = true) {
+        if (resetPage) currentPage = 1;
         const query = (search?.value || '').trim().toLocaleLowerCase('es');
         const filtered = cards.filter(card => (!query || card.dataset.search.includes(query)) && (!status?.value || card.dataset.status === status.value) && (!type?.value || card.dataset.type === type.value) && (!period?.value || card.dataset.period === period.value));
         const sortValue = sort?.value || 'activity';
@@ -95,7 +122,11 @@
             [...cards].sort((a, b) => sortValue === 'title' ? a.dataset.title.localeCompare(b.dataset.title, 'es') : sortValue === 'progress' ? Number(b.dataset.progress) - Number(a.dataset.progress) : Number(b.dataset.activity) - Number(a.dataset.activity)).forEach(card => grid?.append(card));
             appliedSort = sortValue;
         }
-        cards.forEach(card => card.hidden = !filtered.includes(card));
+        const orderedFiltered = [...grid.querySelectorAll('[data-project-card]')].filter(card => filtered.includes(card));
+        const pageStart = (currentPage - 1) * perPage;
+        cards.forEach(card => card.hidden = true);
+        orderedFiltered.slice(pageStart, pageStart + perPage).forEach(card => card.hidden = false);
+        renderPagination(orderedFiltered.length);
         if (empty) empty.hidden = filtered.length > 0;
         if (grid) grid.hidden = filtered.length === 0;
         const active = Boolean(query || status?.value || type?.value || period?.value);

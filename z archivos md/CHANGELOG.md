@@ -55,6 +55,9 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Usuarios, Proyectos, Repositorio, Papelera, Notificaciones dirigidas y Auditoría consultan páginas reales desde MariaDB mediante `LIMIT` y `OFFSET`.
 - Se añadió un componente común con tamaños de 10, 25, 50 o 100 resultados, rango visible, total, navegación numérica y adaptación móvil.
 - Las búsquedas, filtros, fechas y pestañas se conservan al avanzar entre páginas; al aplicar filtros nuevos se vuelve automáticamente a la primera.
+- La bandeja personal de estudiantes y docentes pagina desde MariaDB las notificaciones activas, archivadas y enviadas a la papelera.
+- Los contadores de archivo y papelera se calculan en SQL sin cargar colecciones completas en memoria.
+- La pantalla `Mis proyectos` pagina sus tarjetas después de aplicar búsqueda, filtros y ordenamiento.
 - Los catálogos institucionales pequeños permanecen completos porque su volumen es controlado y no se benefician de paginación.
 
 ## Administrador — Fase 1
@@ -283,7 +286,7 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Se agregó un skeleton loader durante la precarga del repositorio.
 - Se ajustó la distribución del catálogo a cuatro columnas en escritorio, dos en tablet y una en móvil.
 - Se mejoró el comportamiento responsive de insignias, contadores, filtros y controles del carrusel.
-- Se limitó el crecimiento de la interfaz en pantallas superiores a 1900 px mediante márgenes exteriores, conservando las proporciones internas.
+- Se limitó el crecimiento de la interfaz en pantallas de 1950 px en adelante mediante márgenes exteriores, conservando las proporciones internas.
 - Se añadieron colores institucionales centralizados para Tesis, Perfil de tesis, Prácticas preprofesionales, Proyecto PIS y Vinculación.
 - Se agregaron tecnologías, indicador de etiquetas adicionales, número de descargas y la acción visual `Explorar proyecto`.
 - Se incorporaron corazones de favorito con estado visual y mensajes discretos de confirmación.
