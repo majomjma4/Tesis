@@ -46,6 +46,7 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - El buscador administrativo de proyectos filtra mientras se escribe, resalta únicamente el fragmento coincidente y mantiene sincronizados los resultados paginados al confirmar o modificar una consulta.
 - El flujo de estados de Proyectos se normalizó como Desarrollo, Revisión, Cambios, Aprobado, Tribunal y Publicado; Tribunal se limita a tesis y se retiró el estado legado Finalizado.
 - Las tesis incorporan el estado “Aprobado por el Tribunal” entre “En tribunal” y “Publicado”; ambos estados del Tribunal aparecen en filtros generales y se ocultan para otros tipos.
+- Los dropdowns limitan su altura a cuatro opciones visibles y utilizan desplazamiento interno para los listados más extensos.
 - El skeleton del Index replica la nueva distribución de tres métricas y se adapta a escritorio, tablet y móvil.
 
 ## Datos de prueba del Administrador

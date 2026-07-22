@@ -368,6 +368,7 @@ if (temporaryPasswordWarning) {
             if (button.disabled) return; if (active?.select === select) return close(true); close(); sync();
             const panel = document.createElement("div"); panel.id = `customSelectPanel${index}`; panel.className = "custom-select-panel"; panel.setAttribute("role", "listbox"); panel.setAttribute("aria-label", select.getAttribute("aria-label") || "Opciones");
             const searchable = select.dataset.searchable === "true" || select.options.length > 8;
+            if (searchable) panel.classList.add("is-searchable");
             let searchInput = null, emptyMessage = null;
             if (searchable) {
                 const search = document.createElement("label"); search.className = "custom-select-search"; search.innerHTML = '<i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span class="sr-only">Buscar una opción</span>';
