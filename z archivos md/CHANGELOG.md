@@ -43,6 +43,7 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - La última actualización utiliza la zona horaria configurada y diferencia claramente los fallos de conexión.
 - El indicador de actualización incorpora un botón accesible que recarga los datos desde el servidor, muestra progreso y confirma “Ya estás al día” únicamente después de una consulta correcta.
 - Se corrigieron textos breves, singular y plural, prioridad automática de incidencias, presencia de barras, accesibilidad, responsive e impresión del Index administrativo.
+- El buscador administrativo de proyectos filtra mientras se escribe, resalta únicamente el fragmento coincidente y mantiene sincronizados los resultados paginados al confirmar o modificar una consulta.
 - El skeleton del Index replica la nueva distribución de tres métricas y se adapta a escritorio, tablet y móvil.
 
 ## Datos de prueba del Administrador
