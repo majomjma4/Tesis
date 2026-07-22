@@ -62,6 +62,7 @@ final class ProjectModel
             'review' => 2,
             'approved' => 3,
             'defense' => 3,
+            'tribunal_approved' => 4,
             'published' => 4,
             default => 1,
         };
@@ -74,6 +75,7 @@ final class ProjectModel
             'review' => '22 Jul 2026',
             'approved' => 'Por programar',
             'defense' => '29 Jul 2026 · 10:00',
+            'tribunal_approved' => 'Listo para publicación',
             'published' => 'Expediente cerrado',
             default => 'Por definir',
         };
@@ -106,7 +108,7 @@ final class ProjectModel
         $project['participant_groups'] = [
             ['label' => 'Estudiantes', 'members' => array_map(static fn (array $member): array => $member + ['email' => strtolower($member['initial']) . '.estudiante@libertador.edu.ec', 'status' => 'Activo', 'assigned_at' => '02 Jun 2026'], $project['participants'])],
             ['label' => 'Tutoría', 'members' => $project['tutor'] ? [['initial' => mb_substr($project['tutor'], 0, 1, 'UTF-8'), 'name' => $project['tutor'], 'role' => 'Tutor', 'email' => 'tutoria@libertador.edu.ec', 'status' => 'Activo', 'assigned_at' => '05 Jun 2026']] : []],
-            ['label' => 'Tribunal', 'members' => in_array($project['status_key'], ['defense', 'published'], true) ? [
+            ['label' => 'Tribunal', 'members' => in_array($project['status_key'], ['defense', 'tribunal_approved', 'published'], true) ? [
                 ['initial' => 'J1', 'name' => 'Msc. Ana Morales', 'role' => 'Jurado 1', 'email' => 'ana.morales@libertador.edu.ec', 'status' => 'Asignado', 'assigned_at' => '15 Jul 2026'],
                 ['initial' => 'J2', 'name' => 'Ing. Luis Paredes', 'role' => 'Jurado 2', 'email' => 'luis.paredes@libertador.edu.ec', 'status' => 'Asignado', 'assigned_at' => '15 Jul 2026'],
                 ['initial' => 'J3', 'name' => 'Msc. Rosa León', 'role' => 'Jurado 3', 'email' => 'rosa.leon@libertador.edu.ec', 'status' => 'Asignado', 'assigned_at' => '15 Jul 2026'],

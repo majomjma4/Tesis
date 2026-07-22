@@ -670,7 +670,7 @@ Estado: completada.
 
 - Panel de publicación conectado a proyectos y archivos reales de MariaDB.
 - Clasificación de expedientes elegibles, publicados e incompletos.
-- Publicación restringida a proyectos aprobados o, en el caso de tesis, en tribunal, con al menos un documento.
+- Publicación restringida a proyectos aprobados o, en el caso de tesis, aprobados por el Tribunal, con al menos un documento.
 - Retiro reversible de publicaciones sin eliminar el expediente ni sus archivos.
 - Fecha de publicación y estado institucional actualizados dentro de una transacción.
 - Registro de publicación y retiro en la auditoría del proyecto.

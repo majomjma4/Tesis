@@ -10,7 +10,8 @@
     if ($project['status_key'] === 'published' && !empty($project['repository_id'])) $primary = ['label' => 'Ver en repositorio', 'url' => route('repository-detail') . '&id=' . (int) $project['repository_id']];
     elseif ($project['status_key'] === 'review' && $can('observation.address')) $primary = ['label' => 'Atender observaciones', 'url' => $url('review')];
     elseif ($project['status_key'] === 'review' && $can('delivery.review')) $primary = ['label' => 'Revisar entrega', 'url' => $url('review')];
-    elseif (in_array($project['status_key'], ['defense'], true)) $primary = ['label' => 'Consultar evaluación', 'url' => $url('information')];
+    elseif ($project['status_key'] === 'defense') $primary = ['label' => 'Consultar evaluación', 'url' => $url('information')];
+    elseif ($project['status_key'] === 'tribunal_approved') $primary = ['label' => 'Preparar publicación', 'url' => $url('documents')];
     elseif ($project['status_key'] === 'approved') $primary = ['label' => 'Preparar documentos finales', 'url' => $url('documents')];
     elseif ($can('delivery.create')) $primary = ['label' => 'Registrar entrega', 'url' => $url('documents')];
     $statusKey = static function (string $status): string { $value = mb_strtolower($status, 'UTF-8'); return str_contains($value, 'atendida') ? 'addressed' : (str_contains($value, 'resuelta') ? 'resolved' : 'pending'); };

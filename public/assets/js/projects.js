@@ -16,13 +16,12 @@
     let perPage = 25;
     const initialParams = new URLSearchParams(window.location.search);
     const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
-    const defenseOption = [...(status?.options || [])].find(option => option.value === 'defense');
+    const thesisOnlyStatuses = [...(status?.options || [])].filter(option => ['defense', 'tribunal_approved'].includes(option.value));
     const syncStatusWorkflow = () => {
-        if (!type || !defenseOption) return;
+        if (!type || !thesisOnlyStatuses.length) return;
         const allowDefense = !type.value || type.value === 'thesis';
-        defenseOption.disabled = !allowDefense;
-        defenseOption.hidden = !allowDefense;
-        if (!allowDefense && status.value === 'defense') {
+        thesisOnlyStatuses.forEach(option => { option.disabled = !allowDefense; option.hidden = !allowDefense; });
+        if (!allowDefense && ['defense', 'tribunal_approved'].includes(status.value)) {
             status.value = '';
             status.dispatchEvent(new Event('change', { bubbles: true }));
         }

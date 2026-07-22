@@ -458,6 +458,7 @@ Se utilizarán los siguientes, en este orden:
 - Requiere cambios.
 - Aprobado.
 - En tribunal, únicamente para proyectos de tesis.
+- Aprobado por el Tribunal, únicamente para proyectos de tesis.
 - Publicado.
 
 Los proyectos que no sean tesis avanzarán directamente de Aprobado a Publicado.
