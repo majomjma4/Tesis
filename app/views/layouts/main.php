@@ -14,6 +14,7 @@
         <link rel="stylesheet" href="<?= e($pageStyle) ?>">
     <?php endforeach; ?>
     <link rel="stylesheet" href="<?= e(asset('css/admin-controls.css')) ?>">
+    <link rel="stylesheet" href="<?= e(asset('css/card-accents.css')) ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell app-page-loading')) ?>">

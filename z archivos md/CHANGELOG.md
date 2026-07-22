@@ -40,6 +40,9 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Las alertas de observaciones y el grupo de proyectos cerrados abren filtros SQL exactos y muestran el contexto activo en Proyectos.
 - La métrica redundante “Situaciones pendientes” se sustituyó por “Actividad esta semana”, calculada desde las auditorías de los últimos siete días y enlazada directamente a Reportes.
 - Las incidencias que requieren intervención permanecen exclusivamente en el bloque “Requiere tu atención”.
+- La última actualización utiliza la zona horaria configurada y diferencia claramente los fallos de conexión.
+- El indicador de actualización incorpora un botón accesible que recarga los datos desde el servidor, muestra progreso y confirma “Ya estás al día” únicamente después de una consulta correcta.
+- Se corrigieron textos breves, singular y plural, prioridad automática de incidencias, presencia de barras, accesibilidad, responsive e impresión del Index administrativo.
 - El skeleton del Index replica la nueva distribución de tres métricas y se adapta a escritorio, tablet y móvil.
 
 ## Datos de prueba del Administrador

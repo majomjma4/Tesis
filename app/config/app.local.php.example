@@ -6,6 +6,7 @@ declare(strict_types=1);
 return [
     'environment' => 'production',
     'dev_autoreload' => false,
+    'timezone' => 'America/Guayaquil',
     // Actívalo solo después de importar las migraciones y crear el primer administrador.
     'auth_required' => true,
 ];

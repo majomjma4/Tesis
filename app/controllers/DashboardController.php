@@ -23,6 +23,7 @@ final class DashboardController
                 'title' => 'Inicio administrativo | Gestión Documental Académica',
                 'bodyClass' => 'admin-dashboard-page',
                 'pageStyles' => [asset('css/admin-dashboard.css')],
+                'pageScript' => asset('js/admin-dashboard.js'),
                 'dashboard' => $adminDashboard,
                 'dashboardError' => $error,
             ]);

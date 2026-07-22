@@ -27,7 +27,7 @@ final class DashboardModel
             'activity' => [],
             'alerts' => [],
             'dates' => [],
-            'updated_at' => date('Y-m-d H:i:s'),
+            'updated_at' => null,
         ];
     }
 
@@ -44,12 +44,14 @@ final class DashboardModel
 
     private function adminProjectSummary(PDO $connection): array
     {
-        $row=$connection->query("SELECT COUNT(*) total,SUM(status IN ('development','under_review','changes_required')) active,SUM(status='development') development,SUM(status='under_review') review,SUM(status='changes_required') attention,SUM(status IN ('approved','completed','published')) finished FROM projects WHERE deleted_at IS NULL")->fetch()?:[];
+        $row=$connection->query("SELECT COUNT(*) total,SUM(status IN ('development','under_review','changes_required')) active,SUM(status='development') development,SUM(status='under_review') review,SUM(status='changes_required') attention,SUM(status='approved') approved,SUM(status='completed') completed,SUM(status='published') published FROM projects WHERE deleted_at IS NULL")->fetch()?:[];
         $items=[
             ['status'=>'development','label'=>'En desarrollo','count'=>(int)($row['development']??0),'url'=>route('projects').'&status=development'],
             ['status'=>'under_review','label'=>'En revisión','count'=>(int)($row['review']??0),'url'=>route('projects').'&status=under_review'],
             ['status'=>'changes_required','label'=>'Requieren cambios','count'=>(int)($row['attention']??0),'url'=>route('projects').'&status=changes_required'],
-            ['status'=>'finished','label'=>'Cerrados o publicados','count'=>(int)($row['finished']??0),'url'=>route('projects').'&group=finished'],
+            ['status'=>'approved','label'=>'Aprobados','count'=>(int)($row['approved']??0),'url'=>route('projects').'&status=approved'],
+            ['status'=>'completed','label'=>'Finalizados','count'=>(int)($row['completed']??0),'url'=>route('projects').'&status=completed'],
+            ['status'=>'published','label'=>'Publicados','count'=>(int)($row['published']??0),'url'=>route('projects').'&status=published'],
         ];
         return ['total'=>(int)($row['total']??0),'active'=>(int)($row['active']??0),'items'=>$items];
     }
@@ -83,10 +85,11 @@ final class DashboardModel
             'temporary' => (int) $connection->query("SELECT COUNT(*) FROM users u WHERE u.must_change_password=1 AND u.deleted_at IS NULL AND u.purged_at IS NULL AND u.temporary_password_expires_at IS NOT NULL AND u.temporary_password_expires_at <= CURRENT_TIMESTAMP AND NOT EXISTS(SELECT 1 FROM user_roles ur INNER JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.code='administrator')")->fetchColumn(),
         ];
         $alerts = [];
-        if ($counts['blocked'] > 0) $alerts[] = ['tone'=>'danger','icon'=>'fa-user-lock','title'=>'Cuentas bloqueadas','text'=>$counts['blocked'].' '.($counts['blocked'] === 1 ? 'cuenta requiere' : 'cuentas requieren').' revisión.','count'=>$counts['blocked'],'url'=>route('admin-users').'&status=blocked'];
-        if ($counts['temporary'] > 0) $alerts[] = ['tone'=>'warning','icon'=>'fa-key','title'=>'Contraseñas vencidas','text'=>$counts['temporary'].' '.($counts['temporary'] === 1 ? 'persona debe' : 'personas deben').' actualizar su acceso.','count'=>$counts['temporary'],'url'=>route('admin-users')];
-        if ($counts['observations'] > 0) $alerts[] = ['tone'=>'warning','icon'=>'fa-comment-dots','title'=>'Observaciones pendientes','text'=>$counts['observations'].' observaciones siguen abiertas.','count'=>$counts['observations'],'url'=>route('projects').'&attention=observations'];
-        if ($counts['trash'] > 0) $alerts[] = ['tone'=>'neutral','icon'=>'fa-trash-can','title'=>'Elementos en papelera','text'=>$counts['trash'].' '.($counts['trash'] === 1 ? 'elemento permanece' : 'elementos permanecen').' recuperables.','count'=>$counts['trash'],'url'=>route('admin-trash')];
+        if ($counts['temporary'] > 0) $alerts[] = ['priority'=>400,'tone'=>'danger','icon'=>'fa-key','title'=>'Contraseñas temporales vencidas','text'=>$counts['temporary'].' '.($counts['temporary'] === 1 ? 'persona debe' : 'personas deben').' actualizar su acceso.','count'=>$counts['temporary'],'url'=>route('admin-users')];
+        if ($counts['blocked'] > 0) $alerts[] = ['priority'=>300,'tone'=>'danger','icon'=>'fa-user-lock','title'=>'Cuentas bloqueadas','text'=>$counts['blocked'].' '.($counts['blocked'] === 1 ? 'cuenta requiere' : 'cuentas requieren').' revisión.','count'=>$counts['blocked'],'url'=>route('admin-users').'&status=blocked'];
+        if ($counts['observations'] > 0) $alerts[] = ['priority'=>200,'tone'=>'warning','icon'=>'fa-comment-dots','title'=>'Observaciones pendientes','text'=>$counts['observations'].' '.($counts['observations'] === 1 ? 'observación sigue abierta.' : 'observaciones siguen abiertas.'),'count'=>$counts['observations'],'url'=>route('projects').'&attention=observations'];
+        if ($counts['trash'] > 0) $alerts[] = ['priority'=>100,'tone'=>'neutral','icon'=>'fa-trash-can','title'=>'Elementos en papelera','text'=>$counts['trash'].' '.($counts['trash'] === 1 ? 'elemento permanece recuperable.' : 'elementos permanecen recuperables.'),'count'=>$counts['trash'],'url'=>route('admin-trash')];
+        usort($alerts, static fn(array $first,array $second):int => $second['priority'] <=> $first['priority']);
         return array_slice($alerts, 0, 4);
     }
 

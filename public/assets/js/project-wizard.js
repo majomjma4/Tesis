@@ -105,7 +105,7 @@
             if (message && !invalid.some((item) => item.name === field.name)) { invalid.push(field); fieldError(field, message); }
         });
         const leader = form.elements.leader_id; if (leader?.value) { const members = [...form.querySelectorAll('[name="members[]"]:checked,[name="members[]"][type="hidden"]')].map((f) => f.value); if (!members.includes(leader.value)) { invalid.push(leader); fieldError(leader, "El líder debe estar seleccionado como integrante."); } }
-        if (invalid.length) { announce(`${invalid.length} campo(s) necesitan atención.`, true); const customButton=invalid[0].closest(".wizard-custom-select")?.querySelector("button"); (customButton||invalid[0]).focus(); return false; }
+        if (invalid.length) { announce(`${invalid.length} campo(s) necesitan atención.`, true); const customButton=invalid[0].closest(".wizard-custom-select,.custom-select")?.querySelector("button"); (customButton||invalid[0]).focus(); return false; }
         document.querySelector(".wizard-error-summary").hidden = true; return true;
     }
     next.addEventListener("click", () => { if (validateCurrent()) showStep(current + 1); });
@@ -118,7 +118,7 @@
     form.addEventListener("change", () => { updateConditionalFields(); updatePreview(); scheduleAutosave(); });
 
     const memberSemester=document.querySelector("#memberSemester");const memberSearch=document.querySelector("#memberSearch");
-    function filterStudents(){const semester=memberSemester?.value||"";const query=(memberSearch?.value||"").trim().toLocaleLowerCase("es");let visible=0;document.querySelectorAll("[data-student-name]").forEach((row)=>{const show=row.dataset.semester===semester&&row.dataset.studentName.includes(query);row.hidden=!show;if(show)visible++;});const empty=document.querySelector("[data-no-students]");if(empty)empty.hidden=visible>0;}
+    function filterStudents(){const normalize=value=>String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase("es");const semester=memberSemester?.value||"";const query=normalize(memberSearch?.value.trim());let visible=0;document.querySelectorAll("[data-student-name]").forEach((row)=>{const show=row.dataset.semester===semester&&normalize(row.dataset.studentName).includes(query);row.hidden=!show;if(show)visible++;});const empty=document.querySelector("[data-no-students]");if(empty)empty.hidden=visible>0;}
     memberSemester?.addEventListener("change",filterStudents);memberSearch?.addEventListener("input",filterStudents);
 
     function enhanceSelect(select){
@@ -151,7 +151,7 @@
     function updatePreview(){const dl=document.querySelector("[data-preview]");if(!dl)return;dl.replaceChildren(...previewData().map(([term,value])=>{const div=document.createElement("div"),dt=document.createElement("dt"),dd=document.createElement("dd");dt.textContent=term;dd.textContent=value;div.append(dt,dd);return div;}));}
     function renderConfirmation(){const box=document.querySelector("[data-confirmation]");box.replaceChildren(...previewData().map(([term,value])=>{const div=document.createElement("div"),span=document.createElement("span"),strong=document.createElement("strong");span.textContent=term;strong.textContent=value;div.append(span,strong);return div;}));const prefix=config.types?.[selectedType()]?.prefix||"PRY";document.querySelector("[data-code-preview]").textContent=`${prefix}-${new Date().getFullYear()}-XXXX`;}
 
-    restoreDraft(); updateConditionalFields(); filterStudents(); document.querySelectorAll(".project-wizard select").forEach(enhanceSelect);
+    restoreDraft(); updateConditionalFields(); filterStudents(); document.querySelectorAll(".project-wizard select:not(.custom-select-native)").forEach(enhanceSelect);
     const firstServerError=Object.keys(config.serverErrors||{}).find((key)=>!key.startsWith("_")&&!key.startsWith("files"));
     if(firstServerError){const field=form.elements[firstServerError];const owner=field?.closest("[data-step]");const index=visibleSteps.indexOf(owner?.dataset.step);showStep(index>=0?index:0,false);document.querySelector(".wizard-error-summary")?.focus();}else showStep(0,false);
     updatePreview();

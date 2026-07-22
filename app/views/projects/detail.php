@@ -1,4 +1,4 @@
-<div class="project-detail project-workspace-v2" data-project-workspace>
+<div class="project-detail project-workspace-v2" data-project-workspace data-project-status="<?=e((string)($project['status_key']??''))?>">
 <?php if ($project === null): ?>
     <section class="detail-empty detail-not-found"><span><i class="fa-regular fa-folder-open"></i></span><h1>Proyecto no encontrado</h1><p>El expediente no existe o no tienes permiso para consultarlo.</p><a href="<?= e(route('projects')) ?>">Volver a Mis proyectos</a></section>
 <?php else:

@@ -15,11 +15,13 @@
     let currentPage = 1;
     let perPage = 25;
     const initialParams = new URLSearchParams(window.location.search);
+    const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
     if (search) search.value = initialParams.get('q') || '';
     if (status && [...status.options].some(option => option.value === initialParams.get('status'))) status.value = initialParams.get('status');
     if (type && [...type.options].some(option => option.value === initialParams.get('type'))) type.value = initialParams.get('type');
     if (period && [...period.options].some(option => option.value === initialParams.get('period'))) period.value = initialParams.get('period');
     if (sort && [...sort.options].some(option => option.value === initialParams.get('sort'))) sort.value = initialParams.get('sort');
+    [status, type, period, sort].forEach(select => select?.dispatchEvent(new Event('change', { bubbles: true })));
 
     function enhanceSelect(select) {
         if (!select || select.dataset.enhanced === 'true') return;
@@ -115,8 +117,8 @@
 
     function update(resetPage = true) {
         if (resetPage) currentPage = 1;
-        const query = (search?.value || '').trim().toLocaleLowerCase('es');
-        const filtered = cards.filter(card => (!query || card.dataset.search.includes(query)) && (!status?.value || card.dataset.status === status.value) && (!type?.value || card.dataset.type === type.value) && (!period?.value || card.dataset.period === period.value));
+        const query = normalize(search?.value.trim());
+        const filtered = cards.filter(card => (!query || normalize(card.dataset.search).includes(query)) && (!status?.value || card.dataset.status === status.value) && (!type?.value || card.dataset.type === type.value) && (!period?.value || card.dataset.period === period.value));
         const sortValue = sort?.value || 'activity';
         if (sortValue !== appliedSort) {
             [...cards].sort((a, b) => sortValue === 'title' ? a.dataset.title.localeCompare(b.dataset.title, 'es') : sortValue === 'progress' ? Number(b.dataset.progress) - Number(a.dataset.progress) : Number(b.dataset.activity) - Number(a.dataset.activity)).forEach(card => grid?.append(card));
