@@ -2,3 +2,39 @@
 .ap-connection-notice{display:flex;align-items:center;gap:12px;margin-top:14px;padding:12px 14px;border:1px solid rgba(100,116,139,.22);border-radius:13px;background:color-mix(in srgb,var(--surface) 86%,var(--surface-soft));color:var(--muted);font-size:.82rem}.ap-connection-notice>i{display:grid;place-items:center;flex:0 0 auto;width:34px;height:34px;border-radius:10px;background:var(--surface-soft);color:#64748b}.ap-connection-notice strong,.ap-connection-notice span{display:block}.ap-connection-notice strong{margin-bottom:2px;color:var(--text);font-size:.86rem}.ap-connection-notice a{margin-left:auto;color:var(--blue);font-weight:800;text-decoration:none}.ap-connection-notice a:focus-visible{outline:3px solid rgba(37,99,235,.24);outline-offset:3px}@media(max-width:600px){.ap-connection-notice{align-items:flex-start;flex-wrap:wrap}.ap-connection-notice a{width:100%;margin-left:46px}}
 .ap-search-field{position:relative;display:flex;align-items:center;flex:1;min-width:250px}.ap-search-field>i{position:absolute;left:13px;color:var(--muted);pointer-events:none}.ap-search-field input{width:100%;padding-left:38px;padding-right:40px}.ap-search-field input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}.ap-search-clear{position:absolute;right:6px;display:grid!important;place-items:center;width:32px;height:32px;padding:0!important;border:0!important;border-radius:8px!important;background:transparent!important;color:var(--muted)!important}.ap-search-clear:hover{background:var(--surface)!important;color:var(--text)!important}.ap-search-clear:focus-visible{outline:3px solid rgba(37,99,235,.25);outline-offset:1px}.ap-search-clear[hidden]{display:none!important}.ap-search-highlight{padding:0 2px;border-radius:4px;background:rgba(245,158,11,.24);color:inherit;box-shadow:0 0 0 1px rgba(245,158,11,.22)}.ap-search-empty[hidden]{display:none}@media(max-width:850px){.ap-search-field{flex-basis:100%;min-width:100%}}
 .ap-list>article[hidden]{display:none}.ap-search-empty[hidden]{display:none!important}
+
+/* Los diálogos viven en el viewport, no en la posición desplazada de la lista. */
+.ap-modal{z-index:2200;place-items:center;overflow-y:auto;background:rgba(15,23,42,.38)}
+.ap-modal>div{box-sizing:border-box;max-height:calc(100dvh - 32px);margin:auto;overflow:auto}
+.ap-modal>div.small{min-height:0}
+#apTrash>div.small{display:flex;flex-direction:column}
+#apTrash>div.small{overflow:visible}
+#apTrashForm{display:flex;flex:1;flex-direction:column}
+#apTrashForm footer{justify-content:center;margin-top:auto;padding-top:18px}
+#apTrashForm [type=submit].danger{background:#dc2626;color:#fff!important}
+#apTrashForm [type=submit].danger:hover{background:#b91c1c}
+.ap-modal footer button{cursor:pointer}
+.ap-modal textarea{box-sizing:border-box;width:100%;max-width:100%;resize:vertical}
+.ap-modal .custom-select[hidden]{display:none!important}
+.ap-modal label:has(select[name="career_id"]) .custom-select,.ap-modal label:has(select[name="academic_period_id"]) .custom-select{display:none!important}
+.ap-fixed-field{min-height:43px;padding:0;background:transparent;color:var(--text);display:flex;align-items:center;font-size:.9rem;font-weight:700}
+.ap-modal label[hidden],.ap-quick-hint[hidden]{display:none!important}
+.ap-quick-text{font-size:.82rem;color:var(--muted)}
+.ap-quick-hint{display:flex;align-items:flex-start;gap:7px;margin:8px 0 2px;color:var(--muted);font-size:.78rem;line-height:1.45}.ap-quick-hint i{margin-top:2px;color:var(--blue)}
+.ap-quick-dropdown{position:relative;width:100%;margin-top:6px}
+.ap-quick-native{position:absolute!important;width:1px!important;height:1px!important;opacity:0;pointer-events:none}
+.ap-quick-trigger{width:100%;min-height:43px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft);color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:12px;font:inherit;font-size:.86rem;text-align:left;cursor:pointer;transition:border-color .16s ease,box-shadow .16s ease,background-color .16s ease}
+.ap-quick-trigger.is-placeholder{color:var(--muted)}
+.ap-quick-trigger:hover,.ap-quick-dropdown.is-open .ap-quick-trigger{border-color:var(--blue);background:var(--surface);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.ap-quick-dropdown.is-open .ap-quick-trigger>i{transform:rotate(180deg);color:var(--blue)}
+.ap-quick-menu{position:absolute;z-index:2300;top:calc(100% + 7px);left:0;right:0;max-height:164px;padding:6px;overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:0 16px 35px rgba(15,23,42,.18);scrollbar-width:thin}
+.ap-quick-menu button{width:100%;min-height:38px;padding:8px 9px;border:0;border-radius:8px;background:transparent;color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:10px;font:inherit;font-size:.82rem;text-align:left;cursor:pointer}
+.ap-quick-menu button:hover,.ap-quick-menu button:focus-visible,.ap-quick-menu button[aria-selected=true]{outline:0;background:rgba(37,99,235,.09);color:var(--blue)}
+.ap-quick-menu button i{visibility:hidden;font-size:.7rem}.ap-quick-menu button[aria-selected=true] i{visibility:visible}
+
+/* Señales claras para las acciones administrativas de cada proyecto. */
+.ap-actions button{cursor:pointer;font:inherit;transition:background-color .16s ease,border-color .16s ease,color .16s ease}
+.ap-actions a{transition:background-color .16s ease,border-color .16s ease,color .16s ease}
+.ap-actions a:hover,.ap-actions button:hover{border-color:rgba(37,99,235,.42);background:var(--surface);color:var(--blue)}
+.ap-actions button.danger:hover{border-color:rgba(220,38,38,.42);color:#dc2626}
+.ap-actions a:focus-visible,.ap-actions button:focus-visible{outline:3px solid rgba(37,99,235,.25);outline-offset:2px}

@@ -319,9 +319,11 @@ topbarNotificationsList?.addEventListener("click", async (event) => {
     }
 });
 
+// Se usa captura para cerrar también cuando otro menú detiene la propagación
+// (por ejemplo, el menú del avatar).
 document.addEventListener("click", (event) => {
     if (!event.target.closest(".topbar-notifications")) closeTopbarNotifications();
-});
+}, true);
 
 document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && topbarNotificationsPanel && !topbarNotificationsPanel.hidden) {

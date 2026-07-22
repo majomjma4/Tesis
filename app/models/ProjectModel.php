@@ -26,6 +26,67 @@ final class ProjectModel
         return null;
     }
 
+    /** Devuelve un expediente real para la consulta administrativa. */
+    public function findProjectForAdministrator(int $projectId): ?array
+    {
+        if (!Database::isEnabled()) return null;
+
+        $statement = Database::connection()->prepare(
+            "SELECT p.id, p.code, p.title, p.subtitle, p.status, p.current_stage, p.updated_at,
+                    pt.code AS type_key, pt.name AS type, c.name AS career, ap.name AS period,
+                    tutor.full_name AS tutor_name
+             FROM projects p
+             INNER JOIN project_types pt ON pt.id = p.project_type_id
+             LEFT JOIN careers c ON c.id = p.career_id
+             LEFT JOIN academic_periods ap ON ap.id = p.academic_period_id
+             LEFT JOIN users tutor ON tutor.id = p.tutor_id
+             WHERE p.id = :id AND p.deleted_at IS NULL"
+        );
+        $statement->execute(['id' => $projectId]);
+        $row = $statement->fetch();
+        if (!$row) return null;
+
+        $participants = Database::connection()->prepare(
+            "SELECT u.full_name, pp.role_code
+             FROM project_participants pp
+             INNER JOIN users u ON u.id = pp.user_id
+             WHERE pp.project_id = :id AND pp.status = 'active'
+             ORDER BY pp.is_leader DESC, u.full_name"
+        );
+        $participants->execute(['id' => $projectId]);
+        $members = array_map(static fn (array $member): array => [
+            'initial' => mb_strtoupper(mb_substr((string) $member['full_name'], 0, 1, 'UTF-8'), 'UTF-8'),
+            'name' => (string) $member['full_name'],
+            'role' => $member['role_code'] === 'leader' ? 'Líder' : 'Integrante',
+        ], $participants->fetchAll());
+
+        $statusLabels = [
+            'development' => 'En desarrollo', 'under_review' => 'En revisión',
+            'changes_required' => 'Requiere cambios', 'approved' => 'Aprobado',
+            'defense' => 'En tribunal', 'tribunal_approved' => 'Aprobado por el Tribunal',
+            'published' => 'Publicado',
+        ];
+        $statusKey = match ((string) $row['status']) {
+            'under_review', 'changes_required' => 'review',
+            default => (string) $row['status'],
+        };
+        $updatedAt = (string) ($row['updated_at'] ?? '');
+        $date = $updatedAt ? date('d/m/Y', strtotime($updatedAt)) : 'Sin actividad registrada';
+
+        return $this->enrichProject([
+            'id' => (int) $row['id'], 'type' => (string) $row['type'],
+            'type_key' => (string) $row['type_key'], 'status' => $statusLabels[$row['status']] ?? (string) $row['status'],
+            'status_key' => $statusKey, 'title' => (string) $row['title'],
+            'subtitle' => (string) ($row['subtitle'] ?? ''), 'career' => (string) ($row['career'] ?? 'Sin carrera'),
+            'period' => (string) ($row['period'] ?? 'Sin periodo'), 'role' => 'Administración',
+            'tutor' => (string) ($row['tutor_name'] ?? ''), 'participants' => $members,
+            'last_activity' => 'Actualización del expediente · ' . $date,
+            'stage' => (string) ($row['current_stage'] ?? 'Registro'), 'latest_delivery' => null,
+            'observations' => [], 'comments' => [],
+            'activities' => [['title' => 'Expediente disponible para administración', 'date' => $date]],
+        ]);
+    }
+
     public function getProjectMetrics(array $projects): array
     {
         $counts = ['active' => 0, 'review' => 0, 'changes' => 0, 'finished' => 0];
