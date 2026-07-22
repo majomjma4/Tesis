@@ -60,7 +60,8 @@
 .app-page-content .ap-stats>article:nth-child(3),.app-page-content .calendar-stats>article:nth-child(2),.app-page-content .ar-stats>a:nth-child(1){--card-accent:var(--project-linkage)}
 .app-page-content .calendar-stats>article:nth-child(3),.app-page-content .an-stats>article:nth-child(2),
 .app-page-content .an-stats>article:nth-child(3),.app-page-content .rp-stats>article:nth-child(3){--card-accent:var(--status-approved)}
-.app-page-content .ap-stats>article:nth-child(4){--card-accent:var(--status-defense)}
+.app-page-content .ap-stats>article:nth-child(4){--card-accent:var(--status-approved)}
+.app-page-content .ap-stats>article:nth-child(5){--card-accent:var(--status-defense)}
 .app-page-content .ar-stats>a:nth-child(2){--card-accent:var(--status-published)}
 .app-page-content .at-stats>article:nth-child(3),.app-page-content .ar-stats>a:nth-child(3){--card-accent:239,68,68}
 .app-page-content .an-stats>article:nth-child(1),.app-page-content .rp-stats>article:nth-child(4),.app-page-content .an-history,.app-page-content .rp-activity{--card-accent:var(--project-profile)}

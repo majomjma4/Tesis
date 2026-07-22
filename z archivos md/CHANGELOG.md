@@ -48,6 +48,7 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Las tesis incorporan el estado “Aprobado por el Tribunal” entre “En tribunal” y “Publicado”; ambos estados del Tribunal aparecen en filtros generales y se ocultan para otros tipos.
 - Los dropdowns limitan su altura a cuatro opciones visibles y utilizan desplazamiento interno para los listados más extensos.
 - El scroll interno de los dropdowns ya no cierra la lista; únicamente el desplazamiento de la página exterior conserva ese comportamiento.
+- El resumen superior de Proyectos incorpora una card verde con el conteo real de expedientes aprobados.
 - El skeleton del Index replica la nueva distribución de tres métricas y se adapta a escritorio, tablet y móvil.
 
 ## Datos de prueba del Administrador
