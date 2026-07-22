@@ -16,11 +16,23 @@
     let perPage = 25;
     const initialParams = new URLSearchParams(window.location.search);
     const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+    const defenseOption = [...(status?.options || [])].find(option => option.value === 'defense');
+    const syncStatusWorkflow = () => {
+        if (!type || !defenseOption) return;
+        const allowDefense = !type.value || type.value === 'thesis';
+        defenseOption.disabled = !allowDefense;
+        defenseOption.hidden = !allowDefense;
+        if (!allowDefense && status.value === 'defense') {
+            status.value = '';
+            status.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    };
     if (search) search.value = initialParams.get('q') || '';
     if (status && [...status.options].some(option => option.value === initialParams.get('status'))) status.value = initialParams.get('status');
     if (type && [...type.options].some(option => option.value === initialParams.get('type'))) type.value = initialParams.get('type');
     if (period && [...period.options].some(option => option.value === initialParams.get('period'))) period.value = initialParams.get('period');
     if (sort && [...sort.options].some(option => option.value === initialParams.get('sort'))) sort.value = initialParams.get('sort');
+    syncStatusWorkflow();
     [status, type, period, sort].forEach(select => select?.dispatchEvent(new Event('change', { bubbles: true })));
 
     function enhanceSelect(select) {
@@ -146,6 +158,7 @@
         Object.entries(values).forEach(([key, value]) => value ? params.set(key, value) : params.delete(key));
         window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
     }
+    type?.addEventListener('change', syncStatusWorkflow);
     [search, status, type, period, sort].forEach(control => control?.addEventListener(control === search ? 'input' : 'change', update));
     root.querySelectorAll('[data-project-clear]').forEach(button => button.addEventListener('click', () => { if (search) search.value = ''; if (status) { status.value = ''; status.dispatchEvent(new Event('change')); } if (type) { type.value = ''; type.dispatchEvent(new Event('change')); } if (period) { period.value = ''; period.dispatchEvent(new Event('change')); } update(); search?.focus(); }));
     update();

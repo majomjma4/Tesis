@@ -44,13 +44,13 @@ final class DashboardModel
 
     private function adminProjectSummary(PDO $connection): array
     {
-        $row=$connection->query("SELECT COUNT(*) total,SUM(status IN ('development','under_review','changes_required')) active,SUM(status='development') development,SUM(status='under_review') review,SUM(status='changes_required') attention,SUM(status='approved') approved,SUM(status='completed') completed,SUM(status='published') published FROM projects WHERE deleted_at IS NULL")->fetch()?:[];
+        $row=$connection->query("SELECT COUNT(*) total,SUM(status IN ('development','under_review','changes_required','approved','defense')) active,SUM(status='development') development,SUM(status='under_review') review,SUM(status='changes_required') attention,SUM(status='approved') approved,SUM(status='defense') defense,SUM(status='published') published FROM projects WHERE deleted_at IS NULL")->fetch()?:[];
         $items=[
             ['status'=>'development','label'=>'En desarrollo','count'=>(int)($row['development']??0),'url'=>route('projects').'&status=development'],
             ['status'=>'under_review','label'=>'En revisión','count'=>(int)($row['review']??0),'url'=>route('projects').'&status=under_review'],
             ['status'=>'changes_required','label'=>'Requieren cambios','count'=>(int)($row['attention']??0),'url'=>route('projects').'&status=changes_required'],
             ['status'=>'approved','label'=>'Aprobados','count'=>(int)($row['approved']??0),'url'=>route('projects').'&status=approved'],
-            ['status'=>'completed','label'=>'Finalizados','count'=>(int)($row['completed']??0),'url'=>route('projects').'&status=completed'],
+            ['status'=>'defense','label'=>'En tribunal','count'=>(int)($row['defense']??0),'url'=>route('projects').'&status=defense'],
             ['status'=>'published','label'=>'Publicados','count'=>(int)($row['published']??0),'url'=>route('projects').'&status=published'],
         ];
         return ['total'=>(int)($row['total']??0),'active'=>(int)($row['active']??0),'items'=>$items];

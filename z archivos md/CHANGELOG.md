@@ -44,6 +44,7 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - El indicador de actualización incorpora un botón accesible que recarga los datos desde el servidor, muestra progreso y confirma “Ya estás al día” únicamente después de una consulta correcta.
 - Se corrigieron textos breves, singular y plural, prioridad automática de incidencias, presencia de barras, accesibilidad, responsive e impresión del Index administrativo.
 - El buscador administrativo de proyectos filtra mientras se escribe, resalta únicamente el fragmento coincidente y mantiene sincronizados los resultados paginados al confirmar o modificar una consulta.
+- El flujo de estados de Proyectos se normalizó como Desarrollo, Revisión, Cambios, Aprobado, Tribunal y Publicado; Tribunal se limita a tesis y se retiró el estado legado Finalizado.
 - El skeleton del Index replica la nueva distribución de tres métricas y se adapta a escritorio, tablet y móvil.
 
 ## Datos de prueba del Administrador

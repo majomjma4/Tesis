@@ -37,7 +37,7 @@ final class ProjectModel
             ['key' => 'active', 'label' => 'Activos', 'icon' => 'fa-folder-open', 'count' => $counts['active']],
             ['key' => 'review', 'label' => 'En revisión', 'icon' => 'fa-magnifying-glass', 'count' => $counts['review']],
             ['key' => 'changes', 'label' => 'Requieren cambios', 'icon' => 'fa-triangle-exclamation', 'count' => $counts['changes']],
-            ['key' => 'finished', 'label' => 'Finalizados', 'icon' => 'fa-circle-check', 'count' => $counts['finished']],
+            ['key' => 'finished', 'label' => 'Publicados', 'icon' => 'fa-circle-check', 'count' => $counts['finished']],
         ];
     }
 
@@ -166,7 +166,7 @@ final class ProjectModel
                 'action_label' => 'Preparar documentos finales', 'next_action' => 'Completar los documentos requeridos para tribunal.', 'latest_delivery' => null, 'observations' => [], 'activities' => [], 'comments' => [],
             ],
             $common + [
-                'id' => 3, 'type' => 'Trabajo de titulación', 'type_key' => 'thesis', 'status' => 'En defensa', 'status_key' => 'defense', 'metric_bucket' => 'active',
+                'id' => 3, 'type' => 'Trabajo de titulación', 'type_key' => 'thesis', 'status' => 'En tribunal', 'status_key' => 'defense', 'metric_bucket' => 'active',
                 'title' => 'Plataforma para seguimiento de prácticas preprofesionales', 'subtitle' => 'Control académico de convenios, evidencias y evaluaciones.',
                 'tags' => ['Prácticas', 'Evaluación'], 'technologies' => ['Laravel'], 'activity_order' => 2,
                 'tutor' => 'Ing. Pablo Torres', 'last_activity' => 'Defensa programada · 15 Jul 2026', 'stage' => 'Defensa', 'progress' => 91,

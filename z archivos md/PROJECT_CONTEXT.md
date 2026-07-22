@@ -451,22 +451,16 @@ Nunca deberá eliminarse información histórica.
 
 Durante su ciclo de vida un proyecto podrá encontrarse en diferentes estados.
 
-Inicialmente se utilizarán los siguientes:
+Se utilizarán los siguientes, en este orden:
 
-- Pendiente de revisión.
+- En desarrollo.
 - En revisión.
 - Requiere cambios.
 - Aprobado.
-- Finalizado.
+- En tribunal, únicamente para proyectos de tesis.
+- Publicado.
 
-En futuras versiones podrán incorporarse estados específicos para procesos de titulación.
-
-Por ejemplo:
-
-- Asignación de jurados.
-- En evaluación.
-- Defensa programada.
-- Defensa aprobada.
+Los proyectos que no sean tesis avanzarán directamente de Aprobado a Publicado.
 
 La arquitectura deberá permitir incorporar nuevos estados sin afectar el funcionamiento del sistema.
 
@@ -532,7 +526,7 @@ Será posible consultar el historial completo de cambios.
 
 ## Repositorio institucional
 
-Cuando un proyecto sea finalizado, pasará al repositorio institucional.
+Cuando un proyecto sea publicado, pasará al repositorio institucional.
 
 Desde ese momento podrá consultarse como proyecto concluido.
 

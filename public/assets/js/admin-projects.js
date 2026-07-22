@@ -119,7 +119,20 @@
             refreshTimer = setTimeout(() => filters.requestSubmit(), 450);
         }
     };
-    filters.querySelectorAll('select').forEach(select => select.addEventListener('change', () => filters.requestSubmit()));
+    const typeFilter = filters.querySelector('select[name="type_id"]');
+    const statusFilter = filters.querySelector('select[name="status"]');
+    const defenseFilter = [...(statusFilter?.options || [])].find(option => option.value === 'defense');
+    const syncFilterWorkflow = () => {
+        if (!typeFilter || !defenseFilter) return;
+        const selectedType = typeFilter.options[typeFilter.selectedIndex];
+        const isGeneral = !typeFilter.value;
+        const isThesis = /titulación|tesis/i.test(selectedType?.textContent || '');
+        defenseFilter.disabled = !isGeneral && !isThesis;
+        defenseFilter.hidden = !isGeneral && !isThesis;
+        if (defenseFilter.disabled && statusFilter.value === 'defense') statusFilter.value = '';
+    };
+    typeFilter?.addEventListener('change', () => { syncFilterWorkflow(); filters.requestSubmit(); });
+    statusFilter?.addEventListener('change', () => filters.requestSubmit());
     search.addEventListener('input', apply);
     clear?.addEventListener('click', () => {
         search.value = '';
@@ -127,7 +140,30 @@
         search.focus();
         if (serverQuery) filters.requestSubmit();
     });
+    syncFilterWorkflow();
     apply();
+})();
+
+(() => {
+    const form = document.querySelector('#apForm');
+    if (!form) return;
+    const type = form.elements.project_type_id;
+    const status = form.elements.status;
+    const defense = [...status.options].find(option => option.value === 'defense');
+    if (!type || !defense) return;
+    const syncWorkflow = () => {
+        const selectedType = type.options[type.selectedIndex];
+        const isThesis = /titulación|tesis/i.test(selectedType?.textContent || '');
+        defense.disabled = !isThesis;
+        defense.hidden = !isThesis;
+        if (!isThesis && status.value === 'defense') {
+            status.value = 'approved';
+            status.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    };
+    type.addEventListener('change', syncWorkflow);
+    document.querySelectorAll('#apNew,[data-edit]').forEach(button => button.addEventListener('click', () => setTimeout(syncWorkflow)));
+    syncWorkflow();
 })();
 
 (() => {

@@ -28,7 +28,7 @@
 .app-page-content .projects-card[data-status="review"],
 .app-page-content .ap-list>article[data-project-status="under_review"]{--card-accent:var(--status-review)}
 .app-page-content .projects-card[data-status="approved"],.app-page-content .ap-list>article[data-project-status="approved"]{--card-accent:var(--status-approved)}
-.app-page-content .ap-list>article[data-project-status="completed"]{--card-accent:var(--status-completed)}
+.app-page-content .ap-list>article[data-project-status="defense"]{--card-accent:var(--status-defense)}
 .app-page-content .projects-card[data-status="published"],.app-page-content .ap-list>article[data-project-status="published"]{--card-accent:var(--status-published)}
 .app-page-content .projects-card[data-status="defense"]{--card-accent:var(--status-defense)}
 .app-page-content .ap-list>article[data-project-status="changes_required"]{--card-accent:var(--status-changes)}
@@ -58,7 +58,7 @@
 .app-page-content .ap-stats>article:nth-child(3),.app-page-content .calendar-stats>article:nth-child(2),.app-page-content .ar-stats>a:nth-child(1){--card-accent:var(--project-linkage)}
 .app-page-content .calendar-stats>article:nth-child(3),.app-page-content .an-stats>article:nth-child(2),
 .app-page-content .an-stats>article:nth-child(3),.app-page-content .rp-stats>article:nth-child(3){--card-accent:var(--status-approved)}
-.app-page-content .ap-stats>article:nth-child(4){--card-accent:var(--status-completed)}
+.app-page-content .ap-stats>article:nth-child(4){--card-accent:var(--status-defense)}
 .app-page-content .ar-stats>a:nth-child(2){--card-accent:var(--status-published)}
 .app-page-content .at-stats>article:nth-child(3),.app-page-content .ar-stats>a:nth-child(3){--card-accent:239,68,68}
 .app-page-content .an-stats>article:nth-child(1),.app-page-content .rp-stats>article:nth-child(4),.app-page-content .an-history,.app-page-content .rp-activity{--card-accent:var(--project-profile)}
@@ -73,7 +73,7 @@
 .project-status-row[data-project-status="under_review"]{--status-accent:var(--status-review)}
 .project-status-row[data-project-status="changes_required"]{--status-accent:var(--status-changes)}
 .project-status-row[data-project-status="approved"]{--status-accent:var(--status-approved)}
-.project-status-row[data-project-status="completed"]{--status-accent:var(--status-completed)}
+.project-status-row[data-project-status="defense"]{--status-accent:var(--status-defense)}
 .project-status-row[data-project-status="published"]{--status-accent:var(--status-published)}
 .project-status-row[data-project-status] .status-track span{background:linear-gradient(90deg,rgb(var(--status-accent)),rgba(var(--status-accent),.68))}
 
@@ -83,7 +83,7 @@
 .projects-card[data-status="defense"] .projects-status{color:#4338ca;background:rgba(var(--status-defense),.15)}
 .ap-list>article[data-project-status="development"] .ap-status{color:#1d4ed8;background:rgba(var(--status-development),.14)}
 .ap-list>article[data-project-status="changes_required"] .ap-status,.ar-list>article:has(button:disabled) .ar-status{color:#b91c1c;background:rgba(var(--status-changes),.14)}
-.ap-list>article[data-project-status="completed"] .ap-status{color:#0e7490;background:rgba(var(--status-completed),.15)}
+.ap-list>article[data-project-status="defense"] .ap-status{color:#4338ca;background:rgba(var(--status-defense),.15)}
 .ar-list>article:has(button[data-publish="publish"]) .ar-status{color:#92400e;background:rgba(var(--status-review),.15)}
 
 .theme-dark .app-page-content :is(article,section,div,a)[class$="-card"]:not(.status-card):not(.repository-card),
