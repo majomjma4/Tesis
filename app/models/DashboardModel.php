@@ -10,6 +10,7 @@ final class DashboardModel
         return [
             'users' => $this->adminUserSummary($connection),
             'projects' => $this->adminProjectSummary($connection),
+            'weekly_activity' => $this->adminWeeklyActivity($connection),
             'activity' => $this->adminActivity($connection),
             'alerts' => $this->adminAlerts($connection),
             'dates' => $this->adminUpcomingDates($connection),
@@ -22,6 +23,7 @@ final class DashboardModel
         return [
             'users' => ['total' => 0, 'active' => 0, 'blocked' => 0, 'recent' => 0],
             'projects' => ['total' => 0, 'active' => 0, 'items' => []],
+            'weekly_activity' => 0,
             'activity' => [],
             'alerts' => [],
             'dates' => [],
@@ -50,6 +52,13 @@ final class DashboardModel
             ['status'=>'finished','label'=>'Cerrados o publicados','count'=>(int)($row['finished']??0),'url'=>route('projects').'&group=finished'],
         ];
         return ['total'=>(int)($row['total']??0),'active'=>(int)($row['active']??0),'items'=>$items];
+    }
+
+    private function adminWeeklyActivity(PDO $connection): int
+    {
+        return (int) $connection->query("SELECT
+            (SELECT COUNT(*) FROM admin_audit_log WHERE created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 7 DAY)) +
+            (SELECT COUNT(*) FROM project_audit_log WHERE created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 7 DAY))")->fetchColumn();
     }
 
     private function adminActivity(PDO $connection): array

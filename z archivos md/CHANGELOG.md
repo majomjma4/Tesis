@@ -38,7 +38,8 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - La auditoría presenta nombres comprensibles en español y las barras incorporan semántica accesible.
 - Se añadieron fecha de actualización, navegación por teclado, foco visible y adaptación específica para móvil y tablet.
 - Las alertas de observaciones y el grupo de proyectos cerrados abren filtros SQL exactos y muestran el contexto activo en Proyectos.
-- Fechas y actividad utilizan expresiones naturales en español, y “Situaciones pendientes” aclara que el indicador suma incidencias administrativas.
+- La métrica redundante “Situaciones pendientes” se sustituyó por “Actividad esta semana”, calculada desde las auditorías de los últimos siete días y enlazada directamente a Reportes.
+- Las incidencias que requieren intervención permanecen exclusivamente en el bloque “Requiere tu atención”.
 - El skeleton del Index replica la nueva distribución de tres métricas y se adapta a escritorio, tablet y móvil.
 
 ## Datos de prueba del Administrador

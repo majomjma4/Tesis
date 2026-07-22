@@ -1,6 +1,5 @@
 <?php
 $alerts=$dashboard['alerts'];
-$attentionTotal=array_sum(array_map(static fn(array $alert):int=>(int)($alert['count']??0),$alerts));
 $updatedAt='hoy, '.date('H:i',strtotime((string)$dashboard['updated_at']));
 ?>
 <header class="admin-dashboard-heading">
@@ -13,7 +12,7 @@ $updatedAt='hoy, '.date('H:i',strtotime((string)$dashboard['updated_at']));
 <section class="admin-metrics" aria-label="Resumen institucional">
     <a href="<?=e(route('projects'))?>"><span class="metric-icon projects"><i class="fa-solid fa-folder-open"></i></span><div><small>Proyectos en curso</small><strong><?= (int)$dashboard['projects']['active']?></strong><p>Desarrollo, revisión o cambios</p></div><i class="fa-solid fa-arrow-right metric-arrow"></i></a>
     <a href="<?=e(route('admin-users').'&status=active')?>"><span class="metric-icon users"><i class="fa-solid fa-users"></i></span><div><small>Usuarios activos</small><strong><?= (int)$dashboard['users']['active']?></strong><p><?= (int)$dashboard['users']['total']?> cuentas registradas</p></div><i class="fa-solid fa-arrow-right metric-arrow"></i></a>
-    <a href="#dashboardAttention" class="<?=$attentionTotal?'needs-attention':'is-clear'?>"><span class="metric-icon attention"><i class="fa-solid <?=$attentionTotal?'fa-triangle-exclamation':'fa-circle-check'?>"></i></span><div><small>Situaciones pendientes</small><strong><?=$attentionTotal?></strong><p><?=$attentionTotal?'Requieren atención administrativa':'Todo está en orden'?></p></div><i class="fa-solid fa-arrow-down metric-arrow"></i></a>
+    <a href="<?=e(route('admin-reports'))?>"><span class="metric-icon activity"><i class="fa-solid fa-clock-rotate-left"></i></span><div><small>Actividad esta semana</small><strong><?= (int)$dashboard['weekly_activity']?></strong><p>Cambios registrados en los últimos 7 días</p></div><i class="fa-solid fa-arrow-right metric-arrow"></i></a>
 </section>
 
 <div class="admin-dashboard-focus">
