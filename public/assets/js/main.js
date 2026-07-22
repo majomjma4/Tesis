@@ -389,7 +389,7 @@ if (temporaryPasswordWarning) {
     });
     document.addEventListener("click", event => { if (active && !event.target.closest(".custom-select-panel") && !event.target.closest(".custom-select-trigger")) close(); });
     document.addEventListener("keydown", event => { if (!active) return; if (event.key === "Escape") { event.preventDefault(); close(true); } if (["ArrowDown", "ArrowUp"].includes(event.key) && event.target.closest(".custom-select-panel") && !event.target.matches("input")) { event.preventDefault(); const options = [...active.panel.querySelectorAll(".custom-select-option:not(:disabled):not([hidden])")], current = options.indexOf(document.activeElement), next = event.key === "ArrowDown" ? Math.min(options.length - 1, current + 1) : Math.max(0, current - 1); options[next]?.focus(); } });
-    window.addEventListener("resize", () => close()); window.addEventListener("scroll", () => close(), true);
+    window.addEventListener("resize", () => close()); window.addEventListener("scroll", event => { if (event.target instanceof Node && active?.panel.contains(event.target)) return; close(); }, true);
     new MutationObserver(() => instances.forEach(({ sync }) => sync())).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden", "disabled", "selected"] });
 })();
 // Final de selectores personalizados
