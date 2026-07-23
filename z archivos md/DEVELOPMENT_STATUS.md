@@ -2,10 +2,16 @@
 
 # Estado Actual del Desarrollo
 
+> Actualización técnica: 23/07/2026. La edición administrativa de proyectos compara valores persistidos, registra diferencias legibles y confirma acciones sensibles.
+
 > Actualización técnica: 22/07/2026. La aplicación utiliza MariaDB local y mantiene un respaldo transportable en `database/snapshot.sql`.
 
 ## Avances recientes
 
+- Edición de proyectos auditada desde el backend, con administrador, fecha, hora y detalle de valores anteriores y nuevos.
+- Confirmación previa para modificaciones administrativas y advertencias visibles sobre su impacto en reportes.
+- Opciones avanzadas visibles para participantes y documentos del proyecto.
+- Envío a Papelera corregido para motivos rápidos y personalizados.
 - Códigos de proyecto automáticos, no reutilizables y configurables por tipo desde Administración.
 - Paginación común con tamaños dinámicos de hasta 100 registros por página.
 - Navegación compacta mediante primera página, páginas vecinas, puntos suspensivos y última página.

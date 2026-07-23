@@ -42,3 +42,10 @@ anonimizados.
 Los contadores de `project_code_sequences` forman parte del snapshot. No deben
 reiniciarse al borrar proyectos, porque los códigos históricos nunca se
 reutilizan.
+
+## Auditoría administrativa
+
+Las ediciones de proyectos se registran en `project_audit_log`. Cada entrada
+conserva el identificador del administrador autenticado, fecha, hora y solamente
+los campos que cambiaron. Los valores relacionados se guardan con etiquetas
+legibles para su presentación posterior en historiales y reportes.

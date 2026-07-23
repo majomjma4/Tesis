@@ -4,6 +4,12 @@
     const form = document.querySelector('#apForm');
     const trashForm = document.querySelector('#apTrashForm');
     const cfg = document.querySelector('#apConfig');
+    const saveConfirm = document.querySelector('#apSaveConfirm');
+    const editWarning = form?.querySelector('[data-edit-warning]');
+    const advancedOptions = form?.querySelector('[data-advanced-options]');
+    const manageParticipants = form?.querySelector('[data-manage-participants]');
+    const manageFiles = form?.querySelector('[data-manage-files]');
+    let pendingSaveData = null;
     const enhanceQuickSelect = select => {
         const shell = document.createElement('div');
         shell.className = 'ap-quick-dropdown';
@@ -152,6 +158,23 @@
         else [careerSelect, periodSelect, typeSelect, tutorSelect, statusSelect].forEach(select => select?.dispatchEvent(new Event('change', { bubbles: true })));
         syncFixedFields();
         document.querySelector('#apTitle').textContent = project ? 'Editar proyecto' : 'Nuevo proyecto';
+        if (editWarning) editWarning.hidden = !project;
+        if (advancedOptions) {
+            advancedOptions.hidden = !project;
+            advancedOptions.open = false;
+        }
+        if (project) {
+            const projectUrl = tab => {
+                const url = new URL(location.href);
+                url.search = '';
+                url.searchParams.set('page', 'project-detail');
+                url.searchParams.set('id', project.id);
+                url.searchParams.set('tab', tab);
+                return url.toString();
+            };
+            if (manageParticipants) manageParticipants.href = projectUrl('information');
+            if (manageFiles) manageFiles.href = projectUrl('documents');
+        }
         modal.hidden = false;
         form.title.focus();
     };
@@ -159,13 +182,29 @@
     document.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => open(JSON.parse(button.closest('article').querySelector('script').textContent))));
     document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => modal.hidden = true));
     modal?.addEventListener('click', event => { if (event.target === modal) modal.hidden = true; });
-    form?.addEventListener('submit', async event => {
+    const saveProject = async data => {
+        const submit = form.querySelector('[type="submit"]');
+        submit.disabled = true;
+        try { await request(cfg.dataset.save, data); location.reload(); }
+        catch (error) { const message = document.querySelector('#apMessage'); message.textContent = error.message; message.className = 'ap-message error'; message.hidden = false; }
+        finally { submit.disabled = false; }
+    };
+    form?.addEventListener('submit', event => {
         event.preventDefault();
         const data = new FormData(form);
         ['career_id', 'academic_period_id', 'project_type_id', 'tutor_id', 'status'].forEach(name => data.set(name, form.elements[name].value));
-        try { await request(cfg.dataset.save, data); location.reload(); }
-        catch (error) { const message = document.querySelector('#apMessage'); message.textContent = error.message; message.className = 'ap-message error'; message.hidden = false; }
+        if (!form.elements.id.value) { saveProject(data); return; }
+        pendingSaveData = data;
+        saveConfirm.hidden = false;
+        saveConfirm.querySelector('[data-confirm-save]')?.focus();
     });
+    saveConfirm?.querySelector('[data-cancel-save]')?.addEventListener('click', () => { saveConfirm.hidden = true; pendingSaveData = null; form.querySelector('[type="submit"]')?.focus(); });
+    saveConfirm?.querySelector('[data-confirm-save]')?.addEventListener('click', () => {
+        if (!pendingSaveData) return;
+        const data = pendingSaveData; pendingSaveData = null; saveConfirm.hidden = true; saveProject(data);
+    });
+    saveConfirm?.addEventListener('click', event => { if (event.target === saveConfirm) saveConfirm.querySelector('[data-cancel-save]')?.click(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !saveConfirm?.hidden) saveConfirm.querySelector('[data-cancel-save]')?.click(); });
     document.querySelectorAll('[data-trash]').forEach(button => button.addEventListener('click', () => {
         document.body.append(trash);
         trashForm.reset();
@@ -178,7 +217,11 @@
     trash?.addEventListener('click', event => { if (event.target === trash) trash.hidden = true; });
     trashForm?.addEventListener('submit', async event => {
         event.preventDefault();
-        try { await request(cfg.dataset.trash, new FormData(trashForm)); location.reload(); }
+        const data = new FormData(trashForm);
+        const customReason = trashForm.elements.reason?.value.trim() || '';
+        const selectedReason = trashQuickReason?.value?.trim() || '';
+        data.set('reason', selectedReason === 'Otro motivo' ? customReason : selectedReason);
+        try { await request(cfg.dataset.trash, data); location.reload(); }
         catch (error) { alert(error.message); }
     });
 })();

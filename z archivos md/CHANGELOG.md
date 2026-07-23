@@ -20,6 +20,16 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 # [En desarrollo] - 18/07/2026
 
+## Edición administrativa y Papelera — 23/07/2026
+
+- Se eliminó el selector “Texto rápido” del modal Editar proyecto.
+- El backend compara cada edición con los valores reales de MariaDB y evita guardar cuando no existen cambios.
+- La auditoría registra únicamente los campos modificados, con valor anterior, valor nuevo, administrador responsable, fecha y hora.
+- Tutor, periodo, estado, tipo y demás relaciones se presentan en el historial mediante nombres legibles y no mediante identificadores.
+- El modal advierte que las modificaciones afectan el historial y los reportes, y solicita confirmación antes de guardar.
+- Se añadió el bloque plegable “Opciones avanzadas” para acceder a participantes y archivos/versiones, con advertencias específicas.
+- Se corrigió el envío a la Papelera: los motivos rápidos y el motivo personalizado ahora llegan correctamente al backend.
+
 ## Códigos configurables, paginación y adaptación móvil — 22/07/2026
 
 - Los proyectos usan códigos institucionales automáticos por tipo y año, con los prefijos iniciales `TIT`, `PFT`, `PIS`, `PRA` y `VIN`.
