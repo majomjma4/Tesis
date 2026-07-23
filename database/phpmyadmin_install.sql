@@ -387,7 +387,7 @@ INSERT INTO project_types (code, name) VALUES
 ('practice','Prácticas preprofesionales'),('community','Proyecto de vinculación');
 
 INSERT INTO careers (code, name) VALUES
-('TDS','Tecnología Superior en Desarrollo de Software');
+('TDS','Desarrollo de Software');
 
 INSERT INTO academic_periods (code, name, starts_on, ends_on, status) VALUES
 ('2026-I','Periodo académico 2026-I','2026-01-01','2026-06-30','active'),

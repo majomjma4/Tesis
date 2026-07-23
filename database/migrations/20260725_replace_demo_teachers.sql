@@ -30,12 +30,12 @@ WHERE r.code='teacher' AND u.email IN (
 INSERT INTO teacher_profiles (user_id,institutional_code,academic_title,can_tutor)
 SELECT u.id,
   CASE u.email
-    WHEN 'maribel.fierro.pendiente@local.invalid' THEN 'DOC-REAL-001'
-    WHEN 'maria.navarrete.pendiente@local.invalid' THEN 'DOC-REAL-002'
-    WHEN 'diana.alegria.pendiente@local.invalid' THEN 'DOC-REAL-003'
-    WHEN 'diana.ramirez.pendiente@local.invalid' THEN 'DOC-REAL-004'
-    WHEN 'alex.galarza.pendiente@local.invalid' THEN 'DOC-REAL-005'
-    ELSE 'DOC-REAL-006'
+    WHEN 'maribel.fierro.pendiente@local.invalid' THEN '0202053801'
+    WHEN 'maria.navarrete.pendiente@local.invalid' THEN '0202053802'
+    WHEN 'diana.alegria.pendiente@local.invalid' THEN '0202053803'
+    WHEN 'diana.ramirez.pendiente@local.invalid' THEN '0202053804'
+    WHEN 'alex.galarza.pendiente@local.invalid' THEN '0202053805'
+    ELSE '0202053806'
   END,
   CASE u.email
     WHEN 'diana.alegria.pendiente@local.invalid' THEN 'Lic. (por confirmar)'

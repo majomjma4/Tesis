@@ -34,6 +34,13 @@ anonimizados.
 
 ## Migraciones recientes
 
+- `20260728_single_career_defaults.sql` conserva como única carrera activa
+  “Desarrollo de Software”. Los formularios usan además el periodo marcado como
+  activo; el cambio de periodo se realiza desde Gestión académica.
+- `20260729_normalize_demo_cedulas.sql` reemplaza los códigos alfanuméricos de
+  estudiantes y docentes de demostración por cédulas ficticias únicas de diez
+  dígitos.
+
 - `20260726_standardize_project_codes.sql` normaliza los códigos existentes con
   prefijo por tipo, año y secuencia.
 - `20260727_project_code_settings.sql` registra los prefijos y la cantidad de

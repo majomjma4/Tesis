@@ -17,7 +17,8 @@
     <link rel="stylesheet" href="<?= e(asset('css/card-accents.css')) ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
-<body class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell app-page-loading')) ?>">
+<?php $isAdministratorLayout = in_array('administrator', $layoutUserRoles ?? [], true); ?>
+<body class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout app-page-loading' : ''))) ?>">
     <noscript><style>.app-global-skeleton{display:none!important}.app-page-content{position:static!important;width:100%!important;height:auto!important;overflow:visible!important;opacity:1!important}</style></noscript>
     <!-- Inicio de capa para cerrar el menu movil -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -139,11 +140,13 @@
         <?php endif; ?>
         <!-- Final de barra superior -->
 
+        <?php if ($isAdministratorLayout): ?>
         <section class="app-global-skeleton" id="appGlobalSkeleton" aria-label="Cargando contenido" aria-live="polite">
             <div class="app-skeleton-heading"><span class="app-skeleton-block kicker"></span><span class="app-skeleton-block title"></span><span class="app-skeleton-block subtitle"></span></div>
             <div class="app-skeleton-toolbar"><span class="app-skeleton-block"></span><span class="app-skeleton-block"></span><span class="app-skeleton-block compact"></span></div>
             <div class="app-skeleton-grid"><?php for ($i = 0; $i < 4; $i++): ?><article><span class="app-skeleton-block icon"></span><span class="app-skeleton-block line strong"></span><span class="app-skeleton-block line"></span><span class="app-skeleton-block line short"></span></article><?php endfor; ?></div>
         </section>
+        <?php endif; ?>
         <div class="app-page-content" id="appPageContent"><?= $content ?><?php if(!empty($pagePagination)): $pagination=$pagePagination;require APP_PATH.'/views/components/pagination.php';endif;?></div>
     </main>
     <!-- Final de contenido principal -->

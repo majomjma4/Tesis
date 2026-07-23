@@ -1,13 +1,23 @@
 console.log("Layout global (main.js) inicializado correctamente.");
 
 const appPageContent = document.querySelector("#appPageContent");
+const appGlobalSkeleton = document.querySelector("#appGlobalSkeleton");
+const appSkeletonStartedAt = performance.now();
 function revealGlobalPage() {
+    if (!appGlobalSkeleton) return;
     document.body.classList.remove("app-page-loading");
     requestAnimationFrame(() => appPageContent?.classList.add("is-revealed"));
 }
-requestAnimationFrame(revealGlobalPage);
-window.addEventListener("pageshow", revealGlobalPage);
+if (appGlobalSkeleton) {
+    const minimumSkeletonTime = 520;
+    const remainingSkeletonTime = Math.max(0, minimumSkeletonTime - (performance.now() - appSkeletonStartedAt));
+    window.setTimeout(revealGlobalPage, remainingSkeletonTime);
+}
+window.addEventListener("pageshow", (event) => {
+    if (event.persisted) revealGlobalPage();
+});
 document.addEventListener("click", (event) => {
+    if (!appGlobalSkeleton) return;
     const link = event.target.closest("a[href]");
     if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target === "_blank" || link.hasAttribute("download")) return;
     const destination = new URL(link.href, window.location.href);
@@ -416,6 +426,27 @@ if (temporaryPasswordWarning) {
         close();
     }, true);
     new MutationObserver(() => instances.forEach(({ sync }) => sync())).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden", "disabled", "selected"] });
+})();
+
+// Mantiene los diálogos fuera de contenedores animados o desplazables.
+// El overlay conserva el viewport completo y el CSS centra la ventana en el área útil.
+(() => {
+    const selector = [
+        '.ap-modal',
+        '.ap-confirm',
+        '.aa-modal',
+        '.user-modal',
+        '.user-confirm',
+        '.notification-modal-overlay',
+        '.calendar-modal-overlay',
+        '.repository-preview-modal',
+        '.project-file-modal',
+        '.forced-password-shell',
+        '.logout-modal-overlay'
+    ].join(',');
+    document.querySelectorAll(selector).forEach(layer => {
+        if (layer.parentElement !== document.body) document.body.append(layer);
+    });
 })();
 // Final de selectores personalizados
 

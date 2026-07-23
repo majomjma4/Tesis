@@ -20,7 +20,7 @@ INSERT IGNORE INTO user_roles (user_id,role_id)
 SELECT u.id,@student_role_id FROM users u WHERE u.email LIKE 'paginacion0%@demo.local';
 
 INSERT INTO student_profiles (user_id,institutional_code,career_id)
-SELECT u.id,CONCAT('EST-PAG-',LPAD(SUBSTRING(u.email,11,2),3,'0')),@career_id
+SELECT u.id,CONCAT('02020538',LPAD(SUBSTRING(u.email,11,2),2,'0')),@career_id
 FROM users u WHERE u.email LIKE 'paginacion0%@demo.local'
 ON DUPLICATE KEY UPDATE career_id=VALUES(career_id);
 

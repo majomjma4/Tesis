@@ -20,6 +20,19 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 # [En desarrollo] - 18/07/2026
 
+## Renovación de Gestión de usuarios — 23/07/2026
+
+- “Importar una lista” se integró dentro del modal Nuevo usuario y ambos asistentes se centran de forma adaptable.
+- La importación se reorganizó en tres pasos reales: configurar, revisar cuentas y contraseñas, y verificar antes de crear.
+- La creación masiva exige una confirmación final y mantiene la operación transaccional.
+- Carrera y periodo se obtienen desde la configuración institucional activa y no pueden alterarse desde el navegador.
+- La única carrera activa y visible se normalizó como “Desarrollo de Software”.
+- Se incorporó el nombre de usuario real, opcional para estudiantes, tanto en alta individual como importación.
+- El buscador filtra mientras se escribe, resalta coincidencias y dispone de una acción inmediata para limpiar.
+- Los filtros se aplican al cambiar su valor; se eliminó el botón redundante “Aplicar”.
+- El listado se convirtió en cards adaptables que muestran usuario, correo, nombre, cédula, rol, semestre, estado y último acceso sin exigir desplazamiento horizontal.
+- Se reparó el menú de acciones, se añadió actualización manual, colores semánticos por rol y la paginación compartida de Proyectos.
+
 ## Edición administrativa y Papelera — 23/07/2026
 
 - Se eliminó el selector “Texto rápido” del modal Editar proyecto.

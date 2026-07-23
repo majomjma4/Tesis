@@ -640,6 +640,11 @@ Estado: completada.
 - Protección CSRF, validación de correos duplicados y protección de la cuenta administrativa propia.
 - Auditoría administrativa con actor, acción, entidad, fecha, IP y agente de usuario.
 - Actividad de usuarios integrada al Dashboard administrativo.
+- Pantalla responsive basada en cards, sin tabla horizontal obligatoria en dispositivos pequeños.
+- Nombre de usuario institucional disponible para estudiantes y visible en el listado.
+- Búsqueda interactiva por usuario, nombre, correo o cédula, con resaltado y limpieza inmediata.
+- Carrera única “Desarrollo de Software” y periodo activo fijados desde el backend.
+- Menús de acciones, actualización manual y paginación compartida con los demás listados administrativos.
 
 ## Administrador — Fase 4
 
@@ -650,11 +655,13 @@ Estado: completada.
 - Vista previa obligatoria con resultado y error específico por fila.
 - Validación de correos e identificaciones duplicadas tanto en la lista como en MariaDB.
 - Límite de 500 usuarios y 1 MB por operación.
-- Configuración común de carrera, periodo y semestre para grupos de estudiantes.
-- Opción para incorporar docentes a los selectores de tutores.
+- Carrera institucional y periodo activo fijados automáticamente; el administrador solo selecciona el semestre.
+- Opción descrita claramente para habilitar docentes en la asignación de tutores.
 - Creación atómica dentro de una transacción: una fila inválida impide toda la importación.
 - Contraseña temporal `Istel2026+`, cambio obligatorio y vencimiento en siete días.
 - Registro resumido de la importación en la auditoría administrativa.
+- Asistente visual de tres pasos: configuración, revisión completa con contraseña y verificación final.
+- Confirmación independiente antes de crear las cuentas.
 
 ## Administrador — Fase 5
 

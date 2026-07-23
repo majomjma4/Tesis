@@ -215,7 +215,7 @@ final class ProjectModel
     private function projects(): array
     {
         $common = [
-            'user_ids' => [1], 'career' => 'Tecnología Superior en Desarrollo de Software',
+            'user_ids' => [1], 'career' => 'Desarrollo de Software',
             'period' => '2026-I', 'role' => 'Estudiante líder', 'tags' => [], 'technologies' => [],
             'participants' => [
                 ['initial' => 'C', 'name' => 'Carlos Martínez', 'role' => 'Líder'],
