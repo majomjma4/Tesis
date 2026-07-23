@@ -16,6 +16,14 @@
         trigger.innerHTML = '<span></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
         const menu = document.createElement('div');
         menu.className = 'ap-quick-menu'; menu.setAttribute('role', 'listbox'); menu.hidden = true;
+        const fitMenuToCompleteOptions = () => {
+            const available = (window.visualViewport?.height || window.innerHeight) - trigger.getBoundingClientRect().bottom - 15;
+            const menuStyle = getComputedStyle(menu);
+            const bottomInset = parseFloat(menuStyle.paddingBottom) + parseFloat(menuStyle.borderBottomWidth);
+            const heights = [...menu.querySelectorAll('[role="option"]')].slice(0, 4).map(option => Math.ceil(option.offsetTop + option.offsetHeight + bottomInset));
+            const fitting = heights.filter(height => height <= available);
+            menu.style.maxHeight = `${Math.min(fitting.at(-1) || heights[0] || available, available)}px`;
+        };
         const sync = () => {
             trigger.querySelector('span').textContent = select.selectedOptions[0]?.textContent || 'Selecciona una opción';
             trigger.classList.toggle('is-placeholder', !select.value);
@@ -38,7 +46,14 @@
                 item.querySelector('.ap-quick-menu').hidden = true;
                 item.querySelector('.ap-quick-trigger')?.setAttribute('aria-expanded', 'false');
             });
-            if (willOpen) { shell.classList.add('is-open'); menu.hidden = false; trigger.setAttribute('aria-expanded', 'true'); }
+            if (willOpen) {
+                shell.classList.add('is-open'); menu.hidden = false; trigger.setAttribute('aria-expanded', 'true');
+                const fourthOption = [...menu.querySelectorAll('[role="option"]')].slice(0, 4).at(-1);
+                const desiredHeight = fourthOption ? fourthOption.offsetTop + fourthOption.offsetHeight + 8 : menu.scrollHeight;
+                const available = (window.visualViewport?.height || window.innerHeight) - trigger.getBoundingClientRect().bottom - 15;
+                if (available < desiredHeight) trigger.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+                fitMenuToCompleteOptions();
+            }
             else close();
         });
         select.addEventListener('change', sync); document.addEventListener('click', event => { if (!shell.contains(event.target)) close(); });
@@ -162,7 +177,7 @@
         trashForm.id.value = JSON.parse(button.closest('article').querySelector('script').textContent).id;
         trash.hidden = false;
     }));
-    document.querySelector('[data-close-trash]')?.addEventListener('click', () => trash.hidden = true);
+    document.querySelectorAll('[data-close-trash]').forEach(button => button.addEventListener('click', () => trash.hidden = true));
     trash?.addEventListener('click', event => { if (event.target === trash) trash.hidden = true; });
     trashForm?.addEventListener('submit', async event => {
         event.preventDefault();
