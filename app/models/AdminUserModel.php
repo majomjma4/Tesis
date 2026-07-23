@@ -45,8 +45,11 @@ final class AdminUserModel
     {
         $data=$this->withInstitutionalDefaults($data);$this->validate($data,$id);
         return Database::transaction(function(PDO $db)use($data,$id,$actorId):array{
+            $previousRole=null;
             if($id>0){
                 $this->ensureUser($db,$id);
+                $roleRead=$db->prepare('SELECT r.code FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=:id LIMIT 1');
+                $roleRead->execute(['id'=>$id]);$previousRole=(string)($roleRead->fetchColumn()?:'');
                 $statement=$db->prepare('UPDATE users SET username=:username,full_name=:name,email=:email,status=:status,session_version=session_version+1 WHERE id=:id');
                 $statement->execute(['username'=>$data['username']?:null,'name'=>$data['full_name'],'email'=>$data['email'],'status'=>$data['status'],'id'=>$id]);
                 $userId=$id;$action='user_updated';
@@ -69,6 +72,7 @@ final class AdminUserModel
                 $db->prepare('INSERT INTO teacher_profiles(user_id,institutional_code,academic_title,can_tutor) VALUES(:id,:code,:title,:tutor)')->execute(['id'=>$userId,'code'=>$data['institutional_code'],'title'=>$data['academic_title']?:null,'tutor'=>$data['can_tutor']]);
             }
             $this->audit($db,$actorId,$action,$userId,['role'=>$data['role'],'status'=>$data['status']]);
+            if($previousRole!==null&&$previousRole!==$data['role'])$this->audit($db,$actorId,'user_role_changed',$userId,['from'=>$previousRole,'to'=>$data['role']]);
             return ['id'=>$userId];
         });
     }
@@ -176,5 +180,19 @@ final class AdminUserModel
     }
 
     private function ensureUser(PDO $db,int $id):void{$statement=$db->prepare('SELECT id FROM users WHERE id=:id');$statement->execute(['id'=>$id]);if(!$statement->fetchColumn())throw new InvalidArgumentException('El usuario ya no existe.');}
-    private function audit(PDO $db,int $actorId,string $action,int $targetId,array $details):void{$statement=$db->prepare('INSERT INTO admin_audit_log(actor_user_id,action,entity_type,entity_id,details,ip_address,user_agent) VALUES(:actor,:action,\'user\',:entity,:details,:ip,:agent)');$statement->execute(['actor'=>$actorId,'action'=>$action,'entity'=>$targetId,'details'=>json_encode($details,JSON_UNESCAPED_UNICODE),'ip'=>mb_substr((string)($_SERVER['REMOTE_ADDR']??''),0,45)?:null,'agent'=>mb_substr((string)($_SERVER['HTTP_USER_AGENT']??''),0,500)?:null]);}
+    private function audit(PDO $db,int $actorId,string $action,int $targetId,array $details):void
+    {
+        $read=$db->prepare('SELECT full_name FROM users WHERE id=:id');$read->execute(['id'=>$targetId]);
+        $element=(string)($read->fetchColumn()?:($targetId?'Usuario #'.$targetId:'Usuarios importados'));
+        $status=(string)($details['status']??'');
+        $labels=[
+            'user_created'=>'Creó el usuario '.$element,
+            'user_updated'=>'Editó el usuario '.$element,
+            'user_role_changed'=>'Cambió el rol de '.$element,
+            'user_status_changed'=>($status==='blocked'?'Bloqueó':($status==='active'?'Desbloqueó':'Cambió el estado de')).' '.$element,
+            'users_bulk_imported'=>'Creó '.(int)($details['count']??0).' usuarios mediante importación',
+            'password_reset'=>'Restableció la contraseña de '.$element,
+        ];
+        (new AdminActivityService($db))->record($actorId,$action,$labels[$action]??$action,'Usuarios','user',$targetId?:null,$element,'correct',$details);
+    }
 }

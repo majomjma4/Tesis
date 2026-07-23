@@ -34,8 +34,7 @@ final class SystemSettingModel
    $q=$d->prepare('INSERT INTO system_settings(setting_key,setting_value,updated_by) VALUES(:key,:value,:actor) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_by=VALUES(updated_by)');
    $values=['institution_name'=>$name,'file_max_mb'=>(string)$max,'file_total_max_mb'=>(string)$total,'file_extensions'=>json_encode($extensions),'project_code_prefixes'=>json_encode($prefixes),'project_code_digits'=>(string)$digits];
    foreach($values as $key=>$value)$q->execute(['key'=>$key,'value'=>$value,'actor'=>$actor]);
-   $a=$d->prepare("INSERT INTO admin_audit_log(actor_user_id,action,entity_type,details) VALUES(:actor,'settings_updated','settings',:details)");
-   $a->execute(['actor'=>$actor,'details'=>json_encode(['file_max_mb'=>$max,'file_total_max_mb'=>$total,'file_extensions'=>$extensions,'project_code_prefixes'=>$prefixes,'project_code_digits'=>$digits],JSON_UNESCAPED_UNICODE)]);
+   (new AdminActivityService($d))->record($actor,'settings_updated','Actualizó la configuración institucional','Configuración','settings',null,'Configuración del sistema','correct',['file_max_mb'=>$max,'file_total_max_mb'=>$total,'file_extensions'=>$extensions,'project_code_prefixes'=>$prefixes,'project_code_digits'=>$digits]);
   });
  }
 }

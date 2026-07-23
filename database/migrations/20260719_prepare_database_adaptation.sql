@@ -142,6 +142,4 @@ INSERT IGNORE INTO careers (code, name) VALUES
 ('TDS', 'Desarrollo de Software');
 
 INSERT IGNORE INTO academic_periods (code, name, starts_on, ends_on, status) VALUES
-('2026-I', 'Periodo académico 2026-I', '2026-01-01', '2026-06-30', 'active'),
-('2026-II', 'Periodo académico 2026-II', '2026-07-01', '2026-12-31', 'planned'),
-('2027-I', 'Periodo académico 2027-I', '2027-01-01', '2027-06-30', 'planned');
+('2026-I', 'I PAO 2026', '2026-04-01', '2026-09-30', 'active');

@@ -18,5 +18,9 @@ final class RouteAccessService
         $requiresTemporaryPasswordChange=(bool)$identity['must_change_password']&&!in_array('administrator',$identity['roles'],true);
         if($requiresTemporaryPasswordChange&&((int)$identity['password_warning_count']>=3||$expired)&&!in_array($page,['change-password','logout'],true)){header('Location: '.route('change-password'));exit;}
         if(in_array($page,self::ADMIN_ROUTES,true)&&!in_array('administrator',$identity['roles'],true)){header('Location: '.route('forbidden'));exit;}
+        if(in_array('administrator',$identity['roles'],true)){
+            try{(new AcademicPeriodReminderService())->sync();}
+            catch(Throwable $exception){error_log('Academic period reminders: '.$exception->getMessage());}
+        }
     }
 }
