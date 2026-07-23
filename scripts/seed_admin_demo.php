@@ -58,7 +58,7 @@ final class AdminDemoSeeder
     private function seedCatalogs(): array
     {
         $this->db->exec("INSERT INTO roles(code,name) VALUES ('student','Estudiante'),('teacher','Docente'),('administrator','Administrador') ON DUPLICATE KEY UPDATE name=VALUES(name)");
-        $this->db->exec("INSERT INTO careers(code,name,is_active) VALUES ('TDS','Tecnología Superior en Desarrollo de Software',1) ON DUPLICATE KEY UPDATE name=VALUES(name),is_active=1");
+        $this->db->exec("INSERT INTO careers(code,name,is_active) VALUES ('TDS','Desarrollo de Software',1) ON DUPLICATE KEY UPDATE name=VALUES(name),is_active=1");
         $this->db->exec("INSERT INTO academic_periods(code,name,starts_on,ends_on,status) VALUES
             ('2026-I','I PAO 2026','2026-01-01','2026-06-30','closed'),
             ('2026-II','II PAO 2026','2026-07-01','2026-12-31','active'),
@@ -97,12 +97,12 @@ final class AdminDemoSeeder
             ['diego.paredes.demo@correo.com','Diego Paredes Ruiz','student','1750010004',6,'active',null],
             ['valentina.mora.demo@correo.com','Valentina Mora Cedeño','student','1750010005',8,'active',null],
             ['mateo.silva.demo@correo.com','Mateo Silva Ortiz','student','1750010006',4,'blocked',null],
-            ['maribel.fierro.pendiente@local.invalid','Msc. Maribel Fierro Montero','teacher','DOC-REAL-001',0,'active','Msc. (por confirmar)'],
-            ['maria.navarrete.pendiente@local.invalid','Msc. Maria Elena Navarrete','teacher','DOC-REAL-002',0,'active','Msc. (por confirmar)'],
-            ['diana.alegria.pendiente@local.invalid','Lic. Diana Alegría Camino','teacher','DOC-REAL-003',0,'active','Lic. (por confirmar)'],
-            ['diana.ramirez.pendiente@local.invalid','Msc. Diana Anaid Ramirez','teacher','DOC-REAL-004',0,'active','Msc. (por confirmar)'],
-            ['alex.galarza.pendiente@local.invalid','Abg. Alex Fabián Galarza','teacher','DOC-REAL-005',0,'active','Abg. (por confirmar)'],
-            ['henrry.marino.pendiente@local.invalid','Msc. Henrry Mariño Acosta','teacher','DOC-REAL-006',0,'active','Msc. (por confirmar)'],
+            ['maribel.fierro.pendiente@local.invalid','Msc. Maribel Fierro Montero','teacher','0202053801',0,'active','Msc. (por confirmar)'],
+            ['maria.navarrete.pendiente@local.invalid','Msc. Maria Elena Navarrete','teacher','0202053802',0,'active','Msc. (por confirmar)'],
+            ['diana.alegria.pendiente@local.invalid','Lic. Diana Alegría Camino','teacher','0202053803',0,'active','Lic. (por confirmar)'],
+            ['diana.ramirez.pendiente@local.invalid','Msc. Diana Anaid Ramirez','teacher','0202053804',0,'active','Msc. (por confirmar)'],
+            ['alex.galarza.pendiente@local.invalid','Abg. Alex Fabián Galarza','teacher','0202053805',0,'active','Abg. (por confirmar)'],
+            ['henrry.marino.pendiente@local.invalid','Msc. Henrry Mariño Acosta','teacher','0202053806',0,'active','Msc. (por confirmar)'],
         ];
         $hash = password_hash($this->temporaryPassword, PASSWORD_DEFAULT);
         foreach ($users as [$email,$name,$role,$code,$semester,$status,$title]) {

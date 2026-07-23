@@ -23,5 +23,17 @@
 /* Paginación compacta y estable en pantallas pequeñas. */
 .data-pagination p,.data-pagination-size label{white-space:nowrap}.data-pagination-size{flex:0 0 auto;min-width:0;max-width:100%}.data-pagination-size label{min-width:0}.data-pagination-size .custom-select{box-sizing:border-box;flex:0 0 74px;width:74px;max-width:74px}.data-pagination-size .custom-select-trigger{box-sizing:border-box;width:100%}
 .data-pagination-pages{gap:3px}.data-pagination-pages a{min-width:32px;height:32px;padding:0 6px;border-radius:8px;font-size:.78rem}.data-pagination-pages .pagination-ellipsis{display:grid;place-items:center;min-width:17px;height:32px;color:var(--muted);font-size:.78rem;font-weight:850;user-select:none}
+
+/* Los diálogos se centran en el espacio útil a la derecha del navbar en escritorio. */
+:is(.ap-modal,.ap-confirm,.aa-modal,.user-modal,.user-confirm,.notification-modal-overlay,.calendar-modal-overlay,.repository-preview-modal,.project-file-modal,.forced-password-shell,.logout-modal-overlay){
+    padding-left:calc(280px + var(--app-shell-gutter) + 16px)!important;
+    padding-right:calc(var(--app-shell-gutter) + 16px)!important;
+}
+@media(max-width:1000px){
+    :is(.ap-modal,.ap-confirm,.aa-modal,.user-modal,.user-confirm,.notification-modal-overlay,.calendar-modal-overlay,.repository-preview-modal,.project-file-modal,.forced-password-shell,.logout-modal-overlay){
+        padding-left:16px!important;
+        padding-right:16px!important;
+    }
+}
 @media(max-width:720px){.data-pagination{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:11px}.data-pagination p{width:auto}.data-pagination-size{margin:0}.data-pagination-pages{grid-column:1/-1;order:initial}}
 @media(max-width:520px){.data-pagination{grid-template-columns:minmax(0,1fr) minmax(0,auto);max-width:100%;overflow:hidden}.data-pagination p,.data-pagination-size label{font-size:.78rem}.data-pagination-size label{gap:6px}.data-pagination-size .custom-select{flex-basis:68px;width:68px;max-width:68px}.data-pagination-size .custom-select-trigger{padding-inline:8px}.data-pagination-pages{overflow-x:auto;justify-content:flex-start;gap:2px}.data-pagination-pages a{min-width:29px;height:29px;padding:0 5px;font-size:.72rem}.data-pagination-pages .pagination-ellipsis{min-width:14px;height:29px;font-size:.7rem}}

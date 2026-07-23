@@ -66,6 +66,16 @@
 .app-page-content .at-stats>article:nth-child(3),.app-page-content .ar-stats>a:nth-child(3){--card-accent:239,68,68}
 .app-page-content .an-stats>article:nth-child(1),.app-page-content .rp-stats>article:nth-child(4),.app-page-content .an-history,.app-page-content .rp-activity{--card-accent:var(--project-profile)}
 
+/* Usuarios: el color identifica la función de cada resumen y el rol de cada cuenta. */
+.app-page-content .users-summary-total{--card-accent:var(--project-thesis)}
+.app-page-content .users-summary-active{--card-accent:var(--status-approved)}
+.app-page-content .users-summary-students{--card-accent:var(--project-pis)}
+.app-page-content .users-summary-teachers{--card-accent:var(--status-completed)}
+.app-page-content .users-summary-admins{--card-accent:var(--project-profile)}
+.app-page-content .user-record[data-role="student"]{--card-accent:var(--project-pis)}
+.app-page-content .user-record[data-role="teacher"]{--card-accent:var(--status-completed)}
+.app-page-content .user-record[data-role="administrator"]{--card-accent:var(--project-profile)}
+
 /* Estados que ya utiliza el index original. */
 .app-page-content :is(.review-card,.pending-card,.warning-card){--card-accent:var(--project-linkage)}
 .app-page-content :is(.approved-card,.success-card,.completed-card){--card-accent:var(--project-pis)}

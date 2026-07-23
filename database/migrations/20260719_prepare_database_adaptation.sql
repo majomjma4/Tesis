@@ -139,7 +139,7 @@ ALTER TABLE notifications ADD CONSTRAINT fk_notifications_project FOREIGN KEY (p
 -- career/academic_period en una migración posterior, evitando una conversión destructiva.
 
 INSERT IGNORE INTO careers (code, name) VALUES
-('TDS', 'Tecnología Superior en Desarrollo de Software');
+('TDS', 'Desarrollo de Software');
 
 INSERT IGNORE INTO academic_periods (code, name, starts_on, ends_on, status) VALUES
 ('2026-I', 'Periodo académico 2026-I', '2026-01-01', '2026-06-30', 'active'),

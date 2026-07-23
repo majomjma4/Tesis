@@ -34,7 +34,7 @@ final class AdminController
         $filters = ['search'=>mb_substr(trim((string)($_GET['search']??'')),0,100),'role'=>(string)($_GET['role']??''),'status'=>(string)($_GET['status']??'')];
         $error = null;
         try { $result=$model->listing($filters,PaginationService::request());$users=$result['items'];$pagination=$result['pagination']; $summary=$model->summary(); $catalogs=$model->catalogs(); }
-        catch(Throwable $exception){ error_log('Admin users error: '.$exception->getMessage());$error='No fue posible consultar los usuarios.';$users=[];$pagination=['total'=>0];$summary=['total'=>0,'active'=>0,'blocked'=>0,'students'=>0,'teachers'=>0,'administrators'=>0];$catalogs=['careers'=>[],'periods'=>[]]; }
+        catch(Throwable $exception){ error_log('Admin users error: '.$exception->getMessage());$error='No fue posible consultar los usuarios.';$users=[];$pagination=['total'=>0];$summary=['total'=>0,'active'=>0,'blocked'=>0,'students'=>0,'teachers'=>0,'administrators'=>0];$catalogs=['career'=>null,'period'=>null]; }
         $session=new AuthSessionService();
         View::render('admin/users',['currentPage'=>'admin-users','title'=>'Usuarios | Administración','bodyClass'=>'admin-users-page','pageStyles'=>[asset('css/admin-users.css'),asset('css/admin-user-import.css')],'pageScript'=>asset('js/admin-users.js'),'pageScripts'=>[asset('js/admin-user-import.js')],'users'=>$users,'pagePagination'=>$pagination,'userSummary'=>$summary,'catalogs'=>$catalogs,'filters'=>$filters,'adminUserCsrf'=>$session->csrfToken('admin_users'),'adminUserEndpoints'=>['save'=>route('admin-user-save'),'status'=>route('admin-user-status'),'password'=>route('admin-user-password'),'import'=>route('admin-users-import')],'adminUsersError'=>$error]);
     }
@@ -86,7 +86,7 @@ final class AdminController
 
     private function userPayload(): array
     {
-        return ['full_name'=>trim((string)($_POST['full_name']??'')),'email'=>mb_strtolower(trim((string)($_POST['email']??''))),'role'=>(string)($_POST['role']??''),'status'=>(string)($_POST['status']??'active'),'institutional_code'=>trim((string)($_POST['institutional_code']??'')),'career_id'=>(int)($_POST['career_id']??0),'academic_period_id'=>(int)($_POST['academic_period_id']??0),'semester'=>(int)($_POST['semester']??0),'academic_title'=>trim((string)($_POST['academic_title']??'')),'can_tutor'=>isset($_POST['can_tutor'])?1:0];
+        return ['full_name'=>trim((string)($_POST['full_name']??'')),'email'=>mb_strtolower(trim((string)($_POST['email']??''))),'username'=>trim((string)($_POST['username']??'')),'role'=>(string)($_POST['role']??''),'status'=>(string)($_POST['status']??'active'),'institutional_code'=>trim((string)($_POST['institutional_code']??'')),'career_id'=>(int)($_POST['career_id']??0),'academic_period_id'=>(int)($_POST['academic_period_id']??0),'semester'=>(int)($_POST['semester']??0),'academic_title'=>trim((string)($_POST['academic_title']??'')),'can_tutor'=>isset($_POST['can_tutor'])?1:0];
     }
     private function sessionAndCsrf(): AuthSessionService{$session=new AuthSessionService();if(!$session->validateCsrf('admin_users',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión del formulario venció.',[],419);return $session;}
     private function requirePost(): void{if(($_SERVER['REQUEST_METHOD']??'GET')!=='POST'){$this->json(false,'Método no permitido.',[],405);}}

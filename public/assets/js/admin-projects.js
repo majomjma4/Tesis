@@ -9,6 +9,12 @@
     const advancedOptions = form?.querySelector('[data-advanced-options]');
     const manageParticipants = form?.querySelector('[data-manage-participants]');
     const manageFiles = form?.querySelector('[data-manage-files]');
+    const dialogLayers = [modal, trash, saveConfirm].filter(Boolean);
+    dialogLayers.forEach(layer => { layer.hidden = true; });
+    dialogLayers.forEach(layer => document.body.append(layer));
+    const syncProjectDialogs = () => document.body.classList.toggle('project-dialog-open', dialogLayers.some(layer => !layer.hidden));
+    new MutationObserver(syncProjectDialogs).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    syncProjectDialogs();
     let pendingSaveData = null;
     const enhanceQuickSelect = select => {
         const shell = document.createElement('div');
@@ -121,20 +127,24 @@
         [...careerSelect.options].forEach(option => { if (!option.value || !option.textContent.includes('Desarrollo de Software')) option.remove(); });
         selectFirstAvailable(careerSelect);
     }
-    const makeFixedField = (select, label) => {
+    const makeFixedField = (select, label, icon) => {
         const wrapper = select?.closest('.custom-select');
-        if (!select || !wrapper || wrapper.parentElement?.querySelector(`[data-fixed-field="${select.name}"]`)) return null;
+        if (!select || !wrapper) return null;
+        const existing = wrapper.parentElement?.querySelector(`[data-fixed-field="${select.name}"]`);
+        if (existing) { wrapper.hidden = true; return existing; }
         const value = document.createElement('span');
         value.className = 'ap-fixed-field'; value.dataset.fixedField = select.name;
         value.setAttribute('aria-label', label);
+        value.innerHTML = `<i class="${icon}" aria-hidden="true"></i><span><small>${label}</small><strong></strong></span>`;
+        [...wrapper.parentElement.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => { node.textContent = ''; });
         wrapper.after(value); wrapper.hidden = true;
         return value;
     };
-    const careerField = makeFixedField(careerSelect, 'Carrera seleccionada');
-    const periodField = makeFixedField(periodSelect, 'Período académico seleccionado');
+    const careerField = makeFixedField(careerSelect, 'Carrera', 'fa-solid fa-code');
+    const periodField = makeFixedField(periodSelect, 'Período académico', 'fa-regular fa-calendar');
     const syncFixedFields = () => {
-        if (careerField) careerField.textContent = 'Desarrollo de Software';
-        if (periodField) periodField.textContent = periodSelect.selectedOptions[0]?.textContent.trim() || 'Sin período activo';
+        if (careerField) careerField.querySelector('strong').textContent = 'Desarrollo de Software';
+        if (periodField) periodField.querySelector('strong').textContent = periodSelect.selectedOptions[0]?.textContent.trim() || 'Sin período activo';
     };
     const setProjectDefaults = () => {
         selectFirstAvailable(careerSelect);
