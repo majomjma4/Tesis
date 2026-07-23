@@ -31,3 +31,14 @@ git add database/snapshot.sql
 El snapshot puede contener correos y hashes de contrasenas. Debe guardarse en un
 repositorio privado o generarse usando solamente datos de demostracion
 anonimizados.
+
+## Migraciones recientes
+
+- `20260726_standardize_project_codes.sql` normaliza los códigos existentes con
+  prefijo por tipo, año y secuencia.
+- `20260727_project_code_settings.sql` registra los prefijos y la cantidad de
+  dígitos configurables para códigos futuros.
+
+Los contadores de `project_code_sequences` forman parte del snapshot. No deben
+reiniciarse al borrar proyectos, porque los códigos históricos nunca se
+reutilizan.

@@ -2,6 +2,16 @@
 
 # Estado Actual del Desarrollo
 
+> Actualización técnica: 22/07/2026. La aplicación utiliza MariaDB local y mantiene un respaldo transportable en `database/snapshot.sql`.
+
+## Avances recientes
+
+- Códigos de proyecto automáticos, no reutilizables y configurables por tipo desde Administración.
+- Paginación común con tamaños dinámicos de hasta 100 registros por página.
+- Navegación compacta mediante primera página, páginas vecinas, puntos suspensivos y última página.
+- Datos demostrativos y estructura actualizados en el snapshot transportable de MariaDB.
+- Dropdowns y textos compactos adaptados para pantallas pequeñas.
+
 > Actualización técnica: 18/07/2026. El proyecto está preparado para iniciar la integración controlada con MariaDB; la persistencia continúa deshabilitada.
 
 > Administrador — Fase 1 completada: autenticación obligatoria, navegación por rol, sesión verificada, contraseña temporal, cambio seguro de contraseña y rutas administrativas protegidas.

@@ -78,7 +78,10 @@ final class ProjectDraftService
     public function confirmation(array $draft,array $files):array
     {
         $teachers=array_column($this->catalogs()['teachers'],'name','id');
-        return $draft+['type_label'=>self::TYPES[$draft['type']]['label']??'Sin definir','tutor_label'=>$teachers[$draft['tutor_id']]??'Pendiente de asignación','provisional_code'=>(self::TYPES[$draft['type']]['prefix']??'PRY').'-'.date('Y').'-XXXX','file_count'=>count($files)];
+        try{$codeSettings=(new SystemSettingModel())->all();}catch(Throwable){$codeSettings=(new SystemSettingModel())->defaults();}
+        $prefix=$codeSettings['project_code_prefixes'][$draft['type']]??'PRY';
+        $digits=(int)($codeSettings['project_code_digits']??3);
+        return $draft+['type_label'=>self::TYPES[$draft['type']]['label']??'Sin definir','tutor_label'=>$teachers[$draft['tutor_id']]??'Pendiente de asignación','provisional_code'=>$prefix.'-'.date('Y').'-'.str_repeat('X',$digits),'file_count'=>count($files)];
     }
     private function flattenFiles(array $files):array {if(!isset($files['name'])||!is_array($files['name']))return[];$out=[];foreach($files['name'] as $i=>$name)if(($files['error'][$i]??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_NO_FILE)$out[]=['name'=>$name,'type'=>$files['type'][$i]??'','tmp_name'=>$files['tmp_name'][$i]??'','error'=>$files['error'][$i]??UPLOAD_ERR_NO_FILE,'size'=>$files['size'][$i]??0];return$out;}
 }

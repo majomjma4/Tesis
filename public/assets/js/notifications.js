@@ -211,9 +211,18 @@ function renderPagination(pagination = {}) {
     };
     addButton("‹", currentPage - 1, currentPage <= 1);
     const pageCount = Number(pagination.pages || 1);
-    const start = Math.max(1, Math.min(currentPage - 2, pageCount - 4));
-    const end = Math.min(pageCount, start + 4);
-    for (let page = start; page <= end; page++) addButton(String(page), page, false, page === currentPage);
+    const pageItems = pageCount <= 5
+        ? Array.from({ length: pageCount }, (_, index) => index + 1)
+        : currentPage <= 3
+            ? [1, 2, 3, "ellipsis", pageCount]
+            : currentPage >= pageCount - 2
+                ? [1, "ellipsis", pageCount - 2, pageCount - 1, pageCount]
+                : [1, "ellipsis", currentPage - 1, currentPage, currentPage + 1, "ellipsis", pageCount];
+    pageItems.forEach((page) => {
+        if (page === "ellipsis") {
+            const ellipsis = document.createElement("span"); ellipsis.className = "pagination-ellipsis"; ellipsis.textContent = "…"; ellipsis.setAttribute("aria-hidden", "true"); pages.append(ellipsis);
+        } else addButton(String(page), page, false, page === currentPage);
+    });
     addButton("›", currentPage + 1, currentPage >= pageCount);
     paginationContainer.append(summary, sizeLabel, pages);
 }

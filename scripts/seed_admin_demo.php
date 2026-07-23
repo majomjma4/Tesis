@@ -145,7 +145,7 @@ final class AdminDemoSeeder
 
     private function removePreviousDemoProjects(): void
     {
-        $codes = ['DEMO-TT-001','DEMO-PIS-002','DEMO-PP-003','DEMO-VIN-004','DEMO-TT-005','DEMO-PIS-006','DEMO-TRASH-007'];
+        $codes = ['TIT-2026-001','PIS-2026-001','PRA-2026-001','VIN-2026-001','TIT-2026-002','PIS-2026-002','PIS-2026-003'];
         $marks = implode(',', array_fill(0, count($codes), '?'));
         $statement = $this->db->prepare("SELECT id FROM projects WHERE code IN ({$marks})");
         $statement->execute($codes);
@@ -169,16 +169,16 @@ final class AdminDemoSeeder
     private function seedProjects(array $catalogs): void
     {
         $projects = [
-            ['DEMO-TT-001','thesis','Sistema inteligente para la gestión de turnos médicos','Plataforma web accesible para centros de salud','under_review','review','valentina.mora.demo@correo.com','diana.alegria.pendiente@local.invalid','TIT-801'],
-            ['DEMO-PIS-002','pis','Aplicación móvil para rutas de transporte urbano','Seguimiento de recorridos y alertas para usuarios','development','development','ana.torres.demo@correo.com','maribel.fierro.pendiente@local.invalid','PROY-401'],
-            ['DEMO-PP-003','practice','Automatización del inventario de equipos tecnológicos','Práctica preprofesional aplicada al control institucional','changes_required','review','diego.paredes.demo@correo.com','maria.navarrete.pendiente@local.invalid','SEG-601'],
-            ['DEMO-VIN-004','community','Alfabetización digital para emprendedores locales','Proyecto de vinculación con herramientas de comercio electrónico','approved','final_documents','sofia.lopez.demo@correo.com','maribel.fierro.pendiente@local.invalid','PROY-401'],
-            ['DEMO-TT-005','thesis','Modelo de detección temprana de riesgos académicos','Análisis de indicadores para acompañamiento estudiantil','completed','closed','valentina.mora.demo@correo.com','diana.alegria.pendiente@local.invalid','TIT-801'],
-            ['DEMO-PIS-006','pis','Panel de monitoreo energético para laboratorios','Visualización en tiempo real de consumo eléctrico','published','published','carlos.mendoza.demo@correo.com','maria.navarrete.pendiente@local.invalid','PROY-401'],
-            ['DEMO-TRASH-007','pis','Prototipo descartado de control de asistencia','Registro creado para probar la papelera administrativa','development','registration','mateo.silva.demo@correo.com','maribel.fierro.pendiente@local.invalid','PROY-401'],
+            ['TIT-2026-001','thesis','Sistema inteligente para la gestión de turnos médicos','Plataforma web accesible para centros de salud','under_review','review','valentina.mora.demo@correo.com','diana.alegria.pendiente@local.invalid','TIT-801'],
+            ['PIS-2026-001','pis','Aplicación móvil para rutas de transporte urbano','Seguimiento de recorridos y alertas para usuarios','development','development','ana.torres.demo@correo.com','maribel.fierro.pendiente@local.invalid','PROY-401'],
+            ['PRA-2026-001','practice','Automatización del inventario de equipos tecnológicos','Práctica preprofesional aplicada al control institucional','changes_required','review','diego.paredes.demo@correo.com','maria.navarrete.pendiente@local.invalid','SEG-601'],
+            ['VIN-2026-001','community','Alfabetización digital para emprendedores locales','Proyecto de vinculación con herramientas de comercio electrónico','approved','final_documents','sofia.lopez.demo@correo.com','maribel.fierro.pendiente@local.invalid','PROY-401'],
+            ['TIT-2026-002','thesis','Modelo de detección temprana de riesgos académicos','Análisis de indicadores para acompañamiento estudiantil','completed','closed','valentina.mora.demo@correo.com','diana.alegria.pendiente@local.invalid','TIT-801'],
+            ['PIS-2026-002','pis','Panel de monitoreo energético para laboratorios','Visualización en tiempo real de consumo eléctrico','published','published','carlos.mendoza.demo@correo.com','maria.navarrete.pendiente@local.invalid','PROY-401'],
+            ['PIS-2026-003','pis','Prototipo descartado de control de asistencia','Registro creado para probar la papelera administrativa','development','registration','mateo.silva.demo@correo.com','maribel.fierro.pendiente@local.invalid','PROY-401'],
         ];
         foreach ($projects as [$code,$type,$title,$subtitle,$status,$stage,$student,$teacher,$subject]) {
-            $deleted = $code === 'DEMO-TRASH-007' ? 'DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 12 DAY)' : 'NULL';
+            $deleted = $code === 'PIS-2026-003' ? 'DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 12 DAY)' : 'NULL';
             $sql = "INSERT INTO projects(code,project_type_id,career_id,academic_period_id,title,subtitle,summary,modality,research_line_id,academic_subject_id,proposed_tutor_id,tutor_id,status,current_stage,created_by,approved_at,closed_at,published_at,created_at,updated_at,deleted_at,deletion_reason)
                 VALUES(:code,:type,:career,:period,:title,:subtitle,:summary,'group',:line,:subject,:proposed_tutor,:tutor,:status,:stage,:creator,".
                 ($status === 'approved' ? 'DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 2 DAY)' : 'NULL').','.
@@ -191,13 +191,13 @@ final class AdminDemoSeeder
             $this->participant($id, $this->userIds[$student], 'student', 'manage', true);
             $this->participant($id, $this->userIds[$teacher], 'tutor', 'review', false);
         }
-        $this->participant($this->projectIds['DEMO-PIS-002'], $this->userIds['carlos.mendoza.demo@correo.com'], 'student', 'contribute', false);
+        $this->participant($this->projectIds['PIS-2026-001'], $this->userIds['carlos.mendoza.demo@correo.com'], 'student', 'contribute', false);
     }
 
     private function seedProjectDetails(int $adminId): void
     {
         foreach ($this->projectIds as $code => $projectId) {
-            $statuses = $code === 'DEMO-PIS-006' ? ['completed','completed','completed'] : ['completed','current','upcoming'];
+            $statuses = $code === 'PIS-2026-002' ? ['completed','completed','completed'] : ['completed','current','upcoming'];
             foreach ([['registration','Registro'],['development','Desarrollo'],['review','Revisión']] as $position => [$stageCode,$label]) {
                 $this->execute('INSERT INTO project_stages(project_id,stage_code,label,position,status,completed_at) VALUES(:project,:code,:label,:position,:status,:completed)', [
                     'project'=>$projectId,'code'=>$stageCode,'label'=>$label,'position'=>$position + 1,'status'=>$statuses[$position],
@@ -206,7 +206,7 @@ final class AdminDemoSeeder
             }
         }
 
-        $reviewProject = $this->projectIds['DEMO-TT-001'];
+        $reviewProject = $this->projectIds['TIT-2026-001'];
         $student = $this->userIds['valentina.mora.demo@correo.com'];
         $teacher = $this->userIds['diana.alegria.pendiente@local.invalid'];
         $stage = $this->requiredId("SELECT id FROM project_stages WHERE project_id={$reviewProject} AND stage_code='review'", 'Falta etapa de revisión.');
@@ -221,9 +221,9 @@ final class AdminDemoSeeder
         $this->execute("INSERT INTO project_comments(project_id,author_id,body,created_at) VALUES(:project,:teacher,'El avance general es correcto. Prioricen las dos observaciones antes de la próxima entrega.',DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 2 DAY))", ['project'=>$reviewProject,'teacher'=>$teacher]);
 
         $events = [
-            ['DEMO-TT-001','Entrega de versión corregida','delivery','high','2026-07-28'],
-            ['DEMO-VIN-004','Validación de documentos finales','review','medium','2026-08-04'],
-            ['DEMO-PIS-002','Reunión de seguimiento','meeting','medium','2026-08-11'],
+            ['TIT-2026-001','Entrega de versión corregida','delivery','high','2026-07-28'],
+            ['VIN-2026-001','Validación de documentos finales','review','medium','2026-08-04'],
+            ['PIS-2026-001','Reunión de seguimiento','meeting','medium','2026-08-11'],
         ];
         foreach ($events as [$code,$title,$type,$priority,$date]) {
             $this->execute('INSERT INTO project_events(project_id,title,event_type,priority,event_date,description,created_by) VALUES(:project,:title,:type,:priority,:date,:description,:creator)', [
@@ -232,14 +232,14 @@ final class AdminDemoSeeder
             ]);
         }
 
-        foreach ([['DEMO-TT-001',$student,'observation','Tienes observaciones nuevas','Revisa los comentarios registrados por tu tutora.'],['DEMO-VIN-004',$this->userIds['sofia.lopez.demo@correo.com'],'status_change','Proyecto aprobado','El proyecto está listo para cargar sus documentos finales.'],['DEMO-PIS-006',$this->userIds['carlos.mendoza.demo@correo.com'],'repository','Proyecto publicado','El proyecto ya se encuentra publicado en el repositorio.']] as [$code,$user,$type,$title,$message]) {
+        foreach ([['TIT-2026-001',$student,'observation','Tienes observaciones nuevas','Revisa los comentarios registrados por tu tutora.'],['VIN-2026-001',$this->userIds['sofia.lopez.demo@correo.com'],'status_change','Proyecto aprobado','El proyecto está listo para cargar sus documentos finales.'],['PIS-2026-002',$this->userIds['carlos.mendoza.demo@correo.com'],'repository','Proyecto publicado','El proyecto ya se encuentra publicado en el repositorio.']] as [$code,$user,$type,$title,$message]) {
             $this->execute("INSERT INTO notifications(user_id,project_id,type,title,message,action_url,action_label,metadata,created_at) VALUES(:user,:project,:type,:title,:message,:url,'Abrir proyecto',:metadata,DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 1 DAY))", [
                 'user'=>$user,'project'=>$this->projectIds[$code],'type'=>$type,'title'=>$title,'message'=>$message,
                 'url'=>'index.php?page=project-detail&id='.$this->projectIds[$code],'metadata'=>json_encode(['demo'=>true], JSON_UNESCAPED_UNICODE),
             ]);
         }
 
-        foreach ([['DEMO-TT-001','delivery_submitted','delivery',$delivery],['DEMO-VIN-004','project_approved','project',$this->projectIds['DEMO-VIN-004']],['DEMO-PIS-006','project_published','project',$this->projectIds['DEMO-PIS-006']]] as [$code,$action,$entity,$entityId]) {
+        foreach ([['TIT-2026-001','delivery_submitted','delivery',$delivery],['VIN-2026-001','project_approved','project',$this->projectIds['VIN-2026-001']],['PIS-2026-002','project_published','project',$this->projectIds['PIS-2026-002']]] as [$code,$action,$entity,$entityId]) {
             $this->execute("INSERT INTO project_audit_log(project_id,user_id,action,entity_type,entity_id,new_state,reason,created_at) VALUES(:project,:user,:action,:entity,:entity_id,:state,'Actividad demostrativa',DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 1 DAY))", [
                 'project'=>$this->projectIds[$code],'user'=>$adminId,'action'=>$action,'entity'=>$entity,'entity_id'=>$entityId,'state'=>json_encode(['demo'=>true]),
             ]);
@@ -259,12 +259,12 @@ final class AdminDemoSeeder
     private function createPrivateFiles(): int
     {
         $specifications = [
-            ['DEMO-TT-001','Informe_avance_v1.pdf','pdf','application/pdf','delivery'],
-            ['DEMO-TT-001','Anexos_investigacion.zip','zip','application/zip','annex'],
-            ['DEMO-VIN-004','Informe_final_vinculacion.docx','docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document','final'],
-            ['DEMO-TT-005','Trabajo_titulacion_final.pdf','pdf','application/pdf','final'],
-            ['DEMO-PIS-006','Informe_proyecto_publicado.pdf','pdf','application/pdf','final'],
-            ['DEMO-PIS-006','Codigo_fuente_demostrativo.zip','zip','application/zip','source'],
+            ['TIT-2026-001','Informe_avance_v1.pdf','pdf','application/pdf','delivery'],
+            ['TIT-2026-001','Anexos_investigacion.zip','zip','application/zip','annex'],
+            ['VIN-2026-001','Informe_final_vinculacion.docx','docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document','final'],
+            ['TIT-2026-002','Trabajo_titulacion_final.pdf','pdf','application/pdf','final'],
+            ['PIS-2026-002','Informe_proyecto_publicado.pdf','pdf','application/pdf','final'],
+            ['PIS-2026-002','Codigo_fuente_demostrativo.zip','zip','application/zip','source'],
         ];
         $inserted = 0;
         foreach ($specifications as [$code,$original,$extension,$mime,$category]) {
@@ -279,7 +279,7 @@ final class AdminDemoSeeder
             if ($extension === 'pdf') $this->writePdf($path, $original);
             elseif ($extension === 'docx') $this->writeDocx($path, $original);
             else $this->writeZip($path, $original);
-            $deliveryId = $code === 'DEMO-TT-001' ? $this->requiredId("SELECT id FROM project_deliveries WHERE project_id={$projectId} ORDER BY id DESC LIMIT 1", 'Falta la entrega demostrativa.') : null;
+            $deliveryId = $code === 'TIT-2026-001' ? $this->requiredId("SELECT id FROM project_deliveries WHERE project_id={$projectId} ORDER BY id DESC LIMIT 1", 'Falta la entrega demostrativa.') : null;
             $this->execute("INSERT INTO project_files(project_id,delivery_id,category,original_name,storage_name,storage_path,mime_type,extension,size_bytes,checksum_sha256,uploaded_by)
                 VALUES(:project,:delivery,:category,:original,:storage,:path,:mime,:extension,:size,:checksum,:uploader)", [
                 'project'=>$projectId,'delivery'=>$deliveryId,'category'=>$category,'original'=>$original,'storage'=>$storageName,

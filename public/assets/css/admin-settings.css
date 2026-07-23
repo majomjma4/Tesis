@@ -11,6 +11,14 @@
 .as-form label{display:grid;gap:7px;margin-top:16px;font-weight:750}
 .as-form label>input:not([type=checkbox]){min-height:43px;padding:0 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-soft);color:var(--text);font:inherit}
 .as-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.as-code-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.as-code-grid label{min-width:0}
+.as-code-grid label>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.as-code-grid input{text-transform:uppercase}
+.as-code-grid input[type=number]{text-transform:none}
+.as-note{display:flex;align-items:flex-start;gap:9px;margin:17px 0 0;padding:11px 13px;border-radius:10px;background:rgba(37,99,235,.08);color:var(--muted);font-size:.86rem;line-height:1.45}
+.as-note i{margin-top:3px;color:var(--blue)}
+.as-note strong{color:var(--text)}
 .as-form fieldset{display:flex;gap:10px;margin-top:17px;border:0;padding:0}
 .as-form fieldset legend{font-weight:800}
 .as-form fieldset label{display:flex;align-items:center;gap:8px;flex:1;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft)}
@@ -21,4 +29,5 @@
 .as-locked dd{margin:4px 0 0;font-weight:800}
 .as-form>button{justify-self:end;padding:12px 17px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:800}
 .as-error,#settingsMessage{color:#b42318}
-@media(max-width:650px){.admin-settings-page .app-page-content{padding:20px 14px}.as-grid,.as-locked dl{grid-template-columns:1fr}.as-form fieldset{flex-direction:column}.as-form>button{width:100%}}
+@media(max-width:760px){.as-code-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.admin-settings-page .app-page-content{padding:20px 14px}.as-grid,.as-code-grid,.as-locked dl{grid-template-columns:1fr}.as-form fieldset{flex-direction:column}.as-form>button{width:100%}}

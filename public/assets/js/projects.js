@@ -120,8 +120,18 @@
         const controls = document.createElement('div'); controls.className = 'projects-pagination-pages';
         const button = (label, page, disabled = false, active = false) => { const item = document.createElement('button'); item.type = 'button'; item.textContent = label; item.disabled = disabled; item.classList.toggle('is-current', active); if (active) item.setAttribute('aria-current', 'page'); item.addEventListener('click', () => { currentPage = page; update(false); grid?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }); controls.append(item); };
         button('‹', currentPage - 1, currentPage === 1);
-        const start = Math.max(1, Math.min(currentPage - 2, pages - 4));
-        for (let page = start; page <= Math.min(pages, start + 4); page++) button(String(page), page, false, page === currentPage);
+        const pageItems = pages <= 5
+            ? Array.from({ length: pages }, (_, index) => index + 1)
+            : currentPage <= 3
+                ? [1, 2, 3, 'ellipsis', pages]
+                : currentPage >= pages - 2
+                    ? [1, 'ellipsis', pages - 2, pages - 1, pages]
+                    : [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', pages];
+        pageItems.forEach(page => {
+            if (page === 'ellipsis') {
+                const ellipsis = document.createElement('span'); ellipsis.className = 'pagination-ellipsis'; ellipsis.textContent = '…'; ellipsis.setAttribute('aria-hidden', 'true'); controls.append(ellipsis);
+            } else button(String(page), page, false, page === currentPage);
+        });
         button('›', currentPage + 1, currentPage === pages);
         pagination.append(summary, sizeLabel, controls);
     }

@@ -20,6 +20,17 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 # [En desarrollo] - 18/07/2026
 
+## Códigos configurables, paginación y adaptación móvil — 22/07/2026
+
+- Los proyectos usan códigos institucionales automáticos por tipo y año, con los prefijos iniciales `TIT`, `PFT`, `PIS`, `PRA` y `VIN`.
+- Los prefijos y la longitud numérica pueden configurarse desde Administración → Configuración; los cambios solo afectan códigos futuros.
+- Los códigos no se editan manualmente ni se reutilizan después de enviar un proyecto a la papelera o eliminarlo definitivamente.
+- Cambiar el tipo de un proyecto genera un código nuevo y conserva el cambio en la auditoría.
+- Se añadieron las migraciones `20260726_standardize_project_codes.sql` y `20260727_project_code_settings.sql`.
+- La paginación muestra la primera página, las páginas cercanas, puntos suspensivos y la última página, con controles compactos para móvil.
+- El selector de cantidad visible respeta el ancho del contenedor en pantallas pequeñas.
+- Los textos compactos usan puntos suspensivos cuando no caben y los textos de lectura evitan cortar palabras.
+
 ## Respaldo transportable y cuentas de prueba
 
 - Se incorporó `database/snapshot.sql` con la estructura y los datos actuales de MariaDB para trasladar el entorno mediante Git.
