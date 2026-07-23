@@ -12,8 +12,8 @@
     <?php else: ?>
         <section class="projects-toolbar" aria-label="Buscar y filtrar proyectos">
             <label class="projects-search"><i class="fa-solid fa-magnifying-glass"></i><span class="sr-only">Buscar proyectos</span><input type="search" data-project-search placeholder="Buscar por título, tutor, tipo o periodo"></label>
-            <label><span class="sr-only">Estado</span><select data-project-status><option value="">Todos los estados</option><option value="review">En revisión</option><option value="approved">Aprobado</option><option value="defense">En defensa</option><option value="published">Publicado</option></select></label>
-            <label><span class="sr-only">Tipo</span><select data-project-type><option value="">Todos los tipos</option><option value="thesis">Titulación</option><option value="integrator">Integrador</option><option value="community">Vinculación</option></select></label>
+            <label><span class="sr-only">Estado</span><select data-project-status><option value="">Todos los estados</option><option value="development">En desarrollo</option><option value="review">En revisión</option><option value="changes">Requiere cambios</option><option value="approved">Aprobado</option><option value="defense">En tribunal</option><option value="tribunal_approved">Aprobado por el Tribunal</option><option value="published">Publicado</option></select></label>
+            <label><span class="sr-only">Tipo</span><select data-project-type><option value="">Todos los tipos</option><option value="thesis">Titulación</option><option value="thesis_profile">Perfil de tesis</option><option value="pis">Integrador</option><option value="practice">Prácticas</option><option value="community">Vinculación</option></select></label>
             <label><span class="sr-only">Periodo académico</span><select data-project-period><option value="">Todos los periodos</option><option value="2026-I">2026-I</option><option value="2025-II">2025-II</option></select></label>
             <label><span class="sr-only">Ordenar</span><select data-project-sort><option value="activity">Actividad reciente</option><option value="title">Título A–Z</option><option value="progress">Mayor progreso</option></select></label>
             <button type="button" class="projects-clear" data-project-clear hidden><i class="fa-solid fa-xmark"></i> Limpiar</button>
@@ -35,6 +35,9 @@
                 } elseif ($project['status_key'] === 'defense') {
                     $phaseContext = ['Fecha' => $project['key_dates'][2]['value'] ?? 'Por programar', 'Evaluación' => 'En proceso'];
                     $cardAction = 'Consultar evaluación'; $actionUrl .= '&tab=information';
+                } elseif ($project['status_key'] === 'tribunal_approved') {
+                    $phaseContext = ['Tribunal' => 'Aprobado', 'Publicación' => 'Pendiente'];
+                    $cardAction = 'Preparar publicación'; $actionUrl .= '&tab=documents';
                 } elseif ($project['status_key'] === 'published') {
                     $phaseContext = ['Publicación' => $project['key_dates'][1]['value'] ?? 'Publicada', 'Disponibilidad' => 'Repositorio institucional'];
                     $cardAction = 'Ver publicación';
@@ -51,6 +54,7 @@
                 </article>
             <?php endforeach; ?>
         </section>
+        <nav class="projects-pagination" data-project-pagination aria-label="Paginación de proyectos"></nav>
         <section class="projects-empty" data-project-empty hidden><span><i class="fa-solid fa-filter-circle-xmark"></i></span><h2>No encontramos proyectos</h2><p>Prueba con otra búsqueda o limpia los filtros aplicados.</p><button type="button" data-project-clear>Limpiar búsqueda y filtros</button></section>
     <?php endif; ?>
 </div>

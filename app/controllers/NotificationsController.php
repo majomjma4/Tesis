@@ -19,12 +19,16 @@ final class NotificationsController
 
         try {
             $model = new NotificationModel();
-            $notifications = $model->getByUser($this->currentUserId());
+            $result = $model->getByUserPaginated($this->currentUserId(), [], PaginationService::request('notification_page', 'notifications_per_page'));
+            $notifications = $result['items'];
+            $pagination = $result['pagination'];
             $counters = $model->getCounters($this->currentUserId());
         } catch (Throwable $exception) {
             error_log('Notifications index error: ' . $exception->getMessage());
-            $notifications = $this->demoNotifications();
-            $counters = (new NotificationModel())->getDemoCounters($notifications);
+            $allNotifications = $this->demoNotifications();
+            $pagination = $this->demoPagination($allNotifications, 1, 25);
+            $notifications = $pagination['items'];
+            $counters = (new NotificationModel())->getDemoCounters($allNotifications);
         }
 
         View::render('notifications/index', [
@@ -34,6 +38,7 @@ final class NotificationsController
             'pageScript' => asset('js/notifications.js'),
             'summary' => $this->summaryCards($counters),
             'groups' => $this->groupNotifications($notifications),
+            'notificationPagination' => $pagination,
             'statusFilters' => $this->statusFilters(),
             'typeFilters' => $this->typeFilters(),
             'sidebarSummary' => ['unread' => $counters['unread'], 'read' => max(0, $counters['total'] - $counters['unread']), 'updated' => date('d/m/Y H:i')],
@@ -54,12 +59,17 @@ final class NotificationsController
         $hidden = filter_var($_GET['hidden'] ?? false, FILTER_VALIDATE_BOOL);
         $trash = filter_var($_GET['trash'] ?? false, FILTER_VALIDATE_BOOL);
         $status = (string) ($_GET['status'] ?? '');
+        $page = max(1, (int) ($_GET['notification_page'] ?? 1));
+        $perPage = (int) ($_GET['notifications_per_page'] ?? 10);
+        if (!in_array($perPage, [10, 25, 50, 75, 100], true)) $perPage = 10;
         $model = new NotificationModel();
 
         try {
-            $notifications = $model->getByUser($this->currentUserId(), ['search' => $search, 'type' => $type, 'status' => $status, 'hidden' => $hidden, 'trash' => $trash]);
+            $result = $model->getByUserPaginated($this->currentUserId(), ['search' => $search, 'type' => $type, 'status' => $status, 'hidden' => $hidden, 'trash' => $trash], ['page' => $page, 'size' => $perPage, 'pageKey' => 'notification_page', 'sizeKey' => 'notifications_per_page']);
+            $notifications = $result['items'];
+            $pagination = $result['pagination'];
             $counters = $model->getCounters($this->currentUserId());
-            $sectionNotifications = ($hidden || $trash) ? $model->getByUser($this->currentUserId(), ['hidden' => $hidden, 'trash' => $trash]) : [];
+            $sectionCounters = $model->getVisibilityCounters($this->currentUserId(), $hidden, $trash);
         } catch (Throwable $exception) {
             error_log('Notifications list fallback: ' . $exception->getMessage());
             $allNotifications = $this->demoNotifications();
@@ -73,15 +83,19 @@ final class NotificationsController
                     : ($hidden ? !empty($item['archived_at']) && empty($item['deleted_at']) : empty($item['archived_at']) && empty($item['deleted_at']));
                 return $matchesSearch && $matchesType && $matchesStatus && $matchesVisibility;
             }));
+            $pagination = $this->demoPagination($notifications, $page, $perPage);
+            $notifications = $pagination['items'];
             $counters = $model->getDemoCounters($allNotifications);
             $sectionNotifications = array_values(array_filter($allNotifications, static fn (array $item): bool => $trash ? !empty($item['deleted_at']) : ($hidden ? !empty($item['archived_at']) && empty($item['deleted_at']) : empty($item['archived_at']) && empty($item['deleted_at']))));
+            $sectionCounters = $this->sectionCounters($sectionNotifications, $counters, $hidden, $trash);
         }
 
         $this->json(true, 'Notificaciones actualizadas.', [
             'notifications' => $notifications,
             'groups' => $this->groupNotifications($notifications),
+            'pagination' => $pagination,
             'counters' => $counters,
-            'sectionCounters' => $this->sectionCounters($sectionNotifications, $counters, $hidden, $trash),
+            'sectionCounters' => $sectionCounters,
         ]);
     }
     // Final de presentación y consulta de notificaciones
@@ -446,6 +460,18 @@ final class NotificationsController
 
     // Inicio de transformación para la interfaz
     // Agrupa, presenta y resume los registros crudos en estructuras consumibles por la vista.
+    private function demoPagination(array $items, int $page, int $perPage): array
+    {
+        if (!in_array($perPage, [10, 25, 50, 75, 100], true)) $perPage = 10;
+        $total = count($items);
+        $availableSizes = array_values(array_filter([10, 25, 50, 75, 100], static fn(int $size): bool => $size <= $total));
+        if ($availableSizes && $perPage > max($availableSizes)) $perPage = max($availableSizes);
+        $pages = max(1, (int) ceil($total / $perPage));
+        $page = min(max(1, $page), $pages);
+        $offset = ($page - 1) * $perPage;
+        return ['items' => array_slice($items, $offset, $perPage), 'page' => $page, 'per_page' => $perPage, 'total' => $total, 'pages' => $pages, 'from' => $total ? $offset + 1 : 0, 'to' => min($offset + $perPage, $total)];
+    }
+
     private function groupNotifications(array $notifications): array
     {
         $groups = ['Hoy' => [], 'Ayer' => [], 'Esta semana' => [], 'Anteriores' => []];

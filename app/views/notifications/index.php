@@ -173,6 +173,8 @@
                 </section>
             <?php endforeach; ?>
 
+            <nav class="notification-pagination" id="notificationPagination" aria-label="Paginación de notificaciones" data-pagination="<?= e(json_encode($notificationPagination, JSON_UNESCAPED_UNICODE)) ?>"></nav>
+
             <div class="notifications-empty" id="notificationsEmpty" <?= $groups !== [] || $loadError !== null ? 'hidden' : '' ?>>
                 <span><i class="fa-regular fa-bell-slash"></i></span>
                 <h2>No tienes notificaciones por el momento.</h2>

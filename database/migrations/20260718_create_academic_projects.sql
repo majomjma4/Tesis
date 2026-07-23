@@ -210,5 +210,5 @@ INSERT IGNORE INTO roles (code, name) VALUES
 ('student', 'Estudiante'), ('teacher', 'Docente'), ('administrator', 'Administrador');
 
 INSERT IGNORE INTO project_types (code, name) VALUES
-('thesis', 'Trabajo de titulación'), ('integrator', 'Proyecto integrador'),
+('thesis', 'Titulación'), ('thesis_profile', 'Perfil de tesis'), ('integrator', 'Proyecto integrador'),
 ('internship', 'Prácticas preprofesionales'), ('community', 'Proyecto de vinculación');

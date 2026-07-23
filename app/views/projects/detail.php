@@ -1,4 +1,4 @@
-<div class="project-detail project-workspace-v2" data-project-workspace>
+<div class="project-detail project-workspace-v2" data-project-workspace data-project-status="<?=e((string)($project['status_key']??''))?>">
 <?php if ($project === null): ?>
     <section class="detail-empty detail-not-found"><span><i class="fa-regular fa-folder-open"></i></span><h1>Proyecto no encontrado</h1><p>El expediente no existe o no tienes permiso para consultarlo.</p><a href="<?= e(route('projects')) ?>">Volver a Mis proyectos</a></section>
 <?php else:
@@ -10,7 +10,8 @@
     if ($project['status_key'] === 'published' && !empty($project['repository_id'])) $primary = ['label' => 'Ver en repositorio', 'url' => route('repository-detail') . '&id=' . (int) $project['repository_id']];
     elseif ($project['status_key'] === 'review' && $can('observation.address')) $primary = ['label' => 'Atender observaciones', 'url' => $url('review')];
     elseif ($project['status_key'] === 'review' && $can('delivery.review')) $primary = ['label' => 'Revisar entrega', 'url' => $url('review')];
-    elseif (in_array($project['status_key'], ['defense'], true)) $primary = ['label' => 'Consultar evaluación', 'url' => $url('information')];
+    elseif ($project['status_key'] === 'defense') $primary = ['label' => 'Consultar evaluación', 'url' => $url('information')];
+    elseif ($project['status_key'] === 'tribunal_approved') $primary = ['label' => 'Preparar publicación', 'url' => $url('documents')];
     elseif ($project['status_key'] === 'approved') $primary = ['label' => 'Preparar documentos finales', 'url' => $url('documents')];
     elseif ($can('delivery.create')) $primary = ['label' => 'Registrar entrega', 'url' => $url('documents')];
     $statusKey = static function (string $status): string { $value = mb_strtolower($status, 'UTF-8'); return str_contains($value, 'atendida') ? 'addressed' : (str_contains($value, 'resuelta') ? 'resolved' : 'pending'); };
@@ -51,7 +52,7 @@
 
     <?php elseif ($activeTab === 'activity'): ?>
         <nav class="workspace-subtabs" aria-label="Vistas de actividad"><a class="<?= $activityView === 'history' ? 'is-active' : '' ?>" href="<?= e($url('activity', ['view'=>'history'])) ?>">Historial</a><a class="<?= $activityView === 'calendar' ? 'is-active' : '' ?>" href="<?= e($url('activity', ['view'=>'calendar'])) ?>">Calendario</a></nav>
-        <?php if ($activityView === 'history'): ?><section class="activity-view"><header><div><span>Historial</span><h2>Actividad del expediente</h2></div><label>Tipo <select disabled><option>Todas las actividades</option></select></label></header><ol class="activity-timeline"><?php foreach ($project['history'] as $entry): ?><li><i class="fa-solid <?= e($entry['icon']) ?>"></i><div><strong><?= e($entry['action']) ?></strong><p><?= e($entry['detail']) ?></p><small><?= e($entry['user']) ?> · <?= e($entry['role']) ?></small></div><time><?= e($entry['date']) ?></time></li><?php endforeach; ?></ol></section>
+        <?php if ($activityView === 'history'): ?><section class="activity-view"><header><div><span>Historial</span><h2>Actividad del expediente</h2></div><label>Tipo <select disabled><option>Todas las actividades</option></select></label></header><ol class="activity-timeline"><?php foreach ($project['history'] as $entry): ?><li><i class="fa-solid <?= e($entry['icon']) ?>"></i><div><strong><?= e($entry['action']) ?></strong><p><?= e($entry['detail']) ?></p><?php if(!empty($entry['changes'])):?><ul class="activity-change-list"><?php foreach($entry['changes'] as $change):?><li><strong><?=e($change['field'])?></strong> <?=e($change['verb']??'cambiado')?> de “<?=e($change['from'])?>” a “<?=e($change['to'])?>”.</li><?php endforeach;?></ul><?php endif;?><small><?= e($entry['user']) ?> · <?= e($entry['role']) ?></small></div><time><?= e($entry['date']) ?></time></li><?php endforeach; ?></ol></section>
         <?php else: ?><section class="activity-view"><header><div><span>Calendario</span><h2>Eventos del proyecto</h2></div><a class="secondary-action" href="<?= e(route('calendar')) ?>&project_id=<?= (int) $project['id'] ?>">Ver calendario completo</a></header><?php if ($projectEvents): ?><div class="project-events-v2"><?php foreach ($projectEvents as $event): ?><article><i class="fa-regular fa-calendar"></i><div><strong><?= e((string) $event['title']) ?></strong><p><?= e((string) ($event['description'] ?? '')) ?></p></div><time><?= e((string) $event['date']) ?></time></article><?php endforeach; ?></div><?php else: ?><div class="workspace-empty"><i class="fa-regular fa-calendar-xmark"></i><h3>No hay eventos vinculados</h3></div><?php endif; ?></section><?php endif; ?>
 
     <?php else: ?>

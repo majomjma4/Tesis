@@ -12,6 +12,7 @@ $config = [
     'environment' => getenv('APP_ENV') ?: 'development',
     'dev_autoreload' => filter_var(getenv('DEV_AUTORELOAD') ?: 'true', FILTER_VALIDATE_BOOL),
     'auth_required' => filter_var(getenv('AUTH_REQUIRED') ?: 'false', FILTER_VALIDATE_BOOL),
+    'timezone' => getenv('APP_TIMEZONE') ?: 'America/Guayaquil',
 ];
 
 $localFile = __DIR__ . '/app.local.php';

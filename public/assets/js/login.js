@@ -4,6 +4,8 @@ const userInput = document.querySelector("#user");
 const passwordInput = document.querySelector("#password");
 const loginAlert = document.querySelector("#loginAlert");
 const passwordToggle = document.querySelector("#passwordToggle");
+const recentLoginUsers = document.querySelector("#recentLoginUsers");
+const loginHistoryClear = document.querySelector("#loginHistoryClear");
 // Final de seleccion de elementos del formulario
 
 function hidePassword() {
@@ -17,6 +19,13 @@ function hidePassword() {
 
 hidePassword();
 window.addEventListener("pageshow", hidePassword);
+
+const loginHistoryKey = "recentLoginUsers";
+function readLoginHistory() { try { return JSON.parse(localStorage.getItem(loginHistoryKey) || "[]").slice(0, 3); } catch { return []; } }
+function renderLoginHistory() { const history=readLoginHistory(); recentLoginUsers?.replaceChildren(...history.map(value => { const option=document.createElement("option"); option.value=value; return option; })); if(loginHistoryClear)loginHistoryClear.hidden=history.length===0; }
+function rememberLoginUser() { const value=userInput?.value.trim(); if (!value) return; try { localStorage.setItem(loginHistoryKey, JSON.stringify([value, ...readLoginHistory().filter(item => item.toLocaleLowerCase("es") !== value.toLocaleLowerCase("es"))].slice(0, 3))); renderLoginHistory(); } catch {} }
+renderLoginHistory();
+loginHistoryClear?.addEventListener("click",()=>{try{localStorage.removeItem(loginHistoryKey);}catch{}renderLoginHistory();userInput?.focus();});
 
 // Inicio de validacion visual de campos
 function updateFieldState(input) {
@@ -65,6 +74,6 @@ loginForm?.addEventListener("submit", (event) => {
     const hasEmptyFields = !userInput.value.trim() || !passwordInput.value.trim();
     loginAlert?.classList.remove("show");
 
-    if (hasEmptyFields) event.preventDefault();
+    if (hasEmptyFields) event.preventDefault(); else rememberLoginUser();
 });
 // Final de envio del formulario

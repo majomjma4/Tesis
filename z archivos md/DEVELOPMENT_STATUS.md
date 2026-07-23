@@ -2,6 +2,22 @@
 
 # Estado Actual del Desarrollo
 
+> Actualización técnica: 23/07/2026. La edición administrativa de proyectos compara valores persistidos, registra diferencias legibles y confirma acciones sensibles.
+
+> Actualización técnica: 22/07/2026. La aplicación utiliza MariaDB local y mantiene un respaldo transportable en `database/snapshot.sql`.
+
+## Avances recientes
+
+- Edición de proyectos auditada desde el backend, con administrador, fecha, hora y detalle de valores anteriores y nuevos.
+- Confirmación previa para modificaciones administrativas y advertencias visibles sobre su impacto en reportes.
+- Opciones avanzadas visibles para participantes y documentos del proyecto.
+- Envío a Papelera corregido para motivos rápidos y personalizados.
+- Códigos de proyecto automáticos, no reutilizables y configurables por tipo desde Administración.
+- Paginación común con tamaños dinámicos de hasta 100 registros por página.
+- Navegación compacta mediante primera página, páginas vecinas, puntos suspensivos y última página.
+- Datos demostrativos y estructura actualizados en el snapshot transportable de MariaDB.
+- Dropdowns y textos compactos adaptados para pantallas pequeñas.
+
 > Actualización técnica: 18/07/2026. El proyecto está preparado para iniciar la integración controlada con MariaDB; la persistencia continúa deshabilitada.
 
 > Administrador — Fase 1 completada: autenticación obligatoria, navegación por rol, sesión verificada, contraseña temporal, cambio seguro de contraseña y rutas administrativas protegidas.
@@ -275,7 +291,10 @@ Implementado:
 - Skeleton loader para la precarga del repositorio.
 - Diseño claro y oscuro consistente con las tarjetas del Dashboard.
 - Distribución responsive del catálogo en cuatro columnas para escritorio, dos para tablet y una para móvil.
-- Contenedor general centrado en pantallas superiores a 1900 px sin alterar las proporciones internas del contenido.
+- Contenedor general centrado en pantallas de 1950 px en adelante sin alterar las proporciones internas del contenido.
+- Listados principales protegidos contra crecimiento indefinido mediante páginas configurables de 10, 25, 50 o 100 registros.
+- Bandeja personal de notificaciones paginada en sus vistas activa, archivada y papelera, con filtros y contadores SQL.
+- Catálogo `Mis proyectos` paginado después de aplicar búsqueda, filtros y ordenamiento.
 - Fase 1 de evolución del catálogo completada con contador descriptivo, colores por tipo, tecnologías, descargas y acción visual para explorar proyectos.
 - Favoritos funcionales con persistencia temporal por sesión, aislamiento entre sesiones, filtro, contador y mensajes visuales.
 - Acción de favoritos mediante POST con validación de proyecto publicado, token CSRF y respuestas JSON consistentes.
@@ -667,7 +686,7 @@ Estado: completada.
 
 - Panel de publicación conectado a proyectos y archivos reales de MariaDB.
 - Clasificación de expedientes elegibles, publicados e incompletos.
-- Publicación restringida a proyectos aprobados o finalizados con al menos un documento.
+- Publicación restringida a proyectos aprobados o, en el caso de tesis, aprobados por el Tribunal, con al menos un documento.
 - Retiro reversible de publicaciones sin eliminar el expediente ni sus archivos.
 - Fecha de publicación y estado institucional actualizados dentro de una transacción.
 - Registro de publicación y retiro en la auditoría del proyecto.
@@ -755,7 +774,6 @@ Resultado: experiencia del rol Administrador completada en sus trece fases y pre
 - Ejecutar pruebas manuales completas del rol Administrador en escritorio y móvil.
 - Revisar navegación, claridad visual, formularios, mensajes y estados vacíos.
 - Registrar y corregir los cambios detectados durante las pruebas de aceptación.
-- Crear usuarios de prueba para Estudiante y Docente mediante los flujos administrativos.
 - Crear proyectos de prueba y verificar asignaciones, estados, auditoría y notificaciones.
 - Subir documentos controlados en PDF, DOCX y ZIP para comprobar límites, almacenamiento privado y visualización.
 - Verificar publicación, restauración y reportes usando únicamente datos identificados como pruebas.

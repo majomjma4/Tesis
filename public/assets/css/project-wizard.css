@@ -13,3 +13,4 @@
 @media(max-width:680px){.wizard-member-tools,.wizard-student-results{grid-template-columns:1fr}.wizard-autosave-status{order:3;width:100%;text-align:center}}
 .wizard-progress li.is-skipped{opacity:.55}.wizard-progress li.is-skipped span{border-style:dashed}.wizard-progress li.is-skipped b:after{content:" · automático";font-weight:500}
 .wizard-progress ol{grid-template-columns:repeat(5,1fr)}
+.wizard-preview dd{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;overflow-wrap:normal;word-break:normal}

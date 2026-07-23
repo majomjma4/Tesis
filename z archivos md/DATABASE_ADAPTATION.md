@@ -26,6 +26,12 @@ La aplicación queda preparada para MariaDB, InnoDB, `utf8mb4`, PDO y consultas 
 - Los permisos visibles nunca sustituyen la validación del servidor.
 - Los únicos roles globales iniciales son Estudiante, Docente y Administrador. Tutor, líder o miembro de tribunal son funciones internas de un proyecto, no roles de acceso independientes.
 
+## Códigos institucionales
+
+- El formato se obtiene de `system_settings`; los prefijos y la longitud numérica solo afectan proyectos futuros.
+- La reserva utiliza `project_code_sequences` con bloqueo `FOR UPDATE`.
+- La secuencia nunca retrocede al borrar proyectos y el generador evita reutilizar códigos históricos.
+
 ## Convivencia temporal
 
 `DB_ENABLED=false` conserva los modelos demostrativos actuales. Los nuevos servicios PDO no se utilizan hasta activar la conexión. La migración `20260719_prepare_database_adaptation.sql` conserva temporalmente las columnas antiguas de carrera y periodo para permitir una transición sin pérdida; se retirarán después de poblar las claves normalizadas.

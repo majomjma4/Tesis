@@ -19,6 +19,33 @@ final class NotificationModel
 
     public function getByUser(int $userId, array $filters = []): array
     {
+        [$conditions, $parameters] = $this->notificationQuery($userId, $filters);
+        $statement = $this->connection()->prepare(
+            'SELECT id, user_id, project_id, type, title, message, action_url, action_label, metadata, is_read, read_at, created_at, archived_at, deleted_at
+             FROM notifications WHERE ' . implode(' AND ', $conditions) . ' ORDER BY created_at DESC, id DESC'
+        );
+        $statement->execute($parameters);
+
+        return array_map([$this, 'hydrate'], $statement->fetchAll());
+    }
+
+    public function getByUserPaginated(int $userId, array $filters = [], array $pagination = []): array
+    {
+        [$conditions, $parameters] = $this->notificationQuery($userId, $filters);
+        $where = ' FROM notifications WHERE ' . implode(' AND ', $conditions);
+        $result = PaginationService::run(
+            $this->connection(),
+            'SELECT COUNT(*)' . $where,
+            'SELECT id, user_id, project_id, type, title, message, action_url, action_label, metadata, is_read, read_at, created_at, archived_at, deleted_at' . $where . ' ORDER BY created_at DESC, id DESC',
+            $parameters,
+            $pagination ?: PaginationService::request('notification_page', 'notifications_per_page')
+        );
+        $result['items'] = array_map([$this, 'hydrate'], $result['items']);
+        return $result;
+    }
+
+    private function notificationQuery(int $userId, array $filters): array
+    {
         $visibility = !empty($filters['trash'])
             ? 'deleted_at IS NOT NULL'
             : (!empty($filters['hidden']) ? 'archived_at IS NOT NULL AND deleted_at IS NULL' : 'archived_at IS NULL AND deleted_at IS NULL');
@@ -45,13 +72,7 @@ final class NotificationModel
             $conditions[] = 'is_read = 0';
         }
 
-        $statement = $this->connection()->prepare(
-            'SELECT id, user_id, project_id, type, title, message, action_url, action_label, metadata, is_read, read_at, created_at, archived_at, deleted_at
-             FROM notifications WHERE ' . implode(' AND ', $conditions) . ' ORDER BY created_at DESC, id DESC'
-        );
-        $statement->execute($parameters);
-
-        return array_map([$this, 'hydrate'], $statement->fetchAll());
+        return [$conditions, $parameters];
     }
 
     public function findForUser(int $notificationId, int $userId): ?array
@@ -84,6 +105,22 @@ final class NotificationModel
             'week' => (int) ($row['week'] ?? 0),
             'total' => (int) ($row['total'] ?? 0),
         ];
+    }
+
+    public function getVisibilityCounters(int $userId, bool $hidden, bool $trash): array
+    {
+        if (!$hidden && !$trash) return $this->getCounters($userId);
+        $visibility = $trash ? 'deleted_at IS NOT NULL' : 'archived_at IS NOT NULL AND deleted_at IS NULL';
+        $statement = $this->connection()->prepare(
+            "SELECT COUNT(*) total,
+                    COALESCE(SUM(is_read = 0), 0) unread,
+                    COALESCE(SUM(YEARWEEK(created_at, 1) = YEARWEEK(CURRENT_DATE(), 1)), 0) week,
+                    COALESCE(SUM(deleted_at IS NOT NULL AND deleted_at <= DATE_SUB(NOW(), INTERVAL 23 DAY)), 0) expiring
+             FROM notifications WHERE user_id = :user_id AND $visibility"
+        );
+        $statement->execute(['user_id' => $userId]);
+        $row = $statement->fetch() ?: [];
+        return ['total' => (int) ($row['total'] ?? 0), 'unread' => (int) ($row['unread'] ?? 0), 'week' => (int) ($row['week'] ?? 0), 'expiring' => (int) ($row['expiring'] ?? 0)];
     }
     // Final de acceso y consulta de notificaciones
 

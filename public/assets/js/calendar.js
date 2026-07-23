@@ -29,6 +29,7 @@ if (calendarRoot) {
     function fromKey(key) { const [year, month, day] = key.split('-').map(Number); return new Date(year, month - 1, day); }
     function startOfWeek(date) { const result = new Date(date); result.setDate(result.getDate() - ((result.getDay() + 6) % 7)); result.setHours(0, 0, 0, 0); return result; }
     function addDays(date, amount) { const result = new Date(date); result.setDate(result.getDate() + amount); return result; }
+    function normalizeSearch(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es'); }
     function isOverdue(event) { return !event.completed && fromKey(event.date) < today; }
     function sortEvents(items) { const priorities = { high: 0, medium: 1, low: 2 }; return [...items].sort((a, b) => { if (sortMode === 'priority') return (priorities[a.priority] ?? 1) - (priorities[b.priority] ?? 1) || `${a.date} ${a.title}`.localeCompare(`${b.date} ${b.title}`, 'es'); if (sortMode === 'completed') return Number(a.completed) - Number(b.completed) || `${a.date} ${a.title}`.localeCompare(`${b.date} ${b.title}`, 'es'); return `${a.date} ${a.title}`.localeCompare(`${b.date} ${b.title}`, 'es'); }); }
     function eventDestination(event) { const id = Number(event.projectId || 0); if (!id) return { url: projectUrl, label: 'Ir a Mis proyectos' }; const tab = event.type === 'review' ? 'observations' : (event.type === 'delivery' || event.type === 'deadline' ? 'deliveries' : 'calendar'); return { url: `${projectUrl}&id=${id}&tab=${tab}`, label: tab === 'observations' ? 'Ir a observaciones' : (tab === 'deliveries' ? 'Ir a entregas' : 'Ir al proyecto') }; }
@@ -37,7 +38,7 @@ if (calendarRoot) {
             if (projectFilterId && Number(event.projectId || 0) !== projectFilterId) return false;
             const matchesType = activeFilter === 'all' || (activeFilter === 'pending' ? !event.completed : event.type === activeFilter);
             const matchesPriority = activePriority === 'all' || event.priority === activePriority;
-            const text = `${event.title} ${event.description || ''}`.toLocaleLowerCase('es');
+            const text = normalizeSearch(`${event.title} ${event.description || ''}`);
             const prefix = `${visibleDate.getFullYear()}-${String(visibleDate.getMonth() + 1).padStart(2, '0')}`;
             const weekEnd = addDays(today, 7);
             const matchesScope = quickScope === 'month' ? event.date.startsWith(prefix) : quickScope === 'week' ? (!event.completed && fromKey(event.date) >= today && fromKey(event.date) <= weekEnd) : quickScope === 'completed' ? (event.completed && event.date.startsWith(prefix)) : true;
@@ -215,7 +216,7 @@ if (calendarRoot) {
     $$('.calendar-stat-action').forEach((button) => button.addEventListener('click', () => applyQuickScope(button.dataset.scope)));
     $$('.calendar-view-switcher button').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view))); $$('.calendar-filter[data-filter]').forEach((button) => button.addEventListener('click', () => { clearQuickScope(); activeFilter = button.dataset.filter; $$('.calendar-filter[data-filter]').forEach((item) => item.classList.toggle('active', item === button)); renderAll(); }));
     $$('.calendar-priority-filter').forEach((button) => button.addEventListener('click', () => { clearQuickScope(); activePriority = activePriority === button.dataset.priority ? 'all' : button.dataset.priority; $$('.calendar-priority-filter').forEach((item) => item.classList.toggle('active', item.dataset.priority === activePriority)); renderAll(); }));
-    $('#calendarSearch').addEventListener('input', (event) => { clearQuickScope(); searchTerm = event.target.value.trim().toLocaleLowerCase('es'); renderAll(); }); $('#calendarClearFilters').addEventListener('click', clearFilters); $('#calendarNewEventBtn').addEventListener('click', () => openModal()); $('#calendarAgendaAdd').addEventListener('click', () => openModal());
+    $('#calendarSearch').addEventListener('input', (event) => { clearQuickScope(); searchTerm = normalizeSearch(event.target.value.trim()); renderAll(); }); $('#calendarClearFilters').addEventListener('click', clearFilters); $('#calendarNewEventBtn').addEventListener('click', () => openModal()); $('#calendarAgendaAdd').addEventListener('click', () => openModal());
     $('#calendarOpenAgendaBtn').addEventListener('click', openAgenda); $('#calendarAgendaClose').addEventListener('click', closeAgenda); $('#calendarAgendaBackdrop').addEventListener('click', closeAgenda); $('#calendarModalClose').addEventListener('click', closeModal); $('#calendarModalCancel').addEventListener('click', closeModal); $('#calendarEventModal').addEventListener('click', (event) => { if (event.target === $('#calendarEventModal')) closeModal(); });
     $('#calendarEventDescription').addEventListener('input', (event) => $('#calendarDescriptionCount').textContent = event.target.value.length);
     $$('.calendar-select-wrap select').forEach((select) => select.addEventListener('change', syncSelectStyles));

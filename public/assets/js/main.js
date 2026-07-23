@@ -319,9 +319,11 @@ topbarNotificationsList?.addEventListener("click", async (event) => {
     }
 });
 
+// Se usa captura para cerrar también cuando otro menú detiene la propagación
+// (por ejemplo, el menú del avatar).
 document.addEventListener("click", (event) => {
     if (!event.target.closest(".topbar-notifications")) closeTopbarNotifications();
-});
+}, true);
 
 document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && topbarNotificationsPanel && !topbarNotificationsPanel.hidden) {
@@ -349,34 +351,89 @@ if (temporaryPasswordWarning) {
 (() => {
     const instances = [];
     let active = null;
+    let ignoreScrollUntil = 0;
     const close = (focus = false) => { if (!active) return; const { button, panel } = active; panel.remove(); button.setAttribute("aria-expanded", "false"); button.closest(".custom-select")?.classList.remove("is-open"); active = null; if (focus) button.focus(); };
     const position = (button, panel) => {
-        const rect = button.getBoundingClientRect(), margin = 8;
+        const rect = button.getBoundingClientRect(), margin = 8, gap = 6;
+        const viewportHeight = window.visualViewport?.height || window.innerHeight;
+        const opensAbove = button.closest(".custom-select")?.querySelector("select")?.dataset.dropdownPlacement === "top";
         panel.style.width = `${Math.min(Math.max(rect.width, 220), window.innerWidth - margin * 2)}px`;
         panel.style.left = `${Math.min(Math.max(margin, rect.left), window.innerWidth - panel.offsetWidth - margin)}px`;
-        const below = window.innerHeight - rect.bottom - margin, height = Math.min(panel.scrollHeight, 300);
-        const above = below < Math.min(height, 190) && rect.top > below;
-        panel.style.maxHeight = `${Math.max(140, above ? rect.top - margin * 2 : below)}px`;
-        panel.style.top = `${above ? Math.max(margin, rect.top - Math.min(height, rect.top - margin * 2) - 6) : rect.bottom + 6}px`;
+        const availableBelow = Math.max(40, opensAbove ? rect.top - gap - margin : viewportHeight - rect.bottom - gap - margin);
+        const options = [...panel.querySelectorAll(".custom-select-option:not([hidden])")].slice(0, 4);
+        const panelStyle = getComputedStyle(panel);
+        const bottomInset = parseFloat(panelStyle.paddingBottom) + parseFloat(panelStyle.borderBottomWidth);
+        const completeOptionHeights = options.map(option => Math.ceil(option.offsetTop + option.offsetHeight + bottomInset));
+        const fittingHeights = completeOptionHeights.filter(height => height <= availableBelow);
+        const completeHeight = fittingHeights.at(-1) || Math.min(completeOptionHeights[0] || panel.scrollHeight, availableBelow);
+        panel.style.setProperty("max-height", `${Math.min(completeHeight, availableBelow)}px`, "important");
+        panel.style.top = `${opensAbove ? Math.max(margin, rect.top - gap - Math.min(completeHeight, availableBelow)) : rect.bottom + gap}px`;
     };
     document.querySelectorAll(".app-shell select:not([multiple]):not([data-native-select])").forEach((select, index) => {
-        if (select.closest(".calendar-select-wrap, .project-wizard")) return;
-        const wrapper = document.createElement("span"); wrapper.className = "custom-select"; select.parentNode.insertBefore(wrapper, select); wrapper.append(select); select.classList.add("custom-select-native");
+        if (select.closest(".calendar-select-wrap")) return;
+        const wrapper = document.createElement("span"); wrapper.className = "custom-select"; select.parentNode.insertBefore(wrapper, select); wrapper.append(select); select.classList.add("custom-select-native"); select.dataset.enhanced = "true";
         const button = document.createElement("button"); button.type = "button"; button.className = "custom-select-trigger"; button.setAttribute("aria-haspopup", "listbox"); button.setAttribute("aria-expanded", "false"); button.setAttribute("aria-controls", `customSelectPanel${index}`); button.innerHTML = '<span></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>'; wrapper.append(button);
         const sync = () => { const option = select.options[select.selectedIndex]; button.querySelector("span").textContent = option?.textContent.trim() || "Selecciona una opción"; button.disabled = select.disabled; button.classList.toggle("is-placeholder", !select.value); };
         const open = () => {
             if (button.disabled) return; if (active?.select === select) return close(true); close(); sync();
+            document.dispatchEvent(new CustomEvent("app:dropdown-open", { detail: { trigger: button } }));
             const panel = document.createElement("div"); panel.id = `customSelectPanel${index}`; panel.className = "custom-select-panel"; panel.setAttribute("role", "listbox"); panel.setAttribute("aria-label", select.getAttribute("aria-label") || "Opciones");
-            [...select.options].forEach(option => { const item = document.createElement("button"); item.type = "button"; item.className = "custom-select-option"; item.disabled = option.disabled; item.setAttribute("role", "option"); item.setAttribute("aria-selected", String(option.selected)); item.innerHTML = '<span></span><i class="fa-solid fa-check" aria-hidden="true"></i>'; item.querySelector("span").textContent = option.textContent.trim(); item.addEventListener("click", () => { select.value = option.value; select.dispatchEvent(new Event("input", { bubbles: true })); select.dispatchEvent(new Event("change", { bubbles: true })); sync(); close(true); }); panel.append(item); });
-            document.body.append(panel); wrapper.classList.add("is-open"); button.setAttribute("aria-expanded", "true"); active = { select, button, panel }; position(button, panel); panel.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+            const searchable = select.dataset.searchable === "true" || select.options.length > 8;
+            if (searchable) panel.classList.add("is-searchable");
+            let searchInput = null, emptyMessage = null;
+            if (searchable) {
+                const search = document.createElement("label"); search.className = "custom-select-search"; search.innerHTML = '<i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span class="sr-only">Buscar una opción</span>';
+                searchInput = document.createElement("input"); searchInput.type = "search"; searchInput.placeholder = select.dataset.searchPlaceholder || "Buscar en la lista..."; searchInput.autocomplete = "off"; search.append(searchInput); panel.append(search);
+            }
+            [...select.options].forEach(option => { const item = document.createElement("button"); item.type = "button"; item.className = "custom-select-option"; item.disabled = option.disabled; item.dataset.searchText = option.textContent.trim().toLocaleLowerCase("es"); item.setAttribute("role", "option"); item.setAttribute("aria-selected", String(option.selected)); item.innerHTML = '<span></span><i class="fa-solid fa-check" aria-hidden="true"></i>'; item.querySelector("span").textContent = option.textContent.trim(); item.addEventListener("click", () => { select.value = option.value; select.dispatchEvent(new Event("input", { bubbles: true })); select.dispatchEvent(new Event("change", { bubbles: true })); sync(); close(true); }); panel.append(item); });
+            if (searchInput) {
+                emptyMessage = document.createElement("p"); emptyMessage.className = "custom-select-empty"; emptyMessage.textContent = "No hay coincidencias."; emptyMessage.hidden = true; panel.append(emptyMessage);
+                searchInput.addEventListener("input", () => { const query = searchInput.value.trim().toLocaleLowerCase("es"); let visible = 0; panel.querySelectorAll(".custom-select-option").forEach(item => { item.hidden = query !== "" && !item.dataset.searchText.includes(query); if (!item.hidden) visible++; }); emptyMessage.hidden = visible > 0; position(button, panel); });
+                searchInput.addEventListener("keydown", event => { if (event.key === "ArrowDown") { event.preventDefault(); panel.querySelector(".custom-select-option:not(:disabled):not([hidden])")?.focus(); } });
+            }
+            document.body.append(panel);
+            const firstOptions = [...panel.querySelectorAll(".custom-select-option:not([hidden])")].slice(0, 4);
+            const lastInitialOption = firstOptions.at(-1);
+            const desiredHeight = lastInitialOption ? lastInitialOption.offsetTop + lastInitialOption.offsetHeight + 8 : panel.scrollHeight;
+            const viewportHeight = window.visualViewport?.height || window.innerHeight;
+            if (select.dataset.dropdownPlacement !== "top" && viewportHeight - button.getBoundingClientRect().bottom - 14 < desiredHeight) {
+                ignoreScrollUntil = performance.now() + 300;
+                button.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+            }
+            wrapper.classList.add("is-open"); button.setAttribute("aria-expanded", "true"); active = { select, button, panel }; position(button, panel); panel.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+            searchInput?.focus();
         };
         button.addEventListener("click", open);
-        button.addEventListener("keydown", event => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); open(); return; } if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); if (active?.select !== select) open(); const options = [...(active?.panel.querySelectorAll(".custom-select-option:not(:disabled)") || [])]; options[Math.max(0, options.findIndex(option => option.getAttribute("aria-selected") === "true"))]?.focus(); } });
+        button.addEventListener("keydown", event => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); open(); return; } if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); if (active?.select !== select) open(); const options = [...(active?.panel.querySelectorAll(".custom-select-option:not(:disabled):not([hidden])") || [])]; options[Math.max(0, options.findIndex(option => option.getAttribute("aria-selected") === "true"))]?.focus(); } });
         select.addEventListener("change", sync); select.form?.addEventListener("reset", () => setTimeout(sync)); sync(); instances.push({ sync });
     });
     document.addEventListener("click", event => { if (active && !event.target.closest(".custom-select-panel") && !event.target.closest(".custom-select-trigger")) close(); });
-    document.addEventListener("keydown", event => { if (!active) return; if (event.key === "Escape") { event.preventDefault(); close(true); } if (["ArrowDown", "ArrowUp"].includes(event.key) && event.target.closest(".custom-select-panel")) { event.preventDefault(); const options = [...active.panel.querySelectorAll(".custom-select-option:not(:disabled)")], current = options.indexOf(document.activeElement), next = event.key === "ArrowDown" ? Math.min(options.length - 1, current + 1) : Math.max(0, current - 1); options[next]?.focus(); } });
-    window.addEventListener("resize", () => close()); window.addEventListener("scroll", () => close(), true);
+    document.addEventListener("app:dropdown-open", event => { if (active && active.button !== event.detail?.trigger) close(); });
+    document.addEventListener("keydown", event => { if (!active) return; if (event.key === "Escape") { event.preventDefault(); close(true); } if (["ArrowDown", "ArrowUp"].includes(event.key) && event.target.closest(".custom-select-panel") && !event.target.matches("input")) { event.preventDefault(); const options = [...active.panel.querySelectorAll(".custom-select-option:not(:disabled):not([hidden])")], current = options.indexOf(document.activeElement), next = event.key === "ArrowDown" ? Math.min(options.length - 1, current + 1) : Math.max(0, current - 1); options[next]?.focus(); } });
+    window.addEventListener("resize", () => close()); window.addEventListener("scroll", event => {
+        if (event.target instanceof Node && active?.panel.contains(event.target)) return;
+        if (active && performance.now() < ignoreScrollUntil) { requestAnimationFrame(() => active && position(active.button, active.panel)); return; }
+        close();
+    }, true);
     new MutationObserver(() => instances.forEach(({ sync }) => sync())).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden", "disabled", "selected"] });
 })();
 // Final de selectores personalizados
+
+// Inicio de historial breve para buscadores
+(() => {
+    const inputs = document.querySelectorAll('.app-shell input[type="search"],.app-shell .ap-filters input[name="search"],.app-shell .users-filters input[name="search"]');
+    inputs.forEach((input, index) => {
+        if (input.hasAttribute("data-no-search-history")) return;
+        input.autocomplete = "off";
+        const key = `recentSearch:${location.pathname}:${input.id || input.name || index}`;
+        const list = document.createElement("datalist"); list.id = `recentSearchList${index}`; document.body.append(list); input.setAttribute("list", list.id);
+        const read = () => { try { return JSON.parse(localStorage.getItem(key) || "[]").slice(0, 3); } catch { return []; } };
+        const field = document.createElement("span"); field.className = "search-history-field"; input.parentNode.insertBefore(field, input); field.append(input);
+        const clearButton = document.createElement("button"); clearButton.type = "button"; clearButton.className = "search-history-clear"; clearButton.title = "Borrar historial de búsqueda"; clearButton.setAttribute("aria-label", "Borrar historial de búsqueda"); clearButton.innerHTML = '<i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><i class="fa-solid fa-xmark" aria-hidden="true"></i>'; field.append(clearButton);
+        const render = () => { const history = read(); list.replaceChildren(...history.map(value => { const option = document.createElement("option"); option.value = value; return option; })); clearButton.hidden = history.length === 0; };
+        const remember = () => { const value = input.value.trim(); if (!value) return; try { localStorage.setItem(key, JSON.stringify([value, ...read().filter(item => item.toLocaleLowerCase("es") !== value.toLocaleLowerCase("es"))].slice(0, 3))); render(); } catch {} };
+        clearButton.addEventListener("click", () => { try { localStorage.removeItem(key); } catch {} render(); input.focus(); });
+        input.addEventListener("keydown", event => { if (event.key === "Enter") remember(); }); input.form?.addEventListener("submit", event => { if (event.submitter) remember(); }); render();
+    });
+})();
+// Final de historial breve para buscadores

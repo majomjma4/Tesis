@@ -50,7 +50,10 @@ final class ProjectsController
         $selectedObservationId = filter_var($_GET['observation'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 1;
         $model = new ProjectModel();
         $access = new ProjectAccessService();
-        $project = $id && $access->can('project.view') ? $model->findProjectForUser((int) $id, $access->currentUserId()) : null;
+        $isAdministrator = in_array('administrator', $access->currentRoles(), true);
+        $project = $id && $access->can('project.view')
+            ? ($isAdministrator ? $model->findProjectForAdministrator((int) $id) : $model->findProjectForUser((int) $id, $access->currentUserId()))
+            : null;
         $projectEvents = [];
         if ($project !== null) {
             $projectEvents = array_values(array_filter((new CalendarModel())->getEvents(), static fn (array $event): bool => (int) ($event['projectId'] ?? 0) === (int) $project['id']));

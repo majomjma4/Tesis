@@ -20,6 +20,35 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 
 # [En desarrollo] - 18/07/2026
 
+## Edición administrativa y Papelera — 23/07/2026
+
+- Se eliminó el selector “Texto rápido” del modal Editar proyecto.
+- El backend compara cada edición con los valores reales de MariaDB y evita guardar cuando no existen cambios.
+- La auditoría registra únicamente los campos modificados, con valor anterior, valor nuevo, administrador responsable, fecha y hora.
+- Tutor, periodo, estado, tipo y demás relaciones se presentan en el historial mediante nombres legibles y no mediante identificadores.
+- El modal advierte que las modificaciones afectan el historial y los reportes, y solicita confirmación antes de guardar.
+- Se añadió el bloque plegable “Opciones avanzadas” para acceder a participantes y archivos/versiones, con advertencias específicas.
+- Se corrigió el envío a la Papelera: los motivos rápidos y el motivo personalizado ahora llegan correctamente al backend.
+
+## Códigos configurables, paginación y adaptación móvil — 22/07/2026
+
+- Los proyectos usan códigos institucionales automáticos por tipo y año, con los prefijos iniciales `TIT`, `PFT`, `PIS`, `PRA` y `VIN`.
+- Los prefijos y la longitud numérica pueden configurarse desde Administración → Configuración; los cambios solo afectan códigos futuros.
+- Los códigos no se editan manualmente ni se reutilizan después de enviar un proyecto a la papelera o eliminarlo definitivamente.
+- Cambiar el tipo de un proyecto genera un código nuevo y conserva el cambio en la auditoría.
+- Se añadieron las migraciones `20260726_standardize_project_codes.sql` y `20260727_project_code_settings.sql`.
+- La paginación muestra la primera página, las páginas cercanas, puntos suspensivos y la última página, con controles compactos para móvil.
+- El selector de cantidad visible respeta el ancho del contenedor en pantallas pequeñas.
+- Los textos compactos usan puntos suspensivos cuando no caben y los textos de lectura evitan cortar palabras.
+
+## Respaldo transportable y cuentas de prueba
+
+- Se incorporó `database/snapshot.sql` con la estructura y los datos actuales de MariaDB para trasladar el entorno mediante Git.
+- Se añadieron scripts PowerShell para exportar el estado actual y restaurarlo después de clonar el repositorio.
+- Se documentó el proceso de respaldo, restauración y manejo privado del snapshot.
+- Se crearon cuentas activas de prueba para los roles Estudiante y Docente, con sus perfiles y relaciones académicas requeridas.
+- Se verificaron las credenciales de ambas cuentas y se actualizó el snapshot después de los cambios.
+
 ## Rediseño del Index administrativo
 
 - Se reorganizó el inicio del Administrador en tres zonas: resumen institucional, pendientes prioritarios y contexto operativo.
@@ -30,7 +59,17 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - La auditoría presenta nombres comprensibles en español y las barras incorporan semántica accesible.
 - Se añadieron fecha de actualización, navegación por teclado, foco visible y adaptación específica para móvil y tablet.
 - Las alertas de observaciones y el grupo de proyectos cerrados abren filtros SQL exactos y muestran el contexto activo en Proyectos.
-- Fechas y actividad utilizan expresiones naturales en español, y “Situaciones pendientes” aclara que el indicador suma incidencias administrativas.
+- La métrica redundante “Situaciones pendientes” se sustituyó por “Actividad esta semana”, calculada desde las auditorías de los últimos siete días y enlazada directamente a Reportes.
+- Las incidencias que requieren intervención permanecen exclusivamente en el bloque “Requiere tu atención”.
+- La última actualización utiliza la zona horaria configurada y diferencia claramente los fallos de conexión.
+- El indicador de actualización incorpora un botón accesible que recarga los datos desde el servidor, muestra progreso y confirma “Ya estás al día” únicamente después de una consulta correcta.
+- Se corrigieron textos breves, singular y plural, prioridad automática de incidencias, presencia de barras, accesibilidad, responsive e impresión del Index administrativo.
+- El buscador administrativo de proyectos filtra mientras se escribe, resalta únicamente el fragmento coincidente y mantiene sincronizados los resultados paginados al confirmar o modificar una consulta.
+- El flujo de estados de Proyectos se normalizó como Desarrollo, Revisión, Cambios, Aprobado, Tribunal y Publicado; Tribunal se limita a tesis y se retiró el estado legado Finalizado.
+- Las tesis incorporan el estado “Aprobado por el Tribunal” entre “En tribunal” y “Publicado”; ambos estados del Tribunal aparecen en filtros generales y se ocultan para otros tipos.
+- Los dropdowns limitan su altura a cuatro opciones visibles y utilizan desplazamiento interno para los listados más extensos.
+- El scroll interno de los dropdowns ya no cierra la lista; únicamente el desplazamiento de la página exterior conserva ese comportamiento.
+- El resumen superior de Proyectos incorpora una card verde con el conteo real de expedientes aprobados.
 - El skeleton del Index replica la nueva distribución de tres métricas y se adapta a escritorio, tablet y móvil.
 
 ## Datos de prueba del Administrador
@@ -47,6 +86,9 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Usuarios, Proyectos, Repositorio, Papelera, Notificaciones dirigidas y Auditoría consultan páginas reales desde MariaDB mediante `LIMIT` y `OFFSET`.
 - Se añadió un componente común con tamaños de 10, 25, 50 o 100 resultados, rango visible, total, navegación numérica y adaptación móvil.
 - Las búsquedas, filtros, fechas y pestañas se conservan al avanzar entre páginas; al aplicar filtros nuevos se vuelve automáticamente a la primera.
+- La bandeja personal de estudiantes y docentes pagina desde MariaDB las notificaciones activas, archivadas y enviadas a la papelera.
+- Los contadores de archivo y papelera se calculan en SQL sin cargar colecciones completas en memoria.
+- La pantalla `Mis proyectos` pagina sus tarjetas después de aplicar búsqueda, filtros y ordenamiento.
 - Los catálogos institucionales pequeños permanecen completos porque su volumen es controlado y no se benefician de paginación.
 
 ## Administrador — Fase 1
@@ -275,7 +317,7 @@ Este documento deberá actualizarse únicamente cuando se complete una funcional
 - Se agregó un skeleton loader durante la precarga del repositorio.
 - Se ajustó la distribución del catálogo a cuatro columnas en escritorio, dos en tablet y una en móvil.
 - Se mejoró el comportamiento responsive de insignias, contadores, filtros y controles del carrusel.
-- Se limitó el crecimiento de la interfaz en pantallas superiores a 1900 px mediante márgenes exteriores, conservando las proporciones internas.
+- Se limitó el crecimiento de la interfaz en pantallas de 1950 px en adelante mediante márgenes exteriores, conservando las proporciones internas.
 - Se añadieron colores institucionales centralizados para Tesis, Perfil de tesis, Prácticas preprofesionales, Proyecto PIS y Vinculación.
 - Se agregaron tecnologías, indicador de etiquetas adicionales, número de descargas y la acción visual `Explorar proyecto`.
 - Se incorporaron corazones de favorito con estado visual y mensajes discretos de confirmación.

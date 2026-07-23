@@ -8,6 +8,9 @@ define('APP_PATH', ROOT_PATH . '/app');
 // Inicio de carga de configuración y dependencias
 // Define la base de la aplicación e incorpora helpers y el cargador central de clases.
 $config = require APP_PATH . '/config/app.php';
+$timezone = (string) ($config['timezone'] ?? 'America/Guayaquil');
+if (!in_array($timezone, timezone_identifiers_list(), true)) $timezone = 'America/Guayaquil';
+date_default_timezone_set($timezone);
 
 require APP_PATH . '/helpers.php';
 require APP_PATH . '/Core/Autoloader.php';

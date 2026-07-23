@@ -37,7 +37,7 @@ const repositorySupportDocumentLimit = repositorySupportLimit - 1;
 let repositorySupportCurrentPage = 0;
 let repositoryFavoritesOnly = false;
 let repositoryToastTimer = null;
-const repositoryProjectsPerPage = 20;
+const repositoryProjectsPerPage = 10;
 let repositoryCurrentPage = 1;
 
 // Inicio de precarga estilo skeleton
@@ -91,7 +91,7 @@ function filterRepositoryProjects(resetPage = true) {
     const lastVisible = Math.min(pageStart + repositoryProjectsPerPage, matchingProjects.length);
 
     if (repositoryCount) {
-        repositoryCount.textContent = `Mostrando ${firstVisible}–${lastVisible} de ${matchingProjects.length} proyectos`;
+        repositoryCount.textContent = `Mostrando ${lastVisible} de ${matchingProjects.length} proyectos`;
     }
     if (repositoryEmpty) {
         repositoryEmpty.hidden = matchingProjects.length !== 0;
@@ -112,7 +112,7 @@ function filterRepositoryProjects(resetPage = true) {
                 : "Prueba con otros términos o modifica los filtros seleccionados.";
         repositoryShowAllProjects.hidden = !favoritesAreEmpty && !favoritesHaveNoMatches;
     }
-    if (repositoryPagination) repositoryPagination.hidden = matchingProjects.length <= repositoryProjectsPerPage;
+    if (repositoryPagination) repositoryPagination.hidden = matchingProjects.length <= 10;
     if (repositoryPageInfo) repositoryPageInfo.textContent = `Página ${repositoryCurrentPage} de ${totalPages}`;
     if (repositoryPagePrevious) repositoryPagePrevious.disabled = repositoryCurrentPage <= 1;
     if (repositoryPageNext) repositoryPageNext.disabled = repositoryCurrentPage >= totalPages;

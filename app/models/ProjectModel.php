@@ -26,6 +26,89 @@ final class ProjectModel
         return null;
     }
 
+    /** Devuelve un expediente real para la consulta administrativa. */
+    public function findProjectForAdministrator(int $projectId): ?array
+    {
+        if (!Database::isEnabled()) return null;
+
+        $statement = Database::connection()->prepare(
+            "SELECT p.id, p.code, p.title, p.subtitle, p.status, p.current_stage, p.updated_at,
+                    pt.code AS type_key, pt.name AS type, c.name AS career, ap.name AS period,
+                    tutor.full_name AS tutor_name
+             FROM projects p
+             INNER JOIN project_types pt ON pt.id = p.project_type_id
+             LEFT JOIN careers c ON c.id = p.career_id
+             LEFT JOIN academic_periods ap ON ap.id = p.academic_period_id
+             LEFT JOIN users tutor ON tutor.id = p.tutor_id
+             WHERE p.id = :id AND p.deleted_at IS NULL"
+        );
+        $statement->execute(['id' => $projectId]);
+        $row = $statement->fetch();
+        if (!$row) return null;
+
+        $participants = Database::connection()->prepare(
+            "SELECT u.full_name, pp.role_code
+             FROM project_participants pp
+             INNER JOIN users u ON u.id = pp.user_id
+             WHERE pp.project_id = :id AND pp.status = 'active'
+             ORDER BY pp.is_leader DESC, u.full_name"
+        );
+        $participants->execute(['id' => $projectId]);
+        $members = array_map(static fn (array $member): array => [
+            'initial' => mb_strtoupper(mb_substr((string) $member['full_name'], 0, 1, 'UTF-8'), 'UTF-8'),
+            'name' => (string) $member['full_name'],
+            'role' => $member['role_code'] === 'leader' ? 'Líder' : 'Integrante',
+        ], $participants->fetchAll());
+
+        $statusLabels = [
+            'development' => 'En desarrollo', 'under_review' => 'En revisión',
+            'changes_required' => 'Requiere cambios', 'approved' => 'Aprobado',
+            'defense' => 'En tribunal', 'tribunal_approved' => 'Aprobado por el Tribunal',
+            'published' => 'Publicado',
+        ];
+        $statusKey = match ((string) $row['status']) {
+            'under_review', 'changes_required' => 'review',
+            default => (string) $row['status'],
+        };
+        $updatedAt = (string) ($row['updated_at'] ?? '');
+        $date = $updatedAt ? date('d/m/Y', strtotime($updatedAt)) : 'Sin actividad registrada';
+        $audit = Database::connection()->prepare(
+            "SELECT pal.new_state,pal.created_at,u.full_name
+             FROM project_audit_log pal
+             LEFT JOIN users u ON u.id=pal.user_id
+             WHERE pal.project_id=:id AND pal.action='project_updated'
+             ORDER BY pal.created_at DESC,pal.id DESC"
+        );
+        $audit->execute(['id'=>$projectId]);
+        $auditHistory=[];
+        foreach($audit->fetchAll() as $entry){
+            $state=json_decode((string)($entry['new_state']??''),true);
+            $changes=is_array($state)?($state['_history_changes']??null):null;
+            if(!is_array($changes)||!$changes)continue;
+            $auditHistory[]=[
+                'type'=>'Modificación','icon'=>'fa-pen-to-square',
+                'user'=>(string)($entry['full_name']?:'Administrador'),'role'=>'Administrador',
+                'action'=>'Administrador modificó el proyecto',
+                'detail'=>'Cambios realizados:','changes'=>$changes,
+                'date'=>date('d/m/Y H:i',strtotime((string)$entry['created_at'])),
+            ];
+        }
+
+        return $this->enrichProject([
+            'id' => (int) $row['id'], 'type' => (string) $row['type'],
+            'type_key' => (string) $row['type_key'], 'status' => $statusLabels[$row['status']] ?? (string) $row['status'],
+            'status_key' => $statusKey, 'title' => (string) $row['title'],
+            'subtitle' => (string) ($row['subtitle'] ?? ''), 'career' => (string) ($row['career'] ?? 'Sin carrera'),
+            'period' => (string) ($row['period'] ?? 'Sin periodo'), 'role' => 'Administración',
+            'tutor' => (string) ($row['tutor_name'] ?? ''), 'participants' => $members,
+            'last_activity' => 'Actualización del expediente · ' . $date,
+            'stage' => (string) ($row['current_stage'] ?? 'Registro'), 'latest_delivery' => null,
+            'observations' => [], 'comments' => [],
+            'activities' => [['title' => 'Expediente disponible para administración', 'date' => $date]],
+            'persistent_history'=>$auditHistory,
+        ]);
+    }
+
     public function getProjectMetrics(array $projects): array
     {
         $counts = ['active' => 0, 'review' => 0, 'changes' => 0, 'finished' => 0];
@@ -37,7 +120,7 @@ final class ProjectModel
             ['key' => 'active', 'label' => 'Activos', 'icon' => 'fa-folder-open', 'count' => $counts['active']],
             ['key' => 'review', 'label' => 'En revisión', 'icon' => 'fa-magnifying-glass', 'count' => $counts['review']],
             ['key' => 'changes', 'label' => 'Requieren cambios', 'icon' => 'fa-triangle-exclamation', 'count' => $counts['changes']],
-            ['key' => 'finished', 'label' => 'Finalizados', 'icon' => 'fa-circle-check', 'count' => $counts['finished']],
+            ['key' => 'finished', 'label' => 'Publicados', 'icon' => 'fa-circle-check', 'count' => $counts['finished']],
         ];
     }
 
@@ -62,6 +145,7 @@ final class ProjectModel
             'review' => 2,
             'approved' => 3,
             'defense' => 3,
+            'tribunal_approved' => 4,
             'published' => 4,
             default => 1,
         };
@@ -74,6 +158,7 @@ final class ProjectModel
             'review' => '22 Jul 2026',
             'approved' => 'Por programar',
             'defense' => '29 Jul 2026 · 10:00',
+            'tribunal_approved' => 'Listo para publicación',
             'published' => 'Expediente cerrado',
             default => 'Por definir',
         };
@@ -106,13 +191,16 @@ final class ProjectModel
         $project['participant_groups'] = [
             ['label' => 'Estudiantes', 'members' => array_map(static fn (array $member): array => $member + ['email' => strtolower($member['initial']) . '.estudiante@libertador.edu.ec', 'status' => 'Activo', 'assigned_at' => '02 Jun 2026'], $project['participants'])],
             ['label' => 'Tutoría', 'members' => $project['tutor'] ? [['initial' => mb_substr($project['tutor'], 0, 1, 'UTF-8'), 'name' => $project['tutor'], 'role' => 'Tutor', 'email' => 'tutoria@libertador.edu.ec', 'status' => 'Activo', 'assigned_at' => '05 Jun 2026']] : []],
-            ['label' => 'Tribunal', 'members' => in_array($project['status_key'], ['defense', 'published'], true) ? [
+            ['label' => 'Tribunal', 'members' => in_array($project['status_key'], ['defense', 'tribunal_approved', 'published'], true) ? [
                 ['initial' => 'J1', 'name' => 'Msc. Ana Morales', 'role' => 'Jurado 1', 'email' => 'ana.morales@libertador.edu.ec', 'status' => 'Asignado', 'assigned_at' => '15 Jul 2026'],
                 ['initial' => 'J2', 'name' => 'Ing. Luis Paredes', 'role' => 'Jurado 2', 'email' => 'luis.paredes@libertador.edu.ec', 'status' => 'Asignado', 'assigned_at' => '15 Jul 2026'],
                 ['initial' => 'J3', 'name' => 'Msc. Rosa León', 'role' => 'Jurado 3', 'email' => 'rosa.leon@libertador.edu.ec', 'status' => 'Asignado', 'assigned_at' => '15 Jul 2026'],
             ] : []],
         ];
-        $project['history'] = [
+        $project['history'] = isset($project['persistent_history']) ? [
+            ...$project['persistent_history'],
+            ...array_map(static fn (array $activity): array => ['type' => 'Actividad', 'icon' => 'fa-circle-check', 'user' => 'Sistema académico', 'role' => 'Sistema', 'action' => $activity['title'], 'detail' => 'Registro incorporado a la trazabilidad.', 'date' => $activity['date']], $project['activities']),
+        ] : [
             ['type' => 'Estado', 'icon' => 'fa-arrows-rotate', 'user' => $project['tutor'], 'role' => 'Tutor', 'action' => 'Actualizó el estado del proyecto', 'detail' => $project['status'], 'date' => preg_replace('/^.*·\s*/u', '', $project['last_activity'])],
             ...array_map(static fn (array $activity): array => ['type' => 'Actividad', 'icon' => 'fa-circle-check', 'user' => 'Sistema académico', 'role' => 'Sistema', 'action' => $activity['title'], 'detail' => 'Registro incorporado a la trazabilidad.', 'date' => $activity['date']], $project['activities']),
         ];
@@ -138,7 +226,7 @@ final class ProjectModel
 
         return [
             $common + [
-                'id' => 1, 'type' => 'Trabajo de titulación', 'type_key' => 'thesis', 'status' => 'En revisión', 'status_key' => 'review', 'metric_bucket' => 'review',
+                'id' => 1, 'type' => 'Titulación', 'type_key' => 'thesis', 'status' => 'En revisión', 'status_key' => 'review', 'metric_bucket' => 'review',
                 'title' => 'Sistema de Gestión Documental Académica', 'subtitle' => 'Seguimiento, revisión y publicación de proyectos académicos.',
                 'tags' => ['Gestión académica', 'Trazabilidad'], 'technologies' => ['PHP', 'MariaDB'], 'activity_order' => 4,
                 'tutor' => 'Ing. Tutor Asignado', 'last_activity' => 'Revisión del tutor · 17 Jul 2026', 'stage' => 'Revisión académica', 'progress' => 58,
@@ -166,7 +254,7 @@ final class ProjectModel
                 'action_label' => 'Preparar documentos finales', 'next_action' => 'Completar los documentos requeridos para tribunal.', 'latest_delivery' => null, 'observations' => [], 'activities' => [], 'comments' => [],
             ],
             $common + [
-                'id' => 3, 'type' => 'Trabajo de titulación', 'type_key' => 'thesis', 'status' => 'En defensa', 'status_key' => 'defense', 'metric_bucket' => 'active',
+                'id' => 3, 'type' => 'Titulación', 'type_key' => 'thesis', 'status' => 'En tribunal', 'status_key' => 'defense', 'metric_bucket' => 'active',
                 'title' => 'Plataforma para seguimiento de prácticas preprofesionales', 'subtitle' => 'Control académico de convenios, evidencias y evaluaciones.',
                 'tags' => ['Prácticas', 'Evaluación'], 'technologies' => ['Laravel'], 'activity_order' => 2,
                 'tutor' => 'Ing. Pablo Torres', 'last_activity' => 'Defensa programada · 15 Jul 2026', 'stage' => 'Defensa', 'progress' => 91,

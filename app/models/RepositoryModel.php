@@ -9,7 +9,7 @@ final class RepositoryModel
      */
     public function getPublishedProjects(): array
     {
-        return [
+        $projects = [
             [
                 'id' => 1,
                 'title' => 'Sistema de Gestión de Inventario para Microempresas',
@@ -17,8 +17,8 @@ final class RepositoryModel
                 'career' => 'Desarrollo de Software',
                 'career_slug' => 'software',
                 'authors' => 'María Torres y José Cedeño',
-                'tutor' => 'Ing. Andrea Salazar',
-                'teacher_slug' => 'andrea-salazar',
+                'tutor' => 'Msc. Maribel Fierro Montero',
+                'teacher_slug' => 'maribel-fierro',
                 'semester' => '4',
                 'category' => 'Tesis',
                 'category_slug' => 'tesis',
@@ -38,8 +38,8 @@ final class RepositoryModel
                 'career' => 'Desarrollo de Software',
                 'career_slug' => 'software',
                 'authors' => 'Daniel Paredes',
-                'tutor' => 'Mgs. Luis Zambrano',
-                'teacher_slug' => 'luis-zambrano',
+                'tutor' => 'Msc. Maria Elena Navarrete',
+                'teacher_slug' => 'maria-navarrete',
                 'semester' => '3',
                 'category' => 'Prácticas preprofesionales',
                 'category_slug' => 'practicas-preprofesionales',
@@ -59,7 +59,7 @@ final class RepositoryModel
                 'career' => 'Desarrollo de Software',
                 'career_slug' => 'software',
                 'authors' => 'Carla Mena y David López',
-                'tutor' => 'Mgs. Maribel Fierro',
+                'tutor' => 'Msc. Maribel Fierro Montero',
                 'teacher_slug' => 'maribel-fierro',
                 'semester' => '2',
                 'category' => 'Vinculación',
@@ -81,7 +81,7 @@ final class RepositoryModel
                 'career' => 'Desarrollo de Software',
                 'career_slug' => 'software',
                 'authors' => 'Andrea Pérez',
-                'tutor' => 'Abg. Alex Galarza',
+                'tutor' => 'Abg. Alex Fabián Galarza',
                 'teacher_slug' => 'alex-galarza',
                 'semester' => '1',
                 'category' => 'Perfil de Tesis',
@@ -95,9 +95,42 @@ final class RepositoryModel
                 'technologies' => ['C#', '.NET', 'SQL Server', 'MVC'],
                 'keywords' => ['Perfil', 'Seguimiento', 'Titulación', 'Revisión académica']
             ],
-
-
         ];
+        $extraTitles = [
+            'Sistema de reservas para laboratorios',
+            'Aplicación de control de asistencia',
+            'Portal de seguimiento de tutorías',
+            'Gestor documental para secretaría',
+            'Panel de indicadores estudiantiles',
+            'Plataforma de encuestas académicas',
+            'Sistema de préstamos tecnológicos',
+        ];
+        $teachers = $this->getTeachers();
+        foreach ($extraTitles as $index => $title) {
+            $teacher = $teachers[$index % count($teachers)];
+            $projects[] = [
+                'id' => $index + 5,
+                'title' => $title,
+                'description' => 'Proyecto demostrativo publicado para comprobar la paginación y los filtros del repositorio.',
+                'career' => 'Desarrollo de Software',
+                'career_slug' => 'software',
+                'authors' => ['Adriana Ponce Vera','Bruno Cárdenas Mena','Camila Andrade Ruiz','David Guerrero Paz','Elena Morales Cedeño','Fernando Viteri León'][$index % 6],
+                'tutor' => $teacher['label'],
+                'teacher_slug' => $teacher['value'],
+                'semester' => (string)(($index % 4) + 1),
+                'category' => 'Proyecto integrador',
+                'category_slug' => 'proyecto-integrador',
+                'year' => '2026',
+                'pao' => 'pao-ii-2026',
+                'pao_label' => 'PAO II 2026',
+                'type' => 'Proyecto integrador',
+                'type_slug' => 'proyecto-integrador',
+                'downloads' => 20 + ($index * 7),
+                'technologies' => ['PHP', 'JavaScript', 'MariaDB'],
+                'keywords' => ['Demostración', 'Paginación', 'Software'],
+            ];
+        }
+        return $projects;
     }
 
     public function findPublishedProjectById(int $projectId): ?array
@@ -170,10 +203,12 @@ final class RepositoryModel
     public function getTeachers(): array
     {
         return [
-            ['value' => 'andrea-salazar', 'label' => 'Ing. Andrea Salazar'],
-            ['value' => 'luis-zambrano', 'label' => 'Mgs. Luis Zambrano'],
-            ['value' => 'maribel-fierro', 'label' => 'Mgs. Maribel Fierro'],
-            ['value' => 'alex-galarza', 'label' => 'Abg. Alex Galarza'],
+            ['value' => 'maribel-fierro', 'label' => 'Msc. Maribel Fierro Montero'],
+            ['value' => 'maria-navarrete', 'label' => 'Msc. Maria Elena Navarrete'],
+            ['value' => 'diana-alegria', 'label' => 'Lic. Diana Alegría Camino'],
+            ['value' => 'diana-ramirez', 'label' => 'Msc. Diana Anaid Ramirez'],
+            ['value' => 'alex-galarza', 'label' => 'Abg. Alex Fabián Galarza'],
+            ['value' => 'henrry-marino', 'label' => 'Msc. Henrry Mariño Acosta'],
         ];
     }
 

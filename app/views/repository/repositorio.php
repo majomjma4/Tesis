@@ -28,7 +28,7 @@
 <section class="repository-hero">
     <div>
         <span class="section-eyebrow">CARRERA DE DESARROLLO DE SOFTWARE</span>
-        <h2>Repositorio de proyectos finalizados</h2>
+        <h2>Repositorio de proyectos publicados</h2>
         <p>Consulta trabajos desarrollados por estudiantes y accede a sus documentos académicos.</p>
     </div>
     <div class="repository-hero-icon" aria-hidden="true">
