@@ -59,10 +59,16 @@ final class AdminDemoSeeder
     {
         $this->db->exec("INSERT INTO roles(code,name) VALUES ('student','Estudiante'),('teacher','Docente'),('administrator','Administrador') ON DUPLICATE KEY UPDATE name=VALUES(name)");
         $this->db->exec("INSERT INTO careers(code,name,is_active) VALUES ('TDS','Desarrollo de Software',1) ON DUPLICATE KEY UPDATE name=VALUES(name),is_active=1");
+        $this->db->exec("DELETE FROM academic_periods
+            WHERE status IN ('closed','planned') AND code IN ('2026-I','2027-I')
+              AND NOT EXISTS(SELECT 1 FROM projects WHERE projects.academic_period_id=academic_periods.id)
+              AND NOT EXISTS(SELECT 1 FROM student_enrollments WHERE student_enrollments.academic_period_id=academic_periods.id)
+              AND NOT EXISTS(SELECT 1 FROM academic_subjects WHERE academic_subjects.academic_period_id=academic_periods.id)");
+        $this->db->exec("UPDATE academic_periods
+            SET code='2026-I',name='I PAO 2026',starts_on='2026-04-01',ends_on='2026-09-30',status='active'
+            WHERE code='2026-II' AND status='active'");
         $this->db->exec("INSERT INTO academic_periods(code,name,starts_on,ends_on,status) VALUES
-            ('2026-I','I PAO 2026','2026-01-01','2026-06-30','closed'),
-            ('2026-II','II PAO 2026','2026-07-01','2026-12-31','active'),
-            ('2027-I','I PAO 2027','2027-01-01','2027-06-30','planned')
+            ('2026-I','I PAO 2026','2026-04-01','2026-09-30','active')
             ON DUPLICATE KEY UPDATE name=VALUES(name),starts_on=VALUES(starts_on),ends_on=VALUES(ends_on),status=VALUES(status)");
         $this->db->exec("INSERT INTO project_types(code,name,is_active) VALUES
             ('thesis','Titulación',1),('thesis_profile','Perfil de tesis',1),('pis','Proyecto integrador de saberes',1),
@@ -70,7 +76,7 @@ final class AdminDemoSeeder
             ON DUPLICATE KEY UPDATE name=VALUES(name),is_active=1");
 
         $career = $this->requiredId("SELECT id FROM careers WHERE code='TDS'", 'No se pudo preparar la carrera.');
-        $period = $this->requiredId("SELECT id FROM academic_periods WHERE code='2026-II'", 'No se pudo preparar el periodo activo.');
+        $period = $this->requiredId("SELECT id FROM academic_periods WHERE code='2026-I'", 'No se pudo preparar el periodo activo.');
         $this->execute("INSERT INTO research_lines(career_id,name,is_active)
             SELECT :career,:name,1 WHERE NOT EXISTS(SELECT 1 FROM research_lines WHERE career_id=:career2 AND name=:name2)",
             ['career'=>$career,'name'=>'Desarrollo de software y transformación digital','career2'=>$career,'name2'=>'Desarrollo de software y transformación digital']);
@@ -81,7 +87,6 @@ final class AdminDemoSeeder
         return [
             'career' => $career,
             'period' => $period,
-            'previous_period' => $this->requiredId("SELECT id FROM academic_periods WHERE code='2026-I'", 'Falta el periodo anterior.'),
             'line' => $this->requiredId("SELECT id FROM research_lines WHERE career_id={$career} ORDER BY id LIMIT 1", 'No se pudo preparar la línea de investigación.'),
             'types' => $this->pairs('SELECT code,id FROM project_types'),
             'roles' => $this->pairs('SELECT code,id FROM roles'),

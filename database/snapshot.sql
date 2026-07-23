@@ -51,7 +51,7 @@ CREATE TABLE `academic_periods` (
 
 LOCK TABLES `academic_periods` WRITE;
 /*!40000 ALTER TABLE `academic_periods` DISABLE KEYS */;
-INSERT INTO `academic_periods` VALUES (1,'2026-I','I PAO 2026','2026-01-01','2026-06-30','closed'),(2,'2026-II','II PAO 2026','2026-07-01','2026-12-31','active'),(3,'2027-I','I PAO 2027','2027-01-01','2027-06-30','planned');
+INSERT INTO `academic_periods` VALUES (2,'2026-I','I PAO 2026','2026-04-01','2026-09-30','active');
 /*!40000 ALTER TABLE `academic_periods` ENABLE KEYS */;
 UNLOCK TABLES;
 
