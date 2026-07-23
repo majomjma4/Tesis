@@ -75,11 +75,6 @@
         enhanceQuickSelect(select);
         return select;
     };
-    addQuickTextSelect(form?.elements.subtitle, 'Texto rápido', [
-        ['Actualización académica', 'Actualización de información académica del proyecto.'],
-        ['Ajuste de seguimiento', 'Ajuste de estado y seguimiento administrativo.'],
-        ['Corrección de datos', 'Corrección de datos del expediente institucional.'],
-    ]);
     const trashQuickReason = addQuickTextSelect(trashForm?.elements.reason, 'Motivo rápido', [
         ['Proyecto duplicado.', 'Proyecto duplicado. '],
         ['Registro creado por error.', 'Registro creado por error.'],

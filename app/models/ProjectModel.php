@@ -72,6 +72,27 @@ final class ProjectModel
         };
         $updatedAt = (string) ($row['updated_at'] ?? '');
         $date = $updatedAt ? date('d/m/Y', strtotime($updatedAt)) : 'Sin actividad registrada';
+        $audit = Database::connection()->prepare(
+            "SELECT pal.new_state,pal.created_at,u.full_name
+             FROM project_audit_log pal
+             LEFT JOIN users u ON u.id=pal.user_id
+             WHERE pal.project_id=:id AND pal.action='project_updated'
+             ORDER BY pal.created_at DESC,pal.id DESC"
+        );
+        $audit->execute(['id'=>$projectId]);
+        $auditHistory=[];
+        foreach($audit->fetchAll() as $entry){
+            $state=json_decode((string)($entry['new_state']??''),true);
+            $changes=is_array($state)?($state['_history_changes']??null):null;
+            if(!is_array($changes)||!$changes)continue;
+            $auditHistory[]=[
+                'type'=>'Modificación','icon'=>'fa-pen-to-square',
+                'user'=>(string)($entry['full_name']?:'Administrador'),'role'=>'Administrador',
+                'action'=>'Administrador modificó el proyecto',
+                'detail'=>'Cambios realizados:','changes'=>$changes,
+                'date'=>date('d/m/Y H:i',strtotime((string)$entry['created_at'])),
+            ];
+        }
 
         return $this->enrichProject([
             'id' => (int) $row['id'], 'type' => (string) $row['type'],
@@ -84,6 +105,7 @@ final class ProjectModel
             'stage' => (string) ($row['current_stage'] ?? 'Registro'), 'latest_delivery' => null,
             'observations' => [], 'comments' => [],
             'activities' => [['title' => 'Expediente disponible para administración', 'date' => $date]],
+            'persistent_history'=>$auditHistory,
         ]);
     }
 
@@ -175,7 +197,10 @@ final class ProjectModel
                 ['initial' => 'J3', 'name' => 'Msc. Rosa León', 'role' => 'Jurado 3', 'email' => 'rosa.leon@libertador.edu.ec', 'status' => 'Asignado', 'assigned_at' => '15 Jul 2026'],
             ] : []],
         ];
-        $project['history'] = [
+        $project['history'] = isset($project['persistent_history']) ? [
+            ...$project['persistent_history'],
+            ...array_map(static fn (array $activity): array => ['type' => 'Actividad', 'icon' => 'fa-circle-check', 'user' => 'Sistema académico', 'role' => 'Sistema', 'action' => $activity['title'], 'detail' => 'Registro incorporado a la trazabilidad.', 'date' => $activity['date']], $project['activities']),
+        ] : [
             ['type' => 'Estado', 'icon' => 'fa-arrows-rotate', 'user' => $project['tutor'], 'role' => 'Tutor', 'action' => 'Actualizó el estado del proyecto', 'detail' => $project['status'], 'date' => preg_replace('/^.*·\s*/u', '', $project['last_activity'])],
             ...array_map(static fn (array $activity): array => ['type' => 'Actividad', 'icon' => 'fa-circle-check', 'user' => 'Sistema académico', 'role' => 'Sistema', 'action' => $activity['title'], 'detail' => 'Registro incorporado a la trazabilidad.', 'date' => $activity['date']], $project['activities']),
         ];

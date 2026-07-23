@@ -3,6 +3,7 @@ declare(strict_types=1);
 final class AdminProjectModel
 {
     private const STATUSES=['development','under_review','changes_required','approved','defense','tribunal_approved','published'];
+    private const STATUS_LABELS=['development'=>'En desarrollo','under_review'=>'En revisión','changes_required'=>'Requiere cambios','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el Tribunal','published'=>'Publicado'];
     public function listing(array $f,array $pagination=[]):array
     {
         $w=['p.deleted_at IS NULL'];
@@ -35,16 +36,28 @@ final class AdminProjectModel
             $typeCode=(string)$type->fetchColumn();
             if($typeCode==='')throw new InvalidArgumentException('El tipo de proyecto ya no está disponible.');
             if($id){
-                $q=$d->prepare('SELECT id,code,title,status,project_type_id,created_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE');
+                $q=$d->prepare('SELECT id,code,title,subtitle,status,project_type_id,career_id,academic_period_id,tutor_id,created_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE');
                 $q->execute(['id'=>$id]);$before=$q->fetch();
                 if(!$before)throw new InvalidArgumentException('El proyecto ya no existe.');
+                $incoming=['title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'project_type_id'=>$v['project_type_id'],'career_id'=>$v['career_id'],'academic_period_id'=>$v['academic_period_id'],'tutor_id'=>$tutor,'status'=>$v['status']];
+                $changed=[];
+                foreach($incoming as $field=>$value){
+                    $old=$before[$field]??null;
+                    if(in_array($field,['project_type_id','career_id','academic_period_id','tutor_id'],true)){$old=$old===null?null:(int)$old;$value=$value===null?null:(int)$value;}
+                    else{$old=$old===null?null:(string)$old;$value=$value===null?null:(string)$value;}
+                    if($old!==$value)$changed[$field]=[$old,$value];
+                }
+                if(!$changed)throw new InvalidArgumentException('No se detectaron cambios en el proyecto.');
                 $code=$before['code'];
                 if((int)$before['project_type_id']!==$v['project_type_id']){
                     $code=(new ProjectCodeService())->next($d,$v['project_type_id'],$typeCode,(int)date('Y',strtotime($before['created_at'])));
+                    if($code!==(string)$before['code'])$changed['code']=[(string)$before['code'],$code];
                 }
                 $q=$d->prepare('UPDATE projects SET code=:code,title=:title,subtitle=:subtitle,project_type_id=:type,career_id=:career,academic_period_id=:period,tutor_id=:tutor,status=:status WHERE id=:id');
                 $q->execute(['code'=>$code,'title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'type'=>$v['project_type_id'],'career'=>$v['career_id'],'period'=>$v['academic_period_id'],'tutor'=>$tutor,'status'=>$v['status'],'id'=>$id]);
-                (new ProjectAuditService($d))->record($id,$actor,'project_updated','project',$id,$before,$v+['code'=>$code]);
+                [$previous,$next,$history]=$this->describeChanges($d,$changed);
+                $next['_history_changes']=$history;
+                (new ProjectAuditService($d))->record($id,$actor,'project_updated','project',$id,$previous,$next);
                 return $id;
             }
             $code=(new ProjectCodeService())->next($d,$v['project_type_id'],$typeCode,(int)date('Y'));
@@ -54,6 +67,27 @@ final class AdminProjectModel
             (new ProjectAuditService($d))->record($id,$actor,'project_created','project',$id,null,$v+['code'=>$code]);
             return $id;
         });
+    }
+    private function describeChanges(PDO $db,array $changes):array
+    {
+        $labels=['title'=>'Título','subtitle'=>'Descripción breve','project_type_id'=>'Tipo','career_id'=>'Carrera','academic_period_id'=>'Periodo','tutor_id'=>'Tutor','status'=>'Estado','code'=>'Código'];
+        $previous=[];$next=[];$history=[];
+        foreach($changes as $field=>[$old,$new]){
+            $oldLabel=$this->readableValue($db,$field,$old);$newLabel=$this->readableValue($db,$field,$new);
+            $key=$labels[$field]??$field;$previous[$key]=$oldLabel;$next[$key]=$newLabel;
+            $history[]=['field'=>$key,'verb'=>in_array($field,['subtitle','career_id'],true)?'cambiada':'cambiado','from'=>$oldLabel,'to'=>$newLabel];
+        }
+        return [$previous,$next,$history];
+    }
+    private function readableValue(PDO $db,string $field,mixed $value):string
+    {
+        if($value===null||$value==='')return 'Sin asignar';
+        if($field==='status')return self::STATUS_LABELS[(string)$value]??(string)$value;
+        $tables=['project_type_id'=>['project_types','name'],'career_id'=>['careers','name'],'academic_period_id'=>['academic_periods','name'],'tutor_id'=>['users','full_name']];
+        if(!isset($tables[$field]))return (string)$value;
+        [$table,$column]=$tables[$field];$q=$db->prepare("SELECT $column FROM $table WHERE id=:id");$q->execute(['id'=>(int)$value]);
+        $label=$q->fetchColumn();
+        return $label===false?'Sin asignar':(string)$label;
     }
     public function trash(int $id,string $reason,int $actor):void{if($id<1||mb_strlen(trim($reason))<5)throw new InvalidArgumentException('Indica brevemente el motivo de eliminación.');Database::transaction(function(PDO $d)use($id,$reason,$actor):void{$q=$d->prepare('SELECT id,title,status FROM projects WHERE id=:id AND deleted_at IS NULL');$q->execute(['id'=>$id]);$before=$q->fetch();if(!$before)throw new InvalidArgumentException('El proyecto ya no está disponible.');$d->prepare('UPDATE projects SET deleted_at=CURRENT_TIMESTAMP,deleted_by=:actor,deletion_reason=:reason WHERE id=:id')->execute(['actor'=>$actor,'reason'=>trim($reason),'id'=>$id]);(new ProjectAuditService($d))->record($id,$actor,'project_trashed','project',$id,$before,['deleted'=>true],trim($reason));});}
     private function validate(array $v):void{if(mb_strlen($v['title'])<5)throw new InvalidArgumentException('Ingresa un título de al menos cinco caracteres.');if($v['project_type_id']<1||$v['career_id']<1||$v['academic_period_id']<1)throw new InvalidArgumentException('Completa tipo, carrera y periodo académico.');if(!in_array($v['status'],self::STATUSES,true))throw new InvalidArgumentException('El estado seleccionado no es válido.');if(in_array($v['status'],['defense','tribunal_approved'],true)){$q=Database::connection()->prepare('SELECT code FROM project_types WHERE id=:id');$q->execute(['id'=>$v['project_type_id']]);if($q->fetchColumn()!=='thesis')throw new InvalidArgumentException('Los estados del Tribunal solo corresponden a proyectos de tesis.');}}
