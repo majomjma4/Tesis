@@ -147,10 +147,13 @@
         syncDialogState();
         requestAnimationFrame(() => form.querySelector('[data-fields]:not([hidden]) input, [data-fields]:not([hidden]) select')?.focus());
     };
-    const openConfirm = (title, text, action) => {
+    const openConfirm = (title, text, action, confirmLabel = 'Confirmar') => {
         pendingAction = action;
         document.querySelector('#aaConfirmTitle').textContent = title;
-        document.querySelector('#aaConfirmText').textContent = text;
+        const confirmText = document.querySelector('#aaConfirmText');
+        confirmText.textContent = text;
+        confirmText.style.whiteSpace = 'pre-line';
+        confirmBox.querySelector('[data-accept-confirm]').textContent = confirmLabel;
         confirmBox.hidden = false;
         syncDialogState();
         requestAnimationFrame(() => confirmBox.querySelector('[data-accept-confirm]')?.focus());
@@ -193,10 +196,15 @@
     }));
     document.querySelector('[data-close-period]')?.addEventListener('click', () => {
         if (!config.dataset.targetPeriod || config.dataset.targetPeriod === '0') return;
+        const closesEarly = config.dataset.closeEarly === '1';
+        const earlyCloseWarning = closesEarly
+            ? '\n\nEl período académico aún no ha alcanzado su fecha de finalización.\n\nSi continúas, el período será cerrado manualmente por decisión administrativa.\n\nUtiliza esta opción únicamente cuando exista una resolución institucional, prórroga finalizada o autorización correspondiente.'
+            : '';
         openConfirm(
             'Cerrar período académico',
-            `${config.dataset.currentPeriod} se registrará como cerrado y se activará ${config.dataset.nextPeriod}. Los ${config.dataset.activeProjects} proyectos conservarán su período y su historial; no serán movidos ni eliminados.`,
-            { kind: 'close-period', target: config.dataset.targetPeriod }
+            `Vas a cerrar el período académico actual.\n\nAl confirmar ocurrirá lo siguiente:\n\n• El período actual cambiará a estado Cerrado.\n• El siguiente período planificado pasará automáticamente a estado Activo.\n• Los nuevos proyectos ya no podrán registrarse en el período que se está cerrando.\n• Los proyectos existentes conservarán su período original.\n\nEsta acción no podrá deshacerse.${earlyCloseWarning}`,
+            { kind: 'close-period', target: config.dataset.targetPeriod, early: closesEarly },
+            closesEarly ? 'Cerrar de todas formas' : 'Cerrar período'
         );
     });
 
@@ -230,6 +238,7 @@
         try {
             if (action.kind === 'close-period') {
                 data.set('target_period_id', action.target);
+                if (action.early) data.set('confirm_early_close', '1');
                 await send(config.dataset.promote, data);
             } else if (action.kind === 'delete-period') {
                 data.set('entity', 'period');

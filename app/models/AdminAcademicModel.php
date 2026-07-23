@@ -53,13 +53,16 @@ final class AdminAcademicModel
         });
     }
 
-    public function promote(int $target, int $actor): array
+    public function promote(int $target, int $actor, bool $confirmEarlyClose = false): array
     {
         if ($target < 1) throw new InvalidArgumentException('Primero planifica el siguiente período.');
 
-        return Database::transaction(function (PDO $db) use ($target, $actor): array {
+        return Database::transaction(function (PDO $db) use ($target, $actor, $confirmEarlyClose): array {
             $active = $db->query("SELECT * FROM academic_periods WHERE status='active' LIMIT 1 FOR UPDATE")->fetch();
             if (!$active) throw new InvalidArgumentException('No existe un período activo.');
+            if ((string) $active['ends_on'] > date('Y-m-d') && !$confirmEarlyClose) {
+                throw new InvalidArgumentException('El período aún no alcanza su fecha final. Confirma expresamente el cierre anticipado.');
+            }
 
             $statement = $db->prepare("SELECT * FROM academic_periods WHERE id=:id AND status='planned' FOR UPDATE");
             $statement->execute(['id' => $target]);
@@ -80,6 +83,10 @@ final class AdminAcademicModel
             $this->audit($db, $actor, 'academic_period_closed', 'period', (int) $active['id'], [
                 'activated_period_id' => (int) $planned['id'],
                 'projects_preserved' => $projectCount,
+            ]);
+            $this->audit($db, $actor, 'academic_period_activated', 'period', (int) $planned['id'], [
+                'closed_period_id' => (int) $active['id'],
+                'manual_transition' => true,
             ]);
 
             return ['closed' => $active['name'], 'activated' => $planned['name'], 'projects' => $projectCount];
@@ -107,7 +114,7 @@ final class AdminAcademicModel
                 throw new InvalidArgumentException('No se puede eliminar una planificación que ya tiene información asociada.');
             }
             $db->prepare("DELETE FROM academic_periods WHERE id=:id AND status='planned'")->execute(['id' => $id]);
-            $this->audit($db, $actor, 'academic_period_plan_deleted', 'period', $id, ['name' => $planned['name']]);
+            $this->audit($db, $actor, 'academic_period_plan_deleted', 'period', $id, ['name' => $planned['name'], 'starts_on' => $planned['starts_on'] ?? null, 'ends_on' => $planned['ends_on'] ?? null]);
             return;
         }
 
@@ -132,6 +139,12 @@ final class AdminAcademicModel
         if ($end <= $start) {
             throw new InvalidArgumentException('La fecha de finalización debe ser posterior a la fecha de inicio.');
         }
+        $overlap = $db->prepare("SELECT name FROM academic_periods WHERE id<>:id AND starts_on<=:end AND ends_on>=:start LIMIT 1 FOR UPDATE");
+        $overlap->execute(['id' => $id, 'start' => $start, 'end' => $end]);
+        $overlappingPeriod = $overlap->fetchColumn();
+        if ($overlappingPeriod !== false) {
+            throw new InvalidArgumentException('Las fechas se superponen con ' . $overlappingPeriod . '.');
+        }
         $planned = $db->query("SELECT * FROM academic_periods WHERE status='planned' LIMIT 1 FOR UPDATE")->fetch();
         if ($planned && (int) $planned['id'] !== $id) {
             throw new InvalidArgumentException('Ya existe un siguiente período planificado.');
@@ -151,7 +164,7 @@ final class AdminAcademicModel
                  WHERE id=:id AND status='planned'"
             );
             $statement->execute(['code' => $code, 'name' => $name, 'start' => $start, 'end' => $end, 'id' => $id]);
-            $this->audit($db, $actor, 'academic_period_plan_updated', 'period', $id, ['name' => $name]);
+            $this->audit($db, $actor, 'academic_period_plan_updated', 'period', $id, ['name' => $name, 'previous_starts_on' => $planned['starts_on'], 'previous_ends_on' => $planned['ends_on'], 'starts_on' => $start, 'ends_on' => $end]);
             return;
         }
         $statement = $db->prepare(
@@ -159,7 +172,7 @@ final class AdminAcademicModel
              VALUES(:code,:name,:start,:end,'planned')"
         );
         $statement->execute(['code' => $code, 'name' => $name, 'start' => $start, 'end' => $end]);
-        $this->audit($db, $actor, 'academic_period_planned', 'period', (int) $db->lastInsertId(), ['name' => $name]);
+        $this->audit($db, $actor, 'academic_period_planned', 'period', (int) $db->lastInsertId(), ['name' => $name, 'starts_on' => $start, 'ends_on' => $end]);
     }
 
     private function validDate(string $value): bool
@@ -172,15 +185,17 @@ final class AdminAcademicModel
     {
         $id = (int) ($values['id'] ?? 0);
         $action = (string) ($values['action'] ?? 'save');
-        if ($action === 'deactivate') {
+        if (in_array($action, ['activate', 'deactivate'], true)) {
             if ($id < 1) throw new InvalidArgumentException('El tipo de proyecto no es válido.');
-            $db->prepare('UPDATE project_types SET is_active=0 WHERE id=:id')->execute(['id' => $id]);
-            $this->audit($db, $actor, 'academic_type_deactivated', 'type', $id);
+            $active = $action === 'activate' ? 1 : 0;
+            $db->prepare('UPDATE project_types SET is_active=:active WHERE id=:id')->execute(['active' => $active, 'id' => $id]);
+            $this->audit($db, $actor, $active ? 'academic_type_activated' : 'academic_type_deactivated', 'type', $id);
             return;
         }
 
         $name = trim((string) ($values['name'] ?? ''));
         if (mb_strlen($name) < 3) throw new InvalidArgumentException('Ingresa un nombre válido.');
+        $created = $id < 1;
         if ($id > 0) {
             $db->prepare('UPDATE project_types SET name=:name WHERE id=:id')->execute(['name' => $name, 'id' => $id]);
         } else {
@@ -197,7 +212,7 @@ final class AdminAcademicModel
             $db->prepare('INSERT INTO project_types(code,name,is_active) VALUES(:code,:name,1)')->execute(['code' => $code, 'name' => $name]);
             $id = (int) $db->lastInsertId();
         }
-        $this->audit($db, $actor, 'academic_type_saved', 'type', $id, ['name' => $name]);
+        $this->audit($db, $actor, $created ? 'academic_type_created' : 'academic_type_updated', 'type', $id, ['name' => $name]);
     }
 
     private function nextPeriod(?array $period): ?array
@@ -210,16 +225,25 @@ final class AdminAcademicModel
 
     private function audit(PDO $db, int $actor, string $action, string $type, ?int $id, array $details = []): void
     {
-        $statement = $db->prepare(
-            'INSERT INTO admin_audit_log(actor_user_id,action,entity_type,entity_id,details)
-             VALUES(:actor,:action,:type,:id,:details)'
-        );
-        $statement->execute([
-            'actor' => $actor,
-            'action' => $action,
-            'type' => $type,
-            'id' => $id,
-            'details' => json_encode($details, JSON_UNESCAPED_UNICODE),
-        ]);
+        $element = (string) ($details['name'] ?? '');
+        if ($element === '' && $id) {
+            $table = $type === 'period' ? 'academic_periods' : 'project_types';
+            $statement = $db->prepare("SELECT name FROM $table WHERE id=:id");
+            $statement->execute(['id' => $id]);
+            $element = (string) ($statement->fetchColumn() ?: ($type === 'period' ? 'Período académico' : 'Tipo de proyecto'));
+        }
+        $labels = [
+            'academic_period_started' => 'Creó ' . $element,
+            'academic_period_planned' => 'Planificó ' . $element,
+            'academic_period_plan_updated' => 'Editó la planificación de ' . $element,
+            'academic_period_plan_deleted' => 'Eliminó la planificación de ' . $element,
+            'academic_period_closed' => 'Cerró ' . $element,
+            'academic_period_activated' => 'Activó ' . $element,
+            'academic_type_created' => 'Creó el tipo de proyecto ' . $element,
+            'academic_type_updated' => 'Editó el tipo de proyecto ' . $element,
+            'academic_type_activated' => 'Activó el tipo de proyecto ' . $element,
+            'academic_type_deactivated' => 'Desactivó el tipo de proyecto ' . $element,
+        ];
+        (new AdminActivityService($db))->record($actor,$action,$labels[$action]??$action,'Gestión académica',$type,$id,$element,'correct',$details);
     }
 }

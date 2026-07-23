@@ -4,9 +4,17 @@ $activePeriod = $academic['promotion']['source'] ?? null;
 $plannedPeriod = $academic['promotion']['target'] ?? null;
 $closedPeriods = array_values(array_filter($periods, static fn(array $period): bool => ($period['status'] ?? '') === 'closed'));
 $suggestedPeriod = $academic['promotion']['suggested'] ?? null;
+$activeTypeCount = count(array_filter($academic['types'] ?? [], static fn(array $type): bool => (int) ($type['is_active'] ?? 0) === 1));
 $minimumPlanningStart = $activePeriod
     ? (new DateTimeImmutable($activePeriod['ends_on']))->modify('+1 day')->format('Y-m-d')
     : '';
+$today = new DateTimeImmutable('today');
+$activePeriodEnded = $activePeriod
+    ? new DateTimeImmutable($activePeriod['ends_on']) <= $today
+    : false;
+$activePeriodClosesEarly = $activePeriod
+    ? new DateTimeImmutable($activePeriod['ends_on']) > $today
+    : false;
 $monthNames = [1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril', 5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto', 9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre'];
 $friendlyRange = static function (?string $start, ?string $end) use ($monthNames): string {
     if (!$start || !$end) return 'Fechas pendientes';
@@ -51,6 +59,9 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
                         <small>Período académico actual</small>
                         <h3><?= e($activePeriod['name']) ?></h3>
                         <p><?= e($friendlyRange($activePeriod['starts_on'], $activePeriod['ends_on'])) ?></p>
+                        <?php if ($activePeriodEnded): ?>
+                            <p role="status">⚠ El período ya alcanzó su fecha de finalización y permanece activo hasta que un administrador realice el cierre manual.</p>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="aa-period-summary">
@@ -111,6 +122,7 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
             <div>
                 <span>Catálogo de proyectos</span>
                 <h2 id="aaProjectTypesTitle">Tipos de proyecto</h2>
+                <small><?= $activeTypeCount ?> tipo<?= $activeTypeCount === 1 ? '' : 's' ?> registrado<?= $activeTypeCount === 1 ? '' : 's' ?></small>
                 <p>Define las categorías disponibles sin mostrar códigos internos del sistema.</p>
             </div>
             <button type="button" data-form="type"><i class="fa-solid fa-plus" aria-hidden="true"></i> Agregar tipo</button>
@@ -212,6 +224,7 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
     data-promote="<?= e($academicEndpoints['promote']) ?>"
     data-csrf="<?= e($academicCsrf) ?>"
     data-target-period="<?= (int) ($plannedPeriod['id'] ?? 0) ?>"
+    data-close-early="<?= $activePeriodClosesEarly ? '1' : '0' ?>"
     data-current-period="<?= e($activePeriod['name'] ?? '') ?>"
     data-next-period="<?= e($plannedPeriod['name'] ?? '') ?>"
     data-active-projects="<?= (int) ($academic['promotion']['projects'] ?? 0) ?>"

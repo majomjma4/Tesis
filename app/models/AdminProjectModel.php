@@ -58,6 +58,11 @@ final class AdminProjectModel
                 [$previous,$next,$history]=$this->describeChanges($d,$changed);
                 $next['_history_changes']=$history;
                 (new ProjectAuditService($d))->record($id,$actor,'project_updated','project',$id,$previous,$next);
+                if(isset($changed['status'])){
+                    $from=self::STATUS_LABELS[(string)$changed['status'][0]]??(string)$changed['status'][0];
+                    $to=self::STATUS_LABELS[(string)$changed['status'][1]]??(string)$changed['status'][1];
+                    (new AdminActivityService($d))->record($actor,'project_status_changed','Cambió el estado de “'.$v['title'].'” de '.$from.' a '.$to,'Proyectos','project',$id,$v['title'],'correct',['from'=>$changed['status'][0],'to'=>$changed['status'][1]]);
+                }
                 return $id;
             }
             $code=(new ProjectCodeService())->next($d,$v['project_type_id'],$typeCode,(int)date('Y'));

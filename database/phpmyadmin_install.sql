@@ -54,14 +54,20 @@ CREATE TABLE admin_audit_log (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   actor_user_id BIGINT UNSIGNED NULL,
   action VARCHAR(100) NOT NULL,
+  action_label VARCHAR(180) NULL,
+  module VARCHAR(80) NULL,
   entity_type VARCHAR(80) NOT NULL,
   entity_id BIGINT UNSIGNED NULL,
+  element_label VARCHAR(255) NULL,
+  result ENUM('correct','failed') NOT NULL DEFAULT 'correct',
   details JSON NULL,
   ip_address VARCHAR(45) NULL,
   user_agent VARCHAR(500) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_admin_audit_date (created_at),
   INDEX idx_admin_audit_entity (entity_type, entity_id),
+  INDEX idx_admin_activity_filters (module, action, result, created_at),
+  INDEX idx_admin_activity_actor_date (actor_user_id, created_at),
   CONSTRAINT fk_admin_audit_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -347,6 +353,7 @@ CREATE TABLE notifications (
   action_url VARCHAR(500) NULL,
   action_label VARCHAR(80) NULL,
   metadata JSON NULL,
+  deduplication_key VARCHAR(190) NULL,
   is_read TINYINT(1) NOT NULL DEFAULT 0,
   read_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -355,6 +362,7 @@ CREATE TABLE notifications (
   deleted_at DATETIME NULL,
   INDEX idx_notifications_user_active (user_id, deleted_at, created_at),
   INDEX idx_notifications_project (project_id),
+  UNIQUE INDEX uq_notifications_user_deduplication (user_id, deduplication_key),
   CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_notifications_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
