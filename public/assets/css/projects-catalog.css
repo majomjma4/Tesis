@@ -96,3 +96,4 @@
 .projects-pagination-pages button:disabled{opacity:.4;cursor:not-allowed}
 @media(max-width:760px){.projects-pagination{grid-template-columns:1fr auto}.projects-pagination-pages{grid-column:1/-1;justify-content:center}}
 @media(max-width:480px){.projects-pagination{grid-template-columns:1fr}.projects-pagination label{justify-content:space-between}.projects-pagination-pages{grid-column:auto;justify-content:flex-start;overflow-x:auto}}
+.projects-pagination p,.projects-pagination label{white-space:nowrap}@media(max-width:480px){.projects-pagination{grid-template-columns:minmax(0,1fr) auto}.projects-pagination-pages{grid-column:1/-1}.projects-pagination label{gap:6px}}

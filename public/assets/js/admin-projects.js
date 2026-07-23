@@ -37,6 +37,7 @@
             menu.append(item);
         });
         const close = () => { shell.classList.remove('is-open'); menu.hidden = true; trigger.setAttribute('aria-expanded', 'false'); };
+        document.addEventListener('app:dropdown-open', event => { if (event.detail?.trigger !== trigger) close(); });
         trigger.addEventListener('click', event => {
             event.stopPropagation();
             const willOpen = !shell.classList.contains('is-open');
@@ -47,6 +48,7 @@
                 item.querySelector('.ap-quick-trigger')?.setAttribute('aria-expanded', 'false');
             });
             if (willOpen) {
+                document.dispatchEvent(new CustomEvent('app:dropdown-open', { detail: { trigger } }));
                 shell.classList.add('is-open'); menu.hidden = false; trigger.setAttribute('aria-expanded', 'true');
                 const fourthOption = [...menu.querySelectorAll('[role="option"]')].slice(0, 4).at(-1);
                 const desiredHeight = fourthOption ? fourthOption.offsetTop + fourthOption.offsetHeight + 8 : menu.scrollHeight;

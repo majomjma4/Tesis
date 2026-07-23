@@ -383,7 +383,7 @@ INSERT INTO roles (code, name) VALUES
 ('student','Estudiante'),('teacher','Docente'),('administrator','Administrador');
 
 INSERT INTO project_types (code, name) VALUES
-('thesis','Trabajo de titulación'),('pis','Proyecto integrador de saberes'),
+('thesis','Titulación'),('thesis_profile','Perfil de tesis'),('pis','Proyecto integrador de saberes'),
 ('practice','Prácticas preprofesionales'),('community','Proyecto de vinculación');
 
 INSERT INTO careers (code, name) VALUES

@@ -13,7 +13,7 @@
     const pagination = root.querySelector('[data-project-pagination]');
     let appliedSort = null;
     let currentPage = 1;
-    let perPage = 25;
+    let perPage = 10;
     const initialParams = new URLSearchParams(window.location.search);
     const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
     const thesisOnlyStatuses = [...(status?.options || [])].filter(option => ['defense', 'tribunal_approved'].includes(option.value));
@@ -106,16 +106,16 @@
     function renderPagination(total) {
         if (!pagination) return;
         pagination.replaceChildren();
-        pagination.hidden = total === 0;
-        if (!total) return;
         const pages = Math.max(1, Math.ceil(total / perPage));
         currentPage = Math.min(currentPage, pages);
+        pagination.hidden = total <= 10;
+        if (total <= 10) return;
         const from = (currentPage - 1) * perPage + 1;
         const to = Math.min(currentPage * perPage, total);
-        const summary = document.createElement('p'); summary.textContent = `Mostrando ${from}–${to} de ${total}`;
-        const sizeLabel = document.createElement('label'); sizeLabel.append(document.createTextNode('Por pagina '));
-        const size = document.createElement('select'); size.setAttribute('aria-label', 'Proyectos por pagina');
-        [10, 25, 50, 100].forEach(value => { const option = document.createElement('option'); option.value = value; option.textContent = value; option.selected = value === perPage; size.append(option); });
+        const summary = document.createElement('p'); summary.textContent = `Mostrando ${to} de ${total}`;
+        const sizeLabel = document.createElement('label'); sizeLabel.append(document.createTextNode('Mostrar '));
+        const size = document.createElement('select'); size.setAttribute('aria-label', 'Cantidad de proyectos visibles');
+        [10, 25, 50, 75, 100].filter(value => value <= total).forEach(value => { const option = document.createElement('option'); option.value = value; option.textContent = value; option.selected = value === perPage; size.append(option); });
         size.addEventListener('change', () => { perPage = Number(size.value); currentPage = 1; update(false); }); sizeLabel.append(size);
         const controls = document.createElement('div'); controls.className = 'projects-pagination-pages';
         const button = (label, page, disabled = false, active = false) => { const item = document.createElement('button'); item.type = 'button'; item.textContent = label; item.disabled = disabled; item.classList.toggle('is-current', active); if (active) item.setAttribute('aria-current', 'page'); item.addEventListener('click', () => { currentPage = page; update(false); grid?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }); controls.append(item); };
@@ -136,6 +136,8 @@
             appliedSort = sortValue;
         }
         const orderedFiltered = [...grid.querySelectorAll('[data-project-card]')].filter(card => filtered.includes(card));
+        const availablePageSizes = [10, 25, 50, 75, 100].filter(value => value <= orderedFiltered.length);
+        if (availablePageSizes.length && perPage > availablePageSizes.at(-1)) perPage = availablePageSizes.at(-1);
         const pageStart = (currentPage - 1) * perPage;
         cards.forEach(card => card.hidden = true);
         orderedFiltered.slice(pageStart, pageStart + perPage).forEach(card => card.hidden = false);

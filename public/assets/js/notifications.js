@@ -35,7 +35,7 @@ let paginationState = (() => {
     catch { return {}; }
 })();
 let currentPage = Number(paginationState.page || 1);
-let notificationsPerPage = Number(paginationState.per_page || 25);
+let notificationsPerPage = Number(paginationState.per_page || 10);
 
 function normalize(value) {
     return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -186,19 +186,19 @@ function renderPagination(pagination = {}) {
     if (!paginationContainer) return;
     paginationState = pagination;
     currentPage = Number(pagination.page || 1);
-    notificationsPerPage = Number(pagination.per_page || 25);
+    notificationsPerPage = Number(pagination.per_page || 10);
     paginationContainer.replaceChildren();
     const total = Number(pagination.total || 0);
-    paginationContainer.hidden = total === 0;
-    if (!total) return;
+    paginationContainer.hidden = total <= 10;
+    if (total <= 10) return;
 
     const summary = document.createElement("p");
-    summary.innerHTML = `Mostrando <strong>${pagination.from}</strong>–<strong>${pagination.to}</strong> de <strong>${total}</strong>`;
+    summary.innerHTML = `Mostrando <strong>${pagination.to}</strong> de <strong>${total}</strong>`;
     const sizeLabel = document.createElement("label");
-    sizeLabel.append(document.createTextNode("Por pagina "));
+    sizeLabel.append(document.createTextNode("Mostrar "));
     const size = document.createElement("select");
-    size.setAttribute("aria-label", "Notificaciones por pagina");
-    [10, 25, 50, 100].forEach((value) => {
+    size.setAttribute("aria-label", "Cantidad de notificaciones visibles");
+    [10, 25, 50, 75, 100].filter((value) => value <= total).forEach((value) => {
         const option = document.createElement("option"); option.value = value; option.textContent = value; option.selected = value === notificationsPerPage; size.append(option);
     });
     size.addEventListener("change", () => { notificationsPerPage = Number(size.value); currentPage = 1; loadNotifications(); });

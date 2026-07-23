@@ -60,8 +60,8 @@ final class NotificationsController
         $trash = filter_var($_GET['trash'] ?? false, FILTER_VALIDATE_BOOL);
         $status = (string) ($_GET['status'] ?? '');
         $page = max(1, (int) ($_GET['notification_page'] ?? 1));
-        $perPage = (int) ($_GET['notifications_per_page'] ?? 25);
-        if (!in_array($perPage, [10, 25, 50, 100], true)) $perPage = 25;
+        $perPage = (int) ($_GET['notifications_per_page'] ?? 10);
+        if (!in_array($perPage, [10, 25, 50, 75, 100], true)) $perPage = 10;
         $model = new NotificationModel();
 
         try {
@@ -462,8 +462,10 @@ final class NotificationsController
     // Agrupa, presenta y resume los registros crudos en estructuras consumibles por la vista.
     private function demoPagination(array $items, int $page, int $perPage): array
     {
-        if (!in_array($perPage, [10, 25, 50, 100], true)) $perPage = 25;
+        if (!in_array($perPage, [10, 25, 50, 75, 100], true)) $perPage = 10;
         $total = count($items);
+        $availableSizes = array_values(array_filter([10, 25, 50, 75, 100], static fn(int $size): bool => $size <= $total));
+        if ($availableSizes && $perPage > max($availableSizes)) $perPage = max($availableSizes);
         $pages = max(1, (int) ceil($total / $perPage));
         $page = min(max(1, $page), $pages);
         $offset = ($page - 1) * $perPage;

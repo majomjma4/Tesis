@@ -201,7 +201,7 @@ final class ProjectModel
 
         return [
             $common + [
-                'id' => 1, 'type' => 'Trabajo de titulación', 'type_key' => 'thesis', 'status' => 'En revisión', 'status_key' => 'review', 'metric_bucket' => 'review',
+                'id' => 1, 'type' => 'Titulación', 'type_key' => 'thesis', 'status' => 'En revisión', 'status_key' => 'review', 'metric_bucket' => 'review',
                 'title' => 'Sistema de Gestión Documental Académica', 'subtitle' => 'Seguimiento, revisión y publicación de proyectos académicos.',
                 'tags' => ['Gestión académica', 'Trazabilidad'], 'technologies' => ['PHP', 'MariaDB'], 'activity_order' => 4,
                 'tutor' => 'Ing. Tutor Asignado', 'last_activity' => 'Revisión del tutor · 17 Jul 2026', 'stage' => 'Revisión académica', 'progress' => 58,
@@ -229,7 +229,7 @@ final class ProjectModel
                 'action_label' => 'Preparar documentos finales', 'next_action' => 'Completar los documentos requeridos para tribunal.', 'latest_delivery' => null, 'observations' => [], 'activities' => [], 'comments' => [],
             ],
             $common + [
-                'id' => 3, 'type' => 'Trabajo de titulación', 'type_key' => 'thesis', 'status' => 'En tribunal', 'status_key' => 'defense', 'metric_bucket' => 'active',
+                'id' => 3, 'type' => 'Titulación', 'type_key' => 'thesis', 'status' => 'En tribunal', 'status_key' => 'defense', 'metric_bucket' => 'active',
                 'title' => 'Plataforma para seguimiento de prácticas preprofesionales', 'subtitle' => 'Control académico de convenios, evidencias y evaluaciones.',
                 'tags' => ['Prácticas', 'Evaluación'], 'technologies' => ['Laravel'], 'activity_order' => 2,
                 'tutor' => 'Ing. Pablo Torres', 'last_activity' => 'Defensa programada · 15 Jul 2026', 'stage' => 'Defensa', 'progress' => 91,

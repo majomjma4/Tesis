@@ -5,7 +5,8 @@ declare(strict_types=1);
 final class ProjectDraftService
 {
     private const TYPES = [
-        'thesis' => ['label' => 'Trabajo de titulación / Perfil de tesis', 'prefix' => 'TIT', 'additional' => 'research_line'],
+        'thesis' => ['label' => 'Titulación', 'prefix' => 'TIT', 'additional' => 'research_line'],
+        'thesis_profile' => ['label' => 'Perfil de tesis', 'prefix' => 'PFT', 'additional' => 'research_line'],
         'pis' => ['label' => 'Proyecto integrador de saberes (PIS)', 'prefix' => 'PIS', 'additional' => 'academic_subject'],
         'practice' => ['label' => 'Prácticas preprofesionales', 'prefix' => 'PRA', 'additional' => null],
         'community' => ['label' => 'Proyecto de vinculación', 'prefix' => 'VIN', 'additional' => null],
@@ -17,7 +18,14 @@ final class ProjectDraftService
             'research_lines' => ['Sistemas de información', 'Innovación tecnológica', 'Transformación digital'],
             'subjects' => ['Integración curricular', 'Proyecto integrador', 'Nivel académico por definir'],
             'community_programs' => ['Alfabetización digital', 'Innovación comunitaria', 'Programa por definir'],
-            'teachers' => [['id' => 'teacher-1', 'name' => 'Mgs. Andrea Molina'], ['id' => 'teacher-2', 'name' => 'Ing. Carlos Paredes'], ['id' => 'teacher-3', 'name' => 'Mgs. Daniela Ruiz']],
+            'teachers' => [
+                ['id' => 'teacher-1', 'name' => 'Msc. Maribel Fierro Montero'],
+                ['id' => 'teacher-2', 'name' => 'Msc. Maria Elena Navarrete'],
+                ['id' => 'teacher-3', 'name' => 'Lic. Diana Alegría Camino'],
+                ['id' => 'teacher-4', 'name' => 'Msc. Diana Anaid Ramirez'],
+                ['id' => 'teacher-5', 'name' => 'Abg. Alex Fabián Galarza'],
+                ['id' => 'teacher-6', 'name' => 'Msc. Henrry Mariño Acosta'],
+            ],
             'semesters' => ['5' => 'Quinto semestre', '6' => 'Sexto semestre'],
             'students' => [['id' => 'student-1', 'name' => 'María José Monteros', 'semester' => '6'], ['id' => 'student-2', 'name' => 'Juan Pérez', 'semester' => '6'], ['id' => 'student-3', 'name' => 'Camila Torres', 'semester' => '5'], ['id' => 'student-4', 'name' => 'Luis Mendoza', 'semester' => '6']]];
     }
@@ -26,6 +34,7 @@ final class ProjectDraftService
     {
         return [
             'thesis' => ['required' => ['title','description','period','modality','research_line','tutor_id'], 'additional' => ['research_line'], 'uses_description' => true],
+            'thesis_profile' => ['required' => ['title','description','period','research_line','tutor_id'], 'additional' => ['research_line'], 'uses_description' => true],
             'pis' => ['required' => ['title','description','period','academic_subject','tutor_id'], 'additional' => ['academic_subject'], 'uses_description' => true],
             'practice' => ['required' => ['title','period','tutor_id'], 'additional' => [], 'uses_description' => false, 'institution_scope' => 'Instituto Superior Tecnológico El Libertador'],
             'community' => ['required' => ['title','period','tutor_id'], 'additional' => [], 'uses_description' => false],

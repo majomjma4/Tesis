@@ -13,7 +13,7 @@ final class ProjectCodeService
         $select->execute(['type_id'=>$projectTypeId,'year'=>$year]); $number=(int)$select->fetchColumn();
         $update = $db->prepare('UPDATE project_code_sequences SET next_number=next_number+1 WHERE project_type_id=:type_id AND code_year=:year');
         $update->execute(['type_id'=>$projectTypeId,'year'=>$year]);
-        $prefix = match ($typeCode) { 'thesis'=>'TIT','pis'=>'PIS','practice'=>'PRA','community'=>'VIN',default=>'PRY' };
+        $prefix = match ($typeCode) { 'thesis'=>'TIT','thesis_profile'=>'PFT','pis'=>'PIS','practice'=>'PRA','community'=>'VIN',default=>'PRY' };
         return sprintf('%s-%d-%04d',$prefix,$year,$number);
     }
 }

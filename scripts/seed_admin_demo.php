@@ -43,7 +43,7 @@ final class AdminDemoSeeder
 
             return [
                 'users' => count($this->userIds),
-                'teachers' => 3,
+                'teachers' => 6,
                 'students' => 6,
                 'projects' => count($this->projectIds),
                 'files' => $files,
@@ -65,7 +65,7 @@ final class AdminDemoSeeder
             ('2027-I','I PAO 2027','2027-01-01','2027-06-30','planned')
             ON DUPLICATE KEY UPDATE name=VALUES(name),starts_on=VALUES(starts_on),ends_on=VALUES(ends_on),status=VALUES(status)");
         $this->db->exec("INSERT INTO project_types(code,name,is_active) VALUES
-            ('thesis','Trabajo de titulación',1),('pis','Proyecto integrador de saberes',1),
+            ('thesis','Titulación',1),('thesis_profile','Perfil de tesis',1),('pis','Proyecto integrador de saberes',1),
             ('practice','Prácticas preprofesionales',1),('community','Proyecto de vinculación',1)
             ON DUPLICATE KEY UPDATE name=VALUES(name),is_active=1");
 
@@ -97,9 +97,12 @@ final class AdminDemoSeeder
             ['diego.paredes.demo@correo.com','Diego Paredes Ruiz','student','1750010004',6,'active',null],
             ['valentina.mora.demo@correo.com','Valentina Mora Cedeño','student','1750010005',8,'active',null],
             ['mateo.silva.demo@correo.com','Mateo Silva Ortiz','student','1750010006',4,'blocked',null],
-            ['laura.villacis.demo@correo.com','Ing. Laura Villacís','teacher','DOC-DEMO-001',0,'active','Magíster en Ingeniería de Software'],
-            ['andres.salazar.demo@correo.com','Mgs. Andrés Salazar','teacher','DOC-DEMO-002',0,'active','Magíster en Ciberseguridad'],
-            ['paola.rivas.demo@correo.com','Ing. Paola Rivas','teacher','DOC-DEMO-003',0,'active','Ingeniera en Sistemas'],
+            ['maribel.fierro.pendiente@local.invalid','Msc. Maribel Fierro Montero','teacher','DOC-REAL-001',0,'active','Msc. (por confirmar)'],
+            ['maria.navarrete.pendiente@local.invalid','Msc. Maria Elena Navarrete','teacher','DOC-REAL-002',0,'active','Msc. (por confirmar)'],
+            ['diana.alegria.pendiente@local.invalid','Lic. Diana Alegría Camino','teacher','DOC-REAL-003',0,'active','Lic. (por confirmar)'],
+            ['diana.ramirez.pendiente@local.invalid','Msc. Diana Anaid Ramirez','teacher','DOC-REAL-004',0,'active','Msc. (por confirmar)'],
+            ['alex.galarza.pendiente@local.invalid','Abg. Alex Fabián Galarza','teacher','DOC-REAL-005',0,'active','Abg. (por confirmar)'],
+            ['henrry.marino.pendiente@local.invalid','Msc. Henrry Mariño Acosta','teacher','DOC-REAL-006',0,'active','Msc. (por confirmar)'],
         ];
         $hash = password_hash($this->temporaryPassword, PASSWORD_DEFAULT);
         foreach ($users as [$email,$name,$role,$code,$semester,$status,$title]) {
@@ -127,9 +130,9 @@ final class AdminDemoSeeder
     private function seedSubjects(array &$catalogs): void
     {
         $subjects = [
-            ['PROY-401','Proyecto Integrador IV',4,'laura.villacis.demo@correo.com'],
-            ['SEG-601','Seguridad de Aplicaciones',6,'andres.salazar.demo@correo.com'],
-            ['TIT-801','Unidad de Integración Curricular',8,'paola.rivas.demo@correo.com'],
+            ['PROY-401','Proyecto Integrador IV',4,'maribel.fierro.pendiente@local.invalid'],
+            ['SEG-601','Seguridad de Aplicaciones',6,'maria.navarrete.pendiente@local.invalid'],
+            ['TIT-801','Unidad de Integración Curricular',8,'diana.alegria.pendiente@local.invalid'],
         ];
         foreach ($subjects as [$code,$name,$semester,$teacher]) {
             $this->execute("INSERT INTO academic_subjects(career_id,academic_period_id,semester,code,name,responsible_teacher_id)
@@ -166,13 +169,13 @@ final class AdminDemoSeeder
     private function seedProjects(array $catalogs): void
     {
         $projects = [
-            ['DEMO-TT-001','thesis','Sistema inteligente para la gestión de turnos médicos','Plataforma web accesible para centros de salud','under_review','review','valentina.mora.demo@correo.com','paola.rivas.demo@correo.com','TIT-801'],
-            ['DEMO-PIS-002','pis','Aplicación móvil para rutas de transporte urbano','Seguimiento de recorridos y alertas para usuarios','development','development','ana.torres.demo@correo.com','laura.villacis.demo@correo.com','PROY-401'],
-            ['DEMO-PP-003','practice','Automatización del inventario de equipos tecnológicos','Práctica preprofesional aplicada al control institucional','changes_required','review','diego.paredes.demo@correo.com','andres.salazar.demo@correo.com','SEG-601'],
-            ['DEMO-VIN-004','community','Alfabetización digital para emprendedores locales','Proyecto de vinculación con herramientas de comercio electrónico','approved','final_documents','sofia.lopez.demo@correo.com','laura.villacis.demo@correo.com','PROY-401'],
-            ['DEMO-TT-005','thesis','Modelo de detección temprana de riesgos académicos','Análisis de indicadores para acompañamiento estudiantil','completed','closed','valentina.mora.demo@correo.com','paola.rivas.demo@correo.com','TIT-801'],
-            ['DEMO-PIS-006','pis','Panel de monitoreo energético para laboratorios','Visualización en tiempo real de consumo eléctrico','published','published','carlos.mendoza.demo@correo.com','andres.salazar.demo@correo.com','PROY-401'],
-            ['DEMO-TRASH-007','pis','Prototipo descartado de control de asistencia','Registro creado para probar la papelera administrativa','development','registration','mateo.silva.demo@correo.com','laura.villacis.demo@correo.com','PROY-401'],
+            ['DEMO-TT-001','thesis','Sistema inteligente para la gestión de turnos médicos','Plataforma web accesible para centros de salud','under_review','review','valentina.mora.demo@correo.com','diana.alegria.pendiente@local.invalid','TIT-801'],
+            ['DEMO-PIS-002','pis','Aplicación móvil para rutas de transporte urbano','Seguimiento de recorridos y alertas para usuarios','development','development','ana.torres.demo@correo.com','maribel.fierro.pendiente@local.invalid','PROY-401'],
+            ['DEMO-PP-003','practice','Automatización del inventario de equipos tecnológicos','Práctica preprofesional aplicada al control institucional','changes_required','review','diego.paredes.demo@correo.com','maria.navarrete.pendiente@local.invalid','SEG-601'],
+            ['DEMO-VIN-004','community','Alfabetización digital para emprendedores locales','Proyecto de vinculación con herramientas de comercio electrónico','approved','final_documents','sofia.lopez.demo@correo.com','maribel.fierro.pendiente@local.invalid','PROY-401'],
+            ['DEMO-TT-005','thesis','Modelo de detección temprana de riesgos académicos','Análisis de indicadores para acompañamiento estudiantil','completed','closed','valentina.mora.demo@correo.com','diana.alegria.pendiente@local.invalid','TIT-801'],
+            ['DEMO-PIS-006','pis','Panel de monitoreo energético para laboratorios','Visualización en tiempo real de consumo eléctrico','published','published','carlos.mendoza.demo@correo.com','maria.navarrete.pendiente@local.invalid','PROY-401'],
+            ['DEMO-TRASH-007','pis','Prototipo descartado de control de asistencia','Registro creado para probar la papelera administrativa','development','registration','mateo.silva.demo@correo.com','maribel.fierro.pendiente@local.invalid','PROY-401'],
         ];
         foreach ($projects as [$code,$type,$title,$subtitle,$status,$stage,$student,$teacher,$subject]) {
             $deleted = $code === 'DEMO-TRASH-007' ? 'DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 12 DAY)' : 'NULL';
@@ -205,7 +208,7 @@ final class AdminDemoSeeder
 
         $reviewProject = $this->projectIds['DEMO-TT-001'];
         $student = $this->userIds['valentina.mora.demo@correo.com'];
-        $teacher = $this->userIds['paola.rivas.demo@correo.com'];
+        $teacher = $this->userIds['diana.alegria.pendiente@local.invalid'];
         $stage = $this->requiredId("SELECT id FROM project_stages WHERE project_id={$reviewProject} AND stage_code='review'", 'Falta etapa de revisión.');
         $this->execute("INSERT INTO project_deliveries(project_id,stage_id,version_number,title,comment,status,submitted_by,submitted_at) VALUES(:project,:stage,1,'Informe de avance v1','Primera versión para revisión.','changes_required',:student,DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 6 DAY))", ['project'=>$reviewProject,'stage'=>$stage,'student'=>$student]);
         $delivery = (int)$this->db->lastInsertId();
@@ -246,7 +249,7 @@ final class AdminDemoSeeder
     private function seedAdminActivity(int $adminId): void
     {
         $this->db->exec("DELETE FROM admin_audit_log WHERE action LIKE 'demo_%'");
-        foreach ([['demo_users_imported','user',$this->userIds['ana.torres.demo@correo.com']],['demo_teacher_updated','user',$this->userIds['laura.villacis.demo@correo.com']],['demo_catalog_configured','project_type',null]] as $index => [$action,$entity,$entityId]) {
+        foreach ([['demo_users_imported','user',$this->userIds['ana.torres.demo@correo.com']],['demo_teacher_updated','user',$this->userIds['maribel.fierro.pendiente@local.invalid']],['demo_catalog_configured','project_type',null]] as $index => [$action,$entity,$entityId]) {
             $this->execute("INSERT INTO admin_audit_log(actor_user_id,action,entity_type,entity_id,details,created_at) VALUES(:actor,:action,:entity,:entity_id,:details,DATE_SUB(CURRENT_TIMESTAMP,INTERVAL {$index} DAY))", [
                 'actor'=>$adminId,'action'=>$action,'entity'=>$entity,'entity_id'=>$entityId,'details'=>json_encode(['demo'=>true], JSON_UNESCAPED_UNICODE),
             ]);
