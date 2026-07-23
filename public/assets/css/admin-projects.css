@@ -4,8 +4,12 @@
 .ap-list>article[hidden]{display:none}.ap-search-empty[hidden]{display:none!important}
 
 /* Los diálogos viven en el viewport, no en la posición desplazada de la lista. */
-.ap-modal{z-index:2200;place-items:center;overflow-y:auto;background:rgba(15,23,42,.38)}
-.ap-modal>div{box-sizing:border-box;max-height:calc(100dvh - 32px);margin:auto;overflow:auto}
+body.project-dialog-open{overflow:hidden!important}
+.ap-modal,.ap-confirm{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;box-sizing:border-box;display:grid;place-items:center;margin:0!important;background:rgba(15,23,42,.24)!important;backdrop-filter:blur(3px)!important;overflow:hidden}
+.ap-modal{z-index:2200}
+.ap-confirm{z-index:2600}
+.ap-modal[hidden],.ap-confirm[hidden]{display:none!important}
+.ap-modal>div{box-sizing:border-box;width:min(680px,calc(100vw - 32px));max-height:calc(100dvh - 32px);margin:auto;overflow:auto;overscroll-behavior:contain;border:1px solid var(--line);box-shadow:0 30px 75px rgba(0,0,0,.24)}
 .ap-modal>div.small{min-height:0}
 #apTrash>div.small{display:flex;flex-direction:column}
 #apTrash>div.small{overflow:visible}
@@ -17,7 +21,7 @@
 .ap-modal textarea{box-sizing:border-box;width:100%;max-width:100%;resize:vertical}
 .ap-modal .custom-select[hidden]{display:none!important}
 .ap-modal label:has(select[name="career_id"]) .custom-select,.ap-modal label:has(select[name="academic_period_id"]) .custom-select{display:none!important}
-.ap-fixed-field{min-height:43px;padding:0;background:transparent;color:var(--text);display:flex;align-items:center;font-size:.9rem;font-weight:700}
+.ap-fixed-field{box-sizing:border-box;min-height:62px;padding:10px 12px;border:1px solid rgba(37,99,235,.18);border-radius:12px;background:rgba(37,99,235,.055);color:var(--text);display:grid;grid-template-columns:38px minmax(0,1fr);align-items:center;gap:11px}.ap-fixed-field>i{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:rgba(37,99,235,.12);color:var(--blue)}.ap-fixed-field>span{display:block;min-width:0}.ap-fixed-field small,.ap-fixed-field strong{display:block}.ap-fixed-field small{margin-bottom:3px;color:var(--muted);font-size:.72rem;font-weight:750}.ap-fixed-field strong{overflow:hidden;color:var(--text);font-size:.88rem;font-weight:800;text-overflow:ellipsis;white-space:nowrap}
 .ap-modal label[hidden],.ap-quick-hint[hidden]{display:none!important}
 .ap-quick-text{font-size:.82rem;color:var(--muted)}
 .ap-quick-hint{display:flex;align-items:flex-start;gap:7px;margin:8px 0 2px;color:var(--muted);font-size:.78rem;line-height:1.45}.ap-quick-hint i{margin-top:2px;color:var(--blue)}

@@ -9,15 +9,14 @@ final class PaginationService
     {
         $page=max(1,(int)($_GET[$pageKey]??1));
         $size=(int)($_GET[$sizeKey]??$defaultSize);
-        if(!in_array($size,self::ALLOWED_SIZES,true))$size=$defaultSize;
+        if($size<10||$size>100)$size=$defaultSize;
         return compact('page','size','pageKey','sizeKey');
     }
 
     public static function run(PDO $db,string $countSql,string $dataSql,array $params,array $request):array
     {
         $count=$db->prepare($countSql);$count->execute($params);$total=(int)$count->fetchColumn();
-        $availableSizes=array_values(array_filter(self::ALLOWED_SIZES,static fn(int $size):bool=>$size<=$total));
-        $effectiveSize=$availableSizes?min($request['size'],max($availableSizes)):$request['size'];
+        $effectiveSize=max(10,min(100,(int)$request['size']));
         $pages=max(1,(int)ceil($total/$effectiveSize));$page=min($request['page'],$pages);$offset=($page-1)*$effectiveSize;
         $list=$db->prepare($dataSql.' LIMIT :pagination_limit OFFSET :pagination_offset');
         foreach($params as $key=>$value)$list->bindValue(':'.$key,$value,is_int($value)?PDO::PARAM_INT:PDO::PARAM_STR);

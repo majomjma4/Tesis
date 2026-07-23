@@ -5,24 +5,29 @@
     dialogLayers.forEach(layer=>document.body.append(layer));
     const refreshToast=document.createElement('div');refreshToast.className='users-refresh-toast';refreshToast.hidden=true;refreshToast.innerHTML='<i class="fa-solid fa-circle-check"></i><span>Usuarios actualizados</span>';document.body.append(refreshToast);
     let refreshToastTimer;
-    const showRefreshToast=()=>{clearTimeout(refreshToastTimer);refreshToast.hidden=false;requestAnimationFrame(()=>refreshToast.classList.add('is-visible'));refreshToastTimer=setTimeout(()=>{refreshToast.classList.remove('is-visible');setTimeout(()=>{refreshToast.hidden=true;},220);},2600);};
+    const showRefreshToast=(text='Usuarios actualizados')=>{refreshToast.querySelector('span').textContent=text;clearTimeout(refreshToastTimer);refreshToast.hidden=false;requestAnimationFrame(()=>refreshToast.classList.add('is-visible'));refreshToastTimer=setTimeout(()=>{refreshToast.classList.remove('is-visible');setTimeout(()=>{refreshToast.hidden=true;},220);},2600);};
+    window.showAdminUsersToast=showRefreshToast;
     const syncDialogState=()=>document.body.classList.toggle('user-dialog-open',dialogLayers.some(layer=>!layer.hidden));
     window.syncAdminUserDialogs=syncDialogState;
-    let pending=null;
+    let pending=null,formBaseline='';
     const field=name=>form.elements.namedItem(name);
+    const saveButton=form.querySelector('[type=submit]');
+    const formSnapshot=()=>JSON.stringify([...new FormData(form).entries()]);
+    const syncSaveButton=()=>{saveButton.disabled=formSnapshot()===formBaseline;};
+    const openConfirmation=(title,text)=>{document.querySelector('#confirmTitle').textContent=title;document.querySelector('#confirmText').textContent=text;const accept=confirmBox.querySelector('[data-accept-confirm]');accept.disabled=false;confirmBox.hidden=false;syncDialogState();requestAnimationFrame(()=>accept.focus());};
     const showRole=()=>{const role=field('role').value;form.querySelectorAll('.role-fields').forEach(el=>el.hidden=!el.dataset.for.split(' ').includes(role));};
     const open=(user=null)=>{
         form.reset();field('id').value=user?.id||'';field('full_name').value=user?.full_name||'';field('email').value=user?.email||'';field('username').value=user?.username||'';field('role').value=user?.role_code||'student';field('status').value=user?.status||'active';field('institutional_code').value=user?.institutional_code||'';field('semester').value=user?.semester||'';field('academic_title').value=user?.academic_title||'';field('can_tutor').checked=Boolean(Number(user?.can_tutor||0));
-        document.querySelector('#userModalTitle').textContent=user?'Editar usuario':'Nuevo usuario';document.querySelector('#temporaryPasswordNote').hidden=Boolean(user);document.querySelector('#importUsersButton').hidden=Boolean(user);message.hidden=true;showRole();modal.hidden=false;syncDialogState();requestAnimationFrame(()=>field('full_name').focus());
+        document.querySelector('#userModalTitle').textContent=user?'Editar usuario':'Nuevo usuario';document.querySelector('#temporaryPasswordNote').hidden=Boolean(user);document.querySelector('#importUsersButton').hidden=Boolean(user);message.hidden=true;showRole();formBaseline=formSnapshot();syncSaveButton();modal.hidden=false;syncDialogState();requestAnimationFrame(()=>field('full_name').focus());
     };
     const close=()=>{modal.hidden=true;syncDialogState();};
     const request=async(url,data)=>{const response=await fetch(url,{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},body:data});const result=await response.json().catch(()=>({success:false,message:'La respuesta del servidor no es válida.'}));if(!response.ok||!result.success)throw new Error(result.message||'No fue posible completar la acción.');return result;};
     window.adminUserRequest=request;
     document.querySelector('#newUserButton')?.addEventListener('click',()=>open());
-    field('role').addEventListener('change',showRole);
+    field('role').addEventListener('change',showRole);form.addEventListener('input',syncSaveButton);form.addEventListener('change',syncSaveButton);
     document.querySelectorAll('[data-close-modal]').forEach(button=>button.addEventListener('click',close));
     modal.addEventListener('click',event=>{if(event.target===modal)close();});
-    form.addEventListener('submit',async event=>{event.preventDefault();const button=form.querySelector('[type=submit]');button.disabled=true;try{const result=await request(config.dataset.save,new FormData(form));message.className='users-message success';message.textContent=result.message;message.hidden=false;setTimeout(()=>location.reload(),600);}catch(error){message.className='users-message error';message.textContent=error.message;message.hidden=false;}finally{button.disabled=false;}});
+    form.addEventListener('submit',event=>{event.preventDefault();const button=form.querySelector('[type=submit]');if(button.disabled)return;pending={kind:'save',url:config.dataset.save,data:new FormData(form)};openConfirmation(field('id').value?'Guardar cambios':'Crear usuario',field('id').value?'¿Estás seguro de guardar los cambios realizados en este usuario?':'¿Estás seguro de crear esta cuenta institucional?');});
 
     const closeMenus=()=>document.querySelectorAll('.user-actions-wrap[open]').forEach(details=>details.removeAttribute('open'));
     const bindActionMenus=(root=document)=>root.querySelectorAll('.user-actions-wrap').forEach(details=>{if(details.dataset.menuReady)return;details.dataset.menuReady='true';details.addEventListener('toggle',()=>{const record=details.closest('.user-record');record?.classList.toggle('has-open-actions',details.open);if(!details.open)return;document.querySelectorAll('.user-actions-wrap[open]').forEach(other=>{if(other!==details)other.removeAttribute('open');});});});
@@ -32,13 +37,12 @@
         const button=event.target.closest('.user-actions [data-action]');if(!button)return;
         const record=button.closest('.user-record'),user=JSON.parse(record.querySelector('.user-data').textContent);closeMenus();
         if(button.dataset.action==='edit')return open(user);
-        const isPassword=button.dataset.action==='password';pending={url:isPassword?config.dataset.password:config.dataset.status,data:{id:user.id,status:button.dataset.status||''}};
-        document.querySelector('#confirmTitle').textContent=isPassword?'Restablecer contraseña':'Cambiar estado de acceso';
-        document.querySelector('#confirmText').textContent=isPassword?`La contraseña de ${user.full_name} volverá a ser Istel2026+ y sus sesiones se cerrarán.`:`Se cambiará el acceso de ${user.full_name}. Sus sesiones activas se cerrarán.`;
-        confirmBox.hidden=false;syncDialogState();
+        const isPassword=button.dataset.action==='password',restoring=button.dataset.status==='active';pending={kind:'action',url:isPassword?config.dataset.password:config.dataset.status,data:{id:user.id,status:button.dataset.status||''}};
+        openConfirmation(isPassword?'Restablecer contraseña':restoring?'Restablecer acceso':'Bloquear usuario',isPassword?`La contraseña de ${user.full_name} volverá a ser Istel2026+ y sus sesiones se cerrarán.`:restoring?`¿Estás seguro de restablecer el acceso de ${user.full_name}?`:`¿Estás seguro de bloquear a ${user.full_name}? Sus sesiones activas se cerrarán.`);
     });
     document.querySelector('[data-cancel-confirm]')?.addEventListener('click',()=>{confirmBox.hidden=true;pending=null;syncDialogState();});
-    document.querySelector('[data-accept-confirm]')?.addEventListener('click',async event=>{if(!pending)return;event.currentTarget.disabled=true;const data=new FormData();data.set('_csrf',config.dataset.csrf);Object.entries(pending.data).forEach(([key,value])=>data.set(key,value));try{await request(pending.url,data);location.reload();}catch(error){alert(error.message);}finally{event.currentTarget.disabled=false;confirmBox.hidden=true;pending=null;syncDialogState();}});
+    confirmBox.addEventListener('click',event=>{if(event.target===confirmBox){confirmBox.hidden=true;pending=null;syncDialogState();}});
+    document.querySelector('[data-accept-confirm]')?.addEventListener('click',async event=>{if(!pending)return;const confirmButton=event.currentTarget;confirmButton.disabled=true;const action=pending,data=action.kind==='save'?action.data:new FormData();if(action.kind!=='save'){data.set('_csrf',config.dataset.csrf);Object.entries(action.data).forEach(([key,value])=>data.set(key,value));}try{const result=await request(action.url,data);confirmBox.hidden=true;pending=null;if(action.kind==='save')close();else syncDialogState();await updateListing(new URL(location.href));showRefreshToast(result.message||'Usuario actualizado correctamente.');}catch(error){confirmBox.hidden=true;pending=null;syncDialogState();if(action.kind==='save'){message.className='users-message error';message.textContent=error.message;message.hidden=false;syncSaveButton();}else alert(error.message);}finally{confirmButton.disabled=false;}});
 
     const filters=document.querySelector('.users-filters'),search=filters?.querySelector('input[name="search"]'),clear=filters?.querySelector('.users-search-clear');let list=document.querySelector('.users-list'),reindexListing=()=>{},applySearch=()=>{},updateListing=async()=>{};
     if(filters&&search&&list){
@@ -68,16 +72,17 @@
             }
             delete current.dataset.originalSummary;delete current.dataset.originalPages;
         };
-        updateListing=async(url=listingUrl(),showToast=false)=>{
+        updateListing=async(url=listingUrl(),toastMessage='',minimumDelay=0)=>{
             const requestId=++listingRequest,currentCard=document.querySelector('.users-table-card');currentCard?.classList.add('is-refreshing');
             try{
-                const [response]=await Promise.all([fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest'},cache:'no-store'}),new Promise(resolve=>setTimeout(resolve,280))]);
+                const [response]=await Promise.all([fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest'},cache:'no-store'}),minimumDelay>0?new Promise(resolve=>setTimeout(resolve,minimumDelay)):Promise.resolve()]);
                 if(!response.ok)throw new Error();
                 const page=new DOMParser().parseFromString(await response.text(),'text/html'),nextCard=page.querySelector('.users-table-card');
                 if(!nextCard||requestId!==listingRequest)return;
-                currentCard.replaceWith(nextCard);syncPagination(page,nextCard);bindActionMenus(nextCard);serverQuery=url.searchParams.get('search')||'';history.replaceState(null,'',url);reindexListing();applySearch();if(showToast)showRefreshToast();
+                currentCard.replaceWith(nextCard);syncPagination(page,nextCard);bindActionMenus(nextCard);serverQuery=url.searchParams.get('search')||'';history.replaceState(null,'',url);reindexListing();applySearch();if(toastMessage)showRefreshToast(toastMessage);
             }catch{if(requestId!==listingRequest)return;currentCard?.classList.remove('is-refreshing');alert('No fue posible consultar los usuarios.');}
         };
+        window.refreshAdminUsersListing=(toastMessage='')=>updateListing(new URL(location.href),toastMessage);
         const syncSearchCounters=(visible,query)=>{
             const resultCounter=document.querySelector('.users-table-card>header span');
             const pagination=document.querySelector('.data-pagination');
@@ -100,7 +105,7 @@
     }else filters?.querySelectorAll('select').forEach(select=>select.addEventListener('change',()=>filters.requestSubmit()));
     document.addEventListener('click',async event=>{
         const button=event.target.closest('.users-refresh');if(!button)return;
-        button.disabled=true;button.querySelector('i')?.classList.add('fa-spin');await updateListing(new URL(location.href),true);if(button.isConnected){button.disabled=false;button.querySelector('i')?.classList.remove('fa-spin');}
+        const firstPageUrl=new URL(location.href);firstPageUrl.searchParams.delete('p');button.disabled=true;button.querySelector('i')?.classList.add('fa-spin');await updateListing(firstPageUrl,'Usuarios actualizados',320);if(button.isConnected){button.disabled=false;button.querySelector('i')?.classList.remove('fa-spin');}
     });
     document.addEventListener('keydown',event=>{if(event.key==='Escape'){if(!confirmBox.hidden){confirmBox.hidden=true;pending=null;syncDialogState();}else if(!modal.hidden)close();else closeMenus();}});
 })();

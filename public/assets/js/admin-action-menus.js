@@ -58,6 +58,5 @@
         clean.searchParams.delete('action');
         history.replaceState(null, '', clean);
     };
-    form.addEventListener('submit', clearAction, { capture: true });
-    modal.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', clearAction));
+    clearAction();
 })();

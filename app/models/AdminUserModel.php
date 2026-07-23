@@ -82,14 +82,14 @@ final class AdminUserModel
     public function resetPassword(int $id,string $password,int $actorId):void
     {
         if($id<1)throw new InvalidArgumentException('El usuario no es válido.');
-        Database::transaction(function(PDO $db)use($id,$password,$actorId):void{$this->ensureUser($db,$id);$db->prepare('UPDATE users SET password_hash=:hash,must_change_password=1,password_warning_count=0,temporary_password_expires_at=DATE_ADD(CURRENT_TIMESTAMP,INTERVAL 7 DAY),session_version=session_version+1 WHERE id=:id')->execute(['hash'=>password_hash($password,PASSWORD_DEFAULT),'id'=>$id]);$this->audit($db,$actorId,'password_reset',$id,[]);});
+        Database::transaction(function(PDO $db)use($id,$password,$actorId):void{$this->ensureUser($db,$id);$check=$db->prepare('SELECT must_change_password FROM users WHERE id=:id');$check->execute(['id'=>$id]);if((int)$check->fetchColumn()===1)throw new InvalidArgumentException('El usuario todavía utiliza una clave temporal; no es necesario restablecerla.');$db->prepare('UPDATE users SET password_hash=:hash,must_change_password=1,password_warning_count=0,temporary_password_expires_at=DATE_ADD(CURRENT_TIMESTAMP,INTERVAL 7 DAY),session_version=session_version+1 WHERE id=:id')->execute(['hash'=>password_hash($password,PASSWORD_DEFAULT),'id'=>$id]);$this->audit($db,$actorId,'password_reset',$id,[]);});
     }
 
     public function previewImport(string $content,array $config):array
     {
         $config=$this->withInstitutionalDefaults($config);
         if(!in_array($config['role']??'',['student','teacher'],true))throw new InvalidArgumentException('Selecciona Estudiantes o Docentes para la importación.');
-        if($config['role']==='student'&&(($config['semester']??0)<1||$config['semester']>10))throw new InvalidArgumentException('Selecciona el semestre antes de continuar.');
+        if($config['role']==='student'&&(($config['semester']??0)<1||$config['semester']>4))throw new InvalidArgumentException('Selecciona un semestre válido entre primero y cuarto.');
         $rows=$this->parseImportRows($content);$emails=[];$codes=[];$usernames=[];$result=[];$valid=0;$db=Database::connection();
         $emailCheck=$db->prepare('SELECT COUNT(*) FROM users WHERE email=:email');
         $usernameCheck=$db->prepare('SELECT COUNT(*) FROM users WHERE username=:username');
@@ -164,7 +164,7 @@ final class AdminUserModel
         if($data['username']!==''&&!preg_match('/^[a-zA-Z0-9._-]{3,80}$/',$data['username']))throw new InvalidArgumentException('El usuario debe tener entre 3 y 80 caracteres y usar solo letras, números, punto, guion o guion bajo.');
         if($data['username']!==''){$check=Database::connection()->prepare('SELECT id FROM users WHERE username=:username AND id<>:id LIMIT 1');$check->execute(['username'=>$data['username'],'id'=>$id]);if($check->fetch())throw new InvalidArgumentException('Ese nombre de usuario ya está registrado.');}
         if(in_array($data['role'],['student','teacher'],true)&&!preg_match('/^\d{10}$/',$data['institutional_code']))throw new InvalidArgumentException('La cédula debe contener exactamente 10 dígitos.');
-        if($data['role']==='student'&&($data['career_id']<1||$data['academic_period_id']<1||$data['semester']<1||$data['semester']>10))throw new InvalidArgumentException('Completa el semestre del estudiante.');
+        if($data['role']==='student'&&($data['career_id']<1||$data['academic_period_id']<1||$data['semester']<1||$data['semester']>4))throw new InvalidArgumentException('Completa el semestre del estudiante entre primero y cuarto.');
     }
 
     private function withInstitutionalDefaults(array $data):array
