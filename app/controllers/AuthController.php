@@ -19,7 +19,7 @@ final class AuthController
                 $user = $auth->findActiveUserByLogin($login);
                 if ($user && password_verify((string) $_POST['password'], (string) $user['password_hash'])) {
                     $requiresTemporaryPasswordChange = (bool)$user['must_change_password']
-                        && !in_array('administrator', $user['roles'] ?? [], true);
+                        && !(bool)($user['is_admin'] ?? false);
                     if ($requiresTemporaryPasswordChange) {
                         $user['password_warning_count'] = $auth->registerTemporaryPasswordWarning((int)$user['id']);
                     }

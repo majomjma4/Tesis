@@ -9,7 +9,7 @@ final class ProjectsController
      */
     public function index(): void
     {
-        if (in_array('administrator', (new AuthSessionService())->roles(), true)) {
+        if ((new AuthSessionService())->hasAdminAccess()) {
             (new AdminController())->projects();
             return;
         }
@@ -50,7 +50,7 @@ final class ProjectsController
         $selectedObservationId = filter_var($_GET['observation'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 1;
         $model = new ProjectModel();
         $access = new ProjectAccessService();
-        $isAdministrator = in_array('administrator', $access->currentRoles(), true);
+        $isAdministrator = (new AuthSessionService())->hasAdminAccess();
         $project = $id && $access->can('project.view')
             ? ($isAdministrator ? $model->findProjectForAdministrator((int) $id) : $model->findProjectForUser((int) $id, $access->currentUserId()))
             : null;

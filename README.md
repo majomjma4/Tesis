@@ -17,11 +17,18 @@ Autenticación
 - Control de acceso por roles.
 
 # Gestión de usuarios
-- Administradores.
 - Docentes.
 - Estudiantes.
+- Docentes con acceso administrativo.
 
-Cada usuario dispone únicamente de las funciones correspondientes a su rol.
+Estudiante y docente son los perfiles académicos del sistema. El acceso
+administrativo se concede como un privilegio adicional únicamente a docentes,
+sin hacerles perder su perfil académico ni sus asignaciones como tutores.
+
+La cuenta administrativa inicial se conserva solamente para poner en marcha una
+instalación nueva. El sistema protege al último administrador activo para evitar
+que la plataforma quede sin acceso administrativo y registra los cambios
+relevantes en la actividad administrativa.
 
 # Dashboard
 
@@ -238,6 +245,13 @@ public/
 │   └── images/
 
 index.php
+
+# Instalación de la base de datos
+
+La estructura y los datos transportables actuales se encuentran en
+`database/snapshot.sql`. Las instrucciones para importarlos, aplicar migraciones
+y crear la cuenta administrativa inicial están disponibles en
+`database/README.md`.
 
 # Funcionalidades implementadas
 

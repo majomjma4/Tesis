@@ -10,7 +10,7 @@ final class RepositoryController
     public function index(): void
     {
         $this->ensureSession();
-        if (in_array('administrator', (new AuthSessionService())->roles(), true)) {
+        if ((new AuthSessionService())->hasAdminAccess()) {
             (new AdminController())->repository();
             return;
         }

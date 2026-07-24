@@ -6,7 +6,7 @@ final class AuthModel
 {
     public function profile(int $userId):array
     {
-        $q=Database::connection()->prepare('SELECT id,full_name,email,created_at,last_login_at,password_changed_at FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL');$q->execute(['id'=>$userId]);$profile=$q->fetch();if(!$profile)throw new RuntimeException('La cuenta no existe.');$r=Database::connection()->prepare('SELECT roles.code FROM roles INNER JOIN user_roles ON user_roles.role_id=roles.id WHERE user_roles.user_id=:id');$r->execute(['id'=>$userId]);$profile['roles']=array_column($r->fetchAll(),'code');return $profile;
+        $q=Database::connection()->prepare('SELECT id,full_name,email,created_at,last_login_at,password_changed_at,is_admin,is_initial_admin FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL');$q->execute(['id'=>$userId]);$profile=$q->fetch();if(!$profile)throw new RuntimeException('La cuenta no existe.');$profile['roles']=$this->effectiveRoles((int)$profile['id'],(bool)$profile['is_admin']);return $profile;
     }
 
     public function updateProfile(int $userId,string $name,string $email,string $password):void
@@ -18,15 +18,13 @@ final class AuthModel
     public function findActiveUserByLogin(string $login): ?array
     {
         $statement = Database::connection()->prepare(
-            "SELECT id, email, username, password_hash, full_name, must_change_password, password_warning_count, temporary_password_expires_at, session_version FROM users WHERE status = 'active' AND deleted_at IS NULL AND purged_at IS NULL AND email = :email_login LIMIT 1"
+            "SELECT id, email, username, password_hash, full_name, is_admin, is_initial_admin, must_change_password, password_warning_count, temporary_password_expires_at, session_version FROM users WHERE status = 'active' AND deleted_at IS NULL AND purged_at IS NULL AND email = :email_login LIMIT 1"
         );
         $normalizedLogin = mb_strtolower(trim($login));
         $statement->execute(['email_login' => $normalizedLogin]);
         $user = $statement->fetch();
         if (!$user) return null;
-        $roles = Database::connection()->prepare('SELECT r.code FROM roles r INNER JOIN user_roles ur ON ur.role_id = r.id WHERE ur.user_id = :user_id ORDER BY r.id');
-        $roles->execute(['user_id' => $user['id']]);
-        $user['roles'] = array_column($roles->fetchAll(), 'code');
+        $user['roles'] = $this->effectiveRoles((int)$user['id'],(bool)$user['is_admin']);
         return $user;
     }
 
@@ -46,11 +44,19 @@ final class AuthModel
 
     public function sessionIdentity(int $userId): ?array
     {
-        $statement=Database::connection()->prepare("SELECT id,email,full_name,status,must_change_password,password_warning_count,temporary_password_expires_at,session_version FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL LIMIT 1");
+        $statement=Database::connection()->prepare("SELECT id,email,full_name,status,is_admin,is_initial_admin,must_change_password,password_warning_count,temporary_password_expires_at,session_version FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL LIMIT 1");
         $statement->execute(['id'=>$userId]); $user=$statement->fetch();
         if(!$user)return null;
-        $roles=Database::connection()->prepare('SELECT r.code FROM roles r INNER JOIN user_roles ur ON ur.role_id=r.id WHERE ur.user_id=:id');$roles->execute(['id'=>$userId]);$user['roles']=array_column($roles->fetchAll(),'code');
+        $user['roles']=$this->effectiveRoles($userId,(bool)$user['is_admin']);
         return $user;
+    }
+
+    private function effectiveRoles(int $userId,bool $isAdmin):array
+    {
+        $roles=Database::connection()->prepare('SELECT r.code FROM roles r INNER JOIN user_roles ur ON ur.role_id=r.id WHERE ur.user_id=:id ORDER BY r.id');
+        $roles->execute(['id'=>$userId]);$result=array_column($roles->fetchAll(),'code');
+        if($isAdmin&&!in_array('administrator',$result,true))$result[]='administrator';
+        return array_values(array_unique($result));
     }
 
     public function changePassword(int $userId,string $current,string $new): bool

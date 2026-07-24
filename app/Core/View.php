@@ -62,6 +62,8 @@ final class View
             'layoutUserName' => (new AuthSessionService())->name(),
             'layoutUserEmail' => (new AuthSessionService())->email(),
             'layoutUserRoles' => (new AuthSessionService())->roles(),
+            'layoutIsAdmin' => (new AuthSessionService())->hasAdminAccess(),
+            'layoutIsInitialAdmin' => (new AuthSessionService())->isInitialAdmin(),
             'layoutPasswordWarningCount' => (new AuthSessionService())->passwordWarningCount(),
             'layoutMustChangePassword' => (new AuthSessionService())->mustChangePassword(),
         ];

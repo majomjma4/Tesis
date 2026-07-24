@@ -83,7 +83,7 @@ final class DashboardModel
             'blocked' => (int) $connection->query("SELECT COUNT(*) FROM users WHERE status='blocked' AND deleted_at IS NULL AND purged_at IS NULL")->fetchColumn(),
             'observations' => (int) $connection->query("SELECT COUNT(*) FROM project_observations o INNER JOIN projects p ON p.id=o.project_id WHERE o.status='pending' AND p.deleted_at IS NULL")->fetchColumn(),
             'trash' => (int) $connection->query("SELECT (SELECT COUNT(*) FROM projects WHERE deleted_at IS NOT NULL)+(SELECT COUNT(*) FROM users WHERE deleted_at IS NOT NULL AND purged_at IS NULL)")->fetchColumn(),
-            'temporary' => (int) $connection->query("SELECT COUNT(*) FROM users u WHERE u.must_change_password=1 AND u.deleted_at IS NULL AND u.purged_at IS NULL AND u.temporary_password_expires_at IS NOT NULL AND u.temporary_password_expires_at <= CURRENT_TIMESTAMP AND NOT EXISTS(SELECT 1 FROM user_roles ur INNER JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=u.id AND r.code='administrator')")->fetchColumn(),
+            'temporary' => (int) $connection->query("SELECT COUNT(*) FROM users u WHERE u.must_change_password=1 AND u.is_admin=0 AND u.deleted_at IS NULL AND u.purged_at IS NULL AND u.temporary_password_expires_at IS NOT NULL AND u.temporary_password_expires_at <= CURRENT_TIMESTAMP")->fetchColumn(),
         ];
         $alerts = [];
         if ($counts['temporary'] > 0) $alerts[] = ['priority'=>400,'tone'=>'danger','icon'=>'fa-key','title'=>'Contraseñas temporales vencidas','text'=>$counts['temporary'].' '.($counts['temporary'] === 1 ? 'persona debe' : 'personas deben').' actualizar su acceso.','count'=>$counts['temporary'],'url'=>route('admin-users')];

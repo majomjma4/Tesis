@@ -2,6 +2,13 @@ console.log("Layout global (main.js) inicializado correctamente.");
 
 const navigationEntry = performance.getEntriesByType("navigation")[0];
 const isFullPageReload = navigationEntry?.type === "reload";
+const sidebarScrollKey = "app-sidebar-scroll";
+let pendingSidebarScroll = null;
+try {
+    pendingSidebarScroll = JSON.parse(sessionStorage.getItem(sidebarScrollKey) || "null");
+} catch {
+    pendingSidebarScroll = null;
+}
 const resetReloadedPage = () => {
     document.querySelectorAll([
         ".ap-modal", ".ap-confirm", ".aa-modal", ".user-modal", ".user-confirm",
@@ -29,7 +36,9 @@ const appSkeletonStartedAt = performance.now();
 function revealGlobalPage() {
     if (!appGlobalSkeleton) return;
     document.body.classList.remove("app-page-loading");
-    requestAnimationFrame(() => appPageContent?.classList.add("is-revealed"));
+    requestAnimationFrame(() => {
+        appPageContent?.classList.add("is-revealed");
+    });
 }
 if (appGlobalSkeleton) {
     const minimumSkeletonTime = 520;
@@ -38,6 +47,19 @@ if (appGlobalSkeleton) {
 }
 window.addEventListener("pageshow", (event) => {
     if (event.persisted) revealGlobalPage();
+});
+document.addEventListener("click", (event) => {
+    const menuLink = event.target.closest(".menu-item[href]");
+    if (!menuLink || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (!window.matchMedia("(max-width: 900px)").matches) return;
+
+    if (menuLink.classList.contains("active")) {
+        event.preventDefault();
+        closeSidebar();
+        return;
+    }
+
+    saveSidebarScroll();
 });
 document.addEventListener("click", (event) => {
     if (!appGlobalSkeleton) return;
@@ -70,6 +92,51 @@ const logoutAcceptBtn = document.querySelector("#logoutAcceptBtn");
 const logoutButtons = document.querySelectorAll(".js-logout-trigger");
 const themeStorageKey = "theme";
 // Final de selección de elementos globales del layout
+
+const sidebarScroller = sidebar?.querySelector(":scope > div:first-child");
+function saveSidebarScroll() {
+    try {
+        pendingSidebarScroll = {
+            sidebarTop: sidebar?.scrollTop || 0,
+            contentTop: sidebarScroller?.scrollTop || 0,
+            savedAt: Date.now(),
+        };
+        sessionStorage.setItem(sidebarScrollKey, JSON.stringify(pendingSidebarScroll));
+    } catch {
+        // El menú sigue funcionando aunque el almacenamiento esté bloqueado.
+    }
+}
+
+function restoreSidebarScroll() {
+    if (!pendingSidebarScroll || Date.now() - pendingSidebarScroll.savedAt >= 86400000) return;
+    if (sidebar) sidebar.scrollTop = Number(pendingSidebarScroll.sidebarTop) || 0;
+    if (sidebarScroller) sidebarScroller.scrollTop = Number(pendingSidebarScroll.contentTop) || 0;
+}
+
+function keepActiveSidebarItemVisible() {
+    const activeItem = sidebar?.querySelector(".menu-item.active");
+    if (!activeItem) return;
+    const scroller = sidebarScroller && sidebarScroller.scrollHeight > sidebarScroller.clientHeight
+        ? sidebarScroller
+        : sidebar;
+    if (!scroller) return;
+    const itemRect = activeItem.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    if (itemRect.top >= scrollerRect.top && itemRect.bottom <= scrollerRect.bottom) return;
+    scroller.scrollTop += itemRect.top - scrollerRect.top - Math.max(0, (scroller.clientHeight - itemRect.height) / 2);
+    saveSidebarScroll();
+}
+
+function restoreSidebarState() {
+    restoreSidebarScroll();
+    keepActiveSidebarItemVisible();
+}
+
+restoreSidebarState();
+requestAnimationFrame(restoreSidebarState);
+window.addEventListener("load", restoreSidebarState, { once: true });
+sidebar?.addEventListener("scroll", saveSidebarScroll, { passive: true });
+sidebarScroller?.addEventListener("scroll", saveSidebarScroll, { passive: true });
 
 // Inicio de preferencia visual (Tema claro/oscuro)
 function setThemeIcon(isDarkMode) {
@@ -109,6 +176,7 @@ function toggleSidebar() {
     const isOpen = sidebar?.classList.toggle("open");
     sidebarOverlay?.classList.toggle("show", Boolean(isOpen));
     hamburgerBtn?.setAttribute("aria-expanded", String(Boolean(isOpen)));
+    if (isOpen) requestAnimationFrame(restoreSidebarState);
 }
 
 hamburgerBtn?.addEventListener("click", toggleSidebar);
