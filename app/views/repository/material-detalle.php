@@ -9,6 +9,7 @@
     <div class="repository-detail support-material-detail" id="repositoryDetailContent" data-project-id="<?= e((string) $material['id']) ?>" data-preview-url="<?= e($previewActionUrl) ?>" data-preview-content-url="<?= e($previewContentActionUrl) ?>" data-file-download-url="<?= e($downloadActionUrl) ?>" style="display:none;">
         <nav class="repository-detail-breadcrumb" aria-label="Ruta de navegación"><a href="<?= e($repositoryUrl) ?>">Repositorio</a><i class="fa-solid fa-chevron-right"></i><a href="<?= e($materialsUrl) ?>">Material de apoyo</a><i class="fa-solid fa-chevron-right"></i><span title="<?= e($material['title']) ?>"><?= e($material['title']) ?></span></nav>
         <a class="repository-detail-back" href="<?= e($materialsUrl) ?>"><i class="fa-solid fa-arrow-left"></i> Volver a Material de apoyo</a>
+        <?php if (!empty($isAdministrator)): ?><a class="repository-detail-back" href="<?= e($materialEditUrl) ?>"><i class="fa-regular fa-pen-to-square"></i> Editar material</a><?php endif; ?>
 
         <header class="repository-detail-header support-material-header">
             <div><span class="repository-type"><?= e($material['category_label']) ?> · <?= e($material['type']) ?></span><h1><?= e($material['title']) ?></h1><p>Publicado el <?= e($material['publication_date']) ?></p></div>

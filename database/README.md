@@ -34,6 +34,9 @@ anonimizados.
 
 ## Migraciones recientes
 
+- `20260803_persist_support_materials.sql` traslada el material de apoyo y sus
+  archivos a MariaDB. Permite editar metadatos, conservar descargas, gestionar
+  documentos y retirar o restaurar publicaciones sin perder registros.
 - `20260802_teacher_admin_privileges.sql` separa el perfil académico del
   privilegio administrativo. Solo un docente puede recibir acceso
   administrativo y el último administrador activo queda protegido.

@@ -1,8 +1,303 @@
 <?php
+
 declare(strict_types=1);
+
 final class AdminRepositoryModel
 {
- public function listing(string $filter='',array $pagination=[]):array{$eligible="((pt.code='thesis' AND p.status='tribunal_approved') OR (pt.code<>'thesis' AND p.status='approved'))";$where="p.deleted_at IS NULL AND p.status IN ('approved','defense','tribunal_approved','published')";$params=[];if(in_array($filter,['eligible','published','incomplete'],true)){if($filter==='published')$where.=" AND p.status='published'";elseif($filter==='eligible')$where.=" AND $eligible AND EXISTS(SELECT 1 FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL)";else $where.=" AND $eligible AND NOT EXISTS(SELECT 1 FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL)";}$from=" FROM projects p JOIN project_types pt ON pt.id=p.project_type_id JOIN careers c ON c.id=p.career_id JOIN academic_periods ap ON ap.id=p.academic_period_id LEFT JOIN users u ON u.id=p.tutor_id WHERE $where";$sql="SELECT p.id,p.code,p.title,p.summary,p.status,p.published_at,p.updated_at,pt.name type_name,c.name career_name,ap.name period_name,u.full_name tutor_name,(SELECT COUNT(*) FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL) file_count,(SELECT GROUP_CONCAT(DISTINCT UPPER(f.extension) ORDER BY f.extension SEPARATOR ', ') FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL) formats".$from.' ORDER BY COALESCE(p.published_at,p.updated_at) DESC';return PaginationService::run(Database::connection(),'SELECT COUNT(*)'.$from,$sql,$params,$pagination?:PaginationService::request());}
- public function summary():array{$d=Database::connection();$eligible="((pt.code='thesis' AND p.status='tribunal_approved') OR (pt.code<>'thesis' AND p.status='approved'))";return ['eligible'=>(int)$d->query("SELECT COUNT(*) FROM projects p JOIN project_types pt ON pt.id=p.project_type_id WHERE p.deleted_at IS NULL AND $eligible AND EXISTS(SELECT 1 FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL)")->fetchColumn(),'published'=>(int)$d->query("SELECT COUNT(*) FROM projects WHERE deleted_at IS NULL AND status='published'")->fetchColumn(),'incomplete'=>(int)$d->query("SELECT COUNT(*) FROM projects p JOIN project_types pt ON pt.id=p.project_type_id WHERE p.deleted_at IS NULL AND $eligible AND NOT EXISTS(SELECT 1 FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL)")->fetchColumn()];}
- public function setPublished(int $id,bool $publish,int $actor):void{if($id<1)throw new InvalidArgumentException('El proyecto no es válido.');Database::transaction(function(PDO $d)use($id,$publish,$actor):void{$q=$d->prepare('SELECT p.id,p.title,p.status,p.published_at,pt.code type_code FROM projects p JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id=:id AND p.deleted_at IS NULL FOR UPDATE');$q->execute(['id'=>$id]);$before=$q->fetch();if(!$before)throw new InvalidArgumentException('El proyecto ya no está disponible.');if($publish){$required=$before['type_code']==='thesis'?'tribunal_approved':'approved';if($before['status']!==$required)throw new InvalidArgumentException($required==='tribunal_approved'?'La tesis debe estar Aprobada por el Tribunal antes de publicarse.':'El proyecto debe estar aprobado antes de publicarse.');$files=$d->prepare('SELECT COUNT(*) FROM project_files WHERE project_id=:id AND deleted_at IS NULL');$files->execute(['id'=>$id]);if((int)$files->fetchColumn()<1)throw new InvalidArgumentException('Agrega al menos un documento final antes de publicar.');$d->prepare("UPDATE projects SET status='published',published_at=CURRENT_TIMESTAMP WHERE id=:id")->execute(['id'=>$id]);$after=['status'=>'published'];$action='project_published';}else{if($before['status']!=='published')throw new InvalidArgumentException('El proyecto no está publicado.');$previous=$before['type_code']==='thesis'?'tribunal_approved':'approved';$d->prepare('UPDATE projects SET status=:status,published_at=NULL WHERE id=:id')->execute(['status'=>$previous,'id'=>$id]);$after=['status'=>$previous];$action='project_unpublished';}(new ProjectAuditService($d))->record($id,$actor,$action,'project',$id,$before,$after);});}
+    public function listing(string $filter = '', array $pagination = []): array
+    {
+        $eligible = "((pt.code='thesis' AND p.status='tribunal_approved') OR (pt.code<>'thesis' AND p.status='approved'))";
+        $where = "p.deleted_at IS NULL AND p.status IN ('approved','defense','tribunal_approved','published')";
+        $params = [];
+
+        if ($filter === '' || $filter === 'published') {
+            $where .= " AND p.status='published' AND EXISTS(
+                SELECT 1 FROM project_files published_file
+                WHERE published_file.project_id=p.id AND published_file.deleted_at IS NULL
+            )";
+        } elseif ($filter === 'eligible') {
+            $where .= " AND $eligible AND EXISTS(
+                SELECT 1 FROM project_files f
+                WHERE f.project_id=p.id AND f.deleted_at IS NULL
+            )";
+        } elseif ($filter === 'incomplete') {
+            $where .= " AND $eligible AND NOT EXISTS(
+                SELECT 1 FROM project_files f
+                WHERE f.project_id=p.id AND f.deleted_at IS NULL
+            )";
+        }
+
+        $from = " FROM projects p
+            JOIN project_types pt ON pt.id=p.project_type_id
+            JOIN careers c ON c.id=p.career_id
+            JOIN academic_periods ap ON ap.id=p.academic_period_id
+            LEFT JOIN users u ON u.id=p.tutor_id
+            WHERE $where";
+
+        $sql = "SELECT
+                p.id,
+                p.code,
+                p.title,
+                p.summary,
+                p.status,
+                p.published_at,
+                p.updated_at,
+                pt.code type_code,
+                pt.name type_name,
+                c.name career_name,
+                ap.name period_name,
+                u.full_name tutor_name,
+                (
+                    SELECT GROUP_CONCAT(participant.full_name ORDER BY pp.is_leader DESC, participant.full_name SEPARATOR ', ')
+                    FROM project_participants pp
+                    JOIN users participant ON participant.id=pp.user_id
+                    WHERE pp.project_id=p.id AND pp.status='active'
+                ) authors,
+                (
+                    SELECT COUNT(*) FROM project_files f
+                    WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                ) file_count,
+                (
+                    SELECT GROUP_CONCAT(DISTINCT UPPER(f.extension) ORDER BY f.extension SEPARATOR ', ')
+                    FROM project_files f
+                    WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                ) formats"
+            . $from
+            . " ORDER BY COALESCE(p.published_at,p.updated_at) DESC";
+
+        return PaginationService::run(
+            Database::connection(),
+            'SELECT COUNT(*)' . $from,
+            $sql,
+            $params,
+            $pagination ?: PaginationService::request()
+        );
+    }
+
+    public function summary(): array
+    {
+        $database = Database::connection();
+        $eligible = "((pt.code='thesis' AND p.status='tribunal_approved') OR (pt.code<>'thesis' AND p.status='approved'))";
+
+        return [
+            'eligible' => (int) $database->query(
+                "SELECT COUNT(*) FROM projects p
+                JOIN project_types pt ON pt.id=p.project_type_id
+                WHERE p.deleted_at IS NULL AND $eligible
+                AND EXISTS(
+                    SELECT 1 FROM project_files f
+                    WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                )"
+            )->fetchColumn(),
+            'published' => (int) $database->query(
+                "SELECT COUNT(*) FROM projects
+                WHERE deleted_at IS NULL AND status='published'
+                AND EXISTS(
+                    SELECT 1 FROM project_files f
+                    WHERE f.project_id=projects.id AND f.deleted_at IS NULL
+                )"
+            )->fetchColumn(),
+            'incomplete' => (int) $database->query(
+                "SELECT COUNT(*) FROM projects p
+                JOIN project_types pt ON pt.id=p.project_type_id
+                WHERE p.deleted_at IS NULL AND $eligible
+                AND NOT EXISTS(
+                    SELECT 1 FROM project_files f
+                    WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                )"
+            )->fetchColumn(),
+        ];
+    }
+
+    public function filterCatalogs(): array
+    {
+        $database = Database::connection();
+        return [
+            'types' => $database->query(
+                "SELECT id,name FROM project_types
+                WHERE is_active=1 ORDER BY name"
+            )->fetchAll(),
+            'periods' => $database->query(
+                "SELECT DISTINCT ap.id,ap.name,ap.starts_on
+                FROM academic_periods ap
+                JOIN projects p ON p.academic_period_id=ap.id
+                WHERE p.deleted_at IS NULL AND p.status='published'
+                ORDER BY ap.starts_on DESC"
+            )->fetchAll(),
+        ];
+    }
+
+    public function withdrawnPublications(): array
+    {
+        return Database::connection()->query(
+            "SELECT
+                p.id,p.code,p.title,p.status,pt.name type_name,ap.name period_name,
+                u.full_name tutor_name,
+                (
+                    SELECT COUNT(*) FROM project_files f
+                    WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                ) file_count,
+                (
+                    SELECT MAX(log.created_at) FROM project_audit_log log
+                    WHERE log.project_id=p.id AND log.action='project_unpublished'
+                ) withdrawn_at
+            FROM projects p
+            JOIN project_types pt ON pt.id=p.project_type_id
+            JOIN academic_periods ap ON ap.id=p.academic_period_id
+            LEFT JOIN users u ON u.id=p.tutor_id
+            WHERE p.deleted_at IS NULL
+            AND p.status IN ('approved','tribunal_approved')
+            AND EXISTS(
+                SELECT 1 FROM project_audit_log log
+                WHERE log.project_id=p.id AND log.action='project_unpublished'
+            )
+            AND EXISTS(
+                SELECT 1 FROM project_files f
+                WHERE f.project_id=p.id AND f.deleted_at IS NULL
+            )
+            ORDER BY withdrawn_at DESC"
+        )->fetchAll();
+    }
+
+    public function restorePublication(int $id, int $actor): void
+    {
+        if ($id < 1) {
+            throw new InvalidArgumentException('El proyecto no es válido.');
+        }
+
+        Database::transaction(function (PDO $database) use ($id, $actor): void {
+            $query = $database->prepare(
+                "SELECT p.id,p.title,p.status,p.published_at,pt.code type_code
+                FROM projects p
+                JOIN project_types pt ON pt.id=p.project_type_id
+                WHERE p.id=:id AND p.deleted_at IS NULL
+                FOR UPDATE"
+            );
+            $query->execute(['id' => $id]);
+            $before = $query->fetch();
+            if (!$before) {
+                throw new InvalidArgumentException('El proyecto ya no está disponible.');
+            }
+
+            $requiredStatus = $before['type_code'] === 'thesis' ? 'tribunal_approved' : 'approved';
+            if ($before['status'] !== $requiredStatus) {
+                throw new InvalidArgumentException(
+                    'El proyecto cambió de estado y ya no puede restaurarse directamente.'
+                );
+            }
+
+            $withdrawn = $database->prepare(
+                "SELECT COUNT(*) FROM project_audit_log
+                WHERE project_id=:id AND action='project_unpublished'"
+            );
+            $withdrawn->execute(['id' => $id]);
+            if ((int) $withdrawn->fetchColumn() < 1) {
+                throw new InvalidArgumentException(
+                    'Solo pueden restaurarse proyectos retirados previamente del repositorio.'
+                );
+            }
+
+            $files = $database->prepare(
+                'SELECT COUNT(*) FROM project_files
+                WHERE project_id=:id AND deleted_at IS NULL'
+            );
+            $files->execute(['id' => $id]);
+            if ((int) $files->fetchColumn() < 1) {
+                throw new InvalidArgumentException(
+                    'El proyecto no puede restaurarse porque ya no conserva documentos publicados.'
+                );
+            }
+
+            $database->prepare(
+                "UPDATE projects
+                SET status='published',published_at=CURRENT_TIMESTAMP
+                WHERE id=:id"
+            )->execute(['id' => $id]);
+
+            (new ProjectAuditService($database))->record(
+                $id,
+                $actor,
+                'project_republished',
+                'project',
+                $id,
+                $before,
+                ['status' => 'published'],
+                'Restauración de una publicación retirada'
+            );
+        });
+    }
+
+    public function setPublished(int $id, bool $publish, int $actor): void
+    {
+        if ($id < 1) {
+            throw new InvalidArgumentException('El proyecto no es válido.');
+        }
+
+        Database::transaction(function (PDO $database) use ($id, $publish, $actor): void {
+            $query = $database->prepare(
+                'SELECT p.id,p.title,p.status,p.published_at,pt.code type_code
+                FROM projects p
+                JOIN project_types pt ON pt.id=p.project_type_id
+                WHERE p.id=:id AND p.deleted_at IS NULL
+                FOR UPDATE'
+            );
+            $query->execute(['id' => $id]);
+            $before = $query->fetch();
+
+            if (!$before) {
+                throw new InvalidArgumentException('El proyecto ya no está disponible.');
+            }
+
+            if ($publish) {
+                $required = $before['type_code'] === 'thesis' ? 'tribunal_approved' : 'approved';
+                if ($before['status'] !== $required) {
+                    throw new InvalidArgumentException(
+                        $required === 'tribunal_approved'
+                            ? 'La tesis debe estar Aprobada por el Tribunal antes de publicarse.'
+                            : 'El proyecto debe estar aprobado antes de publicarse.'
+                    );
+                }
+
+                $files = $database->prepare(
+                    'SELECT COUNT(*) FROM project_files
+                    WHERE project_id=:id AND deleted_at IS NULL'
+                );
+                $files->execute(['id' => $id]);
+                if ((int) $files->fetchColumn() < 1) {
+                    throw new InvalidArgumentException(
+                        'Agrega al menos un documento final antes de publicar.'
+                    );
+                }
+
+                $database->prepare(
+                    "UPDATE projects
+                    SET status='published', published_at=CURRENT_TIMESTAMP
+                    WHERE id=:id"
+                )->execute(['id' => $id]);
+                $after = ['status' => 'published'];
+                $action = 'project_published';
+            } else {
+                if ($before['status'] !== 'published') {
+                    throw new InvalidArgumentException('El proyecto no está publicado.');
+                }
+
+                $previous = $before['type_code'] === 'thesis' ? 'tribunal_approved' : 'approved';
+                $database->prepare(
+                    'UPDATE projects SET status=:status, published_at=NULL WHERE id=:id'
+                )->execute(['status' => $previous, 'id' => $id]);
+                $after = ['status' => $previous];
+                $action = 'project_unpublished';
+            }
+
+            (new ProjectAuditService($database))->record(
+                $id,
+                $actor,
+                $action,
+                'project',
+                $id,
+                $before,
+                $after
+            );
+        });
+    }
 }

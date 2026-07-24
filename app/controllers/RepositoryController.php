@@ -11,8 +11,8 @@ final class RepositoryController
     {
         $this->ensureSession();
         if ((new AuthSessionService())->hasAdminAccess()) {
-            (new AdminController())->repository();
-            return;
+            header('Location: ' . route('admin-repository'));
+            exit;
         }
         $repositoryModel = new RepositoryModel();
         $favoriteModel = new FavoriteModel();

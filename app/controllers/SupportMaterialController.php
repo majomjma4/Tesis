@@ -30,6 +30,7 @@ final class SupportMaterialController
     public function detail(): void
     {
         $this->ensureSession();
+        $isAdministrator = (new AuthSessionService())->hasAdminAccess();
         $materialId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
         $material = $materialId === false || $materialId === null ? null : (new SupportMaterialModel())->findById((int) $materialId);
         if ($material === null) {
@@ -48,6 +49,8 @@ final class SupportMaterialController
             'previewActionUrl' => route('support-material-preview'),
             'previewContentActionUrl' => route('support-material-preview-content'),
             'downloadActionUrl' => route('support-material-download'),
+            'isAdministrator' => $isAdministrator,
+            'materialEditUrl' => $material === null ? '' : route('admin-repository') . '&tab=materials&edit_material=' . (int) $material['id'],
         ]);
     }
     // Final de presentación de materiales

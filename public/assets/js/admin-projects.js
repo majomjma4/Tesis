@@ -190,6 +190,16 @@
     };
     document.querySelector('#apNew')?.addEventListener('click', () => open());
     document.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => open(JSON.parse(button.closest('article').querySelector('script').textContent))));
+    const requestedProjectEdit = new URLSearchParams(location.search).get('edit');
+    if (requestedProjectEdit) {
+        const requestedCard = [...document.querySelectorAll('.ap-list article')].find(card => {
+            const data = card.querySelector('script');
+            if (!data) return false;
+            try { return String(JSON.parse(data.textContent).id) === requestedProjectEdit; }
+            catch { return false; }
+        });
+        requestedCard?.querySelector('[data-edit]')?.click();
+    }
     document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => modal.hidden = true));
     modal?.addEventListener('click', event => { if (event.target === modal) modal.hidden = true; });
     const saveProject = async data => {

@@ -80,6 +80,8 @@ final class ProjectsController
             'tabs' => $model->getDetailTabs(),
             'projectEvents' => $projectEvents,
             'projectPermissions' => $access->permissions(),
+            'isAdministrator' => $isAdministrator,
+            'projectEditUrl' => route('projects') . '&edit=' . (int) $project['id'],
         ]);
     }
 

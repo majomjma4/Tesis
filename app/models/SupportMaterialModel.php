@@ -6,69 +6,30 @@ final class SupportMaterialModel
 {
     public function getAll(): array
     {
-        $storage = ROOT_PATH . '/storage/support-materials/';
-        $materials = [
-            [
-                'id' => 1,
-                'title' => 'Guía para la elaboración del perfil de tesis',
-                'description' => 'Orientaciones para estructurar correctamente el perfil y preparar el proceso de titulación.',
-                'full_description' => "Esta guía reúne los criterios institucionales para elaborar el perfil de tesis.\n\nIncluye recomendaciones para delimitar el tema, formular objetivos, organizar antecedentes y presentar la propuesta académica.",
-                'category_slug' => 'tesis', 'category_label' => 'Tesis', 'type' => 'Guía', 'pao_label' => 'PAO I 2026', 'year' => '2026',
-                'publication_date' => '8 de julio de 2026', 'status' => 'Disponible', 'downloads' => 86,
-                'keywords' => ['Perfil de tesis', 'Titulación', 'Metodología'],
-                'files' => [
-                    ['id' => 1, 'name' => 'guia_perfil_tesis.pdf', 'format' => 'PDF', 'path' => $storage . 'guia_perfil_tesis.pdf', 'primary' => true],
-                    ['id' => 2, 'name' => 'lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt', 'format' => 'TXT', 'path' => $storage . 'lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt', 'primary' => false],
-                ],
-                'package' => ['id' => 99, 'name' => 'material_tesis_completo.zip', 'format' => 'ZIP', 'path' => $storage . 'material_tesis_completo.zip', 'primary' => false, 'package' => true],
-            ],
-            [
-                'id' => 2, 'title' => 'Formato de seguimiento de prácticas preprofesionales',
-                'description' => 'Formato institucional para registrar actividades, horas cumplidas y evidencias de prácticas.',
-                'full_description' => "Documento editable destinado al seguimiento periódico de las prácticas preprofesionales.\n\nPermite registrar actividades, resultados, evidencias y validaciones del responsable institucional.",
-                'category_slug' => 'practicas', 'category_label' => 'Prácticas', 'type' => 'Formato', 'pao_label' => 'PAO I 2026', 'year' => '2026',
-                'publication_date' => '20 de junio de 2026', 'status' => 'Disponible', 'downloads' => 63,
-                'keywords' => ['Prácticas', 'Seguimiento', 'Evidencias'],
-                'files' => [['id' => 1, 'name' => 'seguimiento_practicas.docx', 'format' => 'DOCX', 'path' => $storage . 'seguimiento_practicas.docx', 'primary' => true]],
-            ],
-            [
-                'id' => 3, 'title' => 'Instructivo para proyectos PIS',
-                'description' => 'Pasos y criterios para organizar entregables, evidencias y presentación de proyectos integradores.',
-                'full_description' => "Este instructivo explica el flujo recomendado para desarrollar proyectos PIS.\n\nDetalla la organización de equipos, entregables mínimos, evidencias y criterios generales de presentación.",
-                'category_slug' => 'proyecto-pis', 'category_label' => 'Proyectos PIS', 'type' => 'Instructivo', 'pao_label' => 'PAO II 2025', 'year' => '2025',
-                'publication_date' => '12 de diciembre de 2025', 'status' => 'Disponible', 'downloads' => 49,
-                'keywords' => ['PIS', 'Entregables', 'Proyectos'],
-                'files' => [['id' => 1, 'name' => 'instructivo_proyectos_pis.pdf', 'format' => 'PDF', 'path' => $storage . 'instructivo_proyectos_pis.pdf', 'primary' => true]],
-            ],
-            [
-                'id' => 4, 'title' => 'Formato de informe de vinculación',
-                'description' => 'Plantilla editable para documentar actividades, beneficiarios, resultados e impacto comunitario.',
-                'full_description' => "Plantilla institucional para presentar el informe de las actividades de vinculación.\n\nOrganiza objetivos, participantes, resultados, evidencias e indicadores de impacto comunitario.",
-                'category_slug' => 'vinculacion', 'category_label' => 'Vinculación', 'type' => 'Plantilla', 'pao_label' => 'PAO II 2025', 'year' => '2025',
-                'publication_date' => '30 de noviembre de 2025', 'status' => 'Disponible', 'downloads' => 38,
-                'keywords' => ['Vinculación', 'Informe', 'Impacto'],
-                'files' => [['id' => 1, 'name' => 'informe_vinculacion.docx', 'format' => 'DOCX', 'path' => $storage . 'informe_vinculacion.docx', 'primary' => true]],
-            ],
-            [
-                'id' => 5, 'title' => 'Reglamento de uso del material académico',
-                'description' => 'Disposiciones generales para consultar y utilizar responsablemente los recursos institucionales.',
-                'full_description' => "Documento informativo sobre el uso responsable del material académico institucional.\n\nResume las condiciones de consulta, atribución y distribución de los recursos disponibles.",
-                'category_slug' => 'tesis', 'category_label' => 'Tesis', 'type' => 'Reglamento', 'pao_label' => 'PAO I 2025', 'year' => '2025',
-                'publication_date' => '14 de mayo de 2025', 'status' => 'Disponible', 'downloads' => 21,
-                'keywords' => ['Reglamento', 'Recursos', 'Uso académico'],
-                'files' => [['id' => 1, 'name' => 'reglamento_material_apoyo.txt', 'format' => 'TXT', 'path' => $storage . 'reglamento_material_apoyo.txt', 'primary' => true]],
-            ],
-        ];
-
-        return array_map([$this, 'hydrateFiles'], $materials);
+        return $this->listing('published');
     }
 
-    public function findById(int $materialId): ?array
+    public function getWithdrawn(): array
     {
-        foreach ($this->getAll() as $material) {
-            if ($material['id'] === $materialId) return $material;
-        }
-        return null;
+        return $this->listing('withdrawn');
+    }
+
+    public function categories(): array
+    {
+        return Database::connection()->query(
+            'SELECT id,slug,name FROM support_material_categories
+             WHERE is_active=1 ORDER BY name'
+        )->fetchAll();
+    }
+
+    public function findById(int $materialId, bool $includeWithdrawn = false): ?array
+    {
+        if ($materialId < 1) return null;
+        $where = $includeWithdrawn ? '' : " AND sm.status='published'";
+        $statement = Database::connection()->prepare($this->baseQuery() . " WHERE sm.id=:id{$where}");
+        $statement->execute(['id' => $materialId]);
+        $row = $statement->fetch();
+        return $row ? $this->hydrate($row) : null;
     }
 
     public function findFile(array $material, int $fileId): ?array
@@ -76,31 +37,289 @@ final class SupportMaterialModel
         foreach ($material['files'] as $file) {
             if ($file['id'] === $fileId) return $file;
         }
-        if (isset($material['package']) && $material['package']['id'] === $fileId) return $material['package'];
+        if (isset($material['package']) && $material['package']['id'] === $fileId) {
+            return $material['package'];
+        }
         return null;
     }
 
-    private function hydrateFiles(array $material): array
+    public function save(array $input, int $actor): int
     {
-        $material['publisher'] ??= 'Instituto Superior Tecnológico "El Libertador"';
-        foreach ($material['files'] as &$file) {
-            $size = is_file($file['path']) ? (int) filesize($file['path']) : 0;
-            $file['size_bytes'] = $size;
-            $file['size'] = ArchiveService::formatBytes($size);
-            $file['extension'] = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $id = (int) ($input['id'] ?? 0);
+        $title = trim((string) ($input['title'] ?? ''));
+        $type = trim((string) ($input['material_type'] ?? ''));
+        $description = trim((string) ($input['description'] ?? ''));
+        $fullDescription = trim((string) ($input['full_description'] ?? ''));
+        $publisher = trim((string) ($input['publisher'] ?? ''));
+        $categoryId = (int) ($input['category_id'] ?? 0);
+        $publicationDate = trim((string) ($input['publication_date'] ?? ''));
+        $keywords = array_values(array_unique(array_filter(array_map(
+            'trim',
+            preg_split('/[,;\n]+/u', (string) ($input['keywords'] ?? '')) ?: []
+        ))));
+
+        if ($title === '' || mb_strlen($title) > 220) {
+            throw new InvalidArgumentException('Ingresa un título válido de hasta 220 caracteres.');
         }
-        unset($file);
-        $material['primary_file'] = current(array_filter($material['files'], static fn (array $file): bool => $file['primary'])) ?: $material['files'][0];
-        $material['additional_files'] = array_values(array_filter($material['files'], static fn (array $file): bool => !$file['primary']));
-        $material['files_count'] = count($material['files']);
-        $material['size_bytes'] = array_sum(array_column($material['files'], 'size_bytes'));
+        if ($type === '' || mb_strlen($type) > 100) {
+            throw new InvalidArgumentException('Ingresa un tipo de material válido.');
+        }
+        if ($description === '' || mb_strlen($description) > 500) {
+            throw new InvalidArgumentException('Ingresa una descripción corta de hasta 500 caracteres.');
+        }
+        if ($fullDescription === '') {
+            throw new InvalidArgumentException('Ingresa la descripción completa del material.');
+        }
+        if ($publisher === '' || mb_strlen($publisher) > 180) {
+            throw new InvalidArgumentException('Ingresa el responsable de la publicación.');
+        }
+        $date = DateTimeImmutable::createFromFormat('Y-m-d', $publicationDate);
+        if (!$date || $date->format('Y-m-d') !== $publicationDate) {
+            throw new InvalidArgumentException('La fecha de publicación no es válida.');
+        }
+
+        $database = Database::connection();
+        $category = $database->prepare(
+            'SELECT COUNT(*) FROM support_material_categories WHERE id=:id AND is_active=1'
+        );
+        $category->execute(['id' => $categoryId]);
+        if ((int) $category->fetchColumn() !== 1) {
+            throw new InvalidArgumentException('Selecciona una categoría válida.');
+        }
+
+        $payload = [
+            'category_id' => $categoryId,
+            'title' => $title,
+            'material_type' => $type,
+            'description' => $description,
+            'full_description' => $fullDescription,
+            'publisher' => $publisher,
+            'publication_date' => $publicationDate,
+            'keywords_json' => json_encode($keywords, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'updated_by' => $actor,
+        ];
+
+        if ($id > 0) {
+            if ($this->findById($id, true) === null) {
+                throw new InvalidArgumentException('El material ya no está disponible.');
+            }
+            $payload['id'] = $id;
+            $statement = $database->prepare(
+                'UPDATE support_materials SET
+                 category_id=:category_id,title=:title,material_type=:material_type,
+                 description=:description,full_description=:full_description,
+                 publisher=:publisher,publication_date=:publication_date,
+                 keywords_json=:keywords_json,updated_by=:updated_by
+                 WHERE id=:id'
+            );
+            $statement->execute($payload);
+            return $id;
+        }
+
+        $payload['created_by'] = $actor;
+        $statement = $database->prepare(
+            "INSERT INTO support_materials
+             (category_id,title,material_type,description,full_description,publisher,
+              publication_date,status,keywords_json,created_by,updated_by)
+             VALUES
+             (:category_id,:title,:material_type,:description,:full_description,:publisher,
+              :publication_date,'published',:keywords_json,:created_by,:updated_by)"
+        );
+        $statement->execute($payload);
+        return (int) $database->lastInsertId();
+    }
+
+    public function setStatus(int $id, string $status, int $actor): void
+    {
+        if (!in_array($status, ['published', 'withdrawn'], true)) {
+            throw new InvalidArgumentException('El estado solicitado no es válido.');
+        }
+        $material = $this->findById($id, true);
+        if ($material === null) {
+            throw new InvalidArgumentException('El material ya no está disponible.');
+        }
+        if ($status === 'published' && $material['files_count'] < 1) {
+            throw new InvalidArgumentException('Agrega al menos un archivo antes de restaurar el material.');
+        }
+        Database::connection()->prepare(
+            "UPDATE support_materials SET status=:status,
+             withdrawn_at=IF(:status_for_date='withdrawn',CURRENT_TIMESTAMP,NULL),
+             withdrawn_by=IF(:status_for_actor='withdrawn',:withdrawn_actor,NULL),
+             updated_by=:updated_actor
+             WHERE id=:id"
+        )->execute([
+            'status' => $status,
+            'status_for_date' => $status,
+            'status_for_actor' => $status,
+            'withdrawn_actor' => $actor,
+            'updated_actor' => $actor,
+            'id' => $id,
+        ]);
+    }
+
+    public function addFile(int $materialId, array $file, int $actor): int
+    {
+        if ($this->findById($materialId, true) === null) {
+            throw new InvalidArgumentException('El material ya no está disponible.');
+        }
+        $database = Database::connection();
+        $isPrimary = !empty($file['is_primary']);
+        if ($isPrimary) {
+            $database->prepare(
+                'UPDATE support_material_files SET is_primary=0
+                 WHERE material_id=:id AND deleted_at IS NULL'
+            )->execute(['id' => $materialId]);
+        }
+        $statement = $database->prepare(
+            'INSERT INTO support_material_files
+             (material_id,original_name,storage_name,relative_path,extension,mime_type,
+              size_bytes,is_primary,is_package,sort_order,created_by)
+             VALUES
+             (:material_id,:original_name,:storage_name,:relative_path,:extension,:mime_type,
+              :size_bytes,:is_primary,0,
+              (SELECT COALESCE(MAX(existing.sort_order),0)+1 FROM support_material_files existing
+               WHERE existing.material_id=:sort_material_id),:created_by)'
+        );
+        $statement->execute([
+            'material_id' => $materialId,
+            'original_name' => $file['original_name'],
+            'storage_name' => $file['storage_name'],
+            'relative_path' => $file['relative_path'],
+            'extension' => $file['extension'],
+            'mime_type' => $file['mime_type'],
+            'size_bytes' => $file['size_bytes'],
+            'is_primary' => $isPrimary ? 1 : 0,
+            'sort_material_id' => $materialId,
+            'created_by' => $actor,
+        ]);
+        return (int) $database->lastInsertId();
+    }
+
+    public function removeFile(int $materialId, int $fileId, int $actor): void
+    {
+        $database = Database::connection();
+        $statement = $database->prepare(
+            'SELECT id,is_primary FROM support_material_files
+             WHERE id=:file_id AND material_id=:material_id AND deleted_at IS NULL'
+        );
+        $statement->execute(['file_id' => $fileId, 'material_id' => $materialId]);
+        $file = $statement->fetch();
+        if (!$file) {
+            throw new InvalidArgumentException('El archivo ya no está disponible.');
+        }
+        $remaining = $database->prepare(
+            'SELECT COUNT(*) FROM support_material_files
+             WHERE material_id=:material_id AND deleted_at IS NULL
+             AND is_package=0 AND id<>:file_id'
+        );
+        $remaining->execute(['material_id' => $materialId, 'file_id' => $fileId]);
+        if ((int) $remaining->fetchColumn() < 1) {
+            throw new InvalidArgumentException(
+                'No puedes retirar el único archivo del material. Agrega primero su reemplazo.'
+            );
+        }
+        $database->prepare(
+            'UPDATE support_material_files
+             SET deleted_at=CURRENT_TIMESTAMP,deleted_by=:actor
+             WHERE id=:file_id'
+        )->execute(['actor' => $actor, 'file_id' => $fileId]);
+        if ((int) $file['is_primary'] === 1) {
+            $database->prepare(
+                'UPDATE support_material_files SET is_primary=1
+                 WHERE material_id=:material_id AND deleted_at IS NULL AND is_package=0
+                 ORDER BY sort_order,id LIMIT 1'
+            )->execute(['material_id' => $materialId]);
+        }
+    }
+
+    public function incrementDownloads(int $materialId): void
+    {
+        Database::connection()->prepare(
+            "UPDATE support_materials SET download_count=download_count+1
+             WHERE id=:id AND status='published'"
+        )->execute(['id' => $materialId]);
+    }
+
+    private function listing(string $status): array
+    {
+        $statement = Database::connection()->prepare(
+            $this->baseQuery() . ' WHERE sm.status=:status ORDER BY sm.publication_date DESC,sm.id DESC'
+        );
+        $statement->execute(['status' => $status]);
+        return array_map([$this, 'hydrate'], $statement->fetchAll());
+    }
+
+    private function baseQuery(): string
+    {
+        return "SELECT sm.*,category.slug category_slug,category.name category_label,
+                period.name period_name
+                FROM support_materials sm
+                JOIN support_material_categories category ON category.id=sm.category_id
+                LEFT JOIN academic_periods period ON period.id=sm.academic_period_id";
+    }
+
+    private function hydrate(array $material): array
+    {
+        $statement = Database::connection()->prepare(
+            'SELECT * FROM support_material_files
+             WHERE material_id=:id AND deleted_at IS NULL
+             ORDER BY is_primary DESC,is_package ASC,sort_order,id'
+        );
+        $statement->execute(['id' => $material['id']]);
+        $files = array_map(function (array $file): array {
+            $path = ROOT_PATH . '/storage/support-materials/' . str_replace(
+                ['/', '\\'],
+                DIRECTORY_SEPARATOR,
+                $file['relative_path']
+            );
+            return [
+                'id' => (int) $file['id'],
+                'name' => $file['original_name'],
+                'format' => strtoupper($file['extension']),
+                'path' => $path,
+                'primary' => (bool) $file['is_primary'],
+                'package' => (bool) $file['is_package'],
+                'extension' => strtolower($file['extension']),
+                'size_bytes' => (int) $file['size_bytes'],
+                'size' => ArchiveService::formatBytes((int) $file['size_bytes']),
+            ];
+        }, $statement->fetchAll());
+
+        $regularFiles = array_values(array_filter($files, static fn (array $file): bool => !$file['package']));
+        $package = current(array_filter($files, static fn (array $file): bool => $file['package'])) ?: null;
+        $primary = current(array_filter($regularFiles, static fn (array $file): bool => $file['primary']))
+            ?: ($regularFiles[0] ?? null);
+        $date = new DateTimeImmutable($material['publication_date']);
+        $keywords = json_decode((string) ($material['keywords_json'] ?? '[]'), true);
+
+        $material['id'] = (int) $material['id'];
+        $material['type'] = $material['material_type'];
+        $material['pao_label'] = $material['period_name'] ?: 'Sin período asociado';
+        $material['year'] = $date->format('Y');
+        $material['publication_date_iso'] = $date->format('Y-m-d');
+        $material['publication_date'] = $this->spanishDate($date);
+        $material['status_key'] = $material['status'];
+        $material['status'] = $material['status'] === 'published' ? 'Disponible' : 'Retirado';
+        $material['downloads'] = (int) $material['download_count'];
+        $material['keywords'] = is_array($keywords) ? array_values($keywords) : [];
+        $material['files'] = $regularFiles;
+        $material['files_count'] = count($regularFiles);
+        $material['primary_file'] = $primary;
+        $material['additional_files'] = array_values(array_filter(
+            $regularFiles,
+            static fn (array $file): bool => $primary === null || $file['id'] !== $primary['id']
+        ));
+        $material['size_bytes'] = array_sum(array_column($regularFiles, 'size_bytes'));
         $material['size'] = ArchiveService::formatBytes($material['size_bytes']);
-        if (isset($material['package'])) {
-            $packageSize = is_file($material['package']['path']) ? (int) filesize($material['package']['path']) : 0;
-            $material['package']['size_bytes'] = $packageSize;
-            $material['package']['size'] = ArchiveService::formatBytes($packageSize);
-            $material['package']['extension'] = 'zip';
-        }
+        if ($package !== null) $material['package'] = $package;
         return $material;
+    }
+
+    private function spanishDate(DateTimeImmutable $date): string
+    {
+        $months = [1=>'enero',2=>'febrero',3=>'marzo',4=>'abril',5=>'mayo',6=>'junio',
+            7=>'julio',8=>'agosto',9=>'septiembre',10=>'octubre',11=>'noviembre',12=>'diciembre'];
+        return (int) $date->format('j') . ' de ' . $months[(int) $date->format('n')]
+            . ' de ' . $date->format('Y');
     }
 }

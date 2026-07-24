@@ -49,7 +49,7 @@
                 <a href="<?= e(route('admin-users')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-users' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-users"></i></span><span>Usuarios</span></a>
                 <a href="<?= e(route('admin-academic')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-academic' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-graduation-cap"></i></span><span>Gestión académica</span></a>
                 <?php endif; ?>
-                <a href="<?= e(route('repository')) ?>" class="menu-item <?= ($currentPage ?? '') === 'repository' ? 'active' : '' ?>">
+                <a href="<?= e(route($isAdministratorLayout ? 'admin-repository' : 'repository')) ?>" class="menu-item <?= ($currentPage ?? '') === 'repository' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-book-open"></i></span>
                     <span>Repositorio</span>
                 </a>
