@@ -8,7 +8,7 @@ final class DashboardController
     {
         $dashboard = new DashboardModel();
 
-        if (in_array('administrator', (new AuthSessionService())->roles(), true)) {
+        if ((new AuthSessionService())->hasAdminAccess()) {
             $error = null;
             try {
                 $adminDashboard = $dashboard->getAdminDashboard();

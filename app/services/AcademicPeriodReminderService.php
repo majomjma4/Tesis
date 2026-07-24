@@ -16,7 +16,7 @@ final class AcademicPeriodReminderService
             if($period['status']==='planned')$events=array_merge($events,$this->plannedEvents($period,$today));
         }
         if(!$events)return 0;
-        $admins=$db->query("SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id WHERE r.code='administrator' AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL")->fetchAll(PDO::FETCH_COLUMN);
+        $admins=$db->query("SELECT u.id FROM users u WHERE u.is_admin=1 AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL")->fetchAll(PDO::FETCH_COLUMN);
         if(!$admins)return 0;
         $insert=$db->prepare("INSERT IGNORE INTO notifications(user_id,type,title,message,action_url,action_label,metadata,deduplication_key) VALUES(:user,'reminder',:title,:message,:url,'Gestionar período',:metadata,:dedup)");
         $created=0;

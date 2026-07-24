@@ -34,13 +34,15 @@ anonimizados.
 
 ## Migraciones recientes
 
+- `20260802_teacher_admin_privileges.sql` separa el perfil académico del
+  privilegio administrativo. Solo un docente puede recibir acceso
+  administrativo y el último administrador activo queda protegido.
 - `20260728_single_career_defaults.sql` conserva como única carrera activa
   “Desarrollo de Software”. Los formularios usan además el periodo marcado como
   activo; el cambio de periodo se realiza desde Gestión académica.
 - `20260729_normalize_demo_cedulas.sql` reemplaza los códigos alfanuméricos de
   estudiantes y docentes de demostración por cédulas ficticias únicas de diez
   dígitos.
-
 - `20260726_standardize_project_codes.sql` normaliza los códigos existentes con
   prefijo por tipo, año y secuencia.
 - `20260727_project_code_settings.sql` registra los prefijos y la cantidad de
@@ -56,3 +58,17 @@ Las ediciones de proyectos se registran en `project_audit_log`. Cada entrada
 conserva el identificador del administrador autenticado, fecha, hora y solamente
 los campos que cambiaron. Los valores relacionados se guardan con etiquetas
 legibles para su presentación posterior en historiales y reportes.
+## Acceso administrativo inicial
+
+Después de importar una base limpia y ejecutar las migraciones, crea la única cuenta administrativa temporal con:
+
+```powershell
+C:\xampp\php\php.exe scripts\create_initial_admin.php
+```
+
+El script no crea otra cuenta si ya existe un administrador activo. La contraseña se genera aleatoriamente, se muestra una sola vez y se almacena únicamente mediante `password_hash`. Para definir credenciales institucionales durante una instalación automatizada pueden usarse `INITIAL_ADMIN_EMAIL` e `INITIAL_ADMIN_PASSWORD`.
+
+Para actualizar una instalación existente debe aplicarse
+`database/migrations/20260802_teacher_admin_privileges.sql`. Para transportar el
+estado completo actual basta con importar `database/snapshot.sql`, que ya
+contiene esa estructura.

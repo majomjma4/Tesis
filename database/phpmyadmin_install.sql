@@ -31,6 +31,8 @@ CREATE TABLE users (
   temporary_password_expires_at DATETIME NULL,
   password_changed_at DATETIME NULL,
   full_name VARCHAR(180) NOT NULL,
+  is_admin TINYINT(1) NOT NULL DEFAULT 0,
+  is_initial_admin TINYINT(1) NOT NULL DEFAULT 0,
   status ENUM('active','inactive','blocked') NOT NULL DEFAULT 'active',
   last_login_at DATETIME NULL,
   session_version INT UNSIGNED NOT NULL DEFAULT 1,
@@ -39,7 +41,9 @@ CREATE TABLE users (
   deletion_reason VARCHAR(500) NULL,
   purged_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_users_admin_access (is_admin, status, deleted_at, purged_at),
+  CONSTRAINT chk_initial_admin_requires_access CHECK (is_initial_admin = 0 OR is_admin = 1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE user_roles (

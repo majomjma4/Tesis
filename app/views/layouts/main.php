@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="<?= e(asset('css/card-accents.css')) ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
-<?php $isAdministratorLayout = in_array('administrator', $layoutUserRoles ?? [], true); ?>
+<?php $isAdministratorLayout = (bool)($layoutIsAdmin ?? false); ?>
 <body class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout app-page-loading' : ''))) ?>">
     <noscript><style>.app-global-skeleton{display:none!important}.app-page-content{position:static!important;width:100%!important;height:auto!important;overflow:visible!important;opacity:1!important}</style></noscript>
     <!-- Inicio de capa para cerrar el menu movil -->
@@ -45,9 +45,9 @@
                     <span class="menu-icon"><i class="fa-solid fa-folder-open"></i></span>
                     <span>Proyectos</span>
                 </a>
-                <?php if (in_array('administrator', $layoutUserRoles ?? [], true)): ?>
+                <?php if ($isAdministratorLayout): ?>
                 <a href="<?= e(route('admin-users')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-users' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-users"></i></span><span>Usuarios</span></a>
-                <a href="<?= e(route('admin-academic')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-academic' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-graduation-cap"></i></span><span>Académico</span></a>
+                <a href="<?= e(route('admin-academic')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-academic' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-graduation-cap"></i></span><span>Gestión académica</span></a>
                 <?php endif; ?>
                 <a href="<?= e(route('repository')) ?>" class="menu-item <?= ($currentPage ?? '') === 'repository' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-book-open"></i></span>
@@ -61,7 +61,7 @@
                     <span class="menu-icon"><i class="fa-solid fa-bell"></i></span>
                     <span>Notificaciones</span>
                 </a>
-                <?php if (in_array('administrator', $layoutUserRoles ?? [], true)): ?>
+                <?php if ($isAdministratorLayout): ?>
                 <a href="<?= e(route('admin-reports')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-reports' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-chart-column"></i></span><span>Reportes</span></a>
                 <a href="<?= e(route('admin-settings')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-settings' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-gear"></i></span><span>Configuración</span></a>
                 <a href="<?= e(route('admin-trash')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-trash' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-regular fa-trash-can"></i></span><span>Papelera</span></a>
@@ -88,11 +88,11 @@
 
             <div class="welcome">
                 <h2>Hola, <?= e(explode(' ', trim($layoutUserName ?? 'Usuario'))[0] ?: 'Usuario') ?></h2>
-                <p><?= in_array('administrator', $layoutUserRoles ?? [], true) ? 'Panel de administración del sistema.' : 'Continúa gestionando tus proyectos académicos.' ?></p>
+                <p><?= $isAdministratorLayout ? 'Panel de administración del sistema.' : 'Continúa gestionando tus proyectos académicos.' ?></p>
             </div>
 
             <div class="topbar-right">
-                <a class="topbar-action-btn" href="<?= e(in_array('administrator', $layoutUserRoles ?? [], true) ? route('projects') . '&action=new' : route('new-project')) ?>">
+                <a class="topbar-action-btn" href="<?= e($isAdministratorLayout ? route('projects') . '&action=new' : route('new-project')) ?>">
                     <i class="fa-solid fa-plus"></i>
                     <span class="topbar-action-label">Nuevo proyecto</span>
                     <span class="topbar-action-label-short">Nuevo</span>
@@ -127,7 +127,7 @@
                 </div>
             </div>
         </header>
-        <?php if (!empty($layoutMustChangePassword) && !in_array('administrator', $layoutUserRoles ?? [], true) && (int)($layoutPasswordWarningCount ?? 0) < 3): ?>
+        <?php if (!empty($layoutMustChangePassword) && !$isAdministratorLayout && (int)($layoutPasswordWarningCount ?? 0) < 3): ?>
         <aside class="password-warning-banner" role="status" data-password-warning data-warning-key="<?= e(hash('sha256', ($layoutUserEmail ?? '') . ':' . (int)$layoutPasswordWarningCount)) ?>">
             <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
             <div><strong>Tu contraseña sigue siendo temporal</strong><span>Aviso <?= (int)$layoutPasswordWarningCount ?> de 3</span></div>

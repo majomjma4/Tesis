@@ -6,6 +6,7 @@ final class AdminUserModel
     private const ROLES=['student','teacher','administrator'];
     private const STATUSES=['active','inactive','blocked'];
     private const TEMPORARY_PASSWORD='Istel2026+';
+    public const LAST_ADMIN_MESSAGE='No es posible realizar esta acción porque esta es la única cuenta con acceso administrativo. Asigna privilegios administrativos a otro docente antes de continuar.';
 
     public function listing(array $filters=[],array $pagination=[]):array
     {
@@ -20,16 +21,17 @@ final class AdminUserModel
                 $params=['search_name'=>$term,'search_email'=>$term,'search_username'=>$term];
             }
         }
-        if(in_array($filters['role']??'',self::ROLES,true)){$where[]='r.code=:role';$params['role']=$filters['role'];}
+        if(($filters['role']??'')==='administrator'){$where[]='u.is_admin=1';}
+        elseif(in_array($filters['role']??'',['student','teacher'],true)){$where[]='r.code=:role';$params['role']=$filters['role'];}
         if(in_array($filters['status']??'',self::STATUSES,true)){$where[]='u.status=:status';$params['status']=$filters['status'];}
         $from=" FROM users u INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id LEFT JOIN student_profiles sp ON sp.user_id=u.id LEFT JOIN student_enrollments se ON se.student_id=u.id AND se.status='active' LEFT JOIN teacher_profiles tp ON tp.user_id=u.id".($where?' WHERE '.implode(' AND ',$where):'');
-        $sql="SELECT u.id,u.username,u.full_name,u.email,u.status,u.must_change_password,u.last_login_at,u.created_at,r.code role_code,COALESCE(sp.institutional_code,tp.institutional_code,'') institutional_code,sp.career_id,se.academic_period_id,se.semester,tp.academic_title,tp.can_tutor".$from.' ORDER BY u.created_at DESC,u.full_name';
+        $sql="SELECT u.id,u.username,u.full_name,u.email,u.status,u.must_change_password,u.last_login_at,u.created_at,u.is_admin,u.is_initial_admin,r.code role_code,COALESCE(sp.institutional_code,tp.institutional_code,'') institutional_code,sp.career_id,se.academic_period_id,se.semester,tp.academic_title,tp.can_tutor".$from.' ORDER BY u.created_at DESC,u.full_name';
         return PaginationService::run(Database::connection(),'SELECT COUNT(DISTINCT u.id)'.$from,$sql,$params,$pagination?:PaginationService::request());
     }
 
     public function summary():array
     {
-        $row=Database::connection()->query("SELECT COUNT(DISTINCT u.id) total,COUNT(DISTINCT CASE WHEN u.status='active' THEN u.id END) active,COUNT(DISTINCT CASE WHEN u.status='blocked' THEN u.id END) blocked,COUNT(DISTINCT CASE WHEN r.code='student' THEN u.id END) students,COUNT(DISTINCT CASE WHEN r.code='teacher' THEN u.id END) teachers,COUNT(DISTINCT CASE WHEN r.code='administrator' THEN u.id END) administrators FROM users u INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id")->fetch()?:[];
+        $row=Database::connection()->query("SELECT COUNT(DISTINCT u.id) total,COUNT(DISTINCT CASE WHEN u.status='active' THEN u.id END) active,COUNT(DISTINCT CASE WHEN u.status='blocked' THEN u.id END) blocked,COUNT(DISTINCT CASE WHEN r.code='student' THEN u.id END) students,COUNT(DISTINCT CASE WHEN r.code='teacher' THEN u.id END) teachers,COUNT(DISTINCT CASE WHEN u.is_admin=1 THEN u.id END) administrators FROM users u INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id")->fetch()?:[];
         return array_map('intval',$row);
     }
 
@@ -45,17 +47,22 @@ final class AdminUserModel
     {
         $data=$this->withInstitutionalDefaults($data);$this->validate($data,$id);
         return Database::transaction(function(PDO $db)use($data,$id,$actorId):array{
-            $previousRole=null;
+            $previousRole=null;$previousAdmin=false;$initialAdmin=false;
             if($id>0){
-                $this->ensureUser($db,$id);
-                $roleRead=$db->prepare('SELECT r.code FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=:id LIMIT 1');
-                $roleRead->execute(['id'=>$id]);$previousRole=(string)($roleRead->fetchColumn()?:'');
-                $statement=$db->prepare('UPDATE users SET username=:username,full_name=:name,email=:email,status=:status,session_version=session_version+1 WHERE id=:id');
-                $statement->execute(['username'=>$data['username']?:null,'name'=>$data['full_name'],'email'=>$data['email'],'status'=>$data['status'],'id'=>$id]);
+                $read=$db->prepare("SELECT u.*,r.code role_code FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id WHERE u.id=:id LIMIT 1 FOR UPDATE");
+                $read->execute(['id'=>$id]);$previous=$read->fetch();
+                if(!$previous)throw new InvalidArgumentException('El usuario ya no existe.');
+                $previousRole=(string)$previous['role_code'];$previousAdmin=(bool)$previous['is_admin'];$initialAdmin=(bool)$previous['is_initial_admin'];
+                if($data['role']==='administrator'&&!$initialAdmin)throw new InvalidArgumentException('Administrador no es un tipo académico seleccionable.');
+                if($initialAdmin)$data['is_admin']=1;
+                $willRemainActiveAdmin=(bool)$data['is_admin']&&$data['status']==='active';
+                if($previousAdmin&&$previous['status']==='active'&&!$willRemainActiveAdmin)$this->assertAnotherActiveAdministrator($db,$id);
+                $statement=$db->prepare('UPDATE users SET username=:username,full_name=:name,email=:email,status=:status,is_admin=:admin,session_version=session_version+1 WHERE id=:id');
+                $statement->execute(['username'=>$data['username']?:null,'name'=>$data['full_name'],'email'=>$data['email'],'status'=>$data['status'],'admin'=>$data['is_admin'],'id'=>$id]);
                 $userId=$id;$action='user_updated';
             }else{
-                $statement=$db->prepare('INSERT INTO users(email,username,password_hash,must_change_password,password_warning_count,temporary_password_expires_at,full_name,status) VALUES(:email,:username,:hash,1,0,DATE_ADD(CURRENT_TIMESTAMP,INTERVAL 7 DAY),:name,:status)');
-                $statement->execute(['email'=>$data['email'],'username'=>$data['username']?:null,'hash'=>password_hash(self::TEMPORARY_PASSWORD,PASSWORD_DEFAULT),'name'=>$data['full_name'],'status'=>$data['status']]);
+                $statement=$db->prepare('INSERT INTO users(email,username,password_hash,must_change_password,password_warning_count,temporary_password_expires_at,full_name,is_admin,status) VALUES(:email,:username,:hash,1,0,DATE_ADD(CURRENT_TIMESTAMP,INTERVAL 7 DAY),:name,:admin,:status)');
+                $statement->execute(['email'=>$data['email'],'username'=>$data['username']?:null,'hash'=>password_hash(self::TEMPORARY_PASSWORD,PASSWORD_DEFAULT),'name'=>$data['full_name'],'admin'=>$data['is_admin'],'status'=>$data['status']]);
                 $userId=(int)$db->lastInsertId();$action='user_created';
             }
             $role=$db->prepare('SELECT id FROM roles WHERE code=:code');$role->execute(['code'=>$data['role']]);$roleId=(int)$role->fetchColumn();
@@ -73,6 +80,8 @@ final class AdminUserModel
             }
             $this->audit($db,$actorId,$action,$userId,['role'=>$data['role'],'status'=>$data['status']]);
             if($previousRole!==null&&$previousRole!==$data['role'])$this->audit($db,$actorId,'user_role_changed',$userId,['from'=>$previousRole,'to'=>$data['role']]);
+            if($previousAdmin!==((bool)$data['is_admin']))$this->audit($db,$actorId,$data['is_admin']?'admin_access_granted':'admin_access_revoked',$userId,['role'=>$data['role']]);
+            if($initialAdmin&&$data['status']!=='active')$this->audit($db,$actorId,'initial_admin_deactivated',$userId,['status'=>$data['status']]);
             return ['id'=>$userId];
         });
     }
@@ -80,7 +89,15 @@ final class AdminUserModel
     public function changeStatus(int $id,string $status,int $actorId):void
     {
         if($id<1||!in_array($status,self::STATUSES,true))throw new InvalidArgumentException('El estado seleccionado no es válido.');
-        Database::transaction(function(PDO $db)use($id,$status,$actorId):void{$this->ensureUser($db,$id);$db->prepare('UPDATE users SET status=:status,session_version=session_version+1 WHERE id=:id')->execute(['status'=>$status,'id'=>$id]);$this->audit($db,$actorId,'user_status_changed',$id,['status'=>$status]);});
+        Database::transaction(function(PDO $db)use($id,$status,$actorId):void{
+            $read=$db->prepare('SELECT id,status,is_admin,is_initial_admin FROM users WHERE id=:id FOR UPDATE');$read->execute(['id'=>$id]);$user=$read->fetch();
+            if(!$user)throw new InvalidArgumentException('El usuario ya no existe.');
+            if((bool)$user['is_admin']&&$user['status']==='active'&&$status!=='active')$this->assertAnotherActiveAdministrator($db,$id);
+            $db->prepare('UPDATE users SET status=:status,session_version=session_version+1 WHERE id=:id')->execute(['status'=>$status,'id'=>$id]);
+            $this->audit($db,$actorId,'user_status_changed',$id,['status'=>$status]);
+            if((bool)$user['is_initial_admin']&&$status!=='active')$this->audit($db,$actorId,'initial_admin_deactivated',$id,['status'=>$status]);
+            if((bool)$user['is_admin']&&$user['status']!=='active'&&$status==='active')$this->audit($db,$actorId,'admin_access_reactivated',$id,[]);
+        });
     }
 
     public function resetPassword(int $id,string $password,int $actorId):void
@@ -162,6 +179,8 @@ final class AdminUserModel
         if(mb_strlen($data['full_name'])<3)throw new InvalidArgumentException('Ingresa el nombre completo.');
         if(!filter_var($data['email'],FILTER_VALIDATE_EMAIL))throw new InvalidArgumentException('Ingresa un correo válido.');
         if(!in_array($data['role'],self::ROLES,true))throw new InvalidArgumentException('Selecciona un rol válido.');
+        if($id<1&&$data['role']==='administrator')throw new InvalidArgumentException('Las cuentas nuevas deben ser Estudiante o Docente.');
+        if(!empty($data['is_admin'])&&$data['role']!=='teacher')throw new InvalidArgumentException('El acceso administrativo solo puede asignarse a un docente.');
         if(!in_array($data['status'],self::STATUSES,true))throw new InvalidArgumentException('Selecciona un estado válido.');
         $check=Database::connection()->prepare('SELECT id FROM users WHERE email=:email AND id<>:id LIMIT 1');$check->execute(['email'=>$data['email'],'id'=>$id]);
         if($check->fetch())throw new InvalidArgumentException('Ya existe una cuenta con ese correo.');
@@ -175,8 +194,15 @@ final class AdminUserModel
     {
         $catalogs=$this->catalogs();
         if(!$catalogs['career']||!$catalogs['period'])throw new InvalidArgumentException('Configura la carrera Desarrollo de Software y un periodo académico activo antes de continuar.');
-        $data['career_id']=(int)$catalogs['career']['id'];$data['academic_period_id']=(int)$catalogs['period']['id'];$data['period_name']=(string)$catalogs['period']['name'];
+        $data['career_id']=(int)$catalogs['career']['id'];$data['academic_period_id']=(int)$catalogs['period']['id'];$data['period_name']=(string)$catalogs['period']['name'];$data['is_admin']=!empty($data['is_admin'])?1:0;
         return $data;
+    }
+
+    private function assertAnotherActiveAdministrator(PDO $db,int $excludedId):void
+    {
+        $statement=$db->prepare("SELECT COUNT(*) FROM users WHERE is_admin=1 AND status='active' AND deleted_at IS NULL AND purged_at IS NULL AND id<>:id");
+        $statement->execute(['id'=>$excludedId]);
+        if((int)$statement->fetchColumn()<1)throw new InvalidArgumentException(self::LAST_ADMIN_MESSAGE);
     }
 
     private function ensureUser(PDO $db,int $id):void{$statement=$db->prepare('SELECT id FROM users WHERE id=:id');$statement->execute(['id'=>$id]);if(!$statement->fetchColumn())throw new InvalidArgumentException('El usuario ya no existe.');}
@@ -189,6 +215,10 @@ final class AdminUserModel
             'user_created'=>'Creó el usuario '.$element,
             'user_updated'=>'Editó el usuario '.$element,
             'user_role_changed'=>'Cambió el rol de '.$element,
+            'admin_access_granted'=>'Asignó acceso administrativo a '.$element,
+            'admin_access_revoked'=>'Retiró el acceso administrativo de '.$element,
+            'admin_access_reactivated'=>'Reactivó una cuenta con acceso administrativo: '.$element,
+            'initial_admin_deactivated'=>'Desactivó la cuenta administrativa inicial '.$element,
             'user_status_changed'=>($status==='blocked'?'Bloqueó':($status==='active'?'Desbloqueó':'Cambió el estado de')).' '.$element,
             'users_bulk_imported'=>'Creó '.(int)($details['count']??0).' usuarios mediante importación',
             'password_reset'=>'Restableció la contraseña de '.$element,

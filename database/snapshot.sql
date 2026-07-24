@@ -1,6 +1,6 @@
 -- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
 --
--- Host: localhost    Database: tesis
+-- Host: 127.0.0.1    Database: tesis
 -- ------------------------------------------------------
 -- Server version	10.4.32-MariaDB
 
@@ -14,6 +14,16 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Current Database: `tesis`
+--
+
+/*!40000 DROP DATABASE IF EXISTS `tesis`*/;
+
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ `tesis` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */;
+
+USE `tesis`;
 
 --
 -- Table structure for table `academic_periods`
@@ -920,6 +930,8 @@ CREATE TABLE `users` (
   `temporary_password_expires_at` datetime DEFAULT NULL,
   `password_changed_at` datetime DEFAULT NULL,
   `full_name` varchar(180) NOT NULL,
+  `is_admin` tinyint(1) NOT NULL DEFAULT 0,
+  `is_initial_admin` tinyint(1) NOT NULL DEFAULT 0,
   `status` enum('active','inactive','blocked') NOT NULL DEFAULT 'active',
   `last_login_at` datetime DEFAULT NULL,
   `session_version` int(10) unsigned NOT NULL DEFAULT 1,
@@ -931,7 +943,9 @@ CREATE TABLE `users` (
   `purged_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`),
-  UNIQUE KEY `username` (`username`)
+  UNIQUE KEY `username` (`username`),
+  KEY `idx_users_admin_access` (`is_admin`,`status`,`deleted_at`,`purged_at`),
+  CONSTRAINT `chk_initial_admin_requires_access` CHECK (`is_initial_admin` = 0 or `is_admin` = 1)
 ) ENGINE=InnoDB AUTO_INCREMENT=78 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -941,7 +955,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,'tesisad@gmail.com',NULL,'$2y$10$Sg94TVbx1kIiuJYhULWb4eemn/D8JsDfZf.3joE7huPhGsoj5ypJS',1,2,'2026-07-26 04:58:06',NULL,'Administrador de pruebas','active','2026-07-23 18:39:26',1,'2026-07-19 03:56:23','2026-07-23 18:39:26',NULL,NULL,NULL,NULL),(20,'ana.torres.demo@correo.com',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Ana Lucía Torres','active',NULL,3,'2026-07-14 21:14:28','2026-07-23 19:52:43',NULL,NULL,NULL,NULL),(21,'carlos.mendoza.demo@correo.com',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Carlos Andrés Mendoza','active',NULL,1,'2026-07-14 21:14:28','2026-07-19 21:14:28',NULL,NULL,NULL,NULL),(22,'sofia.lopez.demo@correo.com',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Sofía López Herrera','active',NULL,1,'2026-07-14 21:14:28','2026-07-19 21:14:28',NULL,NULL,NULL,NULL),(23,'diego.paredes.demo@correo.com',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Diego Paredes Ruiz','active',NULL,1,'2026-07-14 21:14:28','2026-07-19 21:14:28',NULL,NULL,NULL,NULL),(24,'valentina.mora.demo@correo.com',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Valentina Mora Cedeño','active',NULL,1,'2026-07-14 21:14:28','2026-07-19 21:14:28',NULL,NULL,NULL,NULL),(25,'mateo.silva.demo@correo.com',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Mateo Silva Ortiz','blocked',NULL,1,'2026-07-14 21:14:28','2026-07-19 21:14:28',NULL,NULL,NULL,NULL),(26,'maribel.fierro.pendiente@local.invalid',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Msc. Maribel Fierro Montero','active',NULL,1,'2026-07-14 21:14:28','2026-07-23 03:23:58',NULL,NULL,NULL,NULL),(27,'maria.navarrete.pendiente@local.invalid',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Msc. Maria Elena Navarrete','active',NULL,1,'2026-07-14 21:14:28','2026-07-23 03:23:58',NULL,NULL,NULL,NULL),(28,'diana.alegria.pendiente@local.invalid',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Lic. Diana Alegría Camino','active',NULL,1,'2026-07-14 21:14:28','2026-07-23 03:23:58',NULL,NULL,NULL,NULL),(68,'tesises@gmail.com',NULL,'$2y$10$EBLEE8IE4ULTWtidyKhMz.s77YXNXUjXL0Ah9ty5f6damU4Ny7JsG',1,0,'2026-07-30 19:43:41',NULL,'Estudiante de pruebas','active',NULL,2,'2026-07-21 17:40:30','2026-07-23 19:43:41',NULL,NULL,NULL,NULL),(69,'diana.ramirez.pendiente@local.invalid',NULL,'$2y$10$6uVhqPOS9uppnUF5aTm1Wua8xwNq5bBQ/v0STvH4gApHQ95B6IvxO',0,0,NULL,NULL,'Msc. Diana Anaid Ramirez','active',NULL,1,'2026-07-21 17:40:30','2026-07-23 03:23:58',NULL,NULL,NULL,NULL),(70,'alex.galarza.pendiente@local.invalid',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'Abg. Alex Fabián Galarza','active',NULL,1,'2026-07-23 03:23:58','2026-07-23 03:23:58',NULL,NULL,NULL,NULL),(71,'henrry.marino.pendiente@local.invalid',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'Msc. Henrry Mariño Acosta','active',NULL,1,'2026-07-23 03:23:58','2026-07-23 03:23:58',NULL,NULL,NULL,NULL),(72,'paginacion01@demo.local',NULL,'$2y$10$QxVr6AX20btwI3bRQtt4E.Ox4NElqDxMAQ4szQaEJxuTgTsTdXuZC',1,0,'2026-07-30 19:36:42',NULL,'Adriana Ponce Vera','active',NULL,12,'2026-07-23 03:45:56','2026-07-23 19:48:40',NULL,NULL,NULL,NULL),(73,'paginacion02@demo.local',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'Bruno Cárdenas Mena','active',NULL,1,'2026-07-23 03:45:56','2026-07-23 03:45:56',NULL,NULL,NULL,NULL),(74,'paginacion03@demo.local',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'Camila Andrade Ruiz','active',NULL,1,'2026-07-23 03:45:56','2026-07-23 03:45:56',NULL,NULL,NULL,NULL),(75,'paginacion04@demo.local',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'David Guerrero Paz','active',NULL,1,'2026-07-23 03:45:56','2026-07-23 03:45:56',NULL,NULL,NULL,NULL),(76,'paginacion05@demo.local',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'Elena Morales Cedeño','active',NULL,1,'2026-07-23 03:45:56','2026-07-23 03:45:56',NULL,NULL,NULL,NULL),(77,'paginacion06@demo.local',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'Fernando Viteri León','active',NULL,1,'2026-07-23 03:45:56','2026-07-23 03:45:56',NULL,NULL,NULL,NULL);
+INSERT INTO `users` VALUES (1,'tesisad@gmail.com',NULL,'$2y$10$Sg94TVbx1kIiuJYhULWb4eemn/D8JsDfZf.3joE7huPhGsoj5ypJS',1,2,'2026-07-26 04:58:06',NULL,'Administrador de pruebas',1,1,'active','2026-07-23 18:39:26',1,'2026-07-19 03:56:23','2026-07-23 19:53:28',NULL,NULL,NULL,NULL),(20,'ana.torres.demo@correo.com',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Ana Lucía Torres',0,0,'active',NULL,3,'2026-07-14 21:14:28','2026-07-23 19:52:43',NULL,NULL,NULL,NULL),(21,'carlos.mendoza.demo@correo.com',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Carlos Andrés Mendoza',0,0,'active',NULL,1,'2026-07-14 21:14:28','2026-07-19 21:14:28',NULL,NULL,NULL,NULL),(22,'sofia.lopez.demo@correo.com',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Sofía López Herrera',0,0,'active',NULL,1,'2026-07-14 21:14:28','2026-07-19 21:14:28',NULL,NULL,NULL,NULL),(23,'diego.paredes.demo@correo.com',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Diego Paredes Ruiz',0,0,'active',NULL,1,'2026-07-14 21:14:28','2026-07-19 21:14:28',NULL,NULL,NULL,NULL),(24,'valentina.mora.demo@correo.com',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Valentina Mora Cedeño',0,0,'active',NULL,1,'2026-07-14 21:14:28','2026-07-19 21:14:28',NULL,NULL,NULL,NULL),(25,'mateo.silva.demo@correo.com',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Mateo Silva Ortiz',0,0,'blocked',NULL,1,'2026-07-14 21:14:28','2026-07-19 21:14:28',NULL,NULL,NULL,NULL),(26,'maribel.fierro.pendiente@local.invalid',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Msc. Maribel Fierro Montero',0,0,'active',NULL,1,'2026-07-14 21:14:28','2026-07-23 03:23:58',NULL,NULL,NULL,NULL),(27,'maria.navarrete.pendiente@local.invalid',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Msc. Maria Elena Navarrete',0,0,'active',NULL,1,'2026-07-14 21:14:28','2026-07-23 03:23:58',NULL,NULL,NULL,NULL),(28,'diana.alegria.pendiente@local.invalid',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,'2026-07-26 21:14:28',NULL,'Lic. Diana Alegría Camino',0,0,'active',NULL,1,'2026-07-14 21:14:28','2026-07-23 03:23:58',NULL,NULL,NULL,NULL),(68,'tesises@gmail.com',NULL,'$2y$10$EBLEE8IE4ULTWtidyKhMz.s77YXNXUjXL0Ah9ty5f6damU4Ny7JsG',1,0,'2026-07-30 19:43:41',NULL,'Estudiante de pruebas',0,0,'active',NULL,2,'2026-07-21 17:40:30','2026-07-23 19:43:41',NULL,NULL,NULL,NULL),(69,'diana.ramirez.pendiente@local.invalid',NULL,'$2y$10$6uVhqPOS9uppnUF5aTm1Wua8xwNq5bBQ/v0STvH4gApHQ95B6IvxO',0,0,NULL,NULL,'Msc. Diana Anaid Ramirez',0,0,'active',NULL,1,'2026-07-21 17:40:30','2026-07-23 03:23:58',NULL,NULL,NULL,NULL),(70,'alex.galarza.pendiente@local.invalid',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'Abg. Alex Fabián Galarza',0,0,'active',NULL,1,'2026-07-23 03:23:58','2026-07-23 03:23:58',NULL,NULL,NULL,NULL),(71,'henrry.marino.pendiente@local.invalid',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'Msc. Henrry Mariño Acosta',0,0,'active',NULL,1,'2026-07-23 03:23:58','2026-07-23 03:23:58',NULL,NULL,NULL,NULL),(72,'paginacion01@demo.local',NULL,'$2y$10$QxVr6AX20btwI3bRQtt4E.Ox4NElqDxMAQ4szQaEJxuTgTsTdXuZC',1,0,'2026-07-30 19:36:42',NULL,'Adriana Ponce Vera',0,0,'active',NULL,12,'2026-07-23 03:45:56','2026-07-23 19:48:40',NULL,NULL,NULL,NULL),(73,'paginacion02@demo.local',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'Bruno Cárdenas Mena',0,0,'active',NULL,1,'2026-07-23 03:45:56','2026-07-23 03:45:56',NULL,NULL,NULL,NULL),(74,'paginacion03@demo.local',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'Camila Andrade Ruiz',0,0,'active',NULL,1,'2026-07-23 03:45:56','2026-07-23 03:45:56',NULL,NULL,NULL,NULL),(75,'paginacion04@demo.local',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'David Guerrero Paz',0,0,'active',NULL,1,'2026-07-23 03:45:56','2026-07-23 03:45:56',NULL,NULL,NULL,NULL),(76,'paginacion05@demo.local',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'Elena Morales Cedeño',0,0,'active',NULL,1,'2026-07-23 03:45:56','2026-07-23 03:45:56',NULL,NULL,NULL,NULL),(77,'paginacion06@demo.local',NULL,'$2y$10$wsCvQrl1SH6AIIjsYBQIoOhmr22DD4iiniQisj48g1NInZxwd.bRy',1,0,NULL,NULL,'Fernando Viteri León',0,0,'active',NULL,1,'2026-07-23 03:45:56','2026-07-23 03:45:56',NULL,NULL,NULL,NULL);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -962,4 +976,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-07-23 18:18:23
+-- Dump completed

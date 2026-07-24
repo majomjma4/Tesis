@@ -15,10 +15,10 @@ final class RouteAccessService
         if(!$identity||$identity['status']!=='active'||(int)$identity['session_version']!==(int)($_SESSION['session_version']??0)){ $session->logout();header('Location: '.route('login'));exit; }
         $session->refresh($identity);
         $expired=!empty($identity['temporary_password_expires_at'])&&strtotime((string)$identity['temporary_password_expires_at'])<=time();
-        $requiresTemporaryPasswordChange=(bool)$identity['must_change_password']&&!in_array('administrator',$identity['roles'],true);
+        $requiresTemporaryPasswordChange=(bool)$identity['must_change_password']&&!(bool)$identity['is_admin'];
         if($requiresTemporaryPasswordChange&&((int)$identity['password_warning_count']>=3||$expired)&&!in_array($page,['change-password','logout'],true)){header('Location: '.route('change-password'));exit;}
-        if(in_array($page,self::ADMIN_ROUTES,true)&&!in_array('administrator',$identity['roles'],true)){header('Location: '.route('forbidden'));exit;}
-        if(in_array('administrator',$identity['roles'],true)){
+        if(in_array($page,self::ADMIN_ROUTES,true)&&!(bool)$identity['is_admin']){header('Location: '.route('forbidden'));exit;}
+        if((bool)$identity['is_admin']){
             try{(new AcademicPeriodReminderService())->sync();}
             catch(Throwable $exception){error_log('Academic period reminders: '.$exception->getMessage());}
         }

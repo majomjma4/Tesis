@@ -1,5 +1,5 @@
 <?php
-$roleLabels=['student'=>'Estudiante','teacher'=>'Docente','administrator'=>'Admin'];
+$roleLabels=['student'=>'Estudiante','teacher'=>'Docente','administrator'=>'Cuenta inicial'];
 $statusLabels=['active'=>'Activo','inactive'=>'Inactivo','blocked'=>'Bloqueado'];
 $career=$catalogs['career']??null;$period=$catalogs['period']??null;
 ?>
@@ -34,7 +34,7 @@ $career=$catalogs['career']??null;$period=$catalogs['period']??null;
             <dl>
                 <div><dt>Usuario</dt><dd><?=e($user['username']?:'Sin usuario')?></dd></div>
                 <div><dt>Cédula</dt><dd><?=e($user['institutional_code']?:'No registrada')?></dd></div>
-                <div><dt>Rol</dt><dd><span class="role-chip <?=e($user['role_code'])?>"><?=e($roleLabels[$user['role_code']]??$user['role_code'])?></span></dd></div>
+                <div><dt>Rol</dt><dd><span class="role-chip <?=e($user['role_code'])?>"><?=e($roleLabels[$user['role_code']]??$user['role_code'])?></span><?php if($user['is_admin']&&!$user['is_initial_admin']):?><small class="temporary-label">Acceso administrativo</small><?php elseif($user['is_initial_admin']):?><small class="temporary-label">Temporal · sin funciones académicas</small><?php endif;?></dd></div>
                 <div><dt>Semestre</dt><dd><?= $user['role_code']==='student'&&$user['semester']?(int)$user['semester'].'.º':'No aplica'?></dd></div>
                 <div><dt>Estado</dt><dd><span class="status-chip <?=e($user['status'])?>"><?=e($statusLabels[$user['status']]??$user['status'])?></span><?php if($user['must_change_password']):?><small class="temporary-label">Clave temporal</small><?php endif;?></dd></div>
                 <div><dt>Último acceso</dt><dd><?= $user['last_login_at']?e(date('d/m/Y H:i',strtotime($user['last_login_at']))):'Nunca'?></dd></div>
@@ -55,7 +55,7 @@ $career=$catalogs['career']??null;$period=$catalogs['period']??null;
             <label class="wide"><span>Nombre completo</span><input name="full_name" required maxlength="180" autocomplete="off"></label>
             <label class="wide"><span>Correo</span><input type="email" name="email" required maxlength="190" autocomplete="off"></label>
             <div class="role-fields identity-fields wide" data-for="student teacher"><label><span>Cédula</span><input name="institutional_code" inputmode="numeric" minlength="10" maxlength="10" pattern="[0-9]{10}" placeholder="10 dígitos"></label></div>
-            <label><span>Rol</span><select name="role" required><option value="student">Estudiante</option><option value="teacher">Docente</option><option value="administrator">Administrador</option></select></label>
+            <label><span>Tipo de usuario</span><select name="role" required><option value="student">Estudiante</option><option value="teacher">Docente</option><option value="administrator" hidden>Cuenta inicial temporal</option></select></label>
             <label><span>Estado</span><select name="status"><option value="active">Activo</option><option value="inactive">Inactivo</option><option value="blocked">Bloqueado</option></select></label>
             <div class="role-fields student-fields wide" data-for="student">
                 <label><span>Usuario <small>(opcional)</small></span><input name="username" maxlength="80" placeholder="Ej. maria.perez"></label>
@@ -63,7 +63,7 @@ $career=$catalogs['career']??null;$period=$catalogs['period']??null;
                 <div class="user-fixed-field"><i class="fa-solid fa-code" aria-hidden="true"></i><div><span>Carrera</span><strong><?=e($career['name']??'Desarrollo de Software')?></strong></div></div>
                 <div class="user-fixed-field"><i class="fa-regular fa-calendar" aria-hidden="true"></i><div><span>Periodo académico</span><strong><?=e($period['name']??'Sin periodo activo')?></strong></div></div>
             </div>
-            <div class="role-fields teacher-fields wide" data-for="teacher"><label><span>Título académico <small>(opcional)</small></span><input name="academic_title" maxlength="120" placeholder="Ej. Msc."></label><label class="check-label"><input type="checkbox" name="can_tutor" value="1"><span>Disponible para asignación como tutor</span></label></div>
+            <div class="role-fields teacher-fields wide" data-for="teacher"><label><span>Título académico <small>(opcional)</small></span><input name="academic_title" maxlength="120" placeholder="Ej. Msc."></label><label class="check-label"><input type="checkbox" name="can_tutor" value="1"><span>Disponible para asignación como tutor</span></label><label class="check-label"><input type="checkbox" name="is_admin" value="1"><span>Acceso administrativo</span></label></div>
         </div>
         <div class="form-note" id="temporaryPasswordNote"><i class="fa-solid fa-key"></i><span>La cuenta se creará con la contraseña temporal <strong>Istel2026+</strong> y deberá cambiarla.</span></div><div class="users-message" id="userFormMessage" hidden></div>
         <footer><button type="button" class="secondary" data-close-modal>Cancelar</button><button type="submit" class="primary">Guardar usuario</button></footer>
