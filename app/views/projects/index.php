@@ -40,7 +40,7 @@
                     $cardAction = 'Preparar publicación'; $actionUrl .= '&tab=documents';
                 } elseif ($project['status_key'] === 'published') {
                     $phaseContext = ['Publicación' => $project['key_dates'][1]['value'] ?? 'Publicada', 'Disponibilidad' => 'Repositorio institucional'];
-                    $cardAction = 'Ver publicación';
+                    $cardAction = 'Abrir ficha institucional';
                     if (!empty($project['repository_id'])) $actionUrl = route('repository-detail') . '&id=' . (int) $project['repository_id'];
                 } else $phaseContext = ['Etapa' => $project['stage'], 'Expediente' => $project['status']];
             ?>

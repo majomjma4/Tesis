@@ -142,7 +142,7 @@ $formatDate = static function (?string $date): string {
                         </div>
                         <footer>
                             <a class="ar-primary-action" href="<?= e(route('project-detail') . '&id=' . (int) $project['id'] . '&tab=information') ?>">
-                                <i class="fa-regular fa-eye"></i> Ver publicación
+                                <i class="fa-solid fa-diagram-project"></i> Abrir expediente
                             </a>
                             <button class="ar-icon-action ar-danger-action" data-publish="unpublish" data-id="<?= (int) $project['id'] ?>" data-tooltip="Retirar del repositorio" type="button" aria-label="Retirar del repositorio">
                                 <i class="fa-solid fa-eye-slash"></i>
