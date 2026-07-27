@@ -483,3 +483,59 @@ repositoryDetailFavorite?.addEventListener("click", async () => {
 });
 
 // Final de interacciones del detalle del repositorio
+
+// Inicio de interacciones visuales neutrales del Expediente Digital
+const digitalRecord = document.querySelector("[data-digital-record]");
+const digitalRecordMenu = digitalRecord?.querySelector("[data-record-menu]");
+const digitalRecordMenuTrigger = digitalRecordMenu?.querySelector("[data-record-menu-trigger]");
+const digitalRecordMenuPanel = digitalRecordMenu?.querySelector("[data-record-menu-panel]");
+
+function closeDigitalRecordMenu(restoreFocus = false) {
+    if (!digitalRecordMenuPanel || !digitalRecordMenuTrigger) return;
+    digitalRecordMenuPanel.hidden = true;
+    digitalRecordMenuTrigger.setAttribute("aria-expanded", "false");
+    if (restoreFocus) digitalRecordMenuTrigger.focus();
+}
+
+digitalRecordMenuTrigger?.addEventListener("click", () => {
+    const willOpen = digitalRecordMenuPanel?.hidden ?? false;
+    if (!digitalRecordMenuPanel) return;
+    digitalRecordMenuPanel.hidden = !willOpen;
+    digitalRecordMenuTrigger.setAttribute("aria-expanded", String(willOpen));
+    if (willOpen) digitalRecordMenuPanel.querySelector("button:not([disabled])")?.focus();
+});
+
+document.addEventListener("click", (event) => {
+    if (digitalRecordMenu && !digitalRecordMenu.contains(event.target)) closeDigitalRecordMenu();
+});
+
+const neutralFileList = digitalRecord?.querySelector("[data-record-files]");
+const neutralFileButtons = [...(neutralFileList?.querySelectorAll("[data-record-file]") ?? [])];
+const neutralViewer = neutralFileList?.querySelector("[data-record-viewer]");
+const neutralViewerName = neutralViewer?.querySelector("[data-viewer-name]");
+const neutralViewerMeta = neutralViewer?.querySelector("[data-viewer-meta]");
+const neutralViewerBody = neutralViewer?.querySelector("[data-viewer-body]");
+const neutralBackToFiles = neutralViewer?.querySelector("[data-back-to-files]");
+
+neutralFileButtons.forEach((button) => button.addEventListener("click", () => {
+    neutralFileButtons.forEach((item) => {
+        const selected = item === button;
+        item.classList.toggle("is-selected", selected);
+        item.setAttribute("aria-pressed", String(selected));
+    });
+    if (neutralViewerName) neutralViewerName.textContent = button.dataset.fileName ?? "Archivo";
+    if (neutralViewerMeta) neutralViewerMeta.textContent = `${button.dataset.fileType ?? "Archivo"} · ${button.dataset.fileSize ?? "Tamaño no disponible"}`;
+    neutralViewer?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    neutralViewerBody?.focus({ preventScroll: true });
+}));
+
+neutralBackToFiles?.addEventListener("click", () => {
+    neutralFileButtons.find((button) => button.getAttribute("aria-pressed") === "true")?.focus();
+});
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && digitalRecordMenuPanel && !digitalRecordMenuPanel.hidden) {
+        closeDigitalRecordMenu(true);
+    }
+});
+// Final de interacciones visuales neutrales del Expediente Digital

@@ -1,79 +1,10 @@
-<?php
-/**
- * Simulación visual compartida del Visor Documental Institucional.
- * No carga, abre, descarga ni interpreta archivos reales.
- */
-$viewerScenarios = [
-    ['kind'=>'pdf','label'=>'PDF','name'=>'Informe final.pdf','size'=>'3,2 MB','icon'=>'fa-file-pdf','path'=>['Expediente','Documentación','Informe final.pdf']],
-    ['kind'=>'word','label'=>'Word','name'=>'Manual técnico.docx','size'=>'846 KB','icon'=>'fa-file-word','path'=>['Expediente','Documentación','Manual técnico.docx']],
-    ['kind'=>'image','label'=>'Imagen','name'=>'arquitectura_sistema.png','size'=>'1,4 MB','icon'=>'fa-file-image','path'=>['Expediente','Recursos','arquitectura_sistema.png']],
-    ['kind'=>'code','label'=>'Código','name'=>'UsersController.php','size'=>'24 KB','icon'=>'fa-file-code','path'=>['Expediente','Código fuente','Backend','Controllers','UsersController.php']],
-    ['kind'=>'text','label'=>'Texto','name'=>'README.md','size'=>'14 KB','icon'=>'fa-file-lines','path'=>['Expediente','Código fuente','README.md'],'panel'=>'collapsed'],
-    ['kind'=>'zip','label'=>'ZIP','name'=>'codigo_fuente.zip','size'=>'24 MB','icon'=>'fa-file-zipper','path'=>['Expediente','Código fuente','codigo_fuente.zip']],
-    ['kind'=>'unsupported','label'=>'Sin vista previa','name'=>'datos_proyecto.bin','size'=>'6,8 MB','icon'=>'fa-file-circle-question','path'=>['Expediente','Recursos','datos_proyecto.bin']],
-];
-?>
-<style>
-.ed-viewer-showcase{display:grid;gap:38px;color:var(--text)}.ed-viewer-scenario{min-width:0}.ed-viewer-scenario-label{margin:0 0 10px;color:var(--muted);font-size:9px;font-weight:850;letter-spacing:.09em;text-transform:uppercase}
-.ed-viewer{min-width:0;border-top:1px solid var(--line)}.ed-viewer-head{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:15px 0;border-bottom:1px solid var(--line)}
-.ed-viewer-file{min-width:0;display:flex;align-items:center;gap:11px}.ed-viewer-file-icon{width:34px;height:34px;border:1px solid var(--line);border-radius:8px;display:grid;place-items:center;flex:0 0 auto;color:var(--primary)}
-.ed-viewer-file-copy{min-width:0;display:grid;gap:4px}.ed-viewer-file-copy strong{overflow:hidden;font-size:13px;text-overflow:ellipsis;white-space:nowrap}.ed-viewer-file-copy small{color:var(--muted);font-size:10px}
-.ed-viewer-actions,.ed-viewer-tools,.ed-viewer-pagination{display:flex;align-items:center;gap:6px}.ed-viewer-action{height:31px;padding:0 9px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;gap:6px;font:inherit;font-size:10px;font-weight:750}.ed-viewer-action:disabled{opacity:1}
-.ed-viewer-path{display:flex;align-items:center;gap:7px;padding:10px 0;color:var(--muted);font-size:10px;overflow-x:auto;white-space:nowrap}.ed-viewer-path i{font-size:7px}.ed-viewer-path span:last-child{color:var(--text);font-weight:800}
-.ed-viewer-layout{display:grid;grid-template-columns:minmax(0,1fr) 220px;border:1px solid var(--line);border-radius:10px;overflow:hidden}.ed-viewer-layout.is-panel-collapsed{grid-template-columns:minmax(0,1fr) 42px}.ed-viewer-main{min-width:0;background:var(--surface-soft)}.ed-viewer-toolbar{min-height:42px;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:space-between;gap:10px}.ed-viewer-toolbar small{color:var(--muted);font-size:10px}
-.ed-viewer-canvas{min-height:360px;padding:24px;display:grid;place-items:center;overflow:auto}.ed-viewer-side{padding:18px;border-left:1px solid var(--line);background:var(--surface)}.ed-viewer-side-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}.ed-viewer-side h3{margin:0;font-size:12px}.ed-viewer-side-toggle{width:25px;height:25px;border:0;border-radius:6px;background:transparent;color:var(--muted)}.ed-viewer-side-toggle:disabled{opacity:1}.ed-viewer-side-collapsed{padding-top:10px;border-left:1px solid var(--line);background:var(--surface);display:grid;place-items:start center}.ed-viewer-meta{display:grid;gap:11px;margin:0}.ed-viewer-meta div{display:grid;gap:3px}.ed-viewer-meta dt{color:var(--muted);font-size:9px;font-weight:800;text-transform:uppercase}.ed-viewer-meta dd{margin:0;font-size:11px;font-weight:750;overflow-wrap:anywhere}
-.ed-pdf-pages{display:flex;align-items:flex-start;gap:14px}.ed-pdf-page{position:relative;width:205px;aspect-ratio:.71;padding:22px;background:#fff;color:#334155;box-shadow:0 1px 4px rgba(15,23,42,.12)}.ed-pdf-page small{display:block;margin-bottom:7px;color:#64748b;font-size:6px;text-transform:uppercase}.ed-pdf-page h4{margin:0 0 6px;font-size:12px}.ed-pdf-page h5{margin:14px 0 7px;font-size:8px}.ed-faux-line{height:4px;margin:7px 0;border-radius:4px;background:#dbe2ea}.ed-faux-line.short{width:62%}.ed-pdf-table{display:grid;grid-template-columns:repeat(3,1fr);margin-top:12px;border-top:1px solid #cbd5e1;border-left:1px solid #cbd5e1}.ed-pdf-table span{height:15px;border-right:1px solid #cbd5e1;border-bottom:1px solid #cbd5e1}.ed-pdf-number{position:absolute;right:0;bottom:12px;left:0;color:#64748b;font-size:7px;text-align:center}
-.ed-word-page{width:min(520px,100%);min-height:310px;padding:38px 44px;background:#fff;color:#334155;box-shadow:0 1px 4px rgba(15,23,42,.12)}.ed-word-page h4{margin:0 0 18px;font-size:17px}.ed-word-page p{margin:0 0 12px;font-size:11px;line-height:1.7}
-.ed-image-stage{width:min(560px,100%);aspect-ratio:16/9;border:1px solid var(--line);border-radius:8px;background:linear-gradient(135deg,#dbeafe 0 35%,#e2e8f0 35% 65%,#bfdbfe 65%);display:grid;place-items:center;color:#334155}.ed-image-stage i{font-size:42px;opacity:.55}
-.ed-code-view,.ed-text-view{width:100%;min-height:310px;padding:18px;border-radius:7px;background:#111827;color:#cbd5e1;font:11px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace}.ed-code-line{display:grid;grid-template-columns:34px 1fr}.ed-code-line b{padding-right:12px;color:#64748b;font-weight:400;text-align:right}.ed-code-line span{white-space:pre}.ed-code-language{padding:3px 7px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:9px;font-weight:800}.ed-text-view{background:var(--surface);color:var(--text);font-family:inherit}.ed-text-view h4{margin:0 0 14px;font-size:18px}.ed-text-view p{max-width:640px;margin:0 0 13px;color:var(--muted);font-size:12px;line-height:1.8}
-.ed-viewer-message{max-width:430px;display:grid;justify-items:center;gap:10px;text-align:center}.ed-viewer-message>i{color:var(--primary);font-size:34px}.ed-viewer-message h4{margin:0;font-size:15px}.ed-viewer-message p{margin:0;color:var(--muted);font-size:11px;line-height:1.6}.ed-viewer-message .ed-viewer-action{margin-top:4px}
-.ed-viewer-nav{display:flex;justify-content:space-between;gap:12px;padding-top:10px}.ed-viewer-nav button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:10px}.ed-viewer-nav button:disabled{opacity:1}
-@media(max-width:780px){.ed-viewer-head{align-items:flex-start;flex-direction:column}.ed-viewer-actions{width:100%;flex-wrap:wrap}.ed-viewer-layout,.ed-viewer-layout.is-panel-collapsed{grid-template-columns:1fr}.ed-viewer-side{border-top:1px solid var(--line);border-left:0}.ed-viewer-side-collapsed{min-height:42px;padding:8px;border-top:1px solid var(--line);border-left:0;place-items:center end}.ed-viewer-meta{grid-template-columns:repeat(2,minmax(0,1fr))}.ed-pdf-page:nth-child(2){display:none}}
-@media(max-width:480px){.ed-viewer-showcase{gap:30px}.ed-viewer-actions .ed-viewer-action span{display:none}.ed-viewer-canvas{min-height:300px;padding:14px}.ed-word-page{padding:26px 22px}.ed-viewer-meta{grid-template-columns:1fr}.ed-viewer-toolbar{align-items:flex-start;flex-direction:column}.ed-pdf-page{width:min(210px,100%)}}
-</style>
-
-<div class="ed-viewer-showcase">
-<?php foreach ($viewerScenarios as $viewerIndex => $viewer):
-    $previousViewer = $viewerScenarios[($viewerIndex - 1 + count($viewerScenarios)) % count($viewerScenarios)];
-    $nextViewer = $viewerScenarios[($viewerIndex + 1) % count($viewerScenarios)];
-    $panelCollapsed = ($viewer['panel'] ?? '') === 'collapsed';
-?>
-    <section class="ed-viewer-scenario" aria-label="Vista <?= e($viewer['label']) ?>">
-        <p class="ed-viewer-scenario-label"><?= e($viewer['label']) ?></p>
-        <div class="ed-viewer">
-            <header class="ed-viewer-head">
-                <div class="ed-viewer-file"><span class="ed-viewer-file-icon"><i class="fa-solid <?= e($viewer['icon']) ?>" aria-hidden="true"></i></span><span class="ed-viewer-file-copy"><strong><?= e($viewer['name']) ?></strong><small><?= e($viewer['label']) ?> · <?= e($viewer['size']) ?></small></span></div>
-                <div class="ed-viewer-actions"><button class="ed-viewer-action" type="button" disabled><i class="fa-solid fa-arrow-left"></i><span>Volver al explorador</span></button><button class="ed-viewer-action" type="button" disabled><i class="fa-solid fa-download"></i><span>Descargar archivo</span></button><button class="ed-viewer-action" type="button" disabled aria-label="Abrir archivo en nueva ventana"><i class="fa-solid fa-arrow-up-right-from-square"></i></button><button class="ed-viewer-action" type="button" disabled aria-label="Más opciones del archivo"><i class="fa-solid fa-ellipsis"></i></button></div>
-            </header>
-            <nav class="ed-viewer-path" aria-label="Ubicación del archivo"><?php foreach ($viewer['path'] as $index => $level): ?><?php if ($index): ?><i class="fa-solid fa-chevron-right"></i><?php endif; ?><span><?= e($level) ?></span><?php endforeach; ?></nav>
-            <div class="ed-viewer-layout<?= $panelCollapsed ? ' is-panel-collapsed' : '' ?>">
-                <main class="ed-viewer-main">
-                    <div class="ed-viewer-toolbar">
-                        <div class="ed-viewer-tools">
-                            <?php if ($viewer['kind']==='pdf'): ?><button class="ed-viewer-action" disabled>1 / 3</button><button class="ed-viewer-action" disabled><i class="fa-solid fa-magnifying-glass-minus"></i></button><button class="ed-viewer-action" disabled>100%</button><button class="ed-viewer-action" disabled><i class="fa-solid fa-magnifying-glass-plus"></i></button><button class="ed-viewer-action" disabled><i class="fa-solid fa-rotate-right"></i></button><button class="ed-viewer-action" disabled><i class="fa-solid fa-magnifying-glass"></i></button>
-                            <?php elseif ($viewer['kind']==='word'): ?><button class="ed-viewer-action" disabled><i class="fa-solid fa-magnifying-glass"></i> Buscar</button><button class="ed-viewer-action" disabled><i class="fa-solid fa-book-open"></i> Modo lectura</button>
-                            <?php elseif ($viewer['kind']==='image'): ?><button class="ed-viewer-action" disabled><i class="fa-solid fa-magnifying-glass-minus"></i></button><button class="ed-viewer-action" disabled>100%</button><button class="ed-viewer-action" disabled><i class="fa-solid fa-magnifying-glass-plus"></i></button><button class="ed-viewer-action" disabled><i class="fa-solid fa-compress"></i> Ajustar</button><button class="ed-viewer-action" disabled><i class="fa-solid fa-expand"></i></button>
-                            <?php elseif ($viewer['kind']==='code'): ?><span class="ed-code-language">PHP</span><button class="ed-viewer-action" disabled>A−</button><button class="ed-viewer-action" disabled>A+</button><button class="ed-viewer-action" disabled><i class="fa-solid fa-align-left"></i> Ajustar líneas</button>
-                            <?php elseif ($viewer['kind']==='zip'): ?><button class="ed-viewer-action" disabled><i class="fa-regular fa-folder-open"></i> Explorar contenido</button>
-                            <?php else: ?><small>Vista de solo lectura</small><?php endif; ?>
-                        </div>
-                        <small><?= e($viewer['name']) ?></small>
-                    </div>
-                    <div class="ed-viewer-canvas">
-                        <?php if ($viewer['kind']==='pdf'): ?><div class="ed-pdf-pages"><?php for($page=1;$page<=2;$page++): ?><article class="ed-pdf-page"><small>Instituto Superior Tecnológico</small><h4><?= $page===1?'Informe final del proyecto':'Resultados y conclusiones' ?></h4><h5><?= $page===1?'Resumen ejecutivo':'Indicadores institucionales' ?></h5><?php for($line=0;$line<7;$line++): ?><div class="ed-faux-line<?= $line%4===3?' short':'' ?>"></div><?php endfor; ?><?php if($page===2): ?><div class="ed-pdf-table"><?php for($cell=0;$cell<9;$cell++): ?><span></span><?php endfor; ?></div><?php endif; ?><span class="ed-pdf-number">Página <?= $page ?></span></article><?php endfor; ?></div>
-                        <?php elseif ($viewer['kind']==='word'): ?><article class="ed-word-page"><h4>Manual técnico del sistema</h4><p>Este documento describe la arquitectura general, los componentes principales y las consideraciones necesarias para el mantenimiento institucional.</p><p>La solución se organiza en módulos independientes que facilitan la consulta, trazabilidad y conservación de la documentación.</p></article>
-                        <?php elseif ($viewer['kind']==='image'): ?><div class="ed-image-stage"><i class="fa-regular fa-image"></i></div>
-                        <?php elseif ($viewer['kind']==='code'): ?><div class="ed-code-view"><?php foreach(['<?php','final class UsersController','{','    public function index(): void','    {','        $users = $this->repository->all();','        View::render(\'users/index\', compact(\'users\'));','    }','}'] as $line=>$code): ?><div class="ed-code-line"><b><?= $line+1 ?></b><span><?= e($code) ?></span></div><?php endforeach; ?></div>
-                        <?php elseif ($viewer['kind']==='text'): ?><article class="ed-text-view"><h4>Repositorio Institucional</h4><p>Documentación general del proyecto, requisitos de instalación y estructura de los módulos.</p><p>Este archivo se presenta en modo de lectura para facilitar la consulta dentro del expediente.</p></article>
-                        <?php elseif ($viewer['kind']==='zip'): ?><div class="ed-viewer-message"><i class="fa-solid fa-file-zipper"></i><h4>Contenido comprimido</h4><p>Este archivo puede recorrerse mediante el Explorador Documental sin abandonar el expediente.</p><button class="ed-viewer-action" disabled><i class="fa-regular fa-folder-open"></i> Explorar contenido</button></div>
-                        <?php else: ?><div class="ed-viewer-message"><i class="fa-solid fa-file-circle-question"></i><h4>No existe una vista previa disponible</h4><p>El formato BIN no puede representarse de forma segura dentro del expediente. Puedes descargar el archivo o consultarlo con una aplicación externa compatible.</p><div class="ed-viewer-actions"><button class="ed-viewer-action" disabled>Descargar archivo</button><button class="ed-viewer-action" disabled>Abrir externamente</button></div></div><?php endif; ?>
-                    </div>
-                </main>
-                <?php if ($panelCollapsed): ?><aside class="ed-viewer-side-collapsed" aria-label="Panel de información contraído"><button class="ed-viewer-side-toggle" disabled aria-label="Expandir información"><i class="fa-solid fa-circle-info"></i></button></aside>
-                <?php else: ?><aside class="ed-viewer-side"><div class="ed-viewer-side-head"><h3>Información del documento</h3><button class="ed-viewer-side-toggle" disabled aria-label="Contraer información"><i class="fa-solid fa-chevron-right"></i></button></div><dl class="ed-viewer-meta"><div><dt>Nombre</dt><dd><?= e($viewer['name']) ?></dd></div><div><dt>Tipo</dt><dd><?= e($viewer['label']) ?></dd></div><div><dt>Tamaño</dt><dd><?= e($viewer['size']) ?></dd></div><div><dt>Actualización</dt><dd>18 de julio de 2026</dd></div><div><dt>Autor</dt><dd>Repositorio Institucional</dd></div><div><dt>Versión</dt><dd>Final</dd></div></dl></aside><?php endif; ?>
-            </div>
-            <nav class="ed-viewer-nav" aria-label="Navegación entre archivos"><button disabled><i class="fa-solid fa-chevron-left"></i> <?= e($previousViewer['name']) ?></button><button disabled><?= e($nextViewer['name']) ?> <i class="fa-solid fa-chevron-right"></i></button></nav>
-        </div>
-    </section>
-<?php endforeach; ?>
-</div>
+<?php /** Visor neutral; en Fase 1A no solicita contenido real. */ ?>
+<section class="ed-files-panel ed-viewer" aria-labelledby="recordViewerTitle" data-record-viewer>
+    <header class="ed-viewer-head">
+        <button class="ed-back-to-files" type="button" data-back-to-files><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Volver al listado</button>
+        <div><strong id="recordViewerTitle" data-viewer-name><?= e((string) ($selectedDocument['name'] ?? 'Archivo')) ?></strong><span data-viewer-meta><?= e((string) ($selectedDocument['type'] ?? 'Archivo')) ?> · <?= e((string) ($selectedDocument['size'] ?? '')) ?></span></div>
+    </header>
+    <div class="ed-viewer-body" tabindex="-1" data-viewer-body>
+        <div><i class="fa-regular fa-file-lines" aria-hidden="true"></i><h3>Vista documental</h3><p>Selecciona un archivo para consultar sus datos. La vista previa real se conectará en una fase posterior.</p></div>
+    </div>
+</section>
