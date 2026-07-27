@@ -509,31 +509,738 @@ document.addEventListener("click", (event) => {
     if (digitalRecordMenu && !digitalRecordMenu.contains(event.target)) closeDigitalRecordMenu();
 });
 
+const recordPersistentTabs = digitalRecord?.dataset.persistentTabs === "true";
+const recordTabLinks = [...(digitalRecord?.querySelectorAll("[data-record-tab-link]") ?? [])];
+const recordTabPanels = [...(digitalRecord?.querySelectorAll("[data-record-tab-panel]") ?? [])];
+let recordTabActivationSequence = 0;
+
+function activatePersistentRecordTab(tabId, updateHistory = true) {
+    if (!recordPersistentTabs || !["information", "files", "evolution"].includes(tabId)) return;
+    const targetPanel = recordTabPanels.find((panel) => panel.dataset.recordTabPanel === tabId);
+    const targetLink = recordTabLinks.find((link) => link.dataset.tabId === tabId);
+    if (!targetPanel || !targetLink) return;
+    recordTabActivationSequence += 1;
+    recordTabPanels.forEach((panel) => {
+        panel.hidden = panel !== targetPanel;
+    });
+    recordTabLinks.forEach((link) => {
+        const active = link === targetLink;
+        link.setAttribute("aria-selected", String(active));
+        if (active) link.setAttribute("aria-current", "page");
+        else link.removeAttribute("aria-current");
+    });
+    digitalRecord.dataset.activeTab = tabId;
+    if (updateHistory) window.history.pushState({ recordTab: tabId }, "", targetLink.href);
+    digitalRecord.dispatchEvent(new CustomEvent("digitalrecord:tabchange", {
+        detail: { tab: tabId, sequence: recordTabActivationSequence },
+    }));
+}
+
+if (recordPersistentTabs) {
+    recordTabLinks.forEach((link, index) => {
+        link.addEventListener("click", (event) => {
+            if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            activatePersistentRecordTab(link.dataset.tabId || "information");
+        });
+        link.addEventListener("keydown", (event) => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            let nextIndex = index;
+            if (event.key === "ArrowLeft") nextIndex = index === 0 ? recordTabLinks.length - 1 : index - 1;
+            if (event.key === "ArrowRight") nextIndex = index === recordTabLinks.length - 1 ? 0 : index + 1;
+            if (event.key === "Home") nextIndex = 0;
+            if (event.key === "End") nextIndex = recordTabLinks.length - 1;
+            recordTabLinks[nextIndex]?.focus();
+            activatePersistentRecordTab(recordTabLinks[nextIndex]?.dataset.tabId || "information");
+        });
+    });
+    window.addEventListener("popstate", () => {
+        const tab = new URL(window.location.href).searchParams.get("tab") || "information";
+        activatePersistentRecordTab(tab, false);
+    });
+}
+
 const neutralFileList = digitalRecord?.querySelector("[data-record-files]");
-const neutralFileButtons = [...(neutralFileList?.querySelectorAll("[data-record-file]") ?? [])];
+const neutralFilesPanel = neutralFileList?.closest('[data-record-tab-panel="files"]');
+let neutralFileButtons = [...(neutralFileList?.querySelectorAll("[data-record-file]") ?? [])];
 const neutralViewer = neutralFileList?.querySelector("[data-record-viewer]");
+let neutralPackageDownload = neutralFileList?.querySelector("[data-record-package-download]");
 const neutralViewerName = neutralViewer?.querySelector("[data-viewer-name]");
 const neutralViewerMeta = neutralViewer?.querySelector("[data-viewer-meta]");
 const neutralViewerBody = neutralViewer?.querySelector("[data-viewer-body]");
 const neutralBackToFiles = neutralViewer?.querySelector("[data-back-to-files]");
+const neutralViewerDownload = neutralViewer?.querySelector("[data-viewer-download]");
+const neutralViewerDownloadLabel = neutralViewerDownload?.querySelector("[data-viewer-download-label]");
+const neutralViewerState = neutralViewer?.querySelector("[data-viewer-state]");
+const neutralViewerPdf = neutralViewer?.querySelector("[data-viewer-pdf]");
+const neutralViewerImageShell = neutralViewer?.querySelector("[data-viewer-image-shell]");
+const neutralViewerImage = neutralViewer?.querySelector("[data-viewer-image]");
+const neutralViewerText = neutralViewer?.querySelector("[data-viewer-text]");
+const neutralViewerDocx = neutralViewer?.querySelector("[data-viewer-docx]");
+const neutralViewerZip = neutralViewer?.querySelector("[data-viewer-zip]");
+const neutralZipBreadcrumbs = neutralViewerZip?.querySelector("[data-zip-breadcrumbs]");
+const neutralZipList = neutralViewerZip?.querySelector("[data-zip-list]");
+const neutralViewerExpand = neutralViewer?.querySelector("[data-viewer-expand]");
+const neutralZoomControls = [...document.querySelectorAll("[data-viewer-zoom-controls]")];
+const neutralZoomOutButtons = neutralZoomControls.map((control) => control.querySelector("[data-viewer-zoom-out]")).filter(Boolean);
+const neutralZoomResetButtons = neutralZoomControls.map((control) => control.querySelector("[data-viewer-zoom-reset]")).filter(Boolean);
+const neutralZoomInButtons = neutralZoomControls.map((control) => control.querySelector("[data-viewer-zoom-in]")).filter(Boolean);
+const neutralZoomValues = neutralZoomControls.map((control) => control.querySelector("[data-viewer-zoom-value]")).filter(Boolean);
+const neutralZoomStatuses = neutralZoomControls.map((control) => control.querySelector("[data-viewer-zoom-status]")).filter(Boolean);
+const neutralViewerOverlay = document.querySelector("[data-record-viewer-overlay]");
+if (neutralViewerOverlay && neutralViewerOverlay.parentElement !== document.body) document.body.append(neutralViewerOverlay);
+const neutralExpandedViewer = neutralViewerOverlay?.querySelector("[data-record-viewer-expanded]");
+const neutralExpandedBody = neutralViewerOverlay?.querySelector("[data-expanded-viewer-body]");
+const neutralExpandedClose = neutralViewerOverlay?.querySelector("[data-expanded-viewer-close]");
+const neutralExpandedName = neutralViewerOverlay?.querySelector("[data-expanded-viewer-name]");
+const neutralExpandedMeta = neutralViewerOverlay?.querySelector("[data-expanded-viewer-meta]");
+const neutralExpandedDownload = neutralViewerOverlay?.querySelector("[data-expanded-viewer-download]");
+const neutralExpandedDownloadLabel = neutralViewerOverlay?.querySelector("[data-expanded-download-label]");
+let neutralPreviewRequest = null;
+let neutralPreviewSequence = 0;
+let neutralSelectedFileId = "";
+let neutralResourceTimer = null;
+let neutralViewerPlaceholder = null;
+let neutralViewerReturnFocus = null;
+let neutralViewerBackgroundState = [];
+let neutralViewerBodyOverflow = "";
+let neutralViewerHtmlOverflow = "";
+let neutralFilesInitialized = false;
+let neutralViewerLayoutSequence = 0;
+const neutralZoomByFile = new Map();
+let neutralZoomPercent = 100;
+const neutralZoomMinimum = 75;
+const neutralZoomMaximum = 200;
+const neutralZoomStep = 25;
 
-neutralFileButtons.forEach((button) => button.addEventListener("click", () => {
+function neutralZoomSupported() {
+    return ["image", "text", "code", "docx"].includes(neutralViewer?.dataset.previewType || "")
+        && neutralViewer?.dataset.viewerState === "ready";
+}
+
+function setNeutralZoomControlsVisibility(isVisible) {
+    neutralZoomControls.forEach((control) => {
+        control.hidden = !isVisible;
+    });
+}
+
+function updateNeutralZoomControls(announce = false) {
+    const supported = neutralZoomSupported();
+    setNeutralZoomControlsVisibility(supported);
+    neutralZoomValues.forEach((value) => { value.textContent = `${neutralZoomPercent} %`; });
+    neutralZoomOutButtons.forEach((button) => { button.disabled = !supported || neutralZoomPercent <= neutralZoomMinimum; });
+    neutralZoomResetButtons.forEach((button) => { button.disabled = !supported || neutralZoomPercent === 100; });
+    neutralZoomInButtons.forEach((button) => { button.disabled = !supported || neutralZoomPercent >= neutralZoomMaximum; });
+    neutralZoomControls.forEach((control) => {
+        control.title = supported ? `Zoom del documento: ${neutralZoomPercent} %`
+            : (neutralViewer?.dataset.previewType === "pdf" ? "Usa los controles del visor PDF para acercar o alejar." : "El zoom no aplica a este contenido.");
+    });
+    if (announce && supported) neutralZoomStatuses.forEach((status) => { status.textContent = `Zoom ${neutralZoomPercent} por ciento`; });
+}
+
+function applyNeutralZoom(announce = false) {
+    const factor = neutralZoomPercent / 100;
+    if (neutralViewerImage) {
+        neutralViewerImage.style.width = `${neutralZoomPercent}%`;
+        neutralViewerImage.style.maxWidth = "none";
+    }
+    if (neutralViewerText) neutralViewerText.style.fontSize = `${13 * factor}px`;
+    if (neutralViewerDocx) neutralViewerDocx.style.fontSize = `${13 * factor}px`;
+    if (neutralSelectedFileId) neutralZoomByFile.set(neutralSelectedFileId, neutralZoomPercent);
+    updateNeutralZoomControls(announce);
+}
+
+function setNeutralZoom(nextPercent) {
+    neutralZoomPercent = Math.max(neutralZoomMinimum, Math.min(neutralZoomMaximum, nextPercent));
+    applyNeutralZoom(true);
+}
+
+function buildPdfPreviewUrl(url) {
+    const source = String(url || "").trim();
+    if (!source) return "";
+    return `${source.split("#", 1)[0]}#page=1&view=Fit`;
+}
+
+function resetNeutralViewer() {
+    if (neutralResourceTimer !== null) {
+        window.clearTimeout(neutralResourceTimer);
+        neutralResourceTimer = null;
+    }
+    if (neutralViewerPdf) {
+        neutralViewerPdf.hidden = true;
+        neutralViewerPdf.classList.remove("is-preparing");
+        neutralViewerPdf.style.removeProperty("width");
+        neutralViewerPdf.removeAttribute("src");
+    }
+    if (neutralViewerImageShell) neutralViewerImageShell.hidden = true;
+    if (neutralViewerImage) {
+        neutralViewerImage.removeAttribute("src");
+        neutralViewerImage.alt = "";
+        neutralViewerImage.style.removeProperty("width");
+        neutralViewerImage.style.removeProperty("max-width");
+    }
+    if (neutralViewerText) {
+        neutralViewerText.hidden = true;
+        neutralViewerText.textContent = "";
+        neutralViewerText.style.removeProperty("font-size");
+    }
+    if (neutralViewerDocx) {
+        neutralViewerDocx.hidden = true;
+        neutralViewerDocx.replaceChildren();
+        neutralViewerDocx.style.removeProperty("font-size");
+    }
+    if (neutralViewerZip) neutralViewerZip.hidden = true;
+    if (neutralZipBreadcrumbs) neutralZipBreadcrumbs.replaceChildren();
+    if (neutralZipList) neutralZipList.replaceChildren();
+}
+
+function setNeutralViewerState(state, message = "", retryButton = null) {
+    if (!neutralViewerState || !neutralViewer) return;
+    const settings = {
+        loading: ["fa-spinner fa-spin", "Preparando vista previa", message || "Estamos cargando el archivo seleccionado."],
+        unsupported: ["fa-eye-slash", "Vista previa no disponible para este formato.", message || "Descarga el archivo para consultar su contenido."],
+        error: ["fa-triangle-exclamation", "No fue posible cargar la vista previa", message || "Intenta nuevamente o descarga el archivo."],
+        missing: ["fa-file-circle-xmark", "El archivo no está disponible", message || "Selecciona otro documento para continuar."],
+        empty: ["fa-folder-open", "No existen archivos disponibles", message || "Este expediente todavía no contiene documentos."],
+    };
+    const [iconClass, title, description] = settings[state] || settings.error;
+    const wrapper = document.createElement("div");
+    const icon = document.createElement("i");
+    const heading = document.createElement("h3");
+    const copy = document.createElement("p");
+    icon.className = `fa-solid ${iconClass}`;
+    icon.setAttribute("aria-hidden", "true");
+    heading.textContent = title;
+    copy.textContent = description;
+    wrapper.append(icon, heading, copy);
+    if (["unsupported", "error", "missing"].includes(state)) {
+        const selected = neutralFileButtons.find((button) => button.getAttribute("aria-selected") === "true");
+        if (selected) {
+            const name = document.createElement("strong");
+            const meta = document.createElement("span");
+            name.className = "ed-viewer-state-name";
+            name.textContent = selected.dataset.fileName || "Archivo";
+            name.title = selected.dataset.fileName || "Archivo";
+            meta.className = "ed-viewer-state-meta";
+            meta.textContent = [selected.dataset.fileType, selected.dataset.fileSize].filter(Boolean).join(" · ");
+            wrapper.insertBefore(name, copy);
+            wrapper.insertBefore(meta, copy);
+            if (state === "unsupported" && selected.dataset.filePackage === "true") {
+                const tag = document.createElement("span");
+                tag.className = "ed-viewer-state-tag";
+                tag.textContent = "Paquete del material";
+                wrapper.insertBefore(tag, copy);
+            }
+            if (state === "unsupported") {
+                const download = document.createElement("a");
+                const downloadIcon = document.createElement("i");
+                const downloadText = document.createElement("span");
+                download.className = "ed-viewer-download";
+                download.dataset.recordDownload = "";
+                download.setAttribute("download", "");
+                download.href = selected.dataset.downloadUrl || "";
+                download.setAttribute("aria-label", `Descargar ${selected.dataset.fileName || "archivo"}`);
+                downloadIcon.className = "fa-solid fa-download";
+                downloadIcon.setAttribute("aria-hidden", "true");
+                downloadText.textContent = downloadLabelFor(selected.dataset.fileExtension || "");
+                download.append(downloadIcon, downloadText);
+                wrapper.append(download);
+            }
+        }
+    }
+    if (retryButton) wrapper.append(retryButton);
+    neutralViewerState.replaceChildren(wrapper);
+    neutralViewerState.hidden = false;
+    neutralViewer.dataset.viewerState = state;
+    neutralViewer.setAttribute("aria-busy", String(state === "loading"));
+    updateNeutralZoomControls();
+}
+
+function renderNeutralZipBreadcrumbs(button, breadcrumbs, currentPath) {
+    if (!neutralZipBreadcrumbs) return;
+    neutralZipBreadcrumbs.replaceChildren();
+    breadcrumbs.forEach((breadcrumb, index) => {
+        if (index > 0) {
+            const separator = document.createElement("i");
+            separator.className = "fa-solid fa-chevron-right";
+            separator.setAttribute("aria-hidden", "true");
+            neutralZipBreadcrumbs.append(separator);
+        }
+        const item = document.createElement("button");
+        item.type = "button";
+        item.textContent = index === 0 ? "Raíz" : String(breadcrumb.label || breadcrumb.name || "Carpeta");
+        item.title = item.textContent;
+        if (String(breadcrumb.path ?? "") === currentPath) item.setAttribute("aria-current", "page");
+        item.addEventListener("click", () => loadNeutralZip(button, String(breadcrumb.path ?? "")));
+        neutralZipBreadcrumbs.append(item);
+    });
+}
+
+function renderNeutralZipEntries(button, entries, status) {
+    if (!neutralZipList) return;
+    neutralZipList.replaceChildren();
+    if (!entries.length) {
+        const empty = document.createElement("p");
+        empty.className = "ed-viewer-state-meta";
+        empty.setAttribute("role", "status");
+        empty.textContent = "Esta carpeta no contiene archivos.";
+        neutralZipList.append(empty);
+        if (neutralViewer) neutralViewer.dataset.viewerState = "zip-empty";
+        return;
+    }
+    entries.forEach((entry) => {
+        const row = document.createElement(entry.kind === "folder" ? "button" : "div");
+        const icon = document.createElement("i");
+        const copy = document.createElement("span");
+        const name = document.createElement("strong");
+        const meta = document.createElement("small");
+        row.className = `ed-zip-entry${entry.kind === "folder" ? " is-folder" : ""}`;
+        row.setAttribute("role", "listitem");
+        if (entry.kind === "folder") {
+            row.type = "button";
+            row.addEventListener("click", () => loadNeutralZip(button, String(entry.path ?? "")));
+        }
+        icon.className = `fa-solid ${String(entry.icon || (entry.kind === "folder" ? "fa-folder" : "fa-file"))}`;
+        icon.setAttribute("aria-hidden", "true");
+        name.textContent = String(entry.name || "Elemento sin nombre");
+        name.title = name.textContent;
+        meta.textContent = [entry.type, entry.size].filter(Boolean).join(" · ");
+        copy.append(name, meta);
+        row.append(icon, copy);
+        neutralZipList.append(row);
+    });
+    if (neutralViewer) neutralViewer.dataset.viewerState = status === "empty" ? "zip-empty" : "zip-ready";
+}
+
+async function loadNeutralZip(button, path = "") {
+    const requestSequence = ++neutralPreviewSequence;
+    const fileId = button.dataset.fileId ?? "";
+    const actionUrl = button.dataset.zipUrl ?? "";
+    neutralSelectedFileId = fileId;
+    neutralPreviewRequest?.abort();
+    neutralPreviewRequest = new AbortController();
+    resetNeutralViewer();
+    setNeutralViewerState("loading", "Cargando contenido del paquete.");
+    if (neutralViewer) neutralViewer.dataset.viewerState = "zip-loading";
+    startNeutralResourceTimeout(button, requestSequence);
+    try {
+        const separator = actionUrl.includes("?") ? "&" : "?";
+        const response = await fetch(`${actionUrl}${separator}path=${encodeURIComponent(path)}`, {
+            signal: neutralPreviewRequest.signal,
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        let result;
+        try {
+            result = await response.json();
+        } catch {
+            throw new Error("El servidor devolvió una respuesta que no pudo procesarse.");
+        }
+        if (requestSequence !== neutralPreviewSequence || neutralSelectedFileId !== fileId) return;
+        const archive = result?.data?.archive;
+        if (!response.ok || !result?.success || !archive) {
+            const error = new Error(result?.message || "No fue posible leer el paquete.");
+            error.status = response.status;
+            error.archiveStatus = archive?.status || "";
+            throw error;
+        }
+        renderNeutralZipBreadcrumbs(button, Array.isArray(archive.breadcrumbs) ? archive.breadcrumbs : [], String(archive.path ?? ""));
+        renderNeutralZipEntries(button, Array.isArray(archive.items) ? archive.items : [], String(archive.status ?? "ready"));
+        showNeutralPreview(neutralViewerZip);
+        if (neutralViewer) neutralViewer.dataset.viewerState = archive.status === "empty" ? "zip-empty" : "zip-ready";
+    } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (requestSequence !== neutralPreviewSequence || neutralSelectedFileId !== fileId) return;
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "ed-viewer-retry";
+        retry.textContent = "Reintentar";
+        retry.addEventListener("click", () => loadNeutralZip(button, path), { once: true });
+        const unsafe = error?.archiveStatus === "unsafe";
+        const missing = Number(error?.status) === 404;
+        setNeutralViewerState(missing ? "missing" : "error", unsafe ? "El paquete contiene una estructura no permitida." : (error instanceof Error ? error.message : ""), retry);
+        if (neutralViewer) neutralViewer.dataset.viewerState = unsafe ? "zip-unsafe" : "zip-error";
+    }
+}
+
+function downloadLabelFor(extension) {
+    const normalized = String(extension).toLowerCase();
+    if (["jpg", "jpeg", "png", "webp"].includes(normalized)) return "Descargar imagen";
+    const labels = {
+        pdf: "Descargar PDF",
+        docx: "Descargar DOCX",
+        txt: "Descargar TXT",
+        xlsx: "Descargar XLSX",
+        pptx: "Descargar PPTX",
+        zip: "Descargar ZIP",
+    };
+    return labels[normalized] || "Descargar archivo";
+}
+
+function startNeutralResourceTimeout(button, requestSequence) {
+    neutralResourceTimer = window.setTimeout(() => {
+        if (requestSequence !== neutralPreviewSequence || neutralSelectedFileId !== (button.dataset.fileId ?? "")) return;
+        neutralPreviewRequest?.abort();
+        neutralPreviewRequest = null;
+        resetNeutralViewer();
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "ed-viewer-retry";
+        retry.textContent = "Reintentar";
+        retry.addEventListener("click", () => loadNeutralPreview(button), { once: true });
+        setNeutralViewerState("error", "La vista previa tardó demasiado en responder.", retry);
+    }, 15000);
+}
+
+function showNeutralPreview(panel) {
+    if (neutralResourceTimer !== null) {
+        window.clearTimeout(neutralResourceTimer);
+        neutralResourceTimer = null;
+    }
+    if (neutralViewerState) neutralViewerState.hidden = true;
+    panel?.classList.remove("is-preparing");
+    if (panel) panel.hidden = false;
+    if (neutralViewer) {
+        neutralViewer.dataset.viewerState = "ready";
+        neutralViewer.setAttribute("aria-busy", "false");
+    }
+    applyNeutralZoom();
+}
+
+function refreshNeutralPdfLayout() {
+    if (!neutralViewerPdf || !neutralViewerBody || neutralViewerPdf.hidden || neutralFilesPanel?.hidden) return;
+    const width = Math.floor(neutralViewerBody.getBoundingClientRect().width);
+    if (width > 0) neutralViewerPdf.style.width = `${width}px`;
+}
+
+function refreshVisibleViewerLayout() {
+    if (!neutralViewerPdf || !neutralViewerBody || neutralViewerPdf.hidden || neutralFilesPanel?.hidden) return;
+    if (neutralViewer?.dataset.viewerState !== "ready" || neutralViewerPdf.classList.contains("is-preparing")) return;
+    const sequence = ++neutralViewerLayoutSequence;
+    neutralViewer?.classList.toggle("viewer-expanded", Boolean(neutralViewerOverlay && !neutralViewerOverlay.hidden));
+    neutralViewer?.classList.toggle("viewer-normal", !neutralViewerOverlay || neutralViewerOverlay.hidden);
+    neutralViewerPdf.style.removeProperty("width");
+    window.requestAnimationFrame(() => {
+        if (sequence !== neutralViewerLayoutSequence || neutralFilesPanel?.hidden) return;
+        const width = Math.floor(neutralViewerBody.getBoundingClientRect().width);
+        if (width < 1) return;
+        neutralViewerPdf.style.width = `${Math.max(1, width - 1)}px`;
+        neutralViewerPdf.getBoundingClientRect();
+        window.requestAnimationFrame(() => {
+            if (sequence !== neutralViewerLayoutSequence || neutralFilesPanel?.hidden) return;
+            neutralViewerPdf.style.width = `${width}px`;
+        });
+    });
+}
+
+const neutralViewerResizeObserver = typeof ResizeObserver === "function" && neutralViewerBody
+    ? new ResizeObserver(() => window.requestAnimationFrame(refreshNeutralPdfLayout))
+    : null;
+neutralViewerResizeObserver?.observe(neutralViewerBody);
+
+function renderNeutralDocx(blocks) {
+    if (!neutralViewerDocx) return;
+    neutralViewerDocx.replaceChildren();
+    blocks.forEach((block) => {
+        if (block?.type === "table" && Array.isArray(block.rows)) {
+            const shell = document.createElement("div");
+            const table = document.createElement("table");
+            shell.className = "ed-preview-table-shell";
+            block.rows.forEach((row, rowIndex) => {
+                const tableRow = document.createElement("tr");
+                (Array.isArray(row) ? row : []).forEach((cell) => {
+                    const element = document.createElement(rowIndex === 0 ? "th" : "td");
+                    element.textContent = String(cell ?? "");
+                    tableRow.append(element);
+                });
+                table.append(tableRow);
+            });
+            shell.append(table);
+            neutralViewerDocx.append(shell);
+            return;
+        }
+        let element;
+        if (block?.type === "heading") {
+            const level = Math.min(6, Math.max(2, Number(block.level) + 1 || 2));
+            element = document.createElement(`h${level}`);
+        } else {
+            element = document.createElement("p");
+            if (block?.type === "list") element.className = "is-list";
+        }
+        element.textContent = String(block?.text ?? "");
+        neutralViewerDocx.append(element);
+    });
+}
+
+async function loadNeutralPreview(button) {
+    if (button.dataset.previewType === "zip" && button.dataset.zipUrl) {
+        loadNeutralZip(button);
+        return;
+    }
+    const requestSequence = ++neutralPreviewSequence;
+    const fileId = button.dataset.fileId ?? "";
+    const previewUrl = button.dataset.previewUrl ?? "";
+    const previewSupported = button.dataset.previewSupported === "true";
+    neutralSelectedFileId = fileId;
+    neutralPreviewRequest?.abort();
+    neutralPreviewRequest = null;
+    resetNeutralViewer();
+
+    if (!previewSupported || !previewUrl) {
+        setNeutralViewerState("unsupported");
+        return;
+    }
+
+    neutralPreviewRequest = new AbortController();
+    setNeutralViewerState("loading");
+    startNeutralResourceTimeout(button, requestSequence);
+    try {
+        const response = await fetch(previewUrl, {
+            signal: neutralPreviewRequest.signal,
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+        });
+        let result;
+        try {
+            result = await response.json();
+        } catch {
+            throw new Error("El servidor devolvió una respuesta que no pudo procesarse.");
+        }
+        if (requestSequence !== neutralPreviewSequence || neutralSelectedFileId !== fileId) return;
+        const preview = result?.data?.preview;
+        if (!response.ok || !result?.success || !preview) {
+            const error = new Error(result?.message || "No fue posible leer este archivo.");
+            error.status = response.status;
+            throw error;
+        }
+        if (preview.status !== "ready") {
+            const state = preview.status === "missing" ? "missing" : "unsupported";
+            setNeutralViewerState(state, preview.message || "");
+            return;
+        }
+
+        if (preview.preview_type === "pdf" && neutralViewerPdf) {
+            neutralViewerPdf.hidden = false;
+            neutralViewerPdf.classList.add("is-preparing");
+            neutralViewerPdf.onload = () => {
+                if (requestSequence === neutralPreviewSequence) {
+                    showNeutralPreview(neutralViewerPdf);
+                    window.requestAnimationFrame(refreshNeutralPdfLayout);
+                }
+            };
+            neutralViewerPdf.onerror = () => {
+                if (requestSequence === neutralPreviewSequence) {
+                    resetNeutralViewer();
+                    setNeutralViewerState("error", "No fue posible mostrar el documento PDF.");
+                }
+            };
+            window.requestAnimationFrame(() => {
+                if (requestSequence !== neutralPreviewSequence) return;
+                refreshNeutralPdfLayout();
+                neutralViewerPdf.src = buildPdfPreviewUrl(preview.content_url);
+            });
+        } else if (preview.preview_type === "image" && neutralViewerImage && neutralViewerImageShell) {
+            neutralViewerImage.alt = `Vista previa de ${button.dataset.fileName || "la imagen"}`;
+            neutralViewerImage.onload = () => {
+                if (requestSequence === neutralPreviewSequence) showNeutralPreview(neutralViewerImageShell);
+            };
+            neutralViewerImage.onerror = () => {
+                if (requestSequence === neutralPreviewSequence) {
+                    resetNeutralViewer();
+                    setNeutralViewerState("error", "No fue posible mostrar la imagen.");
+                }
+            };
+            neutralViewerImage.src = preview.content_url;
+        } else if ((preview.preview_type === "text" || preview.preview_type === "code") && neutralViewerText) {
+            neutralViewerText.textContent = String(preview.content ?? "");
+            showNeutralPreview(neutralViewerText);
+        } else if (preview.preview_type === "docx" && neutralViewerDocx) {
+            renderNeutralDocx(Array.isArray(preview.blocks) ? preview.blocks : []);
+            showNeutralPreview(neutralViewerDocx);
+        } else {
+            setNeutralViewerState("unsupported", preview.message || "");
+        }
+    } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (requestSequence !== neutralPreviewSequence || neutralSelectedFileId !== fileId) return;
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "ed-viewer-retry";
+        retry.textContent = "Reintentar";
+        retry.addEventListener("click", () => loadNeutralPreview(button), { once: true });
+        const missing = Number(error?.status) === 404;
+        setNeutralViewerState(missing ? "missing" : "error", error instanceof Error ? error.message : "", missing ? null : retry);
+    }
+}
+
+function protectNeutralDownload(link) {
+    link?.addEventListener("click", (event) => {
+        event.stopPropagation();
+    });
+}
+
+function openNeutralExpandedViewer() {
+    if (!neutralViewerOverlay || !neutralExpandedBody || !neutralViewerBody || !neutralViewerExpand || !neutralViewerOverlay.hidden) return;
+    neutralViewerReturnFocus = neutralViewerExpand;
+    neutralViewerPlaceholder = document.createComment("record-viewer-position");
+    neutralViewerBody.before(neutralViewerPlaceholder);
+    neutralExpandedBody.append(neutralViewerBody);
+    if (neutralExpandedName) neutralExpandedName.textContent = neutralViewerName?.textContent || "Visor ampliado";
+    if (neutralExpandedMeta) neutralExpandedMeta.textContent = neutralViewerMeta?.textContent || "Consulta del archivo seleccionado";
+    if (neutralExpandedDownload && neutralViewerDownload) {
+        neutralExpandedDownload.href = neutralViewerDownload.href;
+        neutralExpandedDownload.setAttribute("aria-label", neutralViewerDownload.getAttribute("aria-label") || "Descargar archivo");
+    }
+    if (neutralExpandedDownloadLabel) neutralExpandedDownloadLabel.textContent = neutralViewerDownloadLabel?.textContent || "Descargar archivo";
+    neutralViewerBodyOverflow = document.body.style.overflow;
+    neutralViewerHtmlOverflow = document.documentElement.style.overflow;
+    neutralViewerBackgroundState = [...document.body.children]
+        .filter((element) => element !== neutralViewerOverlay && !["SCRIPT", "STYLE"].includes(element.tagName))
+        .map((element) => ({ element, inert: element.inert, ariaHidden: element.getAttribute("aria-hidden") }));
+    neutralViewerBackgroundState.forEach(({ element }) => {
+        element.inert = true;
+        element.setAttribute("aria-hidden", "true");
+    });
+    document.documentElement.classList.add("record-viewer-open");
+    document.body.classList.add("record-viewer-open");
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    neutralViewerOverlay.hidden = false;
+    neutralViewer?.classList.remove("viewer-normal");
+    neutralViewer?.classList.add("viewer-expanded");
+    window.requestAnimationFrame(refreshNeutralPdfLayout);
+    neutralExpandedClose?.focus();
+}
+
+function closeNeutralExpandedViewer(restoreFocus = true) {
+    if (!neutralViewerOverlay || neutralViewerOverlay.hidden) return;
+    if (neutralViewerPlaceholder?.parentNode && neutralViewerBody) {
+        neutralViewerPlaceholder.before(neutralViewerBody);
+        neutralViewerPlaceholder.remove();
+    }
+    neutralViewerPlaceholder = null;
+    neutralViewerOverlay.hidden = true;
+    neutralViewerBackgroundState.forEach(({ element, inert, ariaHidden }) => {
+        element.inert = inert;
+        if (ariaHidden === null) element.removeAttribute("aria-hidden");
+        else element.setAttribute("aria-hidden", ariaHidden);
+    });
+    neutralViewerBackgroundState = [];
+    document.documentElement.classList.remove("record-viewer-open");
+    document.body.classList.remove("record-viewer-open");
+    document.body.style.overflow = neutralViewerBodyOverflow;
+    document.documentElement.style.overflow = neutralViewerHtmlOverflow;
+    neutralViewer?.classList.remove("viewer-expanded");
+    neutralViewer?.classList.add("viewer-normal");
+    refreshVisibleViewerLayout();
+    if (restoreFocus && neutralViewerReturnFocus instanceof HTMLElement) neutralViewerReturnFocus.focus();
+    neutralViewerReturnFocus = null;
+}
+
+function selectNeutralFile(button) {
     neutralFileButtons.forEach((item) => {
         const selected = item === button;
         item.classList.toggle("is-selected", selected);
-        item.setAttribute("aria-pressed", String(selected));
+        item.setAttribute("aria-selected", String(selected));
     });
     if (neutralViewerName) neutralViewerName.textContent = button.dataset.fileName ?? "Archivo";
-    if (neutralViewerMeta) neutralViewerMeta.textContent = `${button.dataset.fileType ?? "Archivo"} · ${button.dataset.fileSize ?? "Tamaño no disponible"}`;
-    neutralViewer?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    neutralViewerBody?.focus({ preventScroll: true });
-}));
+    if (neutralViewer) neutralViewer.dataset.previewType = button.dataset.previewType ?? "unsupported";
+    neutralZoomPercent = neutralZoomByFile.get(button.dataset.fileId ?? "") ?? 100;
+    setNeutralZoomControlsVisibility(false);
+    if (neutralViewerMeta) {
+        const label = button.dataset.filePrimary === "true" ? "Principal" : (button.dataset.filePackage === "true" ? "Paquete" : "");
+        neutralViewerMeta.textContent = [button.dataset.fileType ?? "Archivo", button.dataset.fileSize ?? "Tamaño no disponible", label].filter(Boolean).join(" · ");
+    }
+    if (neutralViewerDownload) {
+        neutralViewerDownload.href = button.dataset.downloadUrl ?? "";
+        neutralViewerDownload.setAttribute("aria-label", `Descargar ${button.dataset.fileName ?? "archivo"}`);
+    }
+    if (neutralViewerDownloadLabel) {
+        neutralViewerDownloadLabel.textContent = downloadLabelFor(button.dataset.fileExtension ?? "");
+    }
+    loadNeutralPreview(button);
+}
+
+function bindNeutralFileButton(button) {
+    if (!(button instanceof HTMLElement) || button.dataset.fileBound === "true") return;
+    button.dataset.fileBound = "true";
+    button.addEventListener("click", () => {
+        const checkbox = button.closest("[data-record-file-item]")?.querySelector("[data-file-select]");
+        if (fileSelectionMode && checkbox) {
+            checkbox.checked = !checkbox.checked;
+            updateFileSelectionFromCheckbox(checkbox);
+            return;
+        }
+        selectNeutralFile(button);
+    });
+}
+neutralFileButtons.forEach(bindNeutralFileButton);
+function initializeNeutralFiles() {
+    if (neutralFilesInitialized) {
+        refreshVisibleViewerLayout();
+        return;
+    }
+    neutralFilesInitialized = true;
+    if (neutralFileButtons[0]) selectNeutralFile(neutralFileButtons[0]);
+    else if (neutralViewer) setNeutralViewerState("empty");
+}
+if (!neutralFilesPanel || !neutralFilesPanel.hidden) initializeNeutralFiles();
+digitalRecord?.addEventListener("digitalrecord:tabchange", (event) => {
+    if (event.detail?.tab !== "files") {
+        neutralViewerLayoutSequence += 1;
+        return;
+    }
+    initializeNeutralFiles();
+    const activationSequence = event.detail?.sequence;
+    window.requestAnimationFrame(() => {
+        if (activationSequence !== recordTabActivationSequence || neutralFilesPanel?.hidden) return;
+        window.requestAnimationFrame(() => {
+            if (activationSequence !== recordTabActivationSequence || neutralFilesPanel?.hidden) return;
+            refreshVisibleViewerLayout();
+        });
+    });
+});
+window.addEventListener("resize", refreshVisibleViewerLayout, { passive: true });
 
 neutralBackToFiles?.addEventListener("click", () => {
-    neutralFileButtons.find((button) => button.getAttribute("aria-pressed") === "true")?.focus();
+    neutralFileButtons.find((button) => button.getAttribute("aria-selected") === "true")?.focus();
+});
+protectNeutralDownload(neutralViewerDownload);
+protectNeutralDownload(neutralExpandedDownload);
+protectNeutralDownload(neutralPackageDownload);
+neutralViewerBody?.addEventListener("click", (event) => {
+    if (event.target.closest("[data-record-download]")) event.stopPropagation();
+});
+neutralViewerExpand?.addEventListener("click", openNeutralExpandedViewer);
+neutralZoomOutButtons.forEach((button) => button.addEventListener("click", () => setNeutralZoom(neutralZoomPercent - neutralZoomStep)));
+neutralZoomResetButtons.forEach((button) => button.addEventListener("click", () => setNeutralZoom(100)));
+neutralZoomInButtons.forEach((button) => button.addEventListener("click", () => setNeutralZoom(neutralZoomPercent + neutralZoomStep)));
+neutralExpandedClose?.addEventListener("click", () => closeNeutralExpandedViewer(true));
+neutralViewerOverlay?.addEventListener("click", (event) => {
+    if (event.target === neutralViewerOverlay) closeNeutralExpandedViewer(true);
 });
 
 document.addEventListener("keydown", (event) => {
+    if (neutralViewerOverlay && !neutralViewerOverlay.hidden) {
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeNeutralExpandedViewer(true);
+            return;
+        }
+        if (event.key === "Tab") {
+            const controls = [...neutralViewerOverlay.querySelectorAll('a[href],button:not([disabled]),[tabindex="0"]')]
+                .filter((control) => !control.hidden && control.getClientRects().length > 0);
+            if (!controls.length) return;
+            const currentIndex = controls.indexOf(document.activeElement);
+            const nextIndex = event.shiftKey
+                ? (currentIndex <= 0 ? controls.length - 1 : currentIndex - 1)
+                : (currentIndex === controls.length - 1 ? 0 : currentIndex + 1);
+            event.preventDefault();
+            controls[nextIndex].focus();
+            return;
+        }
+    }
     if (event.key === "Escape" && digitalRecordMenuPanel && !digitalRecordMenuPanel.hidden) {
         closeDigitalRecordMenu(true);
     }
@@ -1123,3 +1830,832 @@ document.addEventListener("keydown", (event) => {
     controls[nextIndex].focus();
 });
 // Final del historial administrativo del Expediente Digital
+
+// Incorporación de archivos desde el Expediente Digital.
+const recordUploadOpen = neutralFileList?.querySelector("[data-record-file-add]");
+const recordUploadDialog = document.querySelector("[data-record-file-upload-dialog]");
+if (recordUploadDialog && recordUploadDialog.parentElement !== document.body) document.body.append(recordUploadDialog);
+const recordUploadForm = recordUploadDialog?.querySelector("[data-record-file-upload-form]");
+const recordUploadInput = recordUploadDialog?.querySelector("[data-upload-input]");
+const recordUploadList = recordUploadDialog?.querySelector("[data-upload-file-list]");
+const recordUploadStatus = recordUploadDialog?.querySelector("[data-upload-status]");
+const recordUploadResults = recordUploadDialog?.querySelector("[data-upload-results]");
+const recordUploadSubmit = recordUploadDialog?.querySelector("[data-upload-submit]");
+const recordUploadSubmitLabel = recordUploadDialog?.querySelector("[data-upload-submit-label]");
+const recordUploadCancel = recordUploadDialog?.querySelector("[data-upload-cancel]");
+const recordUploadClose = recordUploadDialog?.querySelector("[data-upload-close]");
+const recordUploadToast = document.querySelector("[data-record-upload-toast]");
+if (recordUploadToast && recordUploadToast.parentElement !== document.body) document.body.append(recordUploadToast);
+const recordUploadToastMessage = recordUploadToast?.querySelector("[data-record-upload-toast-message]");
+const recordUploadToastClose = recordUploadToast?.querySelector("[data-record-upload-toast-close]");
+let recordUploadEntries = [];
+let recordUploadState = "idle";
+let recordUploadReturnFocus = null;
+let recordUploadBackgroundState = [];
+let recordUploadCloseTimer = null;
+let recordUploadToastTimer = null;
+
+function recordUploadSize(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 1) return "0 bytes";
+    const units = ["bytes", "KB", "MB", "GB"];
+    const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    const value = bytes / (1024 ** index);
+    return `${value.toLocaleString("es-EC", { maximumFractionDigits: index ? 1 : 0 })} ${units[index]}`;
+}
+
+function setRecordUploadState(state, message = "") {
+    recordUploadState = state;
+    const busy = state === "uploading";
+    recordUploadForm?.setAttribute("aria-busy", String(busy));
+    if (recordUploadInput) recordUploadInput.disabled = busy;
+    if (recordUploadCancel) recordUploadCancel.disabled = busy;
+    if (recordUploadClose) recordUploadClose.disabled = busy;
+    if (recordUploadSubmit) recordUploadSubmit.disabled = busy || !recordUploadEntries.some((entry) => entry.valid);
+    if (recordUploadSubmitLabel) recordUploadSubmitLabel.textContent = busy ? "Agregando…" : "Agregar archivos";
+    if (recordUploadStatus) {
+        recordUploadStatus.textContent = message;
+        recordUploadStatus.classList.toggle("is-error", state === "error" || state === "partial");
+        recordUploadStatus.classList.toggle("is-success", state === "success");
+    }
+}
+
+function validateRecordUploadFiles(files) {
+    const maxFiles = Number(recordUploadForm?.dataset.maxFiles || 5);
+    if (files.length > maxFiles) {
+        recordUploadEntries = [];
+        renderRecordUploadEntries();
+        setRecordUploadState("error", `Puedes seleccionar un máximo de ${maxFiles} archivos por operación.`);
+        return;
+    }
+    const allowed = new Set((recordUploadForm?.dataset.extensions || "").split(",").filter(Boolean));
+    const maxBytes = Number(recordUploadForm?.dataset.maxBytes || 26214400);
+    const maxOperationBytes = Number(recordUploadForm?.dataset.maxOperationBytes || 36700160);
+    const maxName = Number(recordUploadForm?.dataset.maxName || 200);
+    if (files.reduce((total, file) => total + file.size, 0) > maxOperationBytes) {
+        recordUploadEntries = [];
+        renderRecordUploadEntries();
+        setRecordUploadState("error", "La selección completa supera el límite de 35 MB por operación.");
+        return;
+    }
+    const seen = new Set();
+    recordUploadEntries = files.map((file) => {
+        const name = String(file.name || "");
+        const extension = name.includes(".") ? name.split(".").pop().toLowerCase() : "";
+        const duplicateKey = `${name}\u0000${file.size}\u0000${file.lastModified || 0}`;
+        let message = "Válido";
+        if (!file.size) message = "Archivo vacío";
+        else if (file.size > maxBytes) message = "Supera el tamaño máximo";
+        else if ([...name].length > maxName) message = "Nombre demasiado largo";
+        else if (!allowed.has(extension)) message = "Formato no permitido";
+        else if (seen.has(duplicateKey)) message = "Duplicado en la selección";
+        seen.add(duplicateKey);
+        return { file, valid: message === "Válido", message };
+    });
+    renderRecordUploadEntries();
+    const validCount = recordUploadEntries.filter((entry) => entry.valid).length;
+    setRecordUploadState("idle", validCount ? `${validCount} ${validCount === 1 ? "archivo válido" : "archivos válidos"} para agregar.` : "No hay archivos válidos para agregar.");
+}
+
+function renderRecordUploadEntries() {
+    if (!recordUploadList) return;
+    recordUploadList.replaceChildren();
+    recordUploadEntries.forEach((entry, index) => {
+        const row = document.createElement("div");
+        row.className = `ed-upload-item${entry.valid ? "" : " is-invalid"}`;
+        const info = document.createElement("div");
+        const name = document.createElement("strong");
+        name.textContent = entry.file.name;
+        name.title = entry.file.name;
+        const meta = document.createElement("small");
+        const extension = entry.file.name.includes(".") ? entry.file.name.split(".").pop().toUpperCase() : "Sin extensión";
+        meta.textContent = `${extension} · ${recordUploadSize(entry.file.size)}`;
+        const status = document.createElement("div");
+        status.className = "ed-upload-item-status";
+        status.textContent = entry.message;
+        info.append(name, meta, status);
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "ed-upload-remove";
+        remove.setAttribute("aria-label", `Quitar ${entry.file.name}`);
+        remove.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+        remove.addEventListener("click", () => {
+            recordUploadEntries.splice(index, 1);
+            renderRecordUploadEntries();
+            setRecordUploadState("idle", recordUploadEntries.length ? "Selección actualizada." : "Selecciona al menos un archivo.");
+        });
+        row.append(info, remove);
+        recordUploadList.append(row);
+    });
+}
+
+function openRecordUpload() {
+    if (!recordUploadDialog || recordUploadState === "uploading") return;
+    if (recordUploadCloseTimer !== null) {
+        window.clearTimeout(recordUploadCloseTimer);
+        recordUploadCloseTimer = null;
+    }
+    recordUploadReturnFocus = document.activeElement?.closest?.("[data-file-global-menu]")
+        ? globalFileToggle
+        : document.activeElement;
+    recordUploadEntries = [];
+    if (recordUploadInput) recordUploadInput.value = "";
+    recordUploadResults?.replaceChildren();
+    renderRecordUploadEntries();
+    setRecordUploadState("idle", "Selecciona los archivos que deseas agregar.");
+    recordUploadBackgroundState = [...document.body.children].filter((element) => element !== recordUploadDialog).map((element) => ({
+        element, inert: element.inert, ariaHidden: element.getAttribute("aria-hidden")
+    }));
+    recordUploadBackgroundState.forEach(({ element }) => {
+        element.inert = true;
+        element.setAttribute("aria-hidden", "true");
+    });
+    document.documentElement.classList.add("record-upload-open");
+    document.body.classList.add("record-upload-open");
+    recordUploadDialog.hidden = false;
+    window.requestAnimationFrame(() => recordUploadInput?.focus());
+}
+
+function resetRecordUploadDialog() {
+    if (recordUploadCloseTimer !== null) {
+        window.clearTimeout(recordUploadCloseTimer);
+        recordUploadCloseTimer = null;
+    }
+    recordUploadEntries = [];
+    if (recordUploadInput) recordUploadInput.value = "";
+    recordUploadList?.replaceChildren();
+    recordUploadResults?.replaceChildren();
+    setRecordUploadState("idle", "");
+}
+
+function closeRecordUpload(reset = false) {
+    if (!recordUploadDialog || recordUploadDialog.hidden || recordUploadState === "uploading") return;
+    recordUploadDialog.hidden = true;
+    recordUploadBackgroundState.forEach(({ element, inert, ariaHidden }) => {
+        element.inert = inert;
+        if (ariaHidden === null) element.removeAttribute("aria-hidden");
+        else element.setAttribute("aria-hidden", ariaHidden);
+    });
+    recordUploadBackgroundState = [];
+    document.documentElement.classList.remove("record-upload-open");
+    document.body.classList.remove("record-upload-open");
+    if (recordUploadReturnFocus instanceof HTMLElement) recordUploadReturnFocus.focus();
+    recordUploadReturnFocus = null;
+    if (reset) resetRecordUploadDialog();
+}
+
+function getNeutralFileVisualType(extension) {
+    const normalized = String(extension || "").trim().toLowerCase().replace(/^\.+/, "");
+    const visual = {
+        pdf: ["fa-file-pdf", "PDF"],
+        doc: ["fa-file-word", "DOC"], docx: ["fa-file-word", "DOCX"],
+        xls: ["fa-file-excel", "XLS"], xlsx: ["fa-file-excel", "XLSX"],
+        ppt: ["fa-file-powerpoint", "PPT"], pptx: ["fa-file-powerpoint", "PPTX"],
+        txt: ["fa-file-lines", "TXT"], zip: ["fa-file-zipper", "ZIP"],
+        jpg: ["fa-file-image", "JPG"], jpeg: ["fa-file-image", "JPEG"],
+        png: ["fa-file-image", "PNG"], webp: ["fa-file-image", "WEBP"]
+    }[normalized];
+    return {
+        extension: normalized,
+        icon: visual?.[0] || "fa-file",
+        label: visual?.[1] || (normalized ? normalized.toUpperCase() : "ARCHIVO")
+    };
+}
+
+function showRecordUploadToast(message) {
+    if (!recordUploadToast || !recordUploadToastMessage) return;
+    if (recordUploadToastTimer !== null) window.clearTimeout(recordUploadToastTimer);
+    recordUploadToastMessage.textContent = message;
+    recordUploadToast.hidden = false;
+    recordUploadToastTimer = window.setTimeout(() => {
+        recordUploadToast.hidden = true;
+        recordUploadToastTimer = null;
+    }, 5000);
+}
+
+function ensureNeutralFileGroup(key) {
+    let group = neutralFileList?.querySelector(`[data-file-group="${key}"]`);
+    if (group) return group.querySelector("[data-file-group-list]");
+    const panel = neutralFileList?.querySelector(".ed-files-panel");
+    if (!panel) return null;
+    group = document.createElement("section");
+    group.className = "ed-document-group";
+    group.dataset.fileGroup = key;
+    const heading = document.createElement("h3");
+    heading.textContent = key === "archives" ? "Archivos comprimidos adicionales" : "Archivos adicionales";
+    const list = document.createElement("div");
+    list.className = "ed-document-list";
+    list.dataset.fileGroupList = "";
+    list.setAttribute("role", "listbox");
+    list.setAttribute("aria-label", heading.textContent);
+    group.append(heading, list);
+    panel.append(group);
+    return list;
+}
+
+function appendNeutralAddedFiles(files) {
+    const hadFiles = neutralFileButtons.length > 0;
+    files.forEach((file) => {
+        const visual = getNeutralFileVisualType(file.extension);
+        const list = ensureNeutralFileGroup(visual.extension === "zip" || file.is_archive ? "archives" : "additional");
+        if (!list) return;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "ed-document-row";
+        button.setAttribute("role", "option");
+        button.setAttribute("aria-selected", "false");
+        Object.assign(button.dataset, {
+            recordFile: "", fileId: String(file.id), fileName: file.name, fileType: visual.label,
+            fileSize: file.size_label, fileExtension: visual.extension, filePrimary: "false",
+            filePackage: "false", previewSupported: String(Boolean(file.preview_supported)),
+            previewType: file.preview_type || "unsupported", previewUrl: file.preview_url || "",
+            zipUrl: file.zip_url || "", downloadUrl: file.download_url || ""
+        });
+        button.setAttribute("aria-label", `${file.name}, ${visual.label}, ${file.size_label}`);
+        const icon = document.createElement("i");
+        icon.className = `fa-solid ${visual.icon}`;
+        icon.setAttribute("aria-hidden", "true");
+        const info = document.createElement("span");
+        const strong = document.createElement("strong");
+        strong.textContent = file.name;
+        strong.title = file.name;
+        const small = document.createElement("small");
+        small.textContent = `${visual.label} · ${file.size_label}`;
+        info.append(strong, small);
+        button.append(icon, info);
+        const item = document.createElement("div");
+        item.className = "ed-document-item";
+        item.dataset.recordFileItem = "";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "ed-file-checkbox";
+        checkbox.dataset.fileSelect = "";
+        checkbox.value = String(file.id);
+        checkbox.setAttribute("aria-label", `Seleccionar ${file.name}`);
+        checkbox.hidden = !fileSelectionMode;
+        const menuToggle = document.createElement("button");
+        menuToggle.type = "button";
+        menuToggle.className = "ed-file-menu-toggle";
+        menuToggle.dataset.fileMenuToggle = "";
+        menuToggle.setAttribute("aria-haspopup", "menu");
+        menuToggle.setAttribute("aria-expanded", "false");
+        menuToggle.setAttribute("aria-label", `Acciones de ${file.name}`);
+        menuToggle.innerHTML = '<i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>';
+        const menu = document.createElement("div");
+        menu.className = "ed-file-menu";
+        menu.dataset.fileMenu = "";
+        menu.setAttribute("role", "menu");
+        menu.hidden = true;
+        const removeAction = document.createElement("button");
+        removeAction.type = "button";
+        removeAction.dataset.fileRemoveAction = "";
+        removeAction.setAttribute("role", "menuitem");
+        removeAction.innerHTML = '<i class="fa-solid fa-box-archive" aria-hidden="true"></i>Retirar archivo';
+        menu.append(removeAction);
+        item.append(checkbox, button, menuToggle, menu);
+        list.append(item);
+        neutralFileButtons.push(button);
+        if (fileSelectionToggle) fileSelectionToggle.disabled = false;
+        bindNeutralFileButton(button);
+        bindNeutralFileMenu(item);
+    });
+    neutralFileList?.querySelector("[data-record-files-empty]")?.setAttribute("hidden", "");
+    const count = neutralFileButtons.length;
+    const counter = neutralFileList?.querySelector("[data-record-file-count]");
+    if (counter) counter.textContent = `${count} ${count === 1 ? "archivo disponible" : "archivos disponibles"}`;
+    if (!hadFiles && neutralFileButtons[0]) selectNeutralFile(neutralFileButtons[0]);
+}
+
+function updateNeutralPackage(packageData) {
+    if (!packageData?.available) {
+        neutralPackageDownload?.remove();
+        neutralPackageDownload = null;
+        return;
+    }
+    const actions = neutralFileList?.querySelector("[data-file-global-menu]");
+    if (!actions) return;
+    if (!neutralPackageDownload) {
+        neutralPackageDownload = document.createElement("a");
+        neutralPackageDownload.dataset.recordPackageDownload = "";
+        neutralPackageDownload.dataset.recordDownload = "";
+        neutralPackageDownload.setAttribute("download", "");
+        neutralPackageDownload.setAttribute("role", "menuitem");
+        neutralPackageDownload.innerHTML = '<i class="fa-solid fa-file-zipper" aria-hidden="true"></i><span>Descargar paquete completo<small></small></span>';
+        actions.prepend(neutralPackageDownload);
+        protectNeutralDownload(neutralPackageDownload);
+    }
+    neutralPackageDownload.href = packageData.download_url || "";
+    neutralPackageDownload.setAttribute("aria-label", `Descargar paquete completo con ${packageData.file_count} archivos`);
+    const small = neutralPackageDownload.querySelector("small");
+    if (small) small.textContent = `${packageData.file_count} archivos`;
+}
+
+async function submitRecordUpload(event) {
+    event.preventDefault();
+    if (recordUploadState === "uploading" || !recordUploadForm) return;
+    const validEntries = recordUploadEntries.filter((entry) => entry.valid);
+    if (!validEntries.length) {
+        setRecordUploadState("error", "No hay archivos válidos para agregar.");
+        return;
+    }
+    const data = new FormData();
+    recordUploadForm.querySelectorAll('input[type="hidden"]').forEach((input) => data.append(input.name, input.value));
+    validEntries.forEach((entry) => data.append("files[]", entry.file, entry.file.name));
+    recordUploadResults?.replaceChildren();
+    setRecordUploadState("uploading", `Agregando ${validEntries.length} ${validEntries.length === 1 ? "archivo" : "archivos"}…`);
+    try {
+        const endpoint = recordUploadForm.getAttribute("action");
+        if (!endpoint) throw new Error("No se configuró el endpoint de carga.");
+        const response = await fetch(endpoint, {
+            method: "POST", body: data, credentials: "same-origin",
+            headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" }
+        });
+        const contentType = response.headers.get("content-type") || "";
+        const responseText = await response.text();
+        if (!contentType.toLowerCase().includes("application/json")) {
+            console.error("Carga de archivos: respuesta no JSON", {
+                status: response.status, contentType, body: responseText.slice(0, 1000)
+            });
+            throw new Error(response.redirected || response.status === 401 || response.status === 403
+                ? "La sesión ya no es válida. Recarga la página e inicia sesión nuevamente."
+                : `El servidor devolvió una respuesta no válida (HTTP ${response.status}).`);
+        }
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error("Carga de archivos: JSON inválido", {
+                status: response.status, contentType, body: responseText.slice(0, 1000)
+            });
+            throw new Error(`El servidor devolvió JSON inválido (HTTP ${response.status}).`);
+        }
+        const payload = result && typeof result.data === "object" && result.data !== null ? result.data : result;
+        const added = Array.isArray(payload.added) ? payload.added : [];
+        const failed = Array.isArray(payload.failed) ? payload.failed : [];
+        const summary = payload && typeof payload.summary === "object" ? payload.summary : {};
+        if (added.length) {
+            appendNeutralAddedFiles(added);
+            updateNeutralPackage(payload.package);
+        }
+        [...added.map((file) => `${file.name} — agregado`), ...failed.map((file) => `${file.name} — ${file.message}`)].forEach((message) => {
+            const item = document.createElement("li");
+            item.textContent = message;
+            recordUploadResults?.append(item);
+        });
+        const state = added.length && failed.length ? "partial" : (added.length ? "success" : "error");
+        recordUploadEntries = failed.map((failure) => {
+            const match = validEntries.find((entry) => entry.file.name === failure.name);
+            return match ? { ...match, valid: false, message: failure.message } : null;
+        }).filter(Boolean);
+        renderRecordUploadEntries();
+        const statusMessage = result.message
+            || (response.status === 403 ? "La sesión venció o no tienes permiso para realizar esta acción."
+                : response.status === 404 ? "El material o el endpoint de carga no está disponible."
+                    : response.status === 422 ? "Revisa los archivos seleccionados."
+                        : response.status >= 500 ? "El servidor no pudo completar la carga."
+                            : added.length ? "Archivos agregados correctamente." : "No se pudo agregar ningún archivo.");
+        setRecordUploadState(state, statusMessage);
+        const addedCount = Number(summary.added ?? added.length);
+        const failedCount = Number(summary.failed ?? failed.length);
+        if (addedCount > 0 && failedCount === 0) {
+            recordUploadCloseTimer = window.setTimeout(() => {
+                recordUploadCloseTimer = null;
+                closeRecordUpload(true);
+                showRecordUploadToast(statusMessage);
+            }, 800);
+        }
+    } catch (error) {
+        console.error("Carga de archivos:", error);
+        setRecordUploadState("error", error instanceof TypeError
+            ? "No fue posible conectar con el servidor."
+            : (error instanceof Error ? error.message : "No se pudo completar la carga."));
+    }
+}
+
+recordUploadOpen?.addEventListener("click", openRecordUpload);
+recordUploadInput?.addEventListener("change", () => validateRecordUploadFiles([...recordUploadInput.files]));
+recordUploadForm?.addEventListener("submit", submitRecordUpload);
+recordUploadCancel?.addEventListener("click", () => closeRecordUpload(true));
+recordUploadClose?.addEventListener("click", () => closeRecordUpload(true));
+recordUploadToastClose?.addEventListener("click", () => {
+    if (recordUploadToastTimer !== null) window.clearTimeout(recordUploadToastTimer);
+    recordUploadToastTimer = null;
+    if (recordUploadToast) recordUploadToast.hidden = true;
+});
+recordUploadDialog?.addEventListener("click", (event) => {
+    if (event.target === recordUploadDialog) closeRecordUpload();
+});
+document.addEventListener("keydown", (event) => {
+    if (!recordUploadDialog || recordUploadDialog.hidden) return;
+    if (event.key === "Escape" && recordUploadState !== "uploading") {
+        event.preventDefault();
+        closeRecordUpload();
+        return;
+    }
+    if (event.key !== "Tab") return;
+    const controls = [...recordUploadDialog.querySelectorAll('button:not([disabled]),input:not([disabled]),[href]')];
+    if (!controls.length) return;
+    const index = controls.indexOf(document.activeElement);
+    const next = event.shiftKey ? (index <= 0 ? controls.length - 1 : index - 1) : (index === controls.length - 1 ? 0 : index + 1);
+    event.preventDefault();
+    controls[next]?.focus();
+});
+
+// Retiro lógico de archivos adicionales.
+const fileRemoveDialog = document.querySelector("[data-file-remove-dialog]");
+if (fileRemoveDialog && fileRemoveDialog.parentElement !== document.body) document.body.append(fileRemoveDialog);
+const fileRemoveConfig = fileRemoveDialog?.querySelector("[data-file-remove-config]");
+const fileRemoveTitle = fileRemoveDialog?.querySelector("[data-file-remove-title]");
+const fileRemoveDescription = fileRemoveDialog?.querySelector("[data-file-remove-description]");
+const fileRemoveName = fileRemoveDialog?.querySelector("[data-file-remove-name]");
+const fileRemoveList = fileRemoveDialog?.querySelector("[data-file-remove-list]");
+const fileRemoveMore = fileRemoveDialog?.querySelector("[data-file-remove-more]");
+const fileRemoveError = fileRemoveDialog?.querySelector("[data-file-remove-error]");
+const fileRemoveCancel = fileRemoveDialog?.querySelector("[data-file-remove-cancel]");
+const fileRemoveClose = fileRemoveDialog?.querySelector("[data-file-remove-close]");
+const fileRemoveConfirm = fileRemoveDialog?.querySelector("[data-file-remove-confirm]");
+const fileSelectionToggle = neutralFileList?.querySelector("[data-file-selection-toggle]");
+const fileSelectionBar = neutralFileList?.querySelector("[data-file-selection-bar]");
+const fileSelectionCount = neutralFileList?.querySelector("[data-file-selection-count]");
+const fileSelectionCancel = neutralFileList?.querySelector("[data-file-selection-cancel]");
+const fileSelectionRemove = neutralFileList?.querySelector("[data-file-selection-remove]");
+const globalFileActions = neutralFileList?.querySelector("[data-file-global-actions]");
+const globalFileToggle = neutralFileList?.querySelector("[data-file-global-toggle]");
+const globalFileMenu = neutralFileList?.querySelector("[data-file-global-menu]");
+let openNeutralFileMenu = null;
+let fileRemoveTargets = [];
+let fileRemoveIsBulk = false;
+let fileRemoveReturnFocus = null;
+let fileRemoveSubmitting = false;
+let fileRemoveBackgroundState = [];
+let fileSelectionMode = false;
+const selectedFileIds = new Set();
+
+function closeNeutralFileMenu(restoreFocus = false) {
+    if (!openNeutralFileMenu) return;
+    const toggle = openNeutralFileMenu.querySelector("[data-file-menu-toggle]");
+    const menu = openNeutralFileMenu.querySelector("[data-file-menu]");
+    if (menu) menu.hidden = true;
+    toggle?.setAttribute("aria-expanded", "false");
+    openNeutralFileMenu = null;
+    if (restoreFocus) toggle?.focus();
+}
+
+function closeGlobalFileMenu(restoreFocus = false) {
+    if (!globalFileMenu || globalFileMenu.hidden) return;
+    globalFileMenu.hidden = true;
+    globalFileToggle?.setAttribute("aria-expanded", "false");
+    if (restoreFocus) globalFileToggle?.focus();
+}
+
+function openGlobalFileMenu() {
+    if (!globalFileMenu || !globalFileToggle || fileSelectionMode) return;
+    closeNeutralFileMenu();
+    globalFileMenu.hidden = false;
+    globalFileToggle.setAttribute("aria-expanded", "true");
+    globalFileMenu.querySelector('[role="menuitem"]:not([disabled])')?.focus();
+}
+
+function bindNeutralFileMenu(item) {
+    if (!(item instanceof HTMLElement) || item.dataset.fileMenuBound === "true") return;
+    item.dataset.fileMenuBound = "true";
+    const checkbox = item.querySelector("[data-file-select]");
+    const toggle = item.querySelector("[data-file-menu-toggle]");
+    const menu = item.querySelector("[data-file-menu]");
+    const action = item.querySelector("[data-file-remove-action]");
+    checkbox?.addEventListener("click", (event) => event.stopPropagation());
+    checkbox?.addEventListener("change", () => updateFileSelectionFromCheckbox(checkbox));
+    if (!toggle || !menu || !action) return;
+    const openMenu = () => {
+        closeGlobalFileMenu();
+        if (openNeutralFileMenu !== item) closeNeutralFileMenu();
+        const opening = menu.hidden;
+        menu.hidden = !opening;
+        toggle.setAttribute("aria-expanded", String(opening));
+        openNeutralFileMenu = opening ? item : null;
+        if (opening) action.focus();
+    };
+    toggle.addEventListener("click", openMenu);
+    toggle.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openMenu();
+        }
+    });
+    action.addEventListener("click", () => openFileRemoveDialog(item, action));
+}
+
+function updateFileSelectionControls() {
+    const count = selectedFileIds.size;
+    if (fileSelectionCount) fileSelectionCount.textContent = `${count} ${count === 1 ? "archivo seleccionado" : "archivos seleccionados"}`;
+    if (fileSelectionRemove) {
+        fileSelectionRemove.disabled = count === 0;
+        fileSelectionRemove.textContent = count === 0
+            ? "Retirar archivos"
+            : (count === 1 ? "Retirar archivo" : `Retirar ${count} archivos`);
+    }
+}
+
+function updateFileSelectionFromCheckbox(checkbox) {
+    const item = checkbox.closest("[data-record-file-item]");
+    const id = String(checkbox.value || "");
+    if (!item || !id || !fileSelectionMode) return;
+    if (checkbox.checked && selectedFileIds.size >= 20 && !selectedFileIds.has(id)) {
+        checkbox.checked = false;
+        showRecordUploadToast("Puedes retirar hasta 20 archivos por operación.");
+        return;
+    }
+    if (checkbox.checked) selectedFileIds.add(id);
+    else selectedFileIds.delete(id);
+    item.classList.toggle("is-selected-for-removal", checkbox.checked);
+    updateFileSelectionControls();
+}
+
+function normalizedSelectedFileItems() {
+    const itemsById = new Map();
+    neutralFileList?.querySelectorAll("[data-record-file-item]").forEach((item) => {
+        const checkbox = item.querySelector("[data-file-select]");
+        const button = item.querySelector("[data-record-file]");
+        const id = String(checkbox?.value || "");
+        const eligible = checkbox?.checked && id !== ""
+            && button?.dataset.filePrimary !== "true"
+            && button?.dataset.filePackage !== "true";
+        if (eligible && !itemsById.has(id)) itemsById.set(id, item);
+    });
+    selectedFileIds.clear();
+    itemsById.forEach((item, id) => selectedFileIds.add(id));
+    neutralFileList?.querySelectorAll("[data-file-select]").forEach((checkbox) => {
+        const id = String(checkbox.value || "");
+        const selected = itemsById.get(id) === checkbox.closest("[data-record-file-item]");
+        checkbox.checked = selected;
+        checkbox.closest("[data-record-file-item]")?.classList.toggle("is-selected-for-removal", selected);
+    });
+    updateFileSelectionControls();
+    if (itemsById.size > 20) {
+        showRecordUploadToast("Puedes retirar hasta 20 archivos por operación.");
+        return [];
+    }
+    return [...itemsById.values()];
+}
+
+function setFileSelectionMode(active) {
+    fileSelectionMode = Boolean(active);
+    selectedFileIds.clear();
+    closeNeutralFileMenu();
+    closeGlobalFileMenu();
+    neutralFileList?.classList.toggle("is-file-selection-mode", fileSelectionMode);
+    if (globalFileToggle) globalFileToggle.disabled = fileSelectionMode;
+    if (fileSelectionBar) fileSelectionBar.hidden = !fileSelectionMode;
+    neutralFileList?.querySelectorAll("[data-file-select]").forEach((checkbox) => {
+        checkbox.checked = false;
+        checkbox.hidden = !fileSelectionMode;
+        checkbox.closest("[data-record-file-item]")?.classList.remove("is-selected-for-removal");
+    });
+    updateFileSelectionControls();
+    if (fileSelectionMode) {
+        window.requestAnimationFrame(() => neutralFileList?.querySelector("[data-file-select]:not([hidden])")?.focus());
+    }
+}
+
+function openFileRemoveDialogForTargets(items, origin, bulk = false) {
+    const targets = [...items].filter((item) => {
+        const button = item?.querySelector("[data-record-file]");
+        return button && button.dataset.filePrimary !== "true" && button.dataset.filePackage !== "true";
+    });
+    if (!fileRemoveDialog || !targets.length || targets.length !== items.length) return;
+    closeNeutralFileMenu();
+    fileRemoveTargets = targets;
+    fileRemoveIsBulk = bulk;
+    fileRemoveReturnFocus = origin;
+    const names = targets.map((item) => item.querySelector("[data-record-file]")?.dataset.fileName || "Archivo");
+    const multiple = targets.length > 1;
+    if (fileRemoveTitle) fileRemoveTitle.textContent = bulk ? `Retirar ${targets.length} ${multiple ? "archivos" : "archivo"}` : "Retirar archivo";
+    if (fileRemoveDescription) {
+        fileRemoveDescription.textContent = multiple
+            ? "Los archivos seleccionados dejarán de estar disponibles en el Expediente Digital, pero permanecerán almacenados y podrán restaurarse posteriormente."
+            : "El archivo dejará de estar disponible en el Expediente Digital, pero permanecerá almacenado y podrá restaurarse posteriormente.";
+    }
+    if (fileRemoveName) {
+        fileRemoveName.textContent = names[0];
+        fileRemoveName.title = names[0];
+        fileRemoveName.hidden = bulk;
+    }
+    if (fileRemoveList) {
+        fileRemoveList.replaceChildren(...names.slice(0, 5).map((name) => {
+            const entry = document.createElement("li");
+            entry.textContent = name;
+            entry.title = name;
+            return entry;
+        }));
+        fileRemoveList.hidden = !bulk;
+    }
+    if (fileRemoveMore) {
+        const remaining = Math.max(0, names.length - 5);
+        fileRemoveMore.textContent = remaining ? `y ${remaining} ${remaining === 1 ? "archivo más" : "archivos más"}` : "";
+        fileRemoveMore.hidden = remaining === 0;
+    }
+    if (fileRemoveConfirm) fileRemoveConfirm.textContent = bulk ? "Retirar archivos" : "Retirar archivo";
+    if (fileRemoveError) {
+        fileRemoveError.textContent = "";
+        fileRemoveError.hidden = true;
+    }
+    fileRemoveBackgroundState = [...document.body.children].filter((element) => element !== fileRemoveDialog).map((element) => ({
+        element, inert: element.inert, ariaHidden: element.getAttribute("aria-hidden")
+    }));
+    fileRemoveBackgroundState.forEach(({ element }) => {
+        element.inert = true;
+        element.setAttribute("aria-hidden", "true");
+    });
+    document.documentElement.classList.add("file-remove-open");
+    document.body.classList.add("file-remove-open");
+    fileRemoveDialog.hidden = false;
+    window.requestAnimationFrame(() => fileRemoveCancel?.focus());
+}
+
+function openFileRemoveDialog(item, origin) {
+    openFileRemoveDialogForTargets([item], origin);
+}
+
+function closeFileRemoveDialog(removed = false) {
+    if (!fileRemoveDialog || fileRemoveDialog.hidden || fileRemoveSubmitting) return;
+    fileRemoveDialog.hidden = true;
+    fileRemoveBackgroundState.forEach(({ element, inert, ariaHidden }) => {
+        element.inert = inert;
+        if (ariaHidden === null) element.removeAttribute("aria-hidden");
+        else element.setAttribute("aria-hidden", ariaHidden);
+    });
+    fileRemoveBackgroundState = [];
+    document.documentElement.classList.remove("file-remove-open");
+    document.body.classList.remove("file-remove-open");
+    const focusTarget = !removed && fileRemoveReturnFocus?.isConnected
+        ? fileRemoveReturnFocus
+        : (globalFileToggle?.isConnected ? globalFileToggle : recordUploadOpen);
+    focusTarget?.focus();
+    fileRemoveReturnFocus = null;
+    fileRemoveTargets = [];
+    fileRemoveIsBulk = false;
+}
+
+function removeNeutralFileItems(items, packageData) {
+    const removedButtons = items.map((item) => item.querySelector("[data-record-file]")).filter(Boolean);
+    if (!removedButtons.length) return;
+    const removedSet = new Set(removedButtons);
+    const selectedButton = removedButtons.find((button) => button.getAttribute("aria-selected") === "true") || null;
+    let fallback = null;
+    if (selectedButton) {
+        const selectedIndex = neutralFileButtons.indexOf(selectedButton);
+        fallback = neutralFileButtons.slice(selectedIndex + 1).find((button) => !removedSet.has(button))
+            || neutralFileButtons.slice(0, selectedIndex).reverse().find((button) => !removedSet.has(button))
+            || null;
+    }
+    neutralFileButtons = neutralFileButtons.filter((candidate) => !removedSet.has(candidate));
+    const groups = new Set();
+    items.forEach((item) => {
+        const group = item.closest("[data-file-group]");
+        if (group) groups.add(group);
+        item.remove();
+    });
+    groups.forEach((group) => {
+        if (!group.querySelector("[data-record-file]")) group.remove();
+    });
+    if (fileSelectionToggle) fileSelectionToggle.disabled = !neutralFileList?.querySelector("[data-file-select]");
+    const count = neutralFileButtons.length;
+    const counter = neutralFileList?.querySelector("[data-record-file-count]");
+    if (counter) counter.textContent = `${count} ${count === 1 ? "archivo disponible" : "archivos disponibles"}`;
+    updateNeutralPackage(packageData);
+    if (!selectedButton) return;
+    neutralPreviewSequence += 1;
+    neutralPreviewRequest?.abort();
+    neutralPreviewRequest = null;
+    resetNeutralViewer();
+    if (fallback?.isConnected) {
+        selectNeutralFile(fallback);
+    } else {
+        neutralSelectedFileId = "";
+        if (neutralViewerName) neutralViewerName.textContent = "Archivo";
+        if (neutralViewerMeta) neutralViewerMeta.textContent = "";
+        setNeutralViewerState("empty");
+        neutralFileList?.querySelector("[data-record-files-empty]")?.removeAttribute("hidden");
+    }
+}
+
+async function submitFileRemoval() {
+    if (fileRemoveSubmitting || !fileRemoveTargets.length || !fileRemoveConfig) return;
+    const targets = [...fileRemoveTargets];
+    const buttons = targets.map((item) => item.querySelector("[data-record-file]")).filter(Boolean);
+    if (buttons.length !== targets.length) return;
+    const multiple = fileRemoveIsBulk;
+    fileRemoveSubmitting = true;
+    if (fileRemoveConfirm) {
+        fileRemoveConfirm.disabled = true;
+        fileRemoveConfirm.textContent = "Retirando…";
+    }
+    if (fileRemoveCancel) fileRemoveCancel.disabled = true;
+    if (fileRemoveClose) fileRemoveClose.disabled = true;
+    try {
+        const data = new FormData();
+        data.append("_csrf", fileRemoveConfig.dataset.csrf || "");
+        data.append("material_id", fileRemoveConfig.dataset.materialId || "");
+        if (multiple) buttons.forEach((button) => data.append("file_ids[]", button.dataset.fileId || ""));
+        else data.append("file_id", buttons[0].dataset.fileId || "");
+        data.append("action", multiple ? "remove_multiple" : "remove");
+        const response = await fetch(fileRemoveConfig.dataset.endpoint || "", {
+            method: "POST", body: data, credentials: "same-origin",
+            headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" }
+        });
+        const result = await response.json();
+        if (!response.ok || !result?.success) throw new Error(result?.message || "No fue posible retirar el archivo.");
+        const payload = result?.data && typeof result.data === "object" ? result.data : {};
+        const confirmedIds = new Set((payload.removed_file_ids || []).map(String));
+        const removedItems = confirmedIds.size
+            ? targets.filter((item) => confirmedIds.has(String(item.querySelector("[data-record-file]")?.dataset.fileId || "")))
+            : targets;
+        fileRemoveSubmitting = false;
+        closeFileRemoveDialog(true);
+        removeNeutralFileItems(removedItems, payload.package);
+        setFileSelectionMode(false);
+        showRecordUploadToast(result.message || (multiple ? `${removedItems.length} archivos retirados correctamente.` : "Archivo retirado correctamente."));
+    } catch (error) {
+        if (fileRemoveError) {
+            fileRemoveError.textContent = error instanceof Error ? error.message : "No fue posible retirar el archivo.";
+            fileRemoveError.hidden = false;
+        }
+    } finally {
+        fileRemoveSubmitting = false;
+        if (fileRemoveConfirm) {
+            fileRemoveConfirm.disabled = false;
+            fileRemoveConfirm.textContent = fileRemoveIsBulk ? "Retirar archivos" : "Retirar archivo";
+        }
+        if (fileRemoveCancel) fileRemoveCancel.disabled = false;
+        if (fileRemoveClose) fileRemoveClose.disabled = false;
+    }
+}
+
+neutralFileList?.querySelectorAll("[data-record-file-item]").forEach(bindNeutralFileMenu);
+fileSelectionToggle?.addEventListener("click", () => setFileSelectionMode(!fileSelectionMode));
+fileSelectionCancel?.addEventListener("click", () => {
+    setFileSelectionMode(false);
+    globalFileToggle?.focus();
+});
+fileSelectionRemove?.addEventListener("click", () => {
+    const targets = normalizedSelectedFileItems();
+    if (targets.length) openFileRemoveDialogForTargets(targets, fileSelectionRemove, true);
+});
+fileRemoveCancel?.addEventListener("click", () => closeFileRemoveDialog());
+fileRemoveClose?.addEventListener("click", () => closeFileRemoveDialog());
+fileRemoveConfirm?.addEventListener("click", submitFileRemoval);
+fileRemoveDialog?.addEventListener("click", (event) => {
+    if (event.target === fileRemoveDialog) closeFileRemoveDialog();
+});
+globalFileToggle?.addEventListener("click", () => {
+    if (globalFileMenu?.hidden) openGlobalFileMenu();
+    else closeGlobalFileMenu(true);
+});
+globalFileToggle?.addEventListener("keydown", (event) => {
+    if (["Enter", " ", "ArrowDown"].includes(event.key)) {
+        event.preventDefault();
+        openGlobalFileMenu();
+    }
+});
+globalFileMenu?.addEventListener("click", (event) => {
+    if (event.target.closest('[role="menuitem"]')) closeGlobalFileMenu();
+});
+globalFileMenu?.addEventListener("keydown", (event) => {
+    const items = [...globalFileMenu.querySelectorAll('[role="menuitem"]:not([disabled])')];
+    const index = items.indexOf(document.activeElement);
+    if (event.key === "Escape") {
+        event.preventDefault();
+        closeGlobalFileMenu(true);
+    } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key) && items.length) {
+        event.preventDefault();
+        const next = event.key === "Home" ? 0
+            : event.key === "End" ? items.length - 1
+                : event.key === "ArrowUp" ? (index <= 0 ? items.length - 1 : index - 1)
+                    : (index >= items.length - 1 ? 0 : index + 1);
+        items[next]?.focus();
+    }
+});
+document.addEventListener("click", (event) => {
+    if (openNeutralFileMenu && !openNeutralFileMenu.contains(event.target)) closeNeutralFileMenu();
+    if (globalFileActions && !globalFileActions.contains(event.target)) closeGlobalFileMenu();
+});
+document.addEventListener("keydown", (event) => {
+    if (fileRemoveDialog && !fileRemoveDialog.hidden) {
+        if (event.key === "Escape" && !fileRemoveSubmitting) {
+            event.preventDefault();
+            closeFileRemoveDialog();
+            return;
+        }
+        if (event.key === "Tab") {
+            const controls = [fileRemoveClose, fileRemoveCancel, fileRemoveConfirm].filter((control) => control && !control.disabled);
+            const index = controls.indexOf(document.activeElement);
+            const next = event.shiftKey ? (index <= 0 ? controls.length - 1 : index - 1) : (index === controls.length - 1 ? 0 : index + 1);
+            event.preventDefault();
+            controls[next]?.focus();
+        }
+        return;
+    }
+    if (event.key === "Escape" && openNeutralFileMenu) {
+        event.preventDefault();
+        closeNeutralFileMenu(true);
+    }
+});

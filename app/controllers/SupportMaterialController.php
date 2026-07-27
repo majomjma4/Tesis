@@ -40,6 +40,7 @@ final class SupportMaterialController
             http_response_code(404);
         } else {
             $material['downloads'] = (new SupportMaterialDownloadModel())->getTotal($material['id'], $material['downloads']);
+            $material['package_descriptor'] = (new SupportMaterialPackageService())->describe($material);
             if ($isAdministrator) $materialCategories = $materialModel->categories();
         }
 
@@ -53,13 +54,17 @@ final class SupportMaterialController
             'previewActionUrl' => route('support-material-preview'),
             'previewContentActionUrl' => route('support-material-preview-content'),
             'downloadActionUrl' => route('support-material-download'),
+            'zipListActionUrl' => route('support-material-zip-list'),
+            'packageDownloadActionUrl' => route('support-material-package-download'),
             'isAdministrator' => $isAdministrator,
             'materialEditUrl' => $material === null ? '' : route('support-material-detail') . '&id=' . (int) $material['id'] . '&mode=edit&tab=information',
             'materialSaveEndpoint' => route('admin-support-material-save'),
+            'materialFileEndpoint' => $isAdministrator ? route('admin-support-material-file') : '',
             'materialHistoryEndpoint' => $isAdministrator ? route('admin-support-material-history') . '&id=' . (int) ($material['id'] ?? 0) : '',
             'materialHistoryCleanupEndpoint' => $isAdministrator ? route('admin-support-material-history-cleanup') : '',
             'materialCsrfToken' => $isAdministrator ? $session->csrfToken('admin_repository') : '',
             'materialCategories' => $materialCategories,
+            'materialFileLimits' => $isAdministrator ? (new SupportMaterialFileService())->limits() : [],
         ]);
     }
     // Final de presentación de materiales
@@ -105,6 +110,79 @@ final class SupportMaterialController
         fpassthru($stream);
         fclose($stream);
         exit;
+    }
+
+    public function zipList(): void
+    {
+        $this->ensureGetJson();
+        [$material, $file, $stream] = $this->resolveFileRequest(true);
+        fclose($stream);
+        if ($file['extension'] !== 'zip') {
+            http_response_code(422);
+            $this->sendJson(false, 'El archivo seleccionado no es un paquete navegable.');
+        }
+        $packageDescription = (new SupportMaterialPackageService())->describe($material);
+        if (!empty($file['package']) && empty($packageDescription['browsable'])) {
+            http_response_code(404);
+            $this->sendJson(false, 'Este paquete no contiene recursos adicionales navegables.');
+        }
+        $archive = (new ArchiveService())->listDirectory($file['path'], (string) ($_GET['path'] ?? ''));
+        if (!$archive['success']) {
+            $status = match ($archive['status']) {
+                'not_found' => 404,
+                'invalid_path' => 400,
+                'unsafe' => 422,
+                default => 422,
+            };
+            http_response_code($status);
+            $this->sendJson(false, $archive['message'], ['archive' => $archive]);
+        }
+        $this->sendJson(true, $archive['message'], ['archive' => $archive]);
+    }
+
+    public function downloadPackage(): void
+    {
+        $this->ensureSession();
+        $this->ensureGet();
+        $materialId = filter_var($_GET['material_id'] ?? $_GET['id'] ?? null, FILTER_VALIDATE_INT);
+        $material = $materialId === false || $materialId === null
+            ? null
+            : (new SupportMaterialModel())->findById((int) $materialId);
+        if ($material === null) {
+            http_response_code(404);
+            $this->renderError('El material solicitado no está disponible.');
+        }
+        try {
+            $package = (new SupportMaterialPackageService())->prepare($material);
+            $stream = fopen($package['path'], 'rb');
+            $size = filesize($package['path']);
+            if ($stream === false || $size === false) throw new RuntimeException('No fue posible abrir el paquete.');
+            if (!empty($package['temporary'])) {
+                $temporaryPath = $package['path'];
+                register_shutdown_function(static function () use ($temporaryPath): void {
+                    if (is_file($temporaryPath)) @unlink($temporaryPath);
+                });
+            }
+            (new SupportMaterialDownloadModel())->increment((int) $material['id']);
+            session_write_close();
+            $name = 'material_' . (int) $material['id'] . '.zip';
+            header('Content-Type: application/zip');
+            header('Content-Length: ' . $size);
+            header('Content-Disposition: attachment; filename="' . $name . '"');
+            header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: private, no-store, max-age=0');
+            fpassthru($stream);
+            fclose($stream);
+            if (!empty($package['temporary']) && is_file($package['path'])) @unlink($package['path']);
+            exit;
+        } catch (InvalidArgumentException $exception) {
+            http_response_code(404);
+            $this->renderError($exception->getMessage());
+        } catch (Throwable $exception) {
+            error_log('Support material package: ' . $exception->getMessage());
+            http_response_code(422);
+            $this->renderError('No fue posible preparar el paquete completo.');
+        }
     }
     // Final de vistas previas seguras
 

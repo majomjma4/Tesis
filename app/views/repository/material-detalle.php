@@ -15,18 +15,39 @@
         !empty($material['primary_file']) ? [$material['primary_file']] : [],
         is_array($material['additional_files'] ?? null) ? $material['additional_files'] : []
     ), 'is_array'));
-    $documents = array_map(static function (array $file): array {
+    $documents = array_map(static function (array $file) use ($materialId, $previewActionUrl, $downloadActionUrl, $zipListActionUrl): array {
         $name = (string) ($file['name'] ?? 'Archivo sin nombre');
         $extension = mb_strtolower((string) ($file['extension'] ?? pathinfo($name, PATHINFO_EXTENSION)), 'UTF-8');
+        $fileId = (int) ($file['id'] ?? 0);
+        $query = '&material_id=' . $materialId . '&file_id=' . $fileId;
+        $previewTypes = [
+            'pdf' => 'pdf', 'jpg' => 'image', 'jpeg' => 'image', 'png' => 'image',
+            'webp' => 'image', 'docx' => 'docx', 'txt' => 'text',
+        ];
+        $isZip = $extension === 'zip';
         return [
-            'id' => (int) ($file['id'] ?? 0),
+            'id' => $fileId,
             'name' => $name,
             'type' => (string) ($file['format'] ?? ($extension !== '' ? mb_strtoupper($extension, 'UTF-8') : 'Archivo')),
             'size' => (string) ($file['size'] ?? 'Tamaño no disponible'),
             'extension' => $extension,
             'is_primary' => !empty($file['primary']),
+            'is_package' => false,
+            'preview_supported' => isset($previewTypes[$extension]) || $isZip,
+            'preview_type' => $isZip ? 'zip' : ($previewTypes[$extension] ?? 'unsupported'),
+            'preview_url' => $fileId > 0 ? (string) $previewActionUrl . $query : '',
+            'zip_url' => $isZip && $fileId > 0 ? (string) $zipListActionUrl . $query : '',
+            'download_url' => $fileId > 0 ? (string) $downloadActionUrl . $query : '',
         ];
     }, $materialFiles);
+    $regularArchives = array_values(array_filter($documents, static fn (array $document): bool => ($document['extension'] ?? '') === 'zip'));
+    $documents = array_values(array_filter($documents, static fn (array $document): bool => ($document['extension'] ?? '') !== 'zip'));
+    $packageDescriptor = is_array($material['package_descriptor'] ?? null) ? $material['package_descriptor'] : [];
+    $archives = $regularArchives;
+    $packageAvailable = !empty($packageDescriptor['available']);
+    $packageDownloadUrl = $packageAvailable
+        ? (string) $packageDownloadActionUrl . '&material_id=' . $materialId
+        : '';
 
     $publicationState = (string) ($material['status_key'] ?? 'published');
     $isPublished = $publicationState === 'published';
@@ -89,6 +110,20 @@
             ['id' => 'related', 'title' => 'Recursos relacionados', 'icon' => 'fa-link', 'type' => 'empty', 'content' => 'No existen recursos relacionados para este expediente.'],
         ],
         'documents' => $documents,
+        'archives' => $archives,
+        'can_manage_files' => $administratorView,
+        'file_upload' => [
+            'endpoint' => (string) ($materialFileEndpoint ?? ''),
+            'csrf_token' => (string) ($materialCsrfToken ?? ''),
+            'limits' => is_array($materialFileLimits ?? null) ? $materialFileLimits : [],
+        ],
+        'package' => [
+            'available' => $packageAvailable,
+            'download_url' => $packageDownloadUrl,
+            'file_count' => (int) ($packageDescriptor['file_count'] ?? count($documents)),
+            'source' => (string) ($packageDescriptor['source'] ?? 'generated'),
+            'browsable' => false,
+        ],
         'versions' => [],
         'form' => [
             'action' => (string) ($materialSaveEndpoint ?? ''),

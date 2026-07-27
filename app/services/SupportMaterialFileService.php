@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 final class SupportMaterialFileService
 {
+    private const MAX_OPERATION_FILES = 5;
+    private const MAX_FILE_BYTES = 26214400;
+    private const MAX_OPERATION_BYTES = 36700160;
+    private const MAX_NAME_LENGTH = 200;
     private const MIME_BY_EXTENSION = [
         'pdf' => ['application/pdf'],
         'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
@@ -29,11 +33,14 @@ final class SupportMaterialFileService
             );
         }
         $size = (int) ($upload['size'] ?? 0);
-        if ($size < 1 || $size > 25 * 1024 * 1024) {
+        if ($size < 1 || $size > self::MAX_FILE_BYTES) {
             throw new InvalidArgumentException('El archivo está vacío o supera el límite de 25 MB.');
         }
-        $originalName = basename((string) ($upload['name'] ?? ''));
-        if ($originalName === '' || preg_match('/[\x00-\x1F\x7F]/u', $originalName)) {
+        $rawName = (string) ($upload['name'] ?? '');
+        $originalName = basename(str_replace('\\', '/', $rawName));
+        if ($originalName === '' || $rawName !== $originalName
+            || mb_strlen($originalName, 'UTF-8') > self::MAX_NAME_LENGTH
+            || preg_match('/[\x00-\x1F\x7F]/u', $originalName)) {
             throw new InvalidArgumentException('El nombre del archivo no es válido.');
         }
         $extension = mb_strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
@@ -63,6 +70,32 @@ final class SupportMaterialFileService
             'extension' => $extension,
             'mime_type' => $mime,
             'size_bytes' => $size,
+            'absolute_path' => $destination,
         ];
+    }
+
+    public function limits(): array
+    {
+        return [
+            'max_operation_files' => self::MAX_OPERATION_FILES,
+            'max_file_bytes' => self::MAX_FILE_BYTES,
+            'max_operation_bytes' => self::MAX_OPERATION_BYTES,
+            'max_file_mb' => 25,
+            'max_name_length' => self::MAX_NAME_LENGTH,
+            'extensions' => array_keys(self::MIME_BY_EXTENSION),
+        ];
+    }
+
+    public function discard(array $stored): bool
+    {
+        $base = realpath(ROOT_PATH . '/storage/support-materials');
+        $candidate = (string) ($stored['absolute_path'] ?? '');
+        $path = realpath($candidate);
+        if ($base === false || $path === false
+            || !str_starts_with(strtolower($path), strtolower($base . DIRECTORY_SEPARATOR))
+            || !is_file($path)) {
+            return false;
+        }
+        return @unlink($path);
     }
 }

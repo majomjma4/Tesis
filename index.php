@@ -79,6 +79,8 @@ match ($page) {
     'support-material-preview' => (new SupportMaterialController())->preview(),
     'support-material-preview-content' => (new SupportMaterialController())->previewContent(),
     'support-material-download' => (new SupportMaterialController())->download(),
+    'support-material-zip-list' => (new SupportMaterialController())->zipList(),
+    'support-material-package-download' => (new SupportMaterialController())->downloadPackage(),
     'notifications', 'notificaciones' => (new NotificationsController())->index(),
     'notifications/list' => (new NotificationsController())->listing(),
     'notifications/read' => (new NotificationsController())->markRead(),

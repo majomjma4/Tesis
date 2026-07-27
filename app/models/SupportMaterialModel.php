@@ -219,41 +219,67 @@ final class SupportMaterialModel
         return (int) $database->lastInsertId();
     }
 
-    public function removeFile(int $materialId, int $fileId, int $actor): void
+    public function hasActiveFileEquivalent(int $materialId, string $originalName, int $sizeBytes): bool
+    {
+        $statement = Database::connection()->prepare(
+            'SELECT 1 FROM support_material_files
+             WHERE material_id=:material_id AND original_name=:original_name
+               AND size_bytes=:size_bytes AND deleted_at IS NULL
+             LIMIT 1'
+        );
+        $statement->execute([
+            'material_id' => $materialId,
+            'original_name' => $originalName,
+            'size_bytes' => $sizeBytes,
+        ]);
+        return $statement->fetchColumn() !== false;
+    }
+
+    public function removeAdditionalFile(int $materialId, int $fileId, int $actor): array
+    {
+        return $this->removeAdditionalFiles($materialId, [$fileId], $actor)[0];
+    }
+
+    public function removeAdditionalFiles(int $materialId, array $fileIds, int $actor): array
     {
         $database = Database::connection();
+        $fileIds = array_values(array_unique(array_map('intval', $fileIds)));
+        if ($materialId < 1 || $fileIds === [] || in_array(0, $fileIds, true)) {
+            throw new InvalidArgumentException('Selecciona al menos un archivo válido.');
+        }
+        $placeholders = implode(',', array_fill(0, count($fileIds), '?'));
         $statement = $database->prepare(
-            'SELECT id,is_primary FROM support_material_files
-             WHERE id=:file_id AND material_id=:material_id AND deleted_at IS NULL'
+            'SELECT id,original_name,extension,size_bytes,is_primary,is_package,deleted_at
+             FROM support_material_files
+             WHERE material_id=? AND id IN (' . $placeholders . ')
+             FOR UPDATE'
         );
-        $statement->execute(['file_id' => $fileId, 'material_id' => $materialId]);
-        $file = $statement->fetch();
-        if (!$file) {
-            throw new InvalidArgumentException('El archivo ya no está disponible.');
+        $statement->execute([$materialId, ...$fileIds]);
+        $rows = $statement->fetchAll();
+        if (count($rows) !== count($fileIds)) throw new InvalidArgumentException('Uno o más archivos no pertenecen al material o ya no existen.');
+        $filesById = [];
+        foreach ($rows as $file) {
+            if ($file['deleted_at'] !== null) throw new InvalidArgumentException('Uno o más archivos ya fueron retirados.');
+            if ((int) $file['is_primary'] === 1) throw new InvalidArgumentException('El archivo principal no puede retirarse.');
+            if ((int) $file['is_package'] === 1) throw new InvalidArgumentException('El paquete institucional no puede retirarse.');
+            $filesById[(int) $file['id']] = $file;
         }
-        $remaining = $database->prepare(
-            'SELECT COUNT(*) FROM support_material_files
-             WHERE material_id=:material_id AND deleted_at IS NULL
-             AND is_package=0 AND id<>:file_id'
-        );
-        $remaining->execute(['material_id' => $materialId, 'file_id' => $fileId]);
-        if ((int) $remaining->fetchColumn() < 1) {
-            throw new InvalidArgumentException(
-                'No puedes retirar el único archivo del material. Agrega primero su reemplazo.'
-            );
-        }
-        $database->prepare(
+        $update = $database->prepare(
             'UPDATE support_material_files
-             SET deleted_at=CURRENT_TIMESTAMP,deleted_by=:actor
-             WHERE id=:file_id'
-        )->execute(['actor' => $actor, 'file_id' => $fileId]);
-        if ((int) $file['is_primary'] === 1) {
-            $database->prepare(
-                'UPDATE support_material_files SET is_primary=1
-                 WHERE material_id=:material_id AND deleted_at IS NULL AND is_package=0
-                 ORDER BY sort_order,id LIMIT 1'
-            )->execute(['material_id' => $materialId]);
-        }
+             SET deleted_at=CURRENT_TIMESTAMP,deleted_by=?
+             WHERE material_id=? AND id IN (' . $placeholders . ') AND deleted_at IS NULL'
+        );
+        $update->execute([$actor, $materialId, ...$fileIds]);
+        if ($update->rowCount() !== count($fileIds)) throw new RuntimeException('No fue posible aplicar la baja lógica a todos los archivos.');
+        return array_map(static function (int $id) use ($filesById): array {
+            $file = $filesById[$id];
+            return [
+                'id' => $id,
+                'name' => (string) $file['original_name'],
+                'extension' => (string) $file['extension'],
+                'size_bytes' => (int) $file['size_bytes'],
+            ];
+        }, $fileIds);
     }
 
     public function incrementDownloads(int $materialId): void

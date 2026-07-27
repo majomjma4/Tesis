@@ -21,6 +21,10 @@ final class AdminController
     public function saveSupportMaterial():void
     {
         $this->requirePost();$session=new AuthSessionService();
+        if($_POST===[]&&$_FILES===[]&&(int)($_SERVER['CONTENT_LENGTH']??0)>0){
+            error_log('Support material file upload rejected before parsing: request body exceeded PHP limits or was malformed.');
+            $this->json(false,'La carga supera los límites permitidos por el servidor.',[],422);
+        }
         if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);
         $id=(int)($_POST['id']??0);$title=$this->normalizeAuditText($_POST['title']??'');
         try{
@@ -131,7 +135,117 @@ final class AdminController
         $this->requirePost();$session=new AuthSessionService();
         if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);
         $materialId=(int)($_POST['material_id']??0);$action=(string)($_POST['action']??'add');
-        try{$model=new SupportMaterialModel();if($action==='remove'){$model->removeFile($materialId,(int)($_POST['file_id']??0),(int)$session->userId());$message='Archivo retirado del material.';$event='support_material_file_removed';$label='Retiró un archivo de material de apoyo';}else{$stored=(new SupportMaterialFileService())->store($materialId,$_FILES['file']??[]);$stored['is_primary']=isset($_POST['is_primary']);$model->addFile($materialId,$stored,(int)$session->userId());$message='Archivo agregado correctamente.';$event='support_material_file_added';$label='Agregó un archivo a material de apoyo';}(new AdminActivityService())->record((int)$session->userId(),$event,$label,'Repositorio','support_material',$materialId,'Material #'.$materialId);$this->json(true,$message);}
+        try{
+            $model=new SupportMaterialModel();
+            if($action==='remove'||$action==='remove_multiple'){
+                $rawIds=$action==='remove_multiple'?($_POST['file_ids']??[]):[$_POST['file_id']??0];
+                if(!is_array($rawIds))$this->json(false,'La selección de archivos no es válida.',[],422);
+                if(count($rawIds)>20)$this->json(false,'Puedes retirar hasta 20 archivos por operación.',[],422);
+                $fileIds=array_values(array_unique(array_map(static fn(mixed $id):int=>(int)$id,$rawIds)));
+                if($fileIds===[]||in_array(0,$fileIds,true))$this->json(false,'Selecciona al menos un archivo válido.',[],422);
+                $actor=(int)$session->userId();
+                $removed=Database::transaction(function(PDO $database)use($model,$materialId,$fileIds,$actor):array{
+                    $material=$model->findByIdForUpdate($materialId);
+                    if($material===null)throw new InvalidArgumentException('El material ya no está disponible.');
+                    $files=$model->removeAdditionalFiles($materialId,$fileIds,$actor);
+                    $activity=new AdminActivityService($database);
+                    foreach($files as $file)$activity->record(
+                            $actor,'support_material.file_removed','Retiró un archivo del material',
+                            'Repositorio','support_material',$materialId,$file['name'],'correct',[
+                                'file_id'=>$file['id'],'name'=>$file['name'],'extension'=>$file['extension'],
+                                'size_bytes'=>$file['size_bytes'],
+                            ]
+                        );
+                    return $files;
+                });
+                $material=$model->findById($materialId,true);
+                $package=$material?(new SupportMaterialPackageService())->describe($material):['available'=>false,'file_count'=>0,'source'=>'generated'];
+                $removedIds=array_values(array_map(static fn(array $file):int=>(int)$file['id'],$removed));
+                $removedCount=count($removedIds);$availableCount=count((array)($material['files']??[]));
+                $message=$removedCount===1?'Archivo retirado correctamente.':$removedCount.' archivos retirados correctamente.';
+                $packageDescriptor=[
+                    'available'=>(bool)$package['available'],'file_count'=>(int)$package['file_count'],
+                    'source'=>(string)$package['source'],
+                    'download_url'=>!empty($package['available'])?route('support-material-package-download').'&material_id='.$materialId:'',
+                ];
+                $this->json(true,$message,['removed'=>$removed,'removed_file_ids'=>$removedIds,'removed_count'=>$removedCount,
+                    'available_count'=>$availableCount,'updated_available_count'=>$availableCount,
+                    'package'=>$packageDescriptor,'updated_package_descriptor'=>$packageDescriptor,
+                ]);
+            }
+            if($model->findById($materialId,true)===null)$this->json(false,'El material ya no está disponible.',[],404);
+            $fileService=new SupportMaterialFileService();$limits=$fileService->limits();$uploads=[];
+            if(isset($_FILES['files']['name'])&&is_array($_FILES['files']['name'])){
+                foreach(array_keys($_FILES['files']['name']) as $index)$uploads[]=[
+                    'name'=>$_FILES['files']['name'][$index]??'','type'=>$_FILES['files']['type'][$index]??'',
+                    'tmp_name'=>$_FILES['files']['tmp_name'][$index]??'','error'=>$_FILES['files']['error'][$index]??UPLOAD_ERR_NO_FILE,
+                    'size'=>$_FILES['files']['size'][$index]??0,
+                ];
+            }elseif(isset($_FILES['file']))$uploads[]=$_FILES['file'];
+            if($uploads===[])$this->json(false,'Selecciona al menos un archivo.',[],422);
+            if(count($uploads)>(int)$limits['max_operation_files'])$this->json(false,'Puedes agregar hasta '.$limits['max_operation_files'].' archivos por operación.',[],422);
+            if(array_sum(array_map(static fn(array $upload):int=>(int)($upload['size']??0),$uploads))>(int)$limits['max_operation_bytes']){
+                $this->json(false,'La selección completa supera el límite de 35 MB por operación.',[],422);
+            }
+            $added=[];$failed=[];$actor=(int)$session->userId();$multipleRequest=isset($_FILES['files']);
+            foreach($uploads as $upload){
+                $displayName=mb_substr(basename(str_replace('\\','/',(string)($upload['name']??'Archivo'))),0,200);
+                $stored=null;
+                try{
+                    $stored=$fileService->store($materialId,$upload);
+                    $stored['is_primary']=!$multipleRequest&&isset($_POST['is_primary']);
+                    $fileId=Database::transaction(function(PDO $database)use($model,$materialId,$stored,$actor):int{
+                        if($model->findByIdForUpdate($materialId)===null)throw new InvalidArgumentException('El material ya no está disponible.');
+                        if($model->hasActiveFileEquivalent($materialId,(string)$stored['original_name'],(int)$stored['size_bytes'])){
+                            throw new InvalidArgumentException('Ya existe un archivo activo con el mismo nombre y tamaño.');
+                        }
+                        $id=$model->addFile($materialId,$stored,$actor);
+                        (new AdminActivityService($database))->record(
+                            $actor,'support_material.file_added','Agregó un archivo al material',
+                            'Repositorio','support_material',$materialId,$stored['original_name'],'correct',[
+                                'file_id'=>$id,'name'=>$stored['original_name'],'extension'=>$stored['extension'],
+                                'mime_type'=>$stored['mime_type'],'size_bytes'=>$stored['size_bytes'],
+                                'is_primary'=>(bool)$stored['is_primary'],'is_package'=>false,
+                            ]
+                        );
+                        return $id;
+                    });
+                    $query='&material_id='.$materialId.'&file_id='.$fileId;
+                    $extension=(string)$stored['extension'];
+                    $added[]=[
+                        'id'=>$fileId,'name'=>$stored['original_name'],'extension'=>$extension,
+                        'type'=>mb_strtoupper($extension),'size_label'=>ArchiveService::formatBytes((int)$stored['size_bytes']),
+                        'size_bytes'=>(int)$stored['size_bytes'],'is_primary'=>(bool)$stored['is_primary'],
+                        'is_archive'=>$extension==='zip',
+                        'preview_supported'=>in_array($extension,['pdf','docx','png','jpg','jpeg','webp','txt'],true)||$extension==='zip',
+                        'preview_type'=>$extension==='zip'?'zip':(in_array($extension,['jpg','jpeg','png','webp'],true)?'image':$extension),
+                        'preview_url'=>route('support-material-preview').$query,
+                        'zip_url'=>$extension==='zip'?route('support-material-zip-list').$query:'',
+                        'download_url'=>route('support-material-download').$query,
+                    ];
+                }catch(Throwable $error){
+                    if(is_array($stored)&&!$fileService->discard($stored)){
+                        error_log('Support material orphan cleanup failed for upload '.$displayName);
+                    }
+                    error_log(sprintf(
+                        'Support material file add failed [%s] material=%d file=%s upload_error=%d: %s',
+                        $error::class,$materialId,$displayName?:'Archivo',(int)($upload['error']??UPLOAD_ERR_NO_FILE),$error->getMessage()
+                    ));
+                    $failed[]=['name'=>$displayName?:'Archivo','message'=>$error instanceof InvalidArgumentException?$error->getMessage():'No fue posible procesar este archivo.'];
+                }
+            }
+            $requested=count($uploads);$addedCount=count($added);$failedCount=count($failed);
+            $material=$model->findById($materialId,true);$package=$material?(new SupportMaterialPackageService())->describe($material):['available'=>false,'file_count'=>0,'source'=>'generated'];
+            $data=['summary'=>['requested'=>$requested,'added'=>$addedCount,'failed'=>$failedCount],'added'=>$added,'failed'=>$failed,'package'=>[
+                'available'=>(bool)$package['available'],'file_count'=>(int)$package['file_count'],'source'=>(string)$package['source'],
+                'download_url'=>!empty($package['available'])?route('support-material-package-download').'&material_id='.$materialId:'',
+            ]];
+            if($addedCount===0)$this->json(false,'No se pudo agregar ningún archivo.',$data,422);
+            $message=$failedCount>0
+                ?$addedCount.($addedCount===1?' archivo agregado y ':' archivos agregados y ').$failedCount.($failedCount===1?' no pudo procesarse.':' no pudieron procesarse.')
+                :$addedCount.($addedCount===1?' archivo agregado correctamente.':' archivos agregados correctamente.');
+            $this->json(true,$message,$data,$failedCount>0?207:200);
+        }
         catch(InvalidArgumentException $error){$this->json(false,$error->getMessage(),[],422);}
         catch(Throwable $error){error_log('Support material file: '.$error->getMessage());$this->json(false,'No fue posible actualizar los archivos.',[],500);}
     }
