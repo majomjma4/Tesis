@@ -6,6 +6,10 @@
     $activeTab = in_array($requestedTab, $allowedTabs, true) ? $requestedTab : 'information';
     $materialId = (int) ($material['id'] ?? 0);
     $detailUrl = route('support-material-detail') . '&id=' . $materialId;
+    $requestedMode = strtolower(trim((string) ($_GET['mode'] ?? 'view')));
+    $mode = $requestedMode === 'edit' && !empty($isAdministrator) ? 'edit' : 'view';
+    $modeQuery = $mode === 'edit' ? '&mode=edit' : '&mode=view';
+    $viewUrl = $detailUrl . '&mode=view&tab=information';
 
     $materialFiles = array_values(array_filter(array_merge(
         !empty($material['primary_file']) ? [$material['primary_file']] : [],
@@ -35,7 +39,7 @@
     $digitalRecord = [
         'entity' => ['type' => 'support_material', 'id' => $materialId],
         'context' => 'repository',
-        'mode' => 'view',
+        'mode' => $mode,
         'return_url' => $repositoryUrl,
         'breadcrumbs' => [
             ['label' => 'Repositorio', 'url' => $repositoryUrl],
@@ -44,7 +48,7 @@
         ],
         'header' => [
             'title' => (string) ($material['title'] ?? 'Material de apoyo'),
-            'description' => (string) ($material['description'] ?? ''),
+            'description' => $mode === 'edit' ? 'Editando información del material.' : (string) ($material['description'] ?? ''),
             'type_label' => 'Material de apoyo',
             'status_label' => $isPublished ? 'Publicado' : 'Retirado',
             'status_tone' => $isPublished ? 'success' : 'neutral',
@@ -56,20 +60,21 @@
             ['label' => 'Periodo', 'value' => (string) ($material['pao_label'] ?? '')],
             ['label' => 'Disponibilidad', 'value' => $isPublished ? 'Disponible' : 'No disponible', 'tone' => 'secondary'],
         ], static fn (array $item): bool => $item['value'] !== '')),
-        'actions' => array_values(array_filter([
+        'actions' => $mode === 'edit' ? [] : array_values(array_filter([
             $administratorView ? ['id' => 'edit', 'label' => 'Editar', 'kind' => 'primary', 'icon' => 'fa-pen-to-square', 'url' => $materialEditUrl ?: null, 'enabled' => $materialEditUrl !== ''] : null,
             ['id' => 'download', 'label' => 'Descargar', 'kind' => 'secondary', 'icon' => 'fa-download', 'url' => $downloadUrl, 'enabled' => $downloadUrl !== null],
             ['id' => 'share', 'label' => 'Compartir', 'kind' => 'secondary', 'icon' => 'fa-share-nodes', 'url' => null, 'enabled' => false],
         ])),
-        'menu_actions' => $administratorView ? [
+        'menu_actions' => $administratorView && $mode === 'view' ? [
             ['label' => 'Cambiar disponibilidad', 'icon' => 'fa-toggle-on', 'enabled' => false, 'danger' => false],
             ['label' => $isPublished ? 'Retirar publicación' : 'Publicar material', 'icon' => $isPublished ? 'fa-eye-slash' : 'fa-eye', 'enabled' => false, 'danger' => false],
+            ['label' => 'Ver historial administrativo', 'icon' => 'fa-clock-rotate-left', 'enabled' => true, 'danger' => false, 'action' => 'admin-history', 'separator' => true],
             ['label' => 'Enviar a Papelera', 'icon' => 'fa-trash-can', 'enabled' => false, 'danger' => true],
         ] : [],
         'tabs' => [
-            ['id' => 'information', 'label' => 'Información', 'icon' => 'fa-file-lines', 'url' => $detailUrl . '&tab=information'],
-            ['id' => 'files', 'label' => 'Archivos', 'icon' => 'fa-folder-open', 'url' => $detailUrl . '&tab=files'],
-            ['id' => 'evolution', 'label' => 'Evolución documental', 'icon' => 'fa-clock-rotate-left', 'url' => $detailUrl . '&tab=evolution'],
+            ['id' => 'information', 'label' => 'Información', 'icon' => 'fa-file-lines', 'url' => $detailUrl . $modeQuery . '&tab=information'],
+            ['id' => 'files', 'label' => 'Archivos', 'icon' => 'fa-folder-open', 'url' => $detailUrl . $modeQuery . '&tab=files'],
+            ['id' => 'evolution', 'label' => 'Evolución documental', 'icon' => 'fa-clock-rotate-left', 'url' => $detailUrl . $modeQuery . '&tab=evolution'],
         ],
         'active_tab' => $activeTab,
         'information_sections' => [
@@ -85,10 +90,34 @@
         ],
         'documents' => $documents,
         'versions' => [],
+        'form' => [
+            'action' => (string) ($materialSaveEndpoint ?? ''),
+            'method' => 'POST',
+            'csrf_token' => (string) ($materialCsrfToken ?? ''),
+            'cancel_url' => $viewUrl,
+            'success_url' => $viewUrl . '&saved=1',
+            'success_message' => (string) ($_GET['saved'] ?? '') === '1' ? 'Material actualizado correctamente.' : '',
+            'categories' => is_array($materialCategories ?? null) ? $materialCategories : [],
+            'values' => [
+                'id' => $materialId,
+                'title' => (string) ($material['title'] ?? ''),
+                'category_id' => (int) ($material['category_id'] ?? 0),
+                'material_type' => (string) ($material['material_type'] ?? $material['type'] ?? ''),
+                'description' => (string) ($material['description'] ?? ''),
+                'full_description' => (string) ($material['full_description'] ?? ''),
+                'publisher' => (string) ($material['publisher'] ?? ''),
+                'publication_date' => (string) ($material['publication_date_iso'] ?? ''),
+                'period' => (string) ($material['pao_label'] ?? ''),
+                'keywords' => implode(', ', array_map('strval', (array) ($material['keywords'] ?? []))),
+            ],
+            'errors' => [],
+        ],
         'endpoints' => [
             'preview' => $previewActionUrl ?? '',
             'preview_content' => $previewContentActionUrl ?? '',
             'download' => $downloadActionUrl ?? '',
+            'admin_history' => $materialHistoryEndpoint ?? '',
+            'admin_history_cleanup' => $materialHistoryCleanupEndpoint ?? '',
         ],
     ];
     require __DIR__ . '/_ficha-institucional.php';

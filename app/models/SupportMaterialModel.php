@@ -32,6 +32,30 @@ final class SupportMaterialModel
         return $row ? $this->hydrate($row) : null;
     }
 
+    public function findByIdForUpdate(int $materialId): ?array
+    {
+        if ($materialId < 1) return null;
+        $statement = Database::connection()->prepare($this->baseQuery() . ' WHERE sm.id=:id FOR UPDATE');
+        $statement->execute(['id' => $materialId]);
+        $material = $statement->fetch();
+        if (!$material) return null;
+        $keywords = json_decode((string) ($material['keywords_json'] ?? '[]'), true);
+        $material['category_id'] = (int) $material['category_id'];
+        $material['publication_date_iso'] = (string) $material['publication_date'];
+        $material['keywords'] = is_array($keywords) ? array_values(array_map('strval', $keywords)) : [];
+        return $material;
+    }
+
+    public function categoryName(int $categoryId): ?string
+    {
+        $statement = Database::connection()->prepare(
+            'SELECT name FROM support_material_categories WHERE id=:id AND is_active=1'
+        );
+        $statement->execute(['id' => $categoryId]);
+        $name = $statement->fetchColumn();
+        return $name === false ? null : (string) $name;
+    }
+
     public function findFile(array $material, int $fileId): ?array
     {
         foreach ($material['files'] as $file) {

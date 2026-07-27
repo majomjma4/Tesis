@@ -22,10 +22,98 @@ final class AdminController
     {
         $this->requirePost();$session=new AuthSessionService();
         if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);
-        $id=(int)($_POST['id']??0);$title=trim((string)($_POST['title']??''));
-        try{$saved=(new SupportMaterialModel())->save($_POST,(int)$session->userId());(new AdminActivityService())->record((int)$session->userId(),$id?'support_material_updated':'support_material_created',$id?'Editó material de apoyo':'Creó material de apoyo','Repositorio','support_material',$saved,$title?:'Material de apoyo');$this->json(true,$id?'Material actualizado correctamente.':'Material creado correctamente.',['id'=>$saved]);}
-        catch(InvalidArgumentException $error){$this->activityFailure($session,$id?'support_material_updated':'support_material_created',$id?'Intentó editar material de apoyo':'Intentó crear material de apoyo','Repositorio','support_material',$id?:null,$title?:'Material de apoyo',$error);$this->json(false,$error->getMessage(),[],422);}
-        catch(Throwable $error){$this->activityFailure($session,$id?'support_material_updated':'support_material_created',$id?'Intentó editar material de apoyo':'Intentó crear material de apoyo','Repositorio','support_material',$id?:null,$title?:'Material de apoyo',$error);error_log('Support material save: '.$error->getMessage());$this->json(false,'No fue posible guardar el material.',[],500);}
+        $id=(int)($_POST['id']??0);$title=$this->normalizeAuditText($_POST['title']??'');
+        try{
+            $result=Database::transaction(function(PDO $database)use($id,$title,$session):array{
+                $model=new SupportMaterialModel();
+                $auditChanges=[];
+                if($id>0){
+                    $current=$model->findByIdForUpdate($id);
+                    if($current===null)throw new InvalidArgumentException('El material ya no está disponible.');
+                    $submittedKeywords=$this->normalizeAuditKeywords($_POST['keywords']??'');
+                    $currentKeywords=$this->normalizeAuditKeywords((array)($current['keywords']??[]));
+                    $newCategoryId=(int)($_POST['category_id']??0);
+                    $newCategoryName=$model->categoryName($newCategoryId);
+                    if($newCategoryName===null)throw new InvalidArgumentException('Selecciona una categoría válida.');
+                    $auditableFields=[
+                        'title'=>['label'=>'Título','old'=>$this->normalizeAuditText($current['title']??''),'new'=>$title],
+                        'material_type'=>['label'=>'Tipo de material','old'=>$this->normalizeAuditText($current['material_type']??''),'new'=>$this->normalizeAuditText($_POST['material_type']??'')],
+                        'description'=>['label'=>'Descripción corta','old'=>$this->normalizeAuditText($current['description']??'',true),'new'=>$this->normalizeAuditText($_POST['description']??'',true)],
+                        'full_description'=>['label'=>'Descripción completa','old'=>$this->normalizeAuditText($current['full_description']??'',true),'new'=>$this->normalizeAuditText($_POST['full_description']??'',true)],
+                        'publisher'=>['label'=>'Responsable','old'=>$this->normalizeAuditText($current['publisher']??''),'new'=>$this->normalizeAuditText($_POST['publisher']??'')],
+                        'publication_date'=>['label'=>'Fecha de publicación','old'=>$this->normalizeAuditDate($current['publication_date_iso']??''),'new'=>$this->normalizeAuditDate($_POST['publication_date']??'')],
+                    ];
+                    foreach($auditableFields as $field=>$change){
+                        if($change['old']!==$change['new'])$auditChanges[]=['field'=>$field]+$change;
+                    }
+                    if((int)$current['category_id']!==$newCategoryId)$auditChanges[]=['field'=>'category','label'=>'Categoría','old'=>(string)($current['category_label']??''),'new'=>$newCategoryName];
+                    if($currentKeywords['comparison']!==$submittedKeywords['comparison'])$auditChanges[]=['field'=>'keywords','label'=>'Palabras clave','old'=>$currentKeywords['display'],'new'=>$submittedKeywords['display']];
+                    if($auditChanges===[])return ['id'=>$id,'no_changes'=>true];
+                }
+                $saved=$model->save($_POST,(int)$session->userId());
+                (new AdminActivityService($database))->record(
+                    (int)$session->userId(),
+                    $id?'support_material.updated':'support_material.created',
+                    $id?'Editó la información del material':'Creó el material de apoyo',
+                    'Repositorio','support_material',$saved,$title?:'Material de apoyo','correct',
+                    ['schema_version'=>1,'changes'=>$auditChanges]
+                );
+                return ['id'=>$saved,'no_changes'=>false];
+            });
+            if($result['no_changes'])$this->json(true,'No se detectaron cambios para guardar.',['id'=>$result['id'],'no_changes'=>true]);
+            $saved=(int)$result['id'];
+            $this->json(true,$id?'Material actualizado correctamente.':'Material creado correctamente.',['id'=>$saved]);
+        }
+        catch(InvalidArgumentException $error){$this->activityFailure($session,$id?'support_material.update_failed':'support_material.create_failed',$id?'Intentó editar material de apoyo':'Intentó crear material de apoyo','Repositorio','support_material',$id?:null,$title?:'Material de apoyo',$error);$this->json(false,$error->getMessage(),[],422);}
+        catch(Throwable $error){$this->activityFailure($session,$id?'support_material.update_failed':'support_material.create_failed',$id?'Intentó editar material de apoyo':'Intentó crear material de apoyo','Repositorio','support_material',$id?:null,$title?:'Material de apoyo',$error);error_log('Support material save: '.$error->getMessage());$this->json(false,'No fue posible guardar el material.',[],500);}
+    }
+
+    public function supportMaterialHistory():void
+    {
+        if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET')$this->json(false,'Método no permitido.',[],405);
+        $id=filter_var($_GET['id']??null,FILTER_VALIDATE_INT);
+        $offset=filter_var($_GET['offset']??0,FILTER_VALIDATE_INT);
+        if($id===false||$id===null||(int)$id<1)$this->json(false,'El material solicitado no es válido.',[],422);
+        if((new SupportMaterialModel())->findById((int)$id,true)===null)$this->json(false,'El material solicitado no existe.',[],404);
+        try{
+            $history=(new AdminActivityModel())->forEntity('support_material',(int)$id,20,$offset===false?0:(int)$offset);
+            $this->json(true,'Historial administrativo cargado.',$history);
+        }catch(Throwable $error){
+            error_log('Support material history: '.$error->getMessage());
+            $this->json(false,'No fue posible cargar el historial administrativo.',[],500);
+        }
+    }
+
+    public function cleanupSupportMaterialHistory():void
+    {
+        $this->requirePost();$session=new AuthSessionService();
+        if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);
+        $id=filter_var($_POST['id']??null,FILTER_VALIDATE_INT);
+        if($id===false||$id===null||(int)$id<1)$this->json(false,'El material solicitado no es válido.',[],422);
+        if((string)($_POST['confirmation']??'')!=='ELIMINAR')$this->json(false,'Escribe ELIMINAR para confirmar la depuración.',[],422);
+        try{
+            $deleted=Database::transaction(function(PDO $database)use($id,$session):int{
+                $material=(new SupportMaterialModel())->findByIdForUpdate((int)$id);
+                if($material===null)throw new InvalidArgumentException('El material solicitado no existe.');
+                $deleted=(new AdminActivityModel())->deleteIncompleteSupportMaterialEvents((int)$id);
+                if($deleted>0){
+                    (new AdminActivityService($database))->record(
+                        (int)$session->userId(),'support_material.history_cleaned',
+                        'Eliminó registros antiguos sin detalle','Repositorio','support_material',(int)$id,
+                        (string)($material['title']??'Material de apoyo'),'correct',
+                        ['schema_version'=>1,'deleted_count'=>$deleted,'reason'=>'legacy_events_without_change_details']
+                    );
+                }
+                return $deleted;
+            });
+            if($deleted===0)$this->json(true,'No existen registros antiguos sin detalle para eliminar.',['deleted_count'=>0]);
+            $this->json(true,$deleted===1?'Se eliminó 1 registro antiguo sin detalle.':'Se eliminaron '.$deleted.' registros antiguos sin detalle.',['deleted_count'=>$deleted]);
+        }catch(InvalidArgumentException $error){
+            $this->json(false,$error->getMessage(),[],422);
+        }catch(Throwable $error){
+            error_log('Support material history cleanup: '.$error->getMessage());
+            $this->json(false,'No fue posible eliminar los registros antiguos.',[],500);
+        }
     }
 
     public function changeSupportMaterialStatus():void
@@ -115,6 +203,40 @@ final class AdminController
     private function userPayload(): array
     {
         return ['full_name'=>trim((string)($_POST['full_name']??'')),'email'=>mb_strtolower(trim((string)($_POST['email']??''))),'username'=>trim((string)($_POST['username']??'')),'role'=>(string)($_POST['role']??''),'status'=>(string)($_POST['status']??'active'),'institutional_code'=>trim((string)($_POST['institutional_code']??'')),'career_id'=>(int)($_POST['career_id']??0),'academic_period_id'=>(int)($_POST['academic_period_id']??0),'semester'=>(int)($_POST['semester']??0),'academic_title'=>trim((string)($_POST['academic_title']??'')),'can_tutor'=>isset($_POST['can_tutor'])?1:0,'is_admin'=>isset($_POST['is_admin'])?1:0];
+    }
+    private function normalizeAuditText(mixed $value,bool $multiline=false):string
+    {
+        $normalized=str_replace(["\r\n","\r"],"\n",(string)$value);
+        if(class_exists('Normalizer')){
+            $unicode=Normalizer::normalize($normalized,Normalizer::FORM_C);
+            if(is_string($unicode))$normalized=$unicode;
+        }
+        $normalized=(string)preg_replace('/[\p{Z}\t\f\v]+/u',' ',$normalized);
+        if(!$multiline)return trim((string)preg_replace('/\s+/u',' ',$normalized));
+        $lines=array_map(static fn(string $line):string=>trim($line),explode("\n",$normalized));
+        $normalized=(string)preg_replace('/\n{3,}/',"\n\n",implode("\n",$lines));
+        return trim($normalized);
+    }
+    private function normalizeAuditDate(mixed $value):string
+    {
+        $normalized=trim((string)$value);
+        $date=DateTimeImmutable::createFromFormat('!Y-m-d',$normalized);
+        return $date&&$date->format('Y-m-d')===$normalized?$date->format('Y-m-d'):$normalized;
+    }
+    private function normalizeAuditKeywords(mixed $value):array
+    {
+        $source=is_array($value)?$value:(preg_split('/[,;\n]+/u',(string)$value)?:[]);
+        $display=[];$seen=[];
+        foreach($source as $keyword){
+            $normalized=$this->normalizeAuditText($keyword);
+            if($normalized==='')continue;
+            $key=mb_strtolower($normalized,'UTF-8');
+            if(isset($seen[$key]))continue;
+            $seen[$key]=true;$display[]=$normalized;
+        }
+        $comparison=array_keys($seen);
+        sort($comparison,SORT_STRING);
+        return ['display'=>$display,'comparison'=>$comparison];
     }
     private function sessionAndCsrf(): AuthSessionService{$session=new AuthSessionService();if(!$session->validateCsrf('admin_users',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión del formulario venció.',[],419);return $session;}
     private function activityFailure(AuthSessionService $session,string $action,string $label,string $module,string $entityType,?int $entityId,string $element,Throwable $error):void

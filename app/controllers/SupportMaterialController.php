@@ -30,13 +30,17 @@ final class SupportMaterialController
     public function detail(): void
     {
         $this->ensureSession();
-        $isAdministrator = (new AuthSessionService())->hasAdminAccess();
+        $session = new AuthSessionService();
+        $isAdministrator = $session->hasAdminAccess();
         $materialId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
-        $material = $materialId === false || $materialId === null ? null : (new SupportMaterialModel())->findById((int) $materialId);
+        $materialModel = new SupportMaterialModel();
+        $material = $materialId === false || $materialId === null ? null : $materialModel->findById((int) $materialId);
+        $materialCategories = [];
         if ($material === null) {
             http_response_code(404);
         } else {
             $material['downloads'] = (new SupportMaterialDownloadModel())->getTotal($material['id'], $material['downloads']);
+            if ($isAdministrator) $materialCategories = $materialModel->categories();
         }
 
         View::render('repository/material-detalle', [
@@ -50,7 +54,12 @@ final class SupportMaterialController
             'previewContentActionUrl' => route('support-material-preview-content'),
             'downloadActionUrl' => route('support-material-download'),
             'isAdministrator' => $isAdministrator,
-            'materialEditUrl' => $material === null ? '' : route('admin-repository') . '&tab=materials&edit_material=' . (int) $material['id'],
+            'materialEditUrl' => $material === null ? '' : route('support-material-detail') . '&id=' . (int) $material['id'] . '&mode=edit&tab=information',
+            'materialSaveEndpoint' => route('admin-support-material-save'),
+            'materialHistoryEndpoint' => $isAdministrator ? route('admin-support-material-history') . '&id=' . (int) ($material['id'] ?? 0) : '',
+            'materialHistoryCleanupEndpoint' => $isAdministrator ? route('admin-support-material-history-cleanup') : '',
+            'materialCsrfToken' => $isAdministrator ? $session->csrfToken('admin_repository') : '',
+            'materialCategories' => $materialCategories,
         ]);
     }
     // Final de presentación de materiales

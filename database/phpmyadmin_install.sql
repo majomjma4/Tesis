@@ -70,6 +70,7 @@ CREATE TABLE admin_audit_log (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_admin_audit_date (created_at),
   INDEX idx_admin_audit_entity (entity_type, entity_id),
+  INDEX idx_admin_audit_entity_date (entity_type, entity_id, created_at),
   INDEX idx_admin_activity_filters (module, action, result, created_at),
   INDEX idx_admin_activity_actor_date (actor_user_id, created_at),
   CONSTRAINT fk_admin_audit_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
