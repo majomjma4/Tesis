@@ -581,9 +581,6 @@ const neutralViewerImageShell = neutralViewer?.querySelector("[data-viewer-image
 const neutralViewerImage = neutralViewer?.querySelector("[data-viewer-image]");
 const neutralViewerText = neutralViewer?.querySelector("[data-viewer-text]");
 const neutralViewerDocx = neutralViewer?.querySelector("[data-viewer-docx]");
-const neutralViewerZip = neutralViewer?.querySelector("[data-viewer-zip]");
-const neutralZipBreadcrumbs = neutralViewerZip?.querySelector("[data-zip-breadcrumbs]");
-const neutralZipList = neutralViewerZip?.querySelector("[data-zip-list]");
 const neutralViewerExpand = neutralViewer?.querySelector("[data-viewer-expand]");
 const neutralZoomControls = [...document.querySelectorAll("[data-viewer-zoom-controls]")];
 const neutralZoomOutButtons = neutralZoomControls.map((control) => control.querySelector("[data-viewer-zoom-out]")).filter(Boolean);
@@ -614,6 +611,7 @@ let neutralFilesInitialized = false;
 let neutralViewerLayoutSequence = 0;
 let neutralDocxScrollSyncFrame = 0;
 let neutralDocxHorizontalRatio = 0;
+const neutralZipTreeStates = new Map();
 const neutralZoomByFile = new Map();
 const neutralDocxBaseScaleByContext = new Map();
 let neutralZoomPercent = 100;
@@ -836,9 +834,6 @@ function resetNeutralViewer() {
         neutralViewerDocx.scrollLeft = 0;
         neutralViewerDocx.scrollTop = 0;
     }
-    if (neutralViewerZip) neutralViewerZip.hidden = true;
-    if (neutralZipBreadcrumbs) neutralZipBreadcrumbs.replaceChildren();
-    if (neutralZipList) neutralZipList.replaceChildren();
 }
 
 function setNeutralViewerState(state, message = "", retryButton = null) {
@@ -861,7 +856,8 @@ function setNeutralViewerState(state, message = "", retryButton = null) {
     copy.textContent = description;
     wrapper.append(icon, heading, copy);
     if (["unsupported", "error", "missing"].includes(state)) {
-        const selected = neutralFileButtons.find((button) => button.getAttribute("aria-selected") === "true");
+        const selected = neutralFileButtons.find((button) => button.getAttribute("aria-selected") === "true")
+            || document.querySelector('[data-zip-entry-file][aria-selected="true"]');
         if (selected) {
             const name = document.createElement("strong");
             const meta = document.createElement("span");
@@ -903,110 +899,200 @@ function setNeutralViewerState(state, message = "", retryButton = null) {
     updateNeutralZoomControls();
 }
 
-function renderNeutralZipBreadcrumbs(button, breadcrumbs, currentPath) {
-    if (!neutralZipBreadcrumbs) return;
-    neutralZipBreadcrumbs.replaceChildren();
-    breadcrumbs.forEach((breadcrumb, index) => {
-        if (index > 0) {
-            const separator = document.createElement("i");
-            separator.className = "fa-solid fa-chevron-right";
-            separator.setAttribute("aria-hidden", "true");
-            neutralZipBreadcrumbs.append(separator);
-        }
-        const item = document.createElement("button");
-        item.type = "button";
-        item.textContent = index === 0 ? "Raíz" : String(breadcrumb.label || breadcrumb.name || "Carpeta");
-        item.title = item.textContent;
-        if (String(breadcrumb.path ?? "") === currentPath) item.setAttribute("aria-current", "page");
-        item.addEventListener("click", () => loadNeutralZip(button, String(breadcrumb.path ?? "")));
-        neutralZipBreadcrumbs.append(item);
-    });
+function neutralZipState(button) {
+    const fileId = button.dataset.fileId || "";
+    if (!neutralZipTreeStates.has(fileId)) {
+        neutralZipTreeStates.set(fileId, {
+            openPaths: new Set(),
+            loadedPaths: new Set(),
+            loadingPaths: new Map(),
+            selectedPath: "",
+        });
+    }
+    return neutralZipTreeStates.get(fileId);
 }
 
-function renderNeutralZipEntries(button, entries, status) {
-    if (!neutralZipList) return;
-    neutralZipList.replaceChildren();
+function neutralZipUrl(base, path) {
+    if (!base) return "";
+    return `${base}${base.includes("?") ? "&" : "?"}path=${encodeURIComponent(path)}`;
+}
+
+function neutralZipPreviewType(extension) {
+    const normalized = String(extension || "").toLowerCase();
+    if (normalized === "pdf") return "pdf";
+    if (normalized === "docx") return "docx";
+    if (normalized === "txt") return "text";
+    if (["jpg", "jpeg", "png", "webp"].includes(normalized)) return "image";
+    return "unsupported";
+}
+
+function setNeutralZipFolderState(folderButton, children, expanded) {
+    folderButton.setAttribute("aria-expanded", String(expanded));
+    children.hidden = !expanded;
+    const chevron = folderButton.querySelector("[data-zip-chevron]");
+    const icon = folderButton.querySelector("[data-zip-folder-icon]");
+    if (chevron) chevron.className = `fa-solid ${expanded ? "fa-chevron-down" : "fa-chevron-right"}`;
+    if (icon) icon.className = `fa-solid ${expanded ? "fa-folder-open" : "fa-folder"}`;
+}
+
+async function loadNeutralZipTreePath(zipButton, path, container, depth) {
+    const state = neutralZipState(zipButton);
+    if (state.loadedPaths.has(path)) return;
+    if (state.loadingPaths.has(path)) return state.loadingPaths.get(path);
+    const loading = document.createElement("p");
+    loading.className = "ed-zip-tree-status";
+    loading.setAttribute("role", "status");
+    loading.textContent = "Cargando contenido…";
+    container.replaceChildren(loading);
+    const request = (async () => {
+        try {
+            const response = await fetch(neutralZipUrl(zipButton.dataset.zipUrl || "", path), {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin",
+            });
+            const result = await response.json().catch(() => null);
+            const archive = result?.data?.archive;
+            if (!response.ok || !result?.success || !archive) throw new Error(result?.message || "No fue posible leer el paquete.");
+            renderNeutralZipTreeItems(zipButton, container, Array.isArray(archive.items) ? archive.items : [], depth);
+            state.loadedPaths.add(path);
+        } catch (error) {
+            const message = document.createElement("p");
+            message.className = "ed-zip-tree-status is-error";
+            message.setAttribute("role", "alert");
+            message.textContent = error instanceof Error ? error.message : "No fue posible leer el paquete.";
+            container.replaceChildren(message);
+        } finally {
+            state.loadingPaths.delete(path);
+        }
+    })();
+    state.loadingPaths.set(path, request);
+    return request;
+}
+
+function selectNeutralZipEntry(zipButton, entryButton) {
+    neutralFileButtons.forEach((item) => {
+        item.classList.remove("is-selected");
+        item.setAttribute("aria-selected", "false");
+    });
+    document.querySelectorAll("[data-zip-entry-file].is-selected").forEach((item) => {
+        item.classList.remove("is-selected");
+        item.setAttribute("aria-selected", "false");
+    });
+    entryButton.classList.add("is-selected");
+    entryButton.setAttribute("aria-selected", "true");
+    neutralZipState(zipButton).selectedPath = entryButton.dataset.zipEntryPath || "";
+    neutralSelectedFileId = entryButton.dataset.fileId || "";
+    const previewType = entryButton.dataset.previewType || "unsupported";
+    if (neutralViewer) neutralViewer.dataset.previewType = previewType;
+    if (neutralViewerDocxNote) neutralViewerDocxNote.hidden = previewType !== "docx";
+    neutralViewerBody?.classList.toggle("is-docx-content", previewType === "docx");
+    neutralZoomPercent = previewType === "docx" ? 100 : (neutralZoomByFile.get(neutralSelectedFileId) ?? 100);
+    if (neutralViewerName) neutralViewerName.textContent = entryButton.dataset.fileName || "Archivo";
+    if (neutralViewerMeta) neutralViewerMeta.textContent = [entryButton.dataset.fileType, entryButton.dataset.fileSize, "Contenido de ZIP"].filter(Boolean).join(" · ");
+    if (neutralViewerDownload) {
+        neutralViewerDownload.href = entryButton.dataset.downloadUrl || "";
+        neutralViewerDownload.setAttribute("download", entryButton.dataset.fileName || "archivo");
+        neutralViewerDownload.setAttribute("aria-label", `Descargar ${entryButton.dataset.fileName || "archivo"}`);
+    }
+    if (neutralViewerDownloadLabel) neutralViewerDownloadLabel.textContent = downloadLabelFor(entryButton.dataset.fileExtension || "");
+    loadNeutralPreview(entryButton);
+}
+
+function renderNeutralZipTreeItems(zipButton, container, entries, depth) {
+    container.replaceChildren();
     if (!entries.length) {
         const empty = document.createElement("p");
-        empty.className = "ed-viewer-state-meta";
-        empty.setAttribute("role", "status");
+        empty.className = "ed-zip-tree-status";
         empty.textContent = "Esta carpeta no contiene archivos.";
-        neutralZipList.append(empty);
-        if (neutralViewer) neutralViewer.dataset.viewerState = "zip-empty";
+        container.append(empty);
         return;
     }
+    const state = neutralZipState(zipButton);
     entries.forEach((entry) => {
-        const row = document.createElement(entry.kind === "folder" ? "button" : "div");
+        const path = String(entry.path || "");
+        const row = document.createElement("div");
+        row.className = "ed-zip-tree-node";
+        row.setAttribute("role", "treeitem");
+        row.style.setProperty("--zip-depth", String(depth));
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "ed-zip-tree-row";
+        const chevron = document.createElement("i");
         const icon = document.createElement("i");
         const copy = document.createElement("span");
         const name = document.createElement("strong");
         const meta = document.createElement("small");
-        row.className = `ed-zip-entry${entry.kind === "folder" ? " is-folder" : ""}`;
-        row.setAttribute("role", "listitem");
-        if (entry.kind === "folder") {
-            row.type = "button";
-            row.addEventListener("click", () => loadNeutralZip(button, String(entry.path ?? "")));
-        }
-        icon.className = `fa-solid ${String(entry.icon || (entry.kind === "folder" ? "fa-folder" : "fa-file"))}`;
-        icon.setAttribute("aria-hidden", "true");
         name.textContent = String(entry.name || "Elemento sin nombre");
         name.title = name.textContent;
         meta.textContent = [entry.type, entry.size].filter(Boolean).join(" · ");
         copy.append(name, meta);
-        row.append(icon, copy);
-        neutralZipList.append(row);
+        if (entry.kind === "folder") {
+            const children = document.createElement("div");
+            children.className = "ed-zip-tree-children";
+            children.setAttribute("role", "group");
+            children.hidden = true;
+            chevron.dataset.zipChevron = "";
+            icon.dataset.zipFolderIcon = "";
+            button.append(chevron, icon, copy);
+            button.setAttribute("aria-expanded", "false");
+            button.setAttribute("aria-label", `${name.textContent}, carpeta`);
+            const toggle = async (forceOpen = null) => {
+                const expanded = forceOpen ?? button.getAttribute("aria-expanded") !== "true";
+                if (expanded && !state.loadedPaths.has(path)) await loadNeutralZipTreePath(zipButton, path, children, depth + 1);
+                if (expanded) state.openPaths.add(path); else state.openPaths.delete(path);
+                setNeutralZipFolderState(button, children, expanded);
+            };
+            button.addEventListener("click", () => toggle());
+            button.addEventListener("keydown", (event) => {
+                if (event.key === "ArrowRight") { event.preventDefault(); toggle(true); }
+                if (event.key === "ArrowLeft") { event.preventDefault(); toggle(false); }
+            });
+            row.append(button, children);
+            setNeutralZipFolderState(button, children, false);
+            container.append(row);
+            if (state.openPaths.has(path)) toggle(true);
+            return;
+        }
+        chevron.className = "ed-zip-tree-spacer";
+        icon.className = `fa-solid ${String(entry.icon || "fa-file")}`;
+        icon.setAttribute("aria-hidden", "true");
+        button.append(chevron, icon, copy);
+        button.dataset.zipEntryFile = "";
+        button.dataset.zipEntryPath = path;
+        button.dataset.fileId = `${zipButton.dataset.fileId || "zip"}:${path}`;
+        button.dataset.fileName = String(entry.name || "Archivo");
+        button.dataset.fileType = String(entry.type || "Archivo");
+        button.dataset.fileSize = String(entry.size || "");
+        button.dataset.fileExtension = String(entry.extension || "");
+        button.dataset.previewType = neutralZipPreviewType(entry.extension);
+        button.dataset.previewSupported = String(button.dataset.previewType !== "unsupported");
+        button.dataset.previewUrl = neutralZipUrl(zipButton.dataset.zipEntryPreviewUrl || "", path);
+        button.dataset.downloadUrl = neutralZipUrl(zipButton.dataset.zipEntryDownloadUrl || "", path);
+        button.setAttribute("aria-selected", String(state.selectedPath === path));
+        button.setAttribute("aria-label", `${button.dataset.fileName}, ${button.dataset.fileType}, ${button.dataset.fileSize}`);
+        if (state.selectedPath === path) button.classList.add("is-selected");
+        button.addEventListener("click", () => selectNeutralZipEntry(zipButton, button));
+        row.append(button);
+        container.append(row);
     });
-    if (neutralViewer) neutralViewer.dataset.viewerState = status === "empty" ? "zip-empty" : "zip-ready";
 }
 
-async function loadNeutralZip(button, path = "") {
-    const requestSequence = ++neutralPreviewSequence;
-    const fileId = button.dataset.fileId ?? "";
-    const actionUrl = button.dataset.zipUrl ?? "";
-    neutralSelectedFileId = fileId;
-    neutralPreviewRequest?.abort();
-    neutralPreviewRequest = new AbortController();
-    resetNeutralViewer();
-    setNeutralViewerState("loading", "Cargando contenido del paquete.");
-    if (neutralViewer) neutralViewer.dataset.viewerState = "zip-loading";
-    startNeutralResourceTimeout(button, requestSequence);
-    try {
-        const separator = actionUrl.includes("?") ? "&" : "?";
-        const response = await fetch(`${actionUrl}${separator}path=${encodeURIComponent(path)}`, {
-            signal: neutralPreviewRequest.signal,
-            headers: { Accept: "application/json" },
-            credentials: "same-origin",
-        });
-        let result;
-        try {
-            result = await response.json();
-        } catch {
-            throw new Error("El servidor devolvió una respuesta que no pudo procesarse.");
-        }
-        if (requestSequence !== neutralPreviewSequence || neutralSelectedFileId !== fileId) return;
-        const archive = result?.data?.archive;
-        if (!response.ok || !result?.success || !archive) {
-            const error = new Error(result?.message || "No fue posible leer el paquete.");
-            error.status = response.status;
-            error.archiveStatus = archive?.status || "";
-            throw error;
-        }
-        renderNeutralZipBreadcrumbs(button, Array.isArray(archive.breadcrumbs) ? archive.breadcrumbs : [], String(archive.path ?? ""));
-        renderNeutralZipEntries(button, Array.isArray(archive.items) ? archive.items : [], String(archive.status ?? "ready"));
-        showNeutralPreview(neutralViewerZip);
-        if (neutralViewer) neutralViewer.dataset.viewerState = archive.status === "empty" ? "zip-empty" : "zip-ready";
-    } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        if (requestSequence !== neutralPreviewSequence || neutralSelectedFileId !== fileId) return;
-        const retry = document.createElement("button");
-        retry.type = "button";
-        retry.className = "ed-viewer-retry";
-        retry.textContent = "Reintentar";
-        retry.addEventListener("click", () => loadNeutralZip(button, path), { once: true });
-        const unsafe = error?.archiveStatus === "unsafe";
-        const missing = Number(error?.status) === 404;
-        setNeutralViewerState(missing ? "missing" : "error", unsafe ? "El paquete contiene una estructura no permitida." : (error instanceof Error ? error.message : ""), retry);
-        if (neutralViewer) neutralViewer.dataset.viewerState = unsafe ? "zip-unsafe" : "zip-error";
+async function toggleNeutralZipTree(zipButton) {
+    const item = zipButton.closest("[data-record-file-item]");
+    const tree = item?.nextElementSibling?.matches("[data-zip-tree]") ? item.nextElementSibling : null;
+    if (!(tree instanceof HTMLElement)) return;
+    const state = neutralZipState(zipButton);
+    const expanded = zipButton.getAttribute("aria-expanded") !== "true";
+    zipButton.setAttribute("aria-expanded", String(expanded));
+    tree.hidden = !expanded;
+    const icon = zipButton.querySelector(":scope > i");
+    icon?.classList.toggle("fa-box-open", expanded);
+    icon?.classList.toggle("fa-box-archive", !expanded);
+    if (expanded) {
+        state.openPaths.add("");
+        await loadNeutralZipTreePath(zipButton, "", tree, 0);
+    } else {
+        state.openPaths.delete("");
     }
 }
 
@@ -1255,10 +1341,6 @@ async function renderNeutralDocxPreview(preview, requestSequence, fileId) {
 }
 
 async function loadNeutralPreview(button) {
-    if (button.dataset.previewType === "zip" && button.dataset.zipUrl) {
-        loadNeutralZip(button);
-        return;
-    }
     const requestSequence = ++neutralPreviewSequence;
     const fileId = button.dataset.fileId ?? "";
     const previewUrl = button.dataset.previewUrl ?? "";
@@ -1396,6 +1478,7 @@ function openNeutralExpandedViewer() {
     if (neutralExpandedMeta) neutralExpandedMeta.textContent = neutralViewerMeta?.textContent || "Consulta del archivo seleccionado";
     if (neutralExpandedDownload && neutralViewerDownload) {
         neutralExpandedDownload.href = neutralViewerDownload.href;
+        neutralExpandedDownload.setAttribute("download", neutralViewerDownload.getAttribute("download") || "");
         neutralExpandedDownload.setAttribute("aria-label", neutralViewerDownload.getAttribute("aria-label") || "Descargar archivo");
     }
     if (neutralExpandedDownloadLabel) neutralExpandedDownloadLabel.textContent = neutralViewerDownloadLabel?.textContent || "Descargar archivo";
@@ -1449,6 +1532,10 @@ function closeNeutralExpandedViewer(restoreFocus = true) {
 }
 
 function selectNeutralFile(button) {
+    document.querySelectorAll("[data-zip-entry-file].is-selected").forEach((item) => {
+        item.classList.remove("is-selected");
+        item.setAttribute("aria-selected", "false");
+    });
     neutralFileButtons.forEach((item) => {
         const selected = item === button;
         item.classList.toggle("is-selected", selected);
@@ -1481,6 +1568,7 @@ function selectNeutralFile(button) {
     }
     if (neutralViewerDownload) {
         neutralViewerDownload.href = button.dataset.downloadUrl ?? "";
+        neutralViewerDownload.setAttribute("download", button.dataset.fileName ?? "archivo");
         neutralViewerDownload.setAttribute("aria-label", `Descargar ${button.dataset.fileName ?? "archivo"}`);
     }
     if (neutralViewerDownloadLabel) {
@@ -1492,11 +1580,18 @@ function selectNeutralFile(button) {
 function bindNeutralFileButton(button) {
     if (!(button instanceof HTMLElement) || button.dataset.fileBound === "true") return;
     button.dataset.fileBound = "true";
+    if (button.dataset.previewType === "zip" && button.dataset.zipUrl) {
+        button.setAttribute("aria-expanded", button.getAttribute("aria-expanded") || "false");
+    }
     button.addEventListener("click", () => {
         const checkbox = button.closest("[data-record-file-item]")?.querySelector("[data-file-select]");
         if (fileSelectionMode && checkbox) {
             checkbox.checked = !checkbox.checked;
             updateFileSelectionFromCheckbox(checkbox);
+            return;
+        }
+        if (button.dataset.previewType === "zip" && button.dataset.zipUrl) {
+            toggleNeutralZipTree(button);
             return;
         }
         selectNeutralFile(button);
@@ -2573,7 +2668,10 @@ function appendNeutralAddedFiles(files) {
             filePresentation: "false",
             filePackage: "false", previewSupported: String(Boolean(file.preview_supported)),
             previewType: file.preview_type || "unsupported", previewUrl: file.preview_url || "",
-            zipUrl: file.zip_url || "", downloadUrl: file.download_url || ""
+            zipUrl: file.zip_url || "",
+            zipEntryPreviewUrl: file.zip_entry_preview_url || "",
+            zipEntryDownloadUrl: file.zip_entry_download_url || "",
+            downloadUrl: file.download_url || ""
         });
         button.setAttribute("aria-label", `${file.name}, ${visual.label}, ${file.size_label}`);
         const icon = document.createElement("i");
@@ -2634,6 +2732,16 @@ function appendNeutralAddedFiles(files) {
         }
         item.append(checkbox, button, menuToggle, menu);
         list.append(item);
+        if (visual.extension === "zip") {
+            const tree = document.createElement("div");
+            tree.className = "ed-zip-tree";
+            tree.dataset.zipTree = "";
+            tree.dataset.zipFileId = String(file.id);
+            tree.setAttribute("role", "tree");
+            tree.setAttribute("aria-label", `Contenido de ${file.name}`);
+            tree.hidden = true;
+            list.append(tree);
+        }
         neutralFileButtons.push(button);
         if (fileSelectionToggle) fileSelectionToggle.disabled = false;
         bindNeutralFileButton(button);
@@ -3271,6 +3379,10 @@ function removeNeutralFileItems(items, packageData) {
     items.forEach((item) => {
         const group = item.closest("[data-file-group]");
         if (group) groups.add(group);
+        const button = item.querySelector("[data-record-file]");
+        const tree = item.nextElementSibling?.matches("[data-zip-tree]") ? item.nextElementSibling : null;
+        if (button?.dataset.fileId) neutralZipTreeStates.delete(button.dataset.fileId);
+        tree?.remove();
         item.remove();
     });
     groups.forEach((group) => {

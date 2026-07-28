@@ -274,6 +274,8 @@ final class AdminController
                         'preview_type'=>$extension==='zip'?'zip':(in_array($extension,['jpg','jpeg','png','webp'],true)?'image':$extension),
                         'preview_url'=>route('support-material-preview').$query,
                         'zip_url'=>$extension==='zip'?route('support-material-zip-list').$query:'',
+                        'zip_entry_preview_url'=>$extension==='zip'?route('support-material-zip-entry-preview').$query:'',
+                        'zip_entry_download_url'=>$extension==='zip'?route('support-material-zip-entry-download').$query:'',
                         'download_url'=>route('support-material-download').$query,
                     ];
                 }catch(Throwable $error){

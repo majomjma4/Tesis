@@ -36,10 +36,6 @@
             tabindex="0"
             hidden
         ></article>
-        <section class="ed-zip-explorer" data-viewer-zip hidden aria-label="Contenido del paquete">
-            <nav class="ed-zip-breadcrumbs" data-zip-breadcrumbs aria-label="Ruta dentro del paquete"></nav>
-            <div class="ed-zip-list" data-zip-list role="list"></div>
-        </section>
     </div>
 </section>
 <div class="ed-viewer-overlay" data-record-viewer-overlay hidden>

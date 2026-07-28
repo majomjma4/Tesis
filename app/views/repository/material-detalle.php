@@ -15,7 +15,14 @@
         is_array($material['files'] ?? null) ? $material['files'] : [],
         'is_array'
     ));
-    $documents = array_map(static function (array $file) use ($materialId, $previewActionUrl, $downloadActionUrl, $zipListActionUrl): array {
+    $documents = array_map(static function (array $file) use (
+        $materialId,
+        $previewActionUrl,
+        $downloadActionUrl,
+        $zipListActionUrl,
+        $zipEntryPreviewActionUrl,
+        $zipEntryDownloadActionUrl
+    ): array {
         $name = (string) ($file['name'] ?? 'Archivo sin nombre');
         $extension = mb_strtolower((string) ($file['extension'] ?? pathinfo($name, PATHINFO_EXTENSION)), 'UTF-8');
         $fileId = (int) ($file['id'] ?? 0);
@@ -37,6 +44,8 @@
             'preview_type' => $isZip ? 'zip' : ($previewTypes[$extension] ?? 'unsupported'),
             'preview_url' => $fileId > 0 ? (string) $previewActionUrl . $query : '',
             'zip_url' => $isZip && $fileId > 0 ? (string) $zipListActionUrl . $query : '',
+            'zip_entry_preview_url' => $isZip && $fileId > 0 ? (string) $zipEntryPreviewActionUrl . $query : '',
+            'zip_entry_download_url' => $isZip && $fileId > 0 ? (string) $zipEntryDownloadActionUrl . $query : '',
             'download_url' => $fileId > 0 ? (string) $downloadActionUrl . $query : '',
         ];
     }, $materialFiles);

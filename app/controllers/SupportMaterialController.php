@@ -55,6 +55,8 @@ final class SupportMaterialController
             'previewContentActionUrl' => route('support-material-preview-content'),
             'downloadActionUrl' => route('support-material-download'),
             'zipListActionUrl' => route('support-material-zip-list'),
+            'zipEntryPreviewActionUrl' => route('support-material-zip-entry-preview'),
+            'zipEntryDownloadActionUrl' => route('support-material-zip-entry-download'),
             'packageDownloadActionUrl' => route('support-material-package-download'),
             'isAdministrator' => $isAdministrator,
             'materialEditUrl' => $material === null ? '' : route('support-material-detail') . '&id=' . (int) $material['id'] . '&mode=edit&tab=information',
@@ -138,6 +140,62 @@ final class SupportMaterialController
             $this->sendJson(false, $archive['message'], ['archive' => $archive]);
         }
         $this->sendJson(true, $archive['message'], ['archive' => $archive]);
+    }
+
+    public function zipEntryPreview(): void
+    {
+        $this->ensureGetJson();
+        [$material, $zipFile, $entry] = $this->resolveZipEntryRequest(true);
+        $query = '&material_id=' . rawurlencode((string) $material['id'])
+            . '&file_id=' . rawurlencode((string) $zipFile['id'])
+            . '&path=' . rawurlencode((string) $entry['path']);
+        $preview = (new FilePreviewService())->prepare(
+            $entry,
+            base_url('index.php?page=support-material-zip-entry-content' . $query),
+            base_url('index.php?page=support-material-zip-entry-download' . $query)
+        );
+        $this->closeArchiveEntry($entry);
+        $this->sendJson(true, $preview['message'], ['preview' => $preview]);
+    }
+
+    public function zipEntryContent(): void
+    {
+        $this->ensureSession();
+        $this->ensureGet();
+        [, , $entry] = $this->resolveZipEntryRequest();
+        if (!(new FilePreviewService())->canStreamInline($entry)) {
+            $this->closeArchiveEntry($entry);
+            http_response_code(415);
+            $this->renderError('Este formato no puede visualizarse dentro de la plataforma.');
+        }
+        session_write_close();
+        header('Content-Type: ' . $entry['mime']);
+        header('Content-Length: ' . $entry['size']);
+        header('Content-Disposition: inline; filename*=UTF-8\'\'' . rawurlencode($entry['name']));
+        header('X-Content-Type-Options: nosniff');
+        header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
+        header('Cache-Control: private, no-store, max-age=0');
+        fpassthru($entry['stream']);
+        $this->closeArchiveEntry($entry);
+        exit;
+    }
+
+    public function zipEntryDownload(): void
+    {
+        $this->ensureSession();
+        $this->ensureGet();
+        [, , $entry] = $this->resolveZipEntryRequest();
+        session_write_close();
+        $originalName = basename(str_replace('\\', '/', (string) $entry['name']));
+        $quotedName = str_replace(['\\', '"'], ['\\\\', '\\"'], preg_replace('/[\x00-\x1F\x7F]/u', '', $originalName) ?: 'archivo');
+        header('Content-Type: ' . $entry['mime']);
+        header('Content-Length: ' . $entry['size']);
+        header('Content-Disposition: attachment; filename="' . $quotedName . '"; filename*=UTF-8\'\'' . rawurlencode($originalName));
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store, max-age=0');
+        fpassthru($entry['stream']);
+        $this->closeArchiveEntry($entry);
+        exit;
     }
 
     public function downloadPackage(): void
@@ -240,6 +298,31 @@ final class SupportMaterialController
     private function buildPreviewFile(array $file, $stream): array
     {
         return ['name' => $file['name'], 'path' => (string) $file['id'], 'size' => $file['size_bytes'], 'mime' => $this->mimeFor($file['extension']), 'stream' => $stream, 'archive' => null];
+    }
+
+    private function resolveZipEntryRequest(bool $jsonResponse = false): array
+    {
+        [$material, $zipFile, $zipStream] = $this->resolveFileRequest($jsonResponse);
+        fclose($zipStream);
+        if (($zipFile['extension'] ?? '') !== 'zip') {
+            $this->failFileRequest(422, 'El archivo seleccionado no es un paquete navegable.', $jsonResponse);
+        }
+        $entry = (new ArchiveService())->openFileStream($zipFile['path'], (string) ($_GET['path'] ?? ''));
+        if (empty($entry['success'])) {
+            $status = match ($entry['status'] ?? '') {
+                'invalid_path' => 400,
+                'not_found' => 404,
+                default => 422,
+            };
+            $this->failFileRequest($status, (string) ($entry['message'] ?? 'No fue posible abrir el archivo interno.'), $jsonResponse);
+        }
+        return [$material, $zipFile, $entry];
+    }
+
+    private function closeArchiveEntry(array $entry): void
+    {
+        if (isset($entry['stream']) && is_resource($entry['stream'])) fclose($entry['stream']);
+        if (isset($entry['archive']) && $entry['archive'] instanceof ZipArchive) $entry['archive']->close();
     }
 
     private function mimeFor(string $extension): string
