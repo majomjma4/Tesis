@@ -6,7 +6,7 @@
         <div class="ed-viewer-actions">
             <div class="ed-viewer-zoom" data-viewer-zoom-controls aria-label="Zoom del documento" hidden>
                 <button type="button" data-viewer-zoom-out aria-label="Alejar documento" disabled><i class="fa-solid fa-minus" aria-hidden="true"></i></button>
-                <button type="button" data-viewer-zoom-reset aria-label="Restablecer zoom" disabled><span data-viewer-zoom-value>100 %</span></button>
+                <button type="button" data-viewer-zoom-reset aria-label="Restablecer zoom"><span data-viewer-zoom-value>100 %</span></button>
                 <button type="button" data-viewer-zoom-in aria-label="Acercar documento" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
                 <span class="sr-only" data-viewer-zoom-status aria-live="polite"></span>
             </div>
@@ -15,13 +15,27 @@
         </div>
     </header>
     <div class="ed-viewer-body" data-viewer-body aria-live="polite">
+        <div class="ed-dialog-info-note ed-viewer-docx-note" data-viewer-docx-note role="note" hidden>
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+            <span>La vista previa puede presentar diferencias en el formato, la posición de algunos elementos y la separación entre páginas respecto al documento original.</span>
+        </div>
+        <div class="ed-docx-top-scroll" data-viewer-docx-top-scroll aria-label="Desplazamiento horizontal del documento DOCX" tabindex="0" hidden>
+            <div data-viewer-docx-top-scroll-track></div>
+        </div>
         <div class="ed-viewer-state" data-viewer-state role="status">
             <div><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><h3>Preparando vista previa</h3><p>Estamos cargando el archivo seleccionado.</p></div>
         </div>
         <iframe class="ed-preview-frame" data-viewer-pdf title="Vista previa del documento PDF" hidden></iframe>
         <div class="ed-preview-image-shell" data-viewer-image-shell hidden><img class="ed-preview-image" data-viewer-image alt=""></div>
         <pre class="ed-preview-text" data-viewer-text tabindex="0" hidden></pre>
-        <article class="ed-preview-docx" data-viewer-docx tabindex="0" hidden></article>
+        <article
+            class="ed-preview-docx"
+            data-viewer-docx
+            data-jszip-script="<?= e(asset('vendor/jszip/3.10.1/jszip.min.js')) ?>"
+            data-docx-preview-script="<?= e(asset('vendor/docx-preview/0.4.0/docx-preview.min.js')) ?>"
+            tabindex="0"
+            hidden
+        ></article>
         <section class="ed-zip-explorer" data-viewer-zip hidden aria-label="Contenido del paquete">
             <nav class="ed-zip-breadcrumbs" data-zip-breadcrumbs aria-label="Ruta dentro del paquete"></nav>
             <div class="ed-zip-list" data-zip-list role="list"></div>
@@ -38,7 +52,7 @@
             <div class="ed-viewer-expanded-actions">
                 <div class="ed-viewer-zoom" data-viewer-zoom-controls aria-label="Zoom del documento" hidden>
                     <button type="button" data-viewer-zoom-out aria-label="Alejar documento" disabled><i class="fa-solid fa-minus" aria-hidden="true"></i></button>
-                    <button type="button" data-viewer-zoom-reset aria-label="Restablecer zoom" disabled><span data-viewer-zoom-value>100 %</span></button>
+                    <button type="button" data-viewer-zoom-reset aria-label="Restablecer zoom"><span data-viewer-zoom-value>100 %</span></button>
                     <button type="button" data-viewer-zoom-in aria-label="Acercar documento" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
                     <span class="sr-only" data-viewer-zoom-status aria-live="polite"></span>
                 </div>

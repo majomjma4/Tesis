@@ -573,6 +573,9 @@ const neutralBackToFiles = neutralViewer?.querySelector("[data-back-to-files]");
 const neutralViewerDownload = neutralViewer?.querySelector("[data-viewer-download]");
 const neutralViewerDownloadLabel = neutralViewerDownload?.querySelector("[data-viewer-download-label]");
 const neutralViewerState = neutralViewer?.querySelector("[data-viewer-state]");
+const neutralViewerDocxNote = neutralViewer?.querySelector("[data-viewer-docx-note]");
+const neutralViewerDocxTopScroll = neutralViewer?.querySelector("[data-viewer-docx-top-scroll]");
+const neutralViewerDocxTopScrollTrack = neutralViewerDocxTopScroll?.querySelector("[data-viewer-docx-top-scroll-track]");
 const neutralViewerPdf = neutralViewer?.querySelector("[data-viewer-pdf]");
 const neutralViewerImageShell = neutralViewer?.querySelector("[data-viewer-image-shell]");
 const neutralViewerImage = neutralViewer?.querySelector("[data-viewer-image]");
@@ -603,16 +606,27 @@ let neutralSelectedFileId = "";
 let neutralResourceTimer = null;
 let neutralViewerPlaceholder = null;
 let neutralViewerReturnFocus = null;
+let neutralDocxLibrariesPromise = null;
 let neutralViewerBackgroundState = [];
 let neutralViewerBodyOverflow = "";
 let neutralViewerHtmlOverflow = "";
 let neutralFilesInitialized = false;
 let neutralViewerLayoutSequence = 0;
+let neutralDocxScrollSyncFrame = 0;
+let neutralDocxHorizontalRatio = 0;
 const neutralZoomByFile = new Map();
+const neutralDocxBaseScaleByContext = new Map();
 let neutralZoomPercent = 100;
 const neutralZoomMinimum = 75;
+const neutralDocxZoomMinimum = 35;
 const neutralZoomMaximum = 200;
 const neutralZoomStep = 25;
+
+function neutralMinimumZoom() {
+    return neutralViewerDocx?.classList.contains("is-docx-preview")
+        ? neutralDocxZoomMinimum
+        : neutralZoomMinimum;
+}
 
 function neutralZoomSupported() {
     return ["image", "text", "code", "docx"].includes(neutralViewer?.dataset.previewType || "")
@@ -629,8 +643,13 @@ function updateNeutralZoomControls(announce = false) {
     const supported = neutralZoomSupported();
     setNeutralZoomControlsVisibility(supported);
     neutralZoomValues.forEach((value) => { value.textContent = `${neutralZoomPercent} %`; });
-    neutralZoomOutButtons.forEach((button) => { button.disabled = !supported || neutralZoomPercent <= neutralZoomMinimum; });
-    neutralZoomResetButtons.forEach((button) => { button.disabled = !supported || neutralZoomPercent === 100; });
+    neutralZoomOutButtons.forEach((button) => { button.disabled = !supported || neutralZoomPercent <= neutralMinimumZoom(); });
+    const resetsDocxFit = neutralViewerDocx?.classList.contains("is-docx-preview");
+    neutralZoomResetButtons.forEach((button) => {
+        button.disabled = !supported;
+        button.setAttribute("aria-label", resetsDocxFit ? "Restablecer zoom DOCX al 100 %" : "Restablecer zoom");
+        button.title = "Volver al 100 %";
+    });
     neutralZoomInButtons.forEach((button) => { button.disabled = !supported || neutralZoomPercent >= neutralZoomMaximum; });
     neutralZoomControls.forEach((control) => {
         control.title = supported ? `Zoom del documento: ${neutralZoomPercent} %`
@@ -639,21 +658,137 @@ function updateNeutralZoomControls(announce = false) {
     if (announce && supported) neutralZoomStatuses.forEach((status) => { status.textContent = `Zoom ${neutralZoomPercent} por ciento`; });
 }
 
+function neutralDocxContextKey(fileId = neutralSelectedFileId) {
+    const mode = neutralViewerOverlay && !neutralViewerOverlay.hidden ? "expanded" : "lateral";
+    return `${fileId}:${mode}`;
+}
+
+function syncNeutralDocxHorizontalScroll(source, target) {
+    const sourceMaximum = Math.max(0, source.scrollWidth - source.clientWidth);
+    const targetMaximum = Math.max(0, target.scrollWidth - target.clientWidth);
+    const nextLeft = sourceMaximum > 0 ? (source.scrollLeft / sourceMaximum) * targetMaximum : 0;
+    if (Math.abs(target.scrollLeft - nextLeft) < 1) return;
+    target.scrollLeft = nextLeft;
+}
+
+function updateNeutralDocxTopScroll() {
+    if (!neutralViewerDocxTopScroll || !neutralViewerDocxTopScrollTrack || !neutralViewerDocx) return;
+    const isDocxReady = neutralViewer?.dataset.previewType === "docx"
+        && neutralViewer?.dataset.viewerState === "ready"
+        && neutralViewerDocx.classList.contains("is-docx-preview")
+        && !neutralViewerDocx.hidden;
+    const hasHorizontalOverflow = isDocxReady
+        && neutralViewerDocx.scrollWidth > neutralViewerDocx.clientWidth + 1;
+    neutralViewerDocxTopScroll.hidden = !hasHorizontalOverflow;
+    if (!hasHorizontalOverflow) {
+        neutralViewerDocxTopScrollTrack.style.width = "0";
+        neutralViewerDocxTopScroll.scrollLeft = 0;
+        return;
+    }
+    neutralViewerDocxTopScrollTrack.style.width = `${neutralViewerDocx.scrollWidth}px`;
+    syncNeutralDocxHorizontalScroll(neutralViewerDocx, neutralViewerDocxTopScroll);
+}
+
+function scheduleNeutralDocxTopScrollUpdate() {
+    if (neutralDocxScrollSyncFrame) window.cancelAnimationFrame(neutralDocxScrollSyncFrame);
+    neutralDocxScrollSyncFrame = window.requestAnimationFrame(() => {
+        neutralDocxScrollSyncFrame = 0;
+        updateNeutralDocxTopScroll();
+    });
+}
+
 function applyNeutralZoom(announce = false) {
-    const factor = neutralZoomPercent / 100;
+    const userZoom = neutralZoomPercent / 100;
     if (neutralViewerImage) {
         neutralViewerImage.style.width = `${neutralZoomPercent}%`;
         neutralViewerImage.style.maxWidth = "none";
     }
-    if (neutralViewerText) neutralViewerText.style.fontSize = `${13 * factor}px`;
-    if (neutralViewerDocx) neutralViewerDocx.style.fontSize = `${13 * factor}px`;
+    if (neutralViewerText) neutralViewerText.style.fontSize = `${13 * userZoom}px`;
+    if (neutralViewerDocx) {
+        if (neutralViewerDocx.classList.contains("is-docx-preview")) {
+            const docxWrapper = neutralViewerDocx.querySelector(".ed-docx-render-wrapper");
+            const docxStage = neutralViewerDocx.querySelector(".ed-docx-scale-stage");
+            const baseScale = neutralDocxBaseScaleByContext.get(neutralDocxContextKey()) ?? 1;
+            const effectiveScale = baseScale * userZoom;
+            if (docxWrapper instanceof HTMLElement) {
+                docxWrapper.style.zoom = String(effectiveScale);
+            }
+            if (docxStage instanceof HTMLElement) {
+                const naturalWidth = Number(neutralViewerDocx.dataset.docxNaturalWidth || 0);
+                docxStage.classList.toggle("is-overflowing", naturalWidth * effectiveScale > docxStage.clientWidth);
+            }
+            neutralViewerDocx.style.removeProperty("zoom");
+            neutralViewerDocx.style.removeProperty("font-size");
+        } else {
+            neutralViewerDocx.style.fontSize = `${13 * userZoom}px`;
+            neutralViewerDocx.style.removeProperty("zoom");
+        }
+    }
     if (neutralSelectedFileId) neutralZoomByFile.set(neutralSelectedFileId, neutralZoomPercent);
     updateNeutralZoomControls(announce);
+    scheduleNeutralDocxTopScrollUpdate();
 }
 
 function setNeutralZoom(nextPercent) {
-    neutralZoomPercent = Math.max(neutralZoomMinimum, Math.min(neutralZoomMaximum, nextPercent));
+    neutralZoomPercent = Math.max(neutralMinimumZoom(), Math.min(neutralZoomMaximum, nextPercent));
     applyNeutralZoom(true);
+}
+
+function fitNeutralDocxForCurrentContext() {
+    if (!neutralViewerDocx?.classList.contains("is-docx-preview") || neutralViewerDocx.hidden || !neutralSelectedFileId) return;
+    const wrapper = neutralViewerDocx.querySelector(".ed-docx-render-wrapper");
+    const stage = neutralViewerDocx.querySelector(".ed-docx-scale-stage");
+    if (!(wrapper instanceof HTMLElement) || !(stage instanceof HTMLElement)) return;
+    const contextKey = neutralDocxContextKey();
+    const naturalWidth = Number(neutralViewerDocx.dataset.docxNaturalWidth || 0);
+    if (naturalWidth <= 0) return;
+    const viewerStyle = window.getComputedStyle(neutralViewerDocx);
+    const viewerPadding = parseFloat(viewerStyle.paddingLeft || "0") + parseFloat(viewerStyle.paddingRight || "0");
+    const usefulWidth = Math.max(0, neutralViewerDocx.clientWidth - viewerPadding - 24);
+    if (usefulWidth <= 0) return;
+    const baseScale = Math.min(1, usefulWidth / naturalWidth);
+    neutralDocxBaseScaleByContext.set(contextKey, baseScale);
+    applyNeutralZoom();
+    const horizontalMaximum = Math.max(0, neutralViewerDocx.scrollWidth - neutralViewerDocx.clientWidth);
+    neutralViewerDocx.scrollLeft = horizontalMaximum * neutralDocxHorizontalRatio;
+    console.debug("[DOCX viewer] Escala inicial calculada", {
+        mode: contextKey.endsWith(":expanded") ? "expanded" : "lateral",
+        naturalPageWidth: Number(neutralViewerDocx.dataset.docxNaturalPageWidth || 0),
+        naturalWidth,
+        usefulWidth,
+        baseScale,
+        userZoomPercent: neutralZoomPercent,
+        effectiveScale: baseScale * (neutralZoomPercent / 100),
+        horizontalOverflow: neutralViewerDocx.scrollWidth > neutralViewerDocx.clientWidth,
+    });
+}
+
+function resetNeutralZoom() {
+    if (neutralViewerDocx?.classList.contains("is-docx-preview") && neutralSelectedFileId) {
+        neutralZoomPercent = 100;
+        applyNeutralZoom(true);
+        return;
+    }
+    setNeutralZoom(100);
+}
+
+function prepareNeutralDocxScale() {
+    if (!neutralViewerDocx?.classList.contains("is-docx-preview") || neutralViewerDocx.hidden) return;
+    const wrapper = neutralViewerDocx.querySelector(".ed-docx-render-wrapper");
+    const pages = [...neutralViewerDocx.querySelectorAll("section.ed-docx-render")];
+    if (!(wrapper instanceof HTMLElement) || pages.length === 0) return;
+    wrapper.style.removeProperty("zoom");
+    const wrapperStyle = window.getComputedStyle(wrapper);
+    const wrapperPadding = parseFloat(wrapperStyle.paddingLeft || "0") + parseFloat(wrapperStyle.paddingRight || "0");
+    const naturalPageWidth = Math.max(...pages.map((page) => page instanceof HTMLElement ? page.offsetWidth : 0));
+    const naturalWidth = naturalPageWidth + wrapperPadding;
+    if (naturalWidth <= 0) return;
+    wrapper.style.boxSizing = "border-box";
+    wrapper.style.width = `${naturalWidth}px`;
+    neutralViewerDocx.dataset.docxNaturalWidth = String(naturalWidth);
+    neutralViewerDocx.dataset.docxNaturalPageWidth = String(naturalPageWidth);
+    fitNeutralDocxForCurrentContext();
+    scheduleNeutralDocxTopScrollUpdate();
 }
 
 function buildPdfPreviewUrl(url) {
@@ -686,9 +821,20 @@ function resetNeutralViewer() {
         neutralViewerText.style.removeProperty("font-size");
     }
     if (neutralViewerDocx) {
+        const docxWrapper = neutralViewerDocx.querySelector(".ed-docx-render-wrapper");
+        if (docxWrapper instanceof HTMLElement) {
+            docxWrapper.style.removeProperty("zoom");
+        }
         neutralViewerDocx.hidden = true;
         neutralViewerDocx.replaceChildren();
+        neutralViewerDocx.classList.remove("is-fallback", "is-docx-preview");
+        neutralViewerDocx.removeAttribute("data-docx-fallback-reason");
+        neutralViewerDocx.removeAttribute("data-docx-natural-width");
+        neutralViewerDocx.removeAttribute("data-docx-natural-page-width");
         neutralViewerDocx.style.removeProperty("font-size");
+        neutralViewerDocx.style.removeProperty("zoom");
+        neutralViewerDocx.scrollLeft = 0;
+        neutralViewerDocx.scrollTop = 0;
     }
     if (neutralViewerZip) neutralViewerZip.hidden = true;
     if (neutralZipBreadcrumbs) neutralZipBreadcrumbs.replaceChildren();
@@ -942,6 +1088,8 @@ neutralViewerResizeObserver?.observe(neutralViewerBody);
 function renderNeutralDocx(blocks) {
     if (!neutralViewerDocx) return;
     neutralViewerDocx.replaceChildren();
+    neutralViewerDocx.classList.remove("is-docx-preview");
+    neutralViewerDocx.classList.add("is-fallback");
     blocks.forEach((block) => {
         if (block?.type === "table" && Array.isArray(block.rows)) {
             const shell = document.createElement("div");
@@ -971,6 +1119,139 @@ function renderNeutralDocx(blocks) {
         element.textContent = String(block?.text ?? "");
         neutralViewerDocx.append(element);
     });
+}
+
+function loadNeutralViewerScript(url, isReady) {
+    if (isReady()) {
+        console.debug("[DOCX viewer] Biblioteca disponible", { url });
+        return Promise.resolve();
+    }
+    const resolvedUrl = new URL(url, document.baseURI).href;
+    const existing = [...document.scripts].find((script) => script.src === resolvedUrl);
+    existing?.remove();
+    return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.addEventListener("load", () => {
+            if (isReady()) {
+                console.debug("[DOCX viewer] Biblioteca cargada", { url: resolvedUrl });
+                resolve();
+            } else {
+                reject(new Error("La biblioteca del visor no se inicializÃ³ correctamente."));
+            }
+        }, { once: true });
+        script.addEventListener("error", () => reject(new Error("No fue posible cargar la biblioteca local del visor.")), { once: true });
+        script.src = resolvedUrl;
+        script.defer = true;
+        document.head.append(script);
+    });
+}
+
+function ensureNeutralDocxLibraries() {
+    if (window.JSZip && typeof window.docx?.renderAsync === "function") {
+        console.debug("[DOCX viewer] Globales disponibles", {
+            jszip: typeof window.JSZip,
+            docx: typeof window.docx,
+            renderAsync: typeof window.docx.renderAsync,
+        });
+        return Promise.resolve();
+    }
+    if (neutralDocxLibrariesPromise) return neutralDocxLibrariesPromise;
+    const jsZipUrl = neutralViewerDocx?.dataset.jszipScript || "";
+    const docxPreviewUrl = neutralViewerDocx?.dataset.docxPreviewScript || "";
+    if (!jsZipUrl || !docxPreviewUrl) return Promise.reject(new Error("El visor DOCX local no estÃ¡ configurado."));
+    neutralDocxLibrariesPromise = loadNeutralViewerScript(jsZipUrl, () => Boolean(window.JSZip))
+        .then(() => loadNeutralViewerScript(docxPreviewUrl, () => typeof window.docx?.renderAsync === "function"))
+        .then(() => {
+            console.debug("[DOCX viewer] Globales inicializados", {
+                jszip: typeof window.JSZip,
+                docx: typeof window.docx,
+                renderAsync: typeof window.docx?.renderAsync,
+            });
+        })
+        .catch((error) => {
+            neutralDocxLibrariesPromise = null;
+            throw error;
+        });
+    return neutralDocxLibrariesPromise;
+}
+
+async function renderNeutralDocxPreview(preview, requestSequence, fileId) {
+    if (!neutralViewerDocx || !preview.content_url) throw new Error("El contenido DOCX no estÃ¡ disponible.");
+    await ensureNeutralDocxLibraries();
+    console.debug("[DOCX viewer] Descargando DOCX", {
+        fileId,
+        url: preview.content_url,
+        requestSequence,
+    });
+    const contentResponse = await fetch(preview.content_url, {
+        signal: neutralPreviewRequest?.signal,
+        headers: { Accept: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+        credentials: "same-origin",
+    });
+    console.debug("[DOCX viewer] Respuesta DOCX", {
+        status: contentResponse.status,
+        ok: contentResponse.ok,
+        mime: contentResponse.headers.get("content-type"),
+        contentLength: contentResponse.headers.get("content-length"),
+    });
+    if (!contentResponse.ok) {
+        const error = new Error("No fue posible obtener el contenido del documento.");
+        error.status = contentResponse.status;
+        throw error;
+    }
+    const documentData = await contentResponse.arrayBuffer();
+    if (documentData.byteLength === 0) throw new Error("El endpoint protegido devolviÃ³ un DOCX sin contenido.");
+    console.debug("[DOCX viewer] DOCX descargado", { bytes: documentData.byteLength });
+    const detachedBody = document.createElement("div");
+    const detachedStyles = document.createElement("div");
+    console.debug("[DOCX viewer] Iniciando renderAsync", { fileId, bytes: documentData.byteLength });
+    await window.docx.renderAsync(documentData, detachedBody, detachedStyles, {
+        className: "ed-docx-render",
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        ignoreFonts: false,
+        breakPages: true,
+        ignoreLastRenderedPageBreak: false,
+        renderHeaders: true,
+        renderFooters: true,
+        renderFootnotes: true,
+        renderEndnotes: true,
+        renderComments: false,
+        renderChanges: false,
+        useBase64URL: true,
+    });
+    console.debug("[DOCX viewer] renderAsync completado", {
+        fileId,
+        pages: detachedBody.querySelectorAll("section.ed-docx-render").length,
+        images: detachedBody.querySelectorAll("img").length,
+        styles: detachedStyles.querySelectorAll("style").length,
+    });
+    if (
+        requestSequence !== neutralPreviewSequence
+        || neutralSelectedFileId !== fileId
+        || neutralViewer?.dataset.viewerState !== "loading"
+    ) {
+        console.warn("[DOCX viewer] Resultado descartado por secuencia o estado", {
+            requestSequence,
+            currentSequence: neutralPreviewSequence,
+            fileId,
+            selectedFileId: neutralSelectedFileId,
+            viewerState: neutralViewer?.dataset.viewerState,
+        });
+        return false;
+    }
+    neutralViewerDocx.replaceChildren(...detachedStyles.childNodes, ...detachedBody.childNodes);
+    neutralViewerDocx.classList.remove("is-fallback");
+    neutralViewerDocx.classList.add("is-docx-preview");
+    const generatedWrapper = neutralViewerDocx.querySelector(".ed-docx-render-wrapper");
+    if (generatedWrapper instanceof HTMLElement) {
+        const scaleStage = document.createElement("div");
+        scaleStage.className = "ed-docx-scale-stage";
+        generatedWrapper.before(scaleStage);
+        scaleStage.append(generatedWrapper);
+    }
+    return true;
 }
 
 async function loadNeutralPreview(button) {
@@ -1056,8 +1337,33 @@ async function loadNeutralPreview(button) {
             neutralViewerText.textContent = String(preview.content ?? "");
             showNeutralPreview(neutralViewerText);
         } else if (preview.preview_type === "docx" && neutralViewerDocx) {
-            renderNeutralDocx(Array.isArray(preview.blocks) ? preview.blocks : []);
-            showNeutralPreview(neutralViewerDocx);
+            try {
+                const rendered = await renderNeutralDocxPreview(preview, requestSequence, fileId);
+                if (rendered) {
+                    showNeutralPreview(neutralViewerDocx);
+                    prepareNeutralDocxScale();
+                    neutralViewerDocx.scrollLeft = 0;
+                    neutralViewerDocx.scrollTop = 0;
+                }
+            } catch (docxError) {
+                if (docxError instanceof DOMException && docxError.name === "AbortError") return;
+                if (requestSequence !== neutralPreviewSequence || neutralSelectedFileId !== fileId) return;
+                const fallbackBlocks = Array.isArray(preview.blocks) ? preview.blocks : [];
+                const fallbackReason = docxError instanceof Error ? docxError.message : String(docxError);
+                console.error("[DOCX viewer] Error de renderizado", docxError);
+                if (fallbackBlocks.length > 0) {
+                    console.warn("[DOCX viewer] Respaldo neutralizado activado", {
+                        fileId,
+                        reason: fallbackReason,
+                        blocks: fallbackBlocks.length,
+                    });
+                    neutralViewerDocx.dataset.docxFallbackReason = fallbackReason;
+                    renderNeutralDocx(fallbackBlocks);
+                    showNeutralPreview(neutralViewerDocx);
+                } else {
+                    throw docxError;
+                }
+            }
         } else {
             setNeutralViewerState("unsupported", preview.message || "");
         }
@@ -1109,7 +1415,10 @@ function openNeutralExpandedViewer() {
     neutralViewerOverlay.hidden = false;
     neutralViewer?.classList.remove("viewer-normal");
     neutralViewer?.classList.add("viewer-expanded");
-    window.requestAnimationFrame(refreshNeutralPdfLayout);
+    window.requestAnimationFrame(() => {
+        refreshNeutralPdfLayout();
+        window.requestAnimationFrame(fitNeutralDocxForCurrentContext);
+    });
     neutralExpandedClose?.focus();
 }
 
@@ -1134,6 +1443,7 @@ function closeNeutralExpandedViewer(restoreFocus = true) {
     neutralViewer?.classList.remove("viewer-expanded");
     neutralViewer?.classList.add("viewer-normal");
     refreshVisibleViewerLayout();
+    window.requestAnimationFrame(fitNeutralDocxForCurrentContext);
     if (restoreFocus && neutralViewerReturnFocus instanceof HTMLElement) neutralViewerReturnFocus.focus();
     neutralViewerReturnFocus = null;
 }
@@ -1146,7 +1456,21 @@ function selectNeutralFile(button) {
     });
     if (neutralViewerName) neutralViewerName.textContent = button.dataset.fileName ?? "Archivo";
     if (neutralViewer) neutralViewer.dataset.previewType = button.dataset.previewType ?? "unsupported";
-    neutralZoomPercent = neutralZoomByFile.get(button.dataset.fileId ?? "") ?? 100;
+    const selectedPreviewType = button.dataset.previewType ?? "unsupported";
+    if (neutralViewerDocxNote) neutralViewerDocxNote.hidden = selectedPreviewType !== "docx";
+    neutralViewerBody?.classList.toggle("is-docx-content", selectedPreviewType === "docx");
+    neutralDocxHorizontalRatio = 0;
+    neutralZoomPercent = selectedPreviewType === "docx"
+        ? 100
+        : (neutralZoomByFile.get(button.dataset.fileId ?? "") ?? 100);
+    if (selectedPreviewType === "docx") {
+        const selectedId = button.dataset.fileId ?? "";
+        neutralZoomByFile.delete(selectedId);
+        [...neutralDocxBaseScaleByContext.keys()].forEach((key) => {
+            if (key.startsWith(`${selectedId}:`)) neutralDocxBaseScaleByContext.delete(key);
+        });
+    }
+    if (neutralViewerDocxTopScroll) neutralViewerDocxTopScroll.hidden = true;
     setNeutralZoomControlsVisibility(false);
     if (neutralViewerMeta) {
         const labels = [
@@ -1205,7 +1529,15 @@ digitalRecord?.addEventListener("digitalrecord:tabchange", (event) => {
         });
     });
 });
-window.addEventListener("resize", refreshVisibleViewerLayout, { passive: true });
+window.addEventListener("resize", () => {
+    refreshVisibleViewerLayout();
+    window.requestAnimationFrame(fitNeutralDocxForCurrentContext);
+}, { passive: true });
+
+if (typeof ResizeObserver === "function" && neutralViewerDocx) {
+    const neutralDocxResizeObserver = new ResizeObserver(scheduleNeutralDocxTopScrollUpdate);
+    neutralDocxResizeObserver.observe(neutralViewerDocx);
+}
 
 neutralBackToFiles?.addEventListener("click", () => {
     neutralFileButtons.find((button) => button.getAttribute("aria-selected") === "true")?.focus();
@@ -1216,9 +1548,34 @@ protectNeutralDownload(neutralPackageDownload);
 neutralViewerBody?.addEventListener("click", (event) => {
     if (event.target.closest("[data-record-download]")) event.stopPropagation();
 });
+neutralViewerDocxTopScroll?.addEventListener("scroll", () => {
+    if (!neutralViewerDocx || neutralViewerDocxTopScroll.hidden) return;
+    syncNeutralDocxHorizontalScroll(neutralViewerDocxTopScroll, neutralViewerDocx);
+    const maximum = Math.max(0, neutralViewerDocx.scrollWidth - neutralViewerDocx.clientWidth);
+    neutralDocxHorizontalRatio = maximum > 0 ? neutralViewerDocx.scrollLeft / maximum : 0;
+}, { passive: true });
+neutralViewerDocx?.addEventListener("scroll", () => {
+    const maximum = Math.max(0, neutralViewerDocx.scrollWidth - neutralViewerDocx.clientWidth);
+    neutralDocxHorizontalRatio = maximum > 0 ? neutralViewerDocx.scrollLeft / maximum : 0;
+    if (neutralViewerDocxTopScroll && !neutralViewerDocxTopScroll.hidden) {
+        syncNeutralDocxHorizontalScroll(neutralViewerDocx, neutralViewerDocxTopScroll);
+    }
+}, { passive: true });
+neutralViewerDocx?.addEventListener("wheel", (event) => {
+    if (!neutralViewerDocx.classList.contains("is-docx-preview")) return;
+    const atTop = neutralViewerDocx.scrollTop <= 0;
+    const atBottom = neutralViewerDocx.scrollTop + neutralViewerDocx.clientHeight >= neutralViewerDocx.scrollHeight - 1;
+    const leavesAtTop = event.deltaY < 0 && atTop;
+    const leavesAtBottom = event.deltaY > 0 && atBottom;
+    if ((!leavesAtTop && !leavesAtBottom) || !neutralViewerOverlay || neutralViewerOverlay.hidden) return;
+    const multiplier = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? 16
+        : (event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? window.innerHeight : 1);
+    window.scrollBy({ top: event.deltaY * multiplier, left: 0, behavior: "auto" });
+}, { passive: true });
 neutralViewerExpand?.addEventListener("click", openNeutralExpandedViewer);
 neutralZoomOutButtons.forEach((button) => button.addEventListener("click", () => setNeutralZoom(neutralZoomPercent - neutralZoomStep)));
-neutralZoomResetButtons.forEach((button) => button.addEventListener("click", () => setNeutralZoom(100)));
+neutralZoomResetButtons.forEach((button) => button.addEventListener("click", resetNeutralZoom));
 neutralZoomInButtons.forEach((button) => button.addEventListener("click", () => setNeutralZoom(neutralZoomPercent + neutralZoomStep)));
 neutralExpandedClose?.addEventListener("click", () => closeNeutralExpandedViewer(true));
 neutralViewerOverlay?.addEventListener("click", (event) => {
@@ -2031,13 +2388,16 @@ function closeRecordUpload(reset = false) {
 function getNeutralFileVisualType(extension) {
     const normalized = String(extension || "").trim().toLowerCase().replace(/^\.+/, "");
     const visual = {
-        pdf: ["fa-file-pdf", "PDF"],
-        doc: ["fa-file-word", "DOC"], docx: ["fa-file-word", "DOCX"],
-        xls: ["fa-file-excel", "XLS"], xlsx: ["fa-file-excel", "XLSX"],
-        ppt: ["fa-file-powerpoint", "PPT"], pptx: ["fa-file-powerpoint", "PPTX"],
-        txt: ["fa-file-lines", "TXT"], zip: ["fa-file-zipper", "ZIP"],
-        jpg: ["fa-file-image", "JPG"], jpeg: ["fa-file-image", "JPG"],
-        png: ["fa-file-image", "PNG"], webp: ["fa-file-image", "WEBP"]
+        pdf: ["fa-file-lines", "PDF"],
+        doc: ["fa-file-pen", "DOC"], docx: ["fa-file-pen", "DOCX"],
+        xls: ["fa-table", "XLS"], xlsx: ["fa-table", "XLSX"],
+        ppt: ["fa-display", "PPT"], pptx: ["fa-display", "PPTX"],
+        txt: ["fa-align-left", "TXT"],
+        zip: ["fa-box-archive", "ZIP"], rar: ["fa-box-archive", "RAR"],
+        "7z": ["fa-box-archive", "7Z"], tar: ["fa-box-archive", "TAR"], gz: ["fa-box-archive", "GZ"],
+        jpg: ["fa-image", "JPG"], jpeg: ["fa-image", "JPEG"],
+        png: ["fa-image", "PNG"], webp: ["fa-image", "WEBP"],
+        gif: ["fa-image", "GIF"], svg: ["fa-image", "SVG"]
     }[normalized];
     return {
         extension: normalized,
@@ -2299,7 +2659,7 @@ function updateNeutralPackage(packageData) {
         neutralPackageDownload.dataset.recordDownload = "";
         neutralPackageDownload.setAttribute("download", "");
         neutralPackageDownload.setAttribute("role", "menuitem");
-        neutralPackageDownload.innerHTML = '<i class="fa-solid fa-file-zipper" aria-hidden="true"></i><span>Descargar paquete completo<small></small></span>';
+        neutralPackageDownload.innerHTML = '<i class="fa-solid fa-box-archive" aria-hidden="true"></i><span>Descargar paquete completo<small></small></span>';
         actions.prepend(neutralPackageDownload);
         protectNeutralDownload(neutralPackageDownload);
     }
@@ -2427,6 +2787,7 @@ const fileRemoveMore = fileRemoveDialog?.querySelector("[data-file-remove-more]"
 const fileRemovePresentationWarning = fileRemoveDialog?.querySelector("[data-file-remove-presentation-warning]");
 const fileRemoveReplacement = fileRemoveDialog?.querySelector("[data-file-remove-replacement]");
 const fileRemoveReplacementSelect = fileRemoveDialog?.querySelector("[data-file-remove-replacement-select]");
+const fileRemoveHistoryNote = fileRemoveDialog?.querySelector("[data-file-remove-history-note] span");
 const fileRemoveError = fileRemoveDialog?.querySelector("[data-file-remove-error]");
 const fileRemoveCancel = fileRemoveDialog?.querySelector("[data-file-remove-cancel]");
 const fileRemoveClose = fileRemoveDialog?.querySelector("[data-file-remove-close]");
@@ -2436,11 +2797,13 @@ if (presentationConfirmDialog && presentationConfirmDialog.parentElement !== doc
 const presentationConfirmTitle = presentationConfirmDialog?.querySelector("[data-presentation-confirm-title]");
 const presentationConfirmDescription = presentationConfirmDialog?.querySelector("[data-presentation-confirm-description]");
 const presentationEstablishDetails = presentationConfirmDialog?.querySelector("[data-presentation-establish-details]");
+const presentationSingleLabel = presentationConfirmDialog?.querySelector("[data-presentation-single-label]");
 const presentationChangeDetails = presentationConfirmDialog?.querySelector("[data-presentation-change-details]");
 const presentationNewName = presentationConfirmDialog?.querySelector("[data-presentation-new-name]");
 const presentationNewMeta = presentationConfirmDialog?.querySelector("[data-presentation-new-meta]");
 const presentationCurrentName = presentationConfirmDialog?.querySelector("[data-presentation-current-name]");
 const presentationChangeName = presentationConfirmDialog?.querySelector("[data-presentation-change-name]");
+const presentationHistoryNote = presentationConfirmDialog?.querySelector("[data-presentation-history-note] span");
 const presentationConfirmError = presentationConfirmDialog?.querySelector("[data-presentation-confirm-error]");
 const presentationConfirmCancel = presentationConfirmDialog?.querySelector("[data-presentation-confirm-cancel]");
 const presentationConfirmClose = presentationConfirmDialog?.querySelector("[data-presentation-confirm-close]");
@@ -2549,23 +2912,31 @@ function openPresentationConfirmDialog(target, origin) {
         presentationConfirmTitle.textContent = "Quitar archivo de presentación";
         presentationConfirmDescription.textContent = "El expediente dejará de mostrar automáticamente un archivo al ingresar. Los documentos continuarán disponibles y podrán abrirse manualmente desde la lista.";
         presentationConfirmSubmit.textContent = "Quitar presentación";
+        if (presentationHistoryNote) presentationHistoryNote.textContent = "La acción de quitar la presentación actual quedará registrada en el historial del expediente y podrá reflejarse en los reportes administrativos.";
     } else if (presentationConfirmMode === "change") {
         presentationConfirmTitle.textContent = "Cambiar archivo de presentación";
         presentationConfirmDescription.textContent = "Este archivo reemplazará al archivo de presentación actual como vista inicial del expediente. El archivo anterior permanecerá disponible dentro de ‘Archivos del material’.";
         presentationConfirmSubmit.textContent = "Cambiar presentación";
+        if (presentationHistoryNote) presentationHistoryNote.textContent = "El cambio de la presentación actual quedará registrado en el historial del expediente y podrá reflejarse en los reportes administrativos.";
     } else {
         presentationConfirmTitle.textContent = "Establecer archivo de presentación";
         presentationConfirmDescription.textContent = "Este archivo se mostrará automáticamente cuando una persona ingrese al Expediente Digital. Esta elección no cambia la importancia de los demás archivos.";
         presentationConfirmSubmit.textContent = "Establecer como presentación";
+        if (presentationHistoryNote) presentationHistoryNote.textContent = "La selección de este archivo como presentación quedará registrada en el historial del expediente y podrá reflejarse en los reportes administrativos.";
     }
     const showChange = presentationConfirmMode === "change";
     presentationEstablishDetails.hidden = showChange;
     presentationChangeDetails.hidden = !showChange;
+    if (presentationSingleLabel) {
+        presentationSingleLabel.textContent = presentationConfirmMode === "remove"
+            ? "Presentación actual"
+            : "Nueva presentación";
+    }
     if (showChange) {
         presentationCurrentName.textContent = current?.dataset.fileName || "Archivo actual";
-        presentationChangeName.textContent = target.dataset.fileName || "Archivo seleccionado";
+        presentationChangeName.textContent = target.dataset.fileName || "Archivo";
     } else {
-        presentationNewName.textContent = target.dataset.fileName || "Archivo seleccionado";
+        presentationNewName.textContent = target.dataset.fileName || "Archivo";
         presentationNewMeta.textContent = [target.dataset.fileType, target.dataset.fileSize].filter(Boolean).join(" · ");
     }
     presentationConfirmBackgroundState = [...document.body.children]
@@ -2799,6 +3170,11 @@ function openFileRemoveDialogForTargets(items, origin, bulk = false) {
     if (fileRemoveConfirm) fileRemoveConfirm.disabled = false;
     const multiple = targets.length > 1;
     if (fileRemoveTitle) fileRemoveTitle.textContent = bulk ? `Retirar ${targets.length} ${multiple ? "archivos" : "archivo"}` : "Retirar archivo";
+    if (fileRemoveHistoryNote) {
+        fileRemoveHistoryNote.textContent = multiple
+            ? "El retiro de los archivos seleccionados quedará registrado en el historial del expediente y podrá reflejarse en los reportes administrativos."
+            : "El retiro de este archivo quedará registrado en el historial del expediente y podrá reflejarse en los reportes administrativos.";
+    }
     if (fileRemoveDescription) {
         const removesPresentation = targets.some(({ item }) =>
             item.querySelector("[data-record-file]")?.dataset.filePresentation === "true"

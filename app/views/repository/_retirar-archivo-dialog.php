@@ -12,6 +12,10 @@
             <ul class="ed-file-remove-list" data-file-remove-list hidden></ul>
             <p class="ed-file-remove-more" data-file-remove-more hidden></p>
             <p class="ed-file-remove-warning" data-file-remove-presentation-warning hidden></p>
+            <p class="ed-dialog-info-note" data-file-remove-history-note>
+                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                <span>El retiro de este archivo quedará registrado en el historial del expediente y podrá reflejarse en los reportes administrativos.</span>
+            </p>
             <p class="ed-file-remove-error" data-file-remove-error role="alert" hidden></p>
         </div>
         <footer>

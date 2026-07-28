@@ -422,12 +422,12 @@ final class ArchiveService
         return match ($extension) {
             'pdf' => 'Documento PDF',
             'doc', 'docx' => 'Documento de Word',
-            'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg' => 'Imagen',
+            'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg' => strtoupper($extension),
             'php', 'js', 'css', 'html', 'htm', 'ts', 'java', 'py', 'cs', 'cpp', 'c', 'sql' => 'Código fuente',
             'md', 'markdown' => 'Markdown',
             'json' => 'JSON',
             'txt', 'log', 'ini' => 'Archivo de texto',
-            'zip', 'rar', '7z', 'tar', 'gz' => 'Archivo comprimido',
+            'zip', 'rar', '7z', 'tar', 'gz' => strtoupper($extension),
             default => $extension === '' ? 'Archivo' : strtoupper($extension),
         };
     }
@@ -439,12 +439,15 @@ final class ArchiveService
         }
 
         return match ($extension) {
-            'pdf' => 'fa-file-pdf',
-            'doc', 'docx' => 'fa-file-word',
-            'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg' => 'fa-file-image',
-            'zip', 'rar', '7z', 'tar', 'gz' => 'fa-file-zipper',
-            'php', 'js', 'css', 'html', 'htm', 'ts', 'java', 'py', 'cs', 'cpp', 'c', 'sql', 'md', 'json' => 'fa-file-code',
-            default => 'fa-file-lines',
+            'pdf' => 'fa-file-lines',
+            'doc', 'docx' => 'fa-file-pen',
+            'xls', 'xlsx' => 'fa-table',
+            'ppt', 'pptx' => 'fa-display',
+            'txt' => 'fa-align-left',
+            'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg' => 'fa-image',
+            'zip', 'rar', '7z', 'tar', 'gz' => 'fa-box-archive',
+            'php', 'js', 'css', 'html', 'htm', 'ts', 'java', 'py', 'cs', 'cpp', 'c', 'sql', 'md', 'json' => 'fa-code',
+            default => 'fa-file',
         };
     }
 

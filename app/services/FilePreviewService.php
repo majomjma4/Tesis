@@ -7,6 +7,12 @@ final class FilePreviewService
     private const TEXT_PREVIEW_LIMIT = 524288;
     private const PDF_PREVIEW_LIMIT = 20971520;
     private const IMAGE_PREVIEW_LIMIT = 10485760;
+    private const DOCX_PREVIEW_LIMIT = 15728640;
+    private const DOCX_MIME_TYPES = [
+        'application/zip',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/octet-stream',
+    ];
 
     private const CODE_EXTENSIONS = [
         'php', 'html', 'htm', 'css', 'js', 'mjs', 'ts', 'tsx', 'jsx', 'java', 'py', 'cs',
@@ -89,22 +95,20 @@ final class FilePreviewService
         }
 
         if ($extension === 'docx') {
-            if (!in_array($detectedMime, [
-                'application/zip',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'application/octet-stream',
-            ], true)) {
+            if (!in_array($detectedMime, self::DOCX_MIME_TYPES, true)) {
                 return $this->unsupported($base, $extension, 'La extensión y el tipo del archivo no coinciden.');
             }
 
             $docx = (new DocxPreviewService())->extract($file);
+            $canRenderWithDocxPreview = in_array($docx['status'], ['ready', 'empty'], true);
             return array_merge($base, [
-                'status' => $docx['status'],
+                'status' => $canRenderWithDocxPreview ? 'ready' : $docx['status'],
                 'message' => $docx['message'],
-                'preview_type' => $docx['status'] === 'ready' ? 'docx' : 'unsupported',
+                'preview_type' => $canRenderWithDocxPreview ? 'docx' : 'unsupported',
                 'type_label' => 'Documento de Word',
                 'blocks' => $docx['blocks'],
                 'truncated' => $docx['truncated'],
+                'content_url' => $canRenderWithDocxPreview ? $contentUrl : '',
             ]);
         }
 
@@ -157,6 +161,20 @@ final class FilePreviewService
         $mime = $this->detectMime($file['stream']);
         if ($extension === 'pdf') {
             return $mime === 'application/pdf' && (int) $file['size'] <= self::PDF_PREVIEW_LIMIT;
+        }
+        if ($extension === 'docx') {
+            if (
+                !in_array($mime, self::DOCX_MIME_TYPES, true)
+                || (int) $file['size'] > self::DOCX_PREVIEW_LIMIT
+            ) {
+                return false;
+            }
+            try {
+                $inspection = (new DocxPreviewService())->extract($file);
+            } finally {
+                rewind($file['stream']);
+            }
+            return in_array($inspection['status'], ['ready', 'empty'], true);
         }
         return isset(self::IMAGE_MIME_BY_EXTENSION[$extension])
             && $mime === self::IMAGE_MIME_BY_EXTENSION[$extension]

@@ -25,6 +25,10 @@ $extensions = is_array($limits['extensions'] ?? null) ? $limits['extensions'] : 
                     <span>Los archivos válidos se agregarán como documentos normales; el archivo de presentación solo cambia cuando lo indiques desde su menú.</span>
                     <input id="recordUploadInput" type="file" multiple data-upload-input accept="<?= e('.' . implode(',.', $extensions)) ?>">
                 </label>
+                <p class="ed-dialog-info-note">
+                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                    <span>Los archivos agregados quedarán registrados en el historial del expediente y podrán reflejarse en los reportes administrativos.</span>
+                </p>
                 <div class="ed-upload-list" data-upload-file-list></div>
                 <p class="ed-upload-status" data-upload-status role="status" aria-live="polite"></p>
                 <ul class="ed-upload-results" data-upload-results aria-label="Resultado de la carga"></ul>
