@@ -702,7 +702,7 @@ function setNeutralViewerState(state, message = "", retryButton = null) {
         unsupported: ["fa-eye-slash", "Vista previa no disponible para este formato.", message || "Descarga el archivo para consultar su contenido."],
         error: ["fa-triangle-exclamation", "No fue posible cargar la vista previa", message || "Intenta nuevamente o descarga el archivo."],
         missing: ["fa-file-circle-xmark", "El archivo no está disponible", message || "Selecciona otro documento para continuar."],
-        empty: ["fa-folder-open", "No existen archivos disponibles", message || "Este expediente todavía no contiene documentos."],
+        empty: ["fa-folder-open", "Selecciona un archivo para visualizarlo", message || "Elige un documento del explorador para abrir su vista previa."],
     };
     const [iconClass, title, description] = settings[state] || settings.error;
     const wrapper = document.createElement("div");
@@ -1149,8 +1149,11 @@ function selectNeutralFile(button) {
     neutralZoomPercent = neutralZoomByFile.get(button.dataset.fileId ?? "") ?? 100;
     setNeutralZoomControlsVisibility(false);
     if (neutralViewerMeta) {
-        const label = button.dataset.filePrimary === "true" ? "Principal" : (button.dataset.filePackage === "true" ? "Paquete" : "");
-        neutralViewerMeta.textContent = [button.dataset.fileType ?? "Archivo", button.dataset.fileSize ?? "Tamaño no disponible", label].filter(Boolean).join(" · ");
+        const labels = [
+            button.dataset.filePresentation === "true" ? "Presentación" : "",
+            button.dataset.filePackage === "true" ? "Paquete" : "",
+        ];
+        neutralViewerMeta.textContent = [button.dataset.fileType ?? "Archivo", button.dataset.fileSize ?? "Tamaño no disponible", ...labels].filter(Boolean).join(" · ");
     }
     if (neutralViewerDownload) {
         neutralViewerDownload.href = button.dataset.downloadUrl ?? "";
@@ -1182,7 +1185,8 @@ function initializeNeutralFiles() {
         return;
     }
     neutralFilesInitialized = true;
-    if (neutralFileButtons[0]) selectNeutralFile(neutralFileButtons[0]);
+    const presentation = neutralFileButtons.find((button) => button.dataset.filePresentation === "true");
+    if (presentation) selectNeutralFile(presentation);
     else if (neutralViewer) setNeutralViewerState("empty");
 }
 if (!neutralFilesPanel || !neutralFilesPanel.hidden) initializeNeutralFiles();
@@ -1450,6 +1454,7 @@ async function submitRecordForm() {
         }
         recordIsDirty = false;
         recordForm.dataset.dirty = "false";
+        sessionStorage.setItem("digitalRecordToast", "Cambios guardados correctamente.");
         window.location.assign(recordForm.dataset.successUrl);
     } catch (error) {
         recordIsSubmitting = false;
@@ -1844,16 +1849,36 @@ const recordUploadSubmit = recordUploadDialog?.querySelector("[data-upload-submi
 const recordUploadSubmitLabel = recordUploadDialog?.querySelector("[data-upload-submit-label]");
 const recordUploadCancel = recordUploadDialog?.querySelector("[data-upload-cancel]");
 const recordUploadClose = recordUploadDialog?.querySelector("[data-upload-close]");
-const recordUploadToast = document.querySelector("[data-record-upload-toast]");
-if (recordUploadToast && recordUploadToast.parentElement !== document.body) document.body.append(recordUploadToast);
-const recordUploadToastMessage = recordUploadToast?.querySelector("[data-record-upload-toast-message]");
-const recordUploadToastClose = recordUploadToast?.querySelector("[data-record-upload-toast-close]");
+const recordToastStack = document.querySelector("[data-record-toast-stack]");
+if (recordToastStack && recordToastStack.parentElement !== document.body) document.body.append(recordToastStack);
 let recordUploadEntries = [];
 let recordUploadState = "idle";
 let recordUploadReturnFocus = null;
 let recordUploadBackgroundState = [];
 let recordUploadCloseTimer = null;
-let recordUploadToastTimer = null;
+const recordToastRegistry = new Map();
+const recordToastDurations = { success: 3800, info: 4000, warning: 5000, error: 5600 };
+
+function reflowRecordToasts(mutator) {
+    if (!recordToastStack) return;
+    const before = new Map(
+        [...recordToastStack.children].map((toast) => [toast, toast.getBoundingClientRect().top])
+    );
+    mutator();
+    [...recordToastStack.children].forEach((toast) => {
+        const previousTop = before.get(toast);
+        if (previousTop === undefined) return;
+        const delta = previousTop - toast.getBoundingClientRect().top;
+        if (!delta) return;
+        toast.style.transition = "none";
+        toast.style.transform = `translateY(${delta}px)`;
+        window.requestAnimationFrame(() => {
+            toast.style.transition = "transform 220ms ease";
+            toast.style.transform = "";
+            window.setTimeout(() => { toast.style.transition = ""; }, 230);
+        });
+    });
+}
 
 function recordUploadSize(bytes) {
     if (!Number.isFinite(bytes) || bytes < 1) return "0 bytes";
@@ -2011,25 +2036,74 @@ function getNeutralFileVisualType(extension) {
         xls: ["fa-file-excel", "XLS"], xlsx: ["fa-file-excel", "XLSX"],
         ppt: ["fa-file-powerpoint", "PPT"], pptx: ["fa-file-powerpoint", "PPTX"],
         txt: ["fa-file-lines", "TXT"], zip: ["fa-file-zipper", "ZIP"],
-        jpg: ["fa-file-image", "JPG"], jpeg: ["fa-file-image", "JPEG"],
+        jpg: ["fa-file-image", "JPG"], jpeg: ["fa-file-image", "JPG"],
         png: ["fa-file-image", "PNG"], webp: ["fa-file-image", "WEBP"]
     }[normalized];
     return {
         extension: normalized,
         icon: visual?.[0] || "fa-file",
-        label: visual?.[1] || (normalized ? normalized.toUpperCase() : "ARCHIVO")
+        label: visual?.[1] || "FILE"
     };
 }
 
-function showRecordUploadToast(message) {
-    if (!recordUploadToast || !recordUploadToastMessage) return;
-    if (recordUploadToastTimer !== null) window.clearTimeout(recordUploadToastTimer);
-    recordUploadToastMessage.textContent = message;
-    recordUploadToast.hidden = false;
-    recordUploadToastTimer = window.setTimeout(() => {
-        recordUploadToast.hidden = true;
-        recordUploadToastTimer = null;
-    }, 5000);
+function showRecordUploadToast(message, type = "success") {
+    if (!recordToastStack || !message) return;
+    const normalizedType = ["success", "info", "warning", "error"].includes(type) ? type : "info";
+    const key = `${normalizedType}:${message}`;
+    const existing = recordToastRegistry.get(key);
+    if (existing?.element?.isConnected) {
+        existing.count += 1;
+        existing.copy.textContent = `${message} ×${existing.count}`;
+        window.clearTimeout(existing.timer);
+        existing.timer = window.setTimeout(
+            () => dismissRecordToast(key),
+            recordToastDurations[normalizedType]
+        );
+        return;
+    }
+    const element = document.createElement("div");
+    const icon = document.createElement("i");
+    const copy = document.createElement("span");
+    const close = document.createElement("button");
+    const icons = {
+        success: "fa-circle-check",
+        info: "fa-circle-info",
+        warning: "fa-triangle-exclamation",
+        error: "fa-circle-xmark",
+    };
+    element.className = `ed-upload-toast is-${normalizedType}`;
+    element.setAttribute("role", normalizedType === "error" ? "alert" : "status");
+    icon.className = `fa-solid ${icons[normalizedType]}`;
+    icon.setAttribute("aria-hidden", "true");
+    copy.textContent = message;
+    close.type = "button";
+    close.setAttribute("aria-label", "Cerrar mensaje");
+    close.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+    element.append(icon, copy, close);
+    recordToastStack.prepend(element);
+    const entry = { element, copy, count: 1, timer: null };
+    entry.timer = window.setTimeout(
+        () => dismissRecordToast(key),
+        recordToastDurations[normalizedType]
+    );
+    recordToastRegistry.set(key, entry);
+    close.addEventListener("click", () => dismissRecordToast(key));
+}
+
+function dismissRecordToast(key) {
+    const entry = recordToastRegistry.get(key);
+    if (!entry) return;
+    window.clearTimeout(entry.timer);
+    entry.element.classList.add("is-leaving");
+    window.setTimeout(() => {
+        reflowRecordToasts(() => entry.element.remove());
+    }, 210);
+    recordToastRegistry.delete(key);
+}
+const pendingDigitalRecordToast = sessionStorage.getItem("digitalRecordToast");
+if (pendingDigitalRecordToast) {
+    sessionStorage.removeItem("digitalRecordToast");
+    showRecordUploadToast(pendingDigitalRecordToast);
 }
 
 function ensureNeutralFileGroup(key) {
@@ -2041,19 +2115,89 @@ function ensureNeutralFileGroup(key) {
     group.className = "ed-document-group";
     group.dataset.fileGroup = key;
     const heading = document.createElement("h3");
-    heading.textContent = key === "archives" ? "Archivos comprimidos adicionales" : "Archivos adicionales";
+    heading.textContent = key === "presentation"
+        ? "Archivo de presentación"
+        : (key === "archives" ? "Archivos comprimidos adicionales" : "Archivos del material");
     const list = document.createElement("div");
     list.className = "ed-document-list";
     list.dataset.fileGroupList = "";
     list.setAttribute("role", "listbox");
     list.setAttribute("aria-label", heading.textContent);
     group.append(heading, list);
-    panel.append(group);
+    if (key === "presentation") {
+        panel.insertBefore(group, panel.querySelector(".ed-document-group"));
+    } else {
+        panel.append(group);
+    }
     return list;
 }
 
+function createPresentationMark() {
+    const mark = document.createElement("span");
+    mark.className = "ed-file-mark is-presentation";
+    mark.dataset.filePresentationMark = "";
+    mark.innerHTML = '<i class="fa-solid fa-display" aria-hidden="true"></i> Presentación';
+    return mark;
+}
+
+function fileMarksContainer(button) {
+    let container = button?.querySelector("[data-file-marks]");
+    if (!container && button) {
+        container = document.createElement("span");
+        container.className = "ed-file-marks";
+        container.dataset.fileMarks = "";
+        button.append(container);
+    }
+    return container;
+}
+
+function createPresentationAction(isPresentation = false) {
+    const action = document.createElement("button");
+    action.type = "button";
+    action.dataset.filePresentationAction = "";
+    action.setAttribute("role", "menuitem");
+    action.innerHTML = `<i class="fa-solid fa-display" aria-hidden="true"></i>${isPresentation ? "Quitar como archivo de presentación" : "Usar como archivo de presentación"}`;
+    return action;
+}
+
+function syncPresentationFile(targetButton) {
+    neutralFileButtons.forEach((button) => {
+        const item = button.closest("[data-record-file-item]");
+        const isPresentation = button === targetButton;
+        button.dataset.filePresentation = String(isPresentation);
+        item?.querySelector("[data-file-presentation-mark]")?.remove();
+        if (isPresentation) fileMarksContainer(button)?.prepend(createPresentationMark());
+        const menu = item?.querySelector("[data-file-menu]");
+        const existingAction = menu?.querySelector("[data-file-presentation-action]");
+        existingAction?.remove();
+        if (button.dataset.previewSupported === "true"
+            && button.dataset.filePackage !== "true" && menu) {
+            const action = createPresentationAction(isPresentation);
+            menu.insertBefore(action, menu.querySelector("[data-file-remove-action]"));
+            bindFilePresentationAction(action, item);
+        }
+        const destination = ensureNeutralFileGroup(
+            isPresentation ? "presentation" : (button.dataset.fileExtension === "zip" ? "archives" : "additional")
+        );
+        if (destination && item) destination.append(item);
+    });
+    const presentationGroup = neutralFileList?.querySelector('[data-file-group="presentation"]');
+    if (presentationGroup && !presentationGroup.querySelector("[data-record-file]")) presentationGroup.remove();
+    if (targetButton) {
+        selectNeutralFile(targetButton);
+    } else {
+        neutralSelectedFileId = "";
+        neutralPreviewSequence += 1;
+        neutralPreviewRequest?.abort();
+        neutralPreviewRequest = null;
+        resetNeutralViewer();
+        if (neutralViewerName) neutralViewerName.textContent = "Archivo";
+        if (neutralViewerMeta) neutralViewerMeta.textContent = "";
+        setNeutralViewerState("empty");
+    }
+}
+
 function appendNeutralAddedFiles(files) {
-    const hadFiles = neutralFileButtons.length > 0;
     files.forEach((file) => {
         const visual = getNeutralFileVisualType(file.extension);
         const list = ensureNeutralFileGroup(visual.extension === "zip" || file.is_archive ? "archives" : "additional");
@@ -2065,7 +2209,8 @@ function appendNeutralAddedFiles(files) {
         button.setAttribute("aria-selected", "false");
         Object.assign(button.dataset, {
             recordFile: "", fileId: String(file.id), fileName: file.name, fileType: visual.label,
-            fileSize: file.size_label, fileExtension: visual.extension, filePrimary: "false",
+            fileSize: file.size_label, fileExtension: visual.extension,
+            filePresentation: "false",
             filePackage: "false", previewSupported: String(Boolean(file.preview_supported)),
             previewType: file.preview_type || "unsupported", previewUrl: file.preview_url || "",
             zipUrl: file.zip_url || "", downloadUrl: file.download_url || ""
@@ -2105,12 +2250,28 @@ function appendNeutralAddedFiles(files) {
         menu.dataset.fileMenu = "";
         menu.setAttribute("role", "menu");
         menu.hidden = true;
+        const downloadAction = document.createElement("a");
+        downloadAction.dataset.fileDownloadAction = "";
+        downloadAction.setAttribute("role", "menuitem");
+        downloadAction.setAttribute("download", "");
+        downloadAction.href = file.download_url || "";
+        downloadAction.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i>Descargar';
+        const separator = document.createElement("hr");
         const removeAction = document.createElement("button");
         removeAction.type = "button";
         removeAction.dataset.fileRemoveAction = "";
         removeAction.setAttribute("role", "menuitem");
         removeAction.innerHTML = '<i class="fa-solid fa-box-archive" aria-hidden="true"></i>Retirar archivo';
-        menu.append(removeAction);
+        if (file.preview_supported && visual.extension !== "zip") {
+            const presentationAction = document.createElement("button");
+            presentationAction.type = "button";
+            presentationAction.dataset.filePresentationAction = "";
+            presentationAction.setAttribute("role", "menuitem");
+            presentationAction.innerHTML = '<i class="fa-solid fa-display" aria-hidden="true"></i>Usar como archivo de presentación';
+            menu.append(downloadAction, separator, presentationAction, removeAction);
+        } else {
+            menu.append(downloadAction, separator, removeAction);
+        }
         item.append(checkbox, button, menuToggle, menu);
         list.append(item);
         neutralFileButtons.push(button);
@@ -2122,7 +2283,6 @@ function appendNeutralAddedFiles(files) {
     const count = neutralFileButtons.length;
     const counter = neutralFileList?.querySelector("[data-record-file-count]");
     if (counter) counter.textContent = `${count} ${count === 1 ? "archivo disponible" : "archivos disponibles"}`;
-    if (!hadFiles && neutralFileButtons[0]) selectNeutralFile(neutralFileButtons[0]);
 }
 
 function updateNeutralPackage(packageData) {
@@ -2236,11 +2396,6 @@ recordUploadInput?.addEventListener("change", () => validateRecordUploadFiles([.
 recordUploadForm?.addEventListener("submit", submitRecordUpload);
 recordUploadCancel?.addEventListener("click", () => closeRecordUpload(true));
 recordUploadClose?.addEventListener("click", () => closeRecordUpload(true));
-recordUploadToastClose?.addEventListener("click", () => {
-    if (recordUploadToastTimer !== null) window.clearTimeout(recordUploadToastTimer);
-    recordUploadToastTimer = null;
-    if (recordUploadToast) recordUploadToast.hidden = true;
-});
 recordUploadDialog?.addEventListener("click", (event) => {
     if (event.target === recordUploadDialog) closeRecordUpload();
 });
@@ -2269,10 +2424,27 @@ const fileRemoveDescription = fileRemoveDialog?.querySelector("[data-file-remove
 const fileRemoveName = fileRemoveDialog?.querySelector("[data-file-remove-name]");
 const fileRemoveList = fileRemoveDialog?.querySelector("[data-file-remove-list]");
 const fileRemoveMore = fileRemoveDialog?.querySelector("[data-file-remove-more]");
+const fileRemovePresentationWarning = fileRemoveDialog?.querySelector("[data-file-remove-presentation-warning]");
+const fileRemoveReplacement = fileRemoveDialog?.querySelector("[data-file-remove-replacement]");
+const fileRemoveReplacementSelect = fileRemoveDialog?.querySelector("[data-file-remove-replacement-select]");
 const fileRemoveError = fileRemoveDialog?.querySelector("[data-file-remove-error]");
 const fileRemoveCancel = fileRemoveDialog?.querySelector("[data-file-remove-cancel]");
 const fileRemoveClose = fileRemoveDialog?.querySelector("[data-file-remove-close]");
 const fileRemoveConfirm = fileRemoveDialog?.querySelector("[data-file-remove-confirm]");
+const presentationConfirmDialog = document.querySelector("[data-presentation-confirm-dialog]");
+if (presentationConfirmDialog && presentationConfirmDialog.parentElement !== document.body) document.body.append(presentationConfirmDialog);
+const presentationConfirmTitle = presentationConfirmDialog?.querySelector("[data-presentation-confirm-title]");
+const presentationConfirmDescription = presentationConfirmDialog?.querySelector("[data-presentation-confirm-description]");
+const presentationEstablishDetails = presentationConfirmDialog?.querySelector("[data-presentation-establish-details]");
+const presentationChangeDetails = presentationConfirmDialog?.querySelector("[data-presentation-change-details]");
+const presentationNewName = presentationConfirmDialog?.querySelector("[data-presentation-new-name]");
+const presentationNewMeta = presentationConfirmDialog?.querySelector("[data-presentation-new-meta]");
+const presentationCurrentName = presentationConfirmDialog?.querySelector("[data-presentation-current-name]");
+const presentationChangeName = presentationConfirmDialog?.querySelector("[data-presentation-change-name]");
+const presentationConfirmError = presentationConfirmDialog?.querySelector("[data-presentation-confirm-error]");
+const presentationConfirmCancel = presentationConfirmDialog?.querySelector("[data-presentation-confirm-cancel]");
+const presentationConfirmClose = presentationConfirmDialog?.querySelector("[data-presentation-confirm-close]");
+const presentationConfirmSubmit = presentationConfirmDialog?.querySelector("[data-presentation-confirm-submit]");
 const fileSelectionToggle = neutralFileList?.querySelector("[data-file-selection-toggle]");
 const fileSelectionBar = neutralFileList?.querySelector("[data-file-selection-bar]");
 const fileSelectionCount = neutralFileList?.querySelector("[data-file-selection-count]");
@@ -2282,11 +2454,16 @@ const globalFileActions = neutralFileList?.querySelector("[data-file-global-acti
 const globalFileToggle = neutralFileList?.querySelector("[data-file-global-toggle]");
 const globalFileMenu = neutralFileList?.querySelector("[data-file-global-menu]");
 let openNeutralFileMenu = null;
-let fileRemoveTargets = [];
+let fileRemoveTargets = new Map();
 let fileRemoveIsBulk = false;
 let fileRemoveReturnFocus = null;
 let fileRemoveSubmitting = false;
 let fileRemoveBackgroundState = [];
+let presentationConfirmTarget = null;
+let presentationConfirmOrigin = null;
+let presentationConfirmMode = "";
+let presentationConfirmSubmitting = false;
+let presentationConfirmBackgroundState = [];
 let fileSelectionMode = false;
 const selectedFileIds = new Set();
 
@@ -2295,6 +2472,7 @@ function closeNeutralFileMenu(restoreFocus = false) {
     const toggle = openNeutralFileMenu.querySelector("[data-file-menu-toggle]");
     const menu = openNeutralFileMenu.querySelector("[data-file-menu]");
     if (menu) menu.hidden = true;
+    menu?.classList.remove("opens-up");
     toggle?.setAttribute("aria-expanded", "false");
     openNeutralFileMenu = null;
     if (restoreFocus) toggle?.focus();
@@ -2303,8 +2481,22 @@ function closeNeutralFileMenu(restoreFocus = false) {
 function closeGlobalFileMenu(restoreFocus = false) {
     if (!globalFileMenu || globalFileMenu.hidden) return;
     globalFileMenu.hidden = true;
+    globalFileMenu.classList.remove("opens-up");
     globalFileToggle?.setAttribute("aria-expanded", "false");
     if (restoreFocus) globalFileToggle?.focus();
+}
+
+function positionFileMenu(menu, anchor, boundary = neutralFileList) {
+    if (!menu || !anchor) return;
+    menu.classList.remove("opens-up");
+    const menuRect = menu.getBoundingClientRect();
+    const anchorRect = anchor.getBoundingClientRect();
+    const boundaryRect = boundary?.getBoundingClientRect();
+    const lowerLimit = Math.min(window.innerHeight - 8, boundaryRect?.bottom ?? window.innerHeight - 8);
+    const upperLimit = Math.max(8, boundaryRect?.top ?? 8);
+    if (menuRect.bottom > lowerLimit && anchorRect.top - menuRect.height - 7 >= upperLimit) {
+        menu.classList.add("opens-up");
+    }
 }
 
 function openGlobalFileMenu() {
@@ -2312,7 +2504,137 @@ function openGlobalFileMenu() {
     closeNeutralFileMenu();
     globalFileMenu.hidden = false;
     globalFileToggle.setAttribute("aria-expanded", "true");
+    positionFileMenu(globalFileMenu, globalFileToggle);
     globalFileMenu.querySelector('[role="menuitem"]:not([disabled])')?.focus();
+}
+
+function currentPresentationButton() {
+    return neutralFileButtons.find((button) => button.dataset.filePresentation === "true") || null;
+}
+
+function closePresentationConfirmDialog(success = false) {
+    if (!presentationConfirmDialog || presentationConfirmDialog.hidden || presentationConfirmSubmitting) return;
+    presentationConfirmDialog.hidden = true;
+    presentationConfirmBackgroundState.forEach(({ element, inert, ariaHidden }) => {
+        element.inert = inert;
+        if (ariaHidden === null) element.removeAttribute("aria-hidden");
+        else element.setAttribute("aria-hidden", ariaHidden);
+    });
+    presentationConfirmBackgroundState = [];
+    document.documentElement.classList.remove("file-remove-open");
+    document.body.classList.remove("file-remove-open");
+    if (presentationConfirmOrigin?.isConnected) presentationConfirmOrigin.focus();
+    presentationConfirmTarget = null;
+    presentationConfirmOrigin = null;
+    presentationConfirmMode = "";
+    if (presentationConfirmError) {
+        presentationConfirmError.textContent = "";
+        presentationConfirmError.hidden = true;
+    }
+}
+
+function openPresentationConfirmDialog(target, origin) {
+    if (!presentationConfirmDialog || !target || presentationConfirmSubmitting) return;
+    const current = currentPresentationButton();
+    const removing = target.dataset.filePresentation === "true";
+    presentationConfirmMode = removing ? "remove" : (current ? "change" : "establish");
+    presentationConfirmTarget = target;
+    presentationConfirmOrigin = origin;
+    closeNeutralFileMenu();
+    if (presentationConfirmError) {
+        presentationConfirmError.textContent = "";
+        presentationConfirmError.hidden = true;
+    }
+    if (presentationConfirmMode === "remove") {
+        presentationConfirmTitle.textContent = "Quitar archivo de presentación";
+        presentationConfirmDescription.textContent = "El expediente dejará de mostrar automáticamente un archivo al ingresar. Los documentos continuarán disponibles y podrán abrirse manualmente desde la lista.";
+        presentationConfirmSubmit.textContent = "Quitar presentación";
+    } else if (presentationConfirmMode === "change") {
+        presentationConfirmTitle.textContent = "Cambiar archivo de presentación";
+        presentationConfirmDescription.textContent = "Este archivo reemplazará al archivo de presentación actual como vista inicial del expediente. El archivo anterior permanecerá disponible dentro de ‘Archivos del material’.";
+        presentationConfirmSubmit.textContent = "Cambiar presentación";
+    } else {
+        presentationConfirmTitle.textContent = "Establecer archivo de presentación";
+        presentationConfirmDescription.textContent = "Este archivo se mostrará automáticamente cuando una persona ingrese al Expediente Digital. Esta elección no cambia la importancia de los demás archivos.";
+        presentationConfirmSubmit.textContent = "Establecer como presentación";
+    }
+    const showChange = presentationConfirmMode === "change";
+    presentationEstablishDetails.hidden = showChange;
+    presentationChangeDetails.hidden = !showChange;
+    if (showChange) {
+        presentationCurrentName.textContent = current?.dataset.fileName || "Archivo actual";
+        presentationChangeName.textContent = target.dataset.fileName || "Archivo seleccionado";
+    } else {
+        presentationNewName.textContent = target.dataset.fileName || "Archivo seleccionado";
+        presentationNewMeta.textContent = [target.dataset.fileType, target.dataset.fileSize].filter(Boolean).join(" · ");
+    }
+    presentationConfirmBackgroundState = [...document.body.children]
+        .filter((element) => element !== presentationConfirmDialog)
+        .map((element) => ({ element, inert: element.inert, ariaHidden: element.getAttribute("aria-hidden") }));
+    presentationConfirmBackgroundState.forEach(({ element }) => {
+        element.inert = true;
+        element.setAttribute("aria-hidden", "true");
+    });
+    document.documentElement.classList.add("file-remove-open");
+    document.body.classList.add("file-remove-open");
+    presentationConfirmDialog.hidden = false;
+    window.requestAnimationFrame(() => presentationConfirmCancel?.focus());
+}
+
+async function submitPresentationChange() {
+    if (presentationConfirmSubmitting || !presentationConfirmTarget || !fileRemoveConfig) return;
+    const target = presentationConfirmTarget;
+    const mode = presentationConfirmMode;
+    presentationConfirmSubmitting = true;
+    presentationConfirmSubmit.disabled = true;
+    presentationConfirmCancel.disabled = true;
+    presentationConfirmClose.disabled = true;
+    presentationConfirmSubmit.textContent = mode === "remove" ? "Quitando…" : "Guardando…";
+    try {
+        const data = new FormData();
+        data.set("_csrf", fileRemoveConfig.dataset.csrf || "");
+        data.set("material_id", fileRemoveConfig.dataset.materialId || "");
+        data.set("file_id", target.dataset.fileId || "");
+        data.set("action", mode === "remove" ? "unpresentation" : "presentation");
+        const response = await fetch(fileRemoveConfig.dataset.endpoint || "", {
+            method: "POST", body: data, credentials: "same-origin",
+            headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" }
+        });
+        const result = await response.json();
+        if (!response.ok || !result?.success) throw new Error(result?.message || "No fue posible actualizar el archivo de presentación.");
+        presentationConfirmSubmitting = false;
+        closePresentationConfirmDialog(true);
+        syncPresentationFile(mode === "remove" ? null : target);
+        const message = mode === "remove"
+            ? "Archivo de presentación eliminado."
+            : (mode === "change"
+                ? "Archivo de presentación actualizado correctamente."
+                : "Archivo de presentación establecido correctamente.");
+        showRecordUploadToast(message, "success");
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "No fue posible actualizar el archivo de presentación.";
+        presentationConfirmError.textContent = message;
+        presentationConfirmError.hidden = false;
+        showRecordUploadToast(message, "error");
+    } finally {
+        presentationConfirmSubmitting = false;
+        presentationConfirmSubmit.disabled = false;
+        presentationConfirmCancel.disabled = false;
+        presentationConfirmClose.disabled = false;
+        presentationConfirmSubmit.textContent = mode === "remove"
+            ? "Quitar presentación"
+            : (mode === "change" ? "Cambiar presentación" : "Establecer como presentación");
+    }
+}
+
+function bindFilePresentationAction(action, item) {
+    if (!action || action.dataset.bound === "true") return;
+    action.dataset.bound = "true";
+    action.addEventListener("click", () => {
+        const button = item.querySelector("[data-record-file]");
+        if (!button || action.disabled) return;
+        openPresentationConfirmDialog(button, item.querySelector("[data-file-menu-toggle]") || action);
+    });
 }
 
 function bindNeutralFileMenu(item) {
@@ -2322,6 +2644,7 @@ function bindNeutralFileMenu(item) {
     const toggle = item.querySelector("[data-file-menu-toggle]");
     const menu = item.querySelector("[data-file-menu]");
     const action = item.querySelector("[data-file-remove-action]");
+    const presentationAction = item.querySelector("[data-file-presentation-action]");
     checkbox?.addEventListener("click", (event) => event.stopPropagation());
     checkbox?.addEventListener("change", () => updateFileSelectionFromCheckbox(checkbox));
     if (!toggle || !menu || !action) return;
@@ -2332,7 +2655,12 @@ function bindNeutralFileMenu(item) {
         menu.hidden = !opening;
         toggle.setAttribute("aria-expanded", String(opening));
         openNeutralFileMenu = opening ? item : null;
-        if (opening) action.focus();
+        if (opening) {
+            positionFileMenu(menu, toggle);
+            menu.querySelector('[role="menuitem"]:not([disabled])')?.focus();
+        } else {
+            menu.classList.remove("opens-up");
+        }
     };
     toggle.addEventListener("click", openMenu);
     toggle.addEventListener("keydown", (event) => {
@@ -2341,6 +2669,25 @@ function bindNeutralFileMenu(item) {
             openMenu();
         }
     });
+    menu.addEventListener("keydown", (event) => {
+        const items = [...menu.querySelectorAll('[role="menuitem"]:not([disabled])')];
+        const index = items.indexOf(document.activeElement);
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeNeutralFileMenu(true);
+        } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key) && items.length) {
+            event.preventDefault();
+            const next = event.key === "Home" ? 0
+                : event.key === "End" ? items.length - 1
+                    : event.key === "ArrowUp" ? (index <= 0 ? items.length - 1 : index - 1)
+                        : (index >= items.length - 1 ? 0 : index + 1);
+            items[next]?.focus();
+        }
+    });
+    item.addEventListener("focusout", (event) => {
+        if (openNeutralFileMenu === item && !item.contains(event.relatedTarget)) closeNeutralFileMenu();
+    });
+    bindFilePresentationAction(presentationAction, item);
     action.addEventListener("click", () => openFileRemoveDialog(item, action));
 }
 
@@ -2361,7 +2708,7 @@ function updateFileSelectionFromCheckbox(checkbox) {
     if (!item || !id || !fileSelectionMode) return;
     if (checkbox.checked && selectedFileIds.size >= 20 && !selectedFileIds.has(id)) {
         checkbox.checked = false;
-        showRecordUploadToast("Puedes retirar hasta 20 archivos por operación.");
+        showRecordUploadToast("Puedes retirar hasta 20 archivos por operación.", "warning");
         return;
     }
     if (checkbox.checked) selectedFileIds.add(id);
@@ -2377,7 +2724,6 @@ function normalizedSelectedFileItems() {
         const button = item.querySelector("[data-record-file]");
         const id = String(checkbox?.value || "");
         const eligible = checkbox?.checked && id !== ""
-            && button?.dataset.filePrimary !== "true"
             && button?.dataset.filePackage !== "true";
         if (eligible && !itemsById.has(id)) itemsById.set(id, item);
     });
@@ -2391,7 +2737,7 @@ function normalizedSelectedFileItems() {
     });
     updateFileSelectionControls();
     if (itemsById.size > 20) {
-        showRecordUploadToast("Puedes retirar hasta 20 archivos por operación.");
+        showRecordUploadToast("Puedes retirar hasta 20 archivos por operación.", "warning");
         return [];
     }
     return [...itemsById.values()];
@@ -2417,26 +2763,61 @@ function setFileSelectionMode(active) {
 }
 
 function openFileRemoveDialogForTargets(items, origin, bulk = false) {
-    const targets = [...items].filter((item) => {
+    const normalizedTargets = new Map();
+    [...items].forEach((item) => {
         const button = item?.querySelector("[data-record-file]");
-        return button && button.dataset.filePrimary !== "true" && button.dataset.filePackage !== "true";
+        const id = String(button?.dataset.fileId || "");
+        if (id && button.dataset.filePackage !== "true" && !normalizedTargets.has(id)) {
+            normalizedTargets.set(id, {
+                id,
+                item,
+                name: button.dataset.fileName || "Archivo",
+            });
+        }
     });
-    if (!fileRemoveDialog || !targets.length || targets.length !== items.length) return;
+    const targets = [...normalizedTargets.values()];
+    const names = targets.map(({ name }) => name);
+    const expectedCount = bulk ? selectedFileIds.size : 1;
+    if (!fileRemoveDialog || !targets.length || targets.length !== expectedCount || names.length !== expectedCount) {
+        console.error("No se abrió el diálogo de retiro: contador, IDs, elementos y nombres no coinciden.", {
+            counter: expectedCount,
+            ids: normalizedTargets.size,
+            items: targets.length,
+            names: names.length,
+        });
+        return;
+    }
     closeNeutralFileMenu();
-    fileRemoveTargets = targets;
+    closeGlobalFileMenu();
+    fileRemoveTargets = normalizedTargets;
     fileRemoveIsBulk = bulk;
     fileRemoveReturnFocus = origin;
-    const names = targets.map((item) => item.querySelector("[data-record-file]")?.dataset.fileName || "Archivo");
+    if (fileRemoveError) {
+        fileRemoveError.textContent = "";
+        fileRemoveError.hidden = true;
+    }
+    if (fileRemoveConfirm) fileRemoveConfirm.disabled = false;
     const multiple = targets.length > 1;
     if (fileRemoveTitle) fileRemoveTitle.textContent = bulk ? `Retirar ${targets.length} ${multiple ? "archivos" : "archivo"}` : "Retirar archivo";
     if (fileRemoveDescription) {
+        const removesPresentation = targets.some(({ item }) =>
+            item.querySelector("[data-record-file]")?.dataset.filePresentation === "true"
+        );
         fileRemoveDescription.textContent = multiple
-            ? "Los archivos seleccionados dejarán de estar disponibles en el Expediente Digital, pero permanecerán almacenados y podrán restaurarse posteriormente."
-            : "El archivo dejará de estar disponible en el Expediente Digital, pero permanecerá almacenado y podrá restaurarse posteriormente.";
+                ? "Los archivos seleccionados dejarán de estar disponibles en el Expediente Digital, pero permanecerán almacenados y podrán restaurarse posteriormente."
+                : "El archivo dejará de estar disponible en el Expediente Digital, pero permanecerá almacenado y podrá restaurarse posteriormente.";
+        if (fileRemovePresentationWarning) {
+            fileRemovePresentationWarning.textContent = "Este archivo está configurado como presentación. Al retirarlo, el expediente quedará sin archivo inicial.";
+            fileRemovePresentationWarning.hidden = !removesPresentation;
+        }
+        if (fileRemoveReplacement && fileRemoveReplacementSelect) {
+            fileRemoveReplacementSelect.replaceChildren();
+            fileRemoveReplacement.hidden = true;
+        }
     }
     if (fileRemoveName) {
-        fileRemoveName.textContent = names[0];
-        fileRemoveName.title = names[0];
+        fileRemoveName.textContent = bulk ? "" : names[0];
+        fileRemoveName.title = bulk ? "" : names[0];
         fileRemoveName.hidden = bulk;
     }
     if (fileRemoveList) {
@@ -2454,10 +2835,6 @@ function openFileRemoveDialogForTargets(items, origin, bulk = false) {
         fileRemoveMore.hidden = remaining === 0;
     }
     if (fileRemoveConfirm) fileRemoveConfirm.textContent = bulk ? "Retirar archivos" : "Retirar archivo";
-    if (fileRemoveError) {
-        fileRemoveError.textContent = "";
-        fileRemoveError.hidden = true;
-    }
     fileRemoveBackgroundState = [...document.body.children].filter((element) => element !== fileRemoveDialog).map((element) => ({
         element, inert: element.inert, ariaHidden: element.getAttribute("aria-hidden")
     }));
@@ -2491,14 +2868,20 @@ function closeFileRemoveDialog(removed = false) {
         : (globalFileToggle?.isConnected ? globalFileToggle : recordUploadOpen);
     focusTarget?.focus();
     fileRemoveReturnFocus = null;
-    fileRemoveTargets = [];
+    fileRemoveTargets.clear();
     fileRemoveIsBulk = false;
+    fileRemoveName?.replaceChildren();
+    fileRemoveList?.replaceChildren();
+    if (fileRemovePresentationWarning) fileRemovePresentationWarning.hidden = true;
+    if (fileRemoveReplacement) fileRemoveReplacement.hidden = true;
+    fileRemoveReplacementSelect?.replaceChildren();
 }
 
 function removeNeutralFileItems(items, packageData) {
     const removedButtons = items.map((item) => item.querySelector("[data-record-file]")).filter(Boolean);
     if (!removedButtons.length) return;
     const removedSet = new Set(removedButtons);
+    const removedPresentation = removedButtons.some((button) => button.dataset.filePresentation === "true");
     const selectedButton = removedButtons.find((button) => button.getAttribute("aria-selected") === "true") || null;
     let fallback = null;
     if (selectedButton) {
@@ -2527,7 +2910,7 @@ function removeNeutralFileItems(items, packageData) {
     neutralPreviewRequest?.abort();
     neutralPreviewRequest = null;
     resetNeutralViewer();
-    if (fallback?.isConnected) {
+    if (!removedPresentation && fallback?.isConnected) {
         selectNeutralFile(fallback);
     } else {
         neutralSelectedFileId = "";
@@ -2539,10 +2922,15 @@ function removeNeutralFileItems(items, packageData) {
 }
 
 async function submitFileRemoval() {
-    if (fileRemoveSubmitting || !fileRemoveTargets.length || !fileRemoveConfig) return;
-    const targets = [...fileRemoveTargets];
+    if (fileRemoveSubmitting || !fileRemoveTargets.size || !fileRemoveConfig) return;
+    const targetRecords = [...fileRemoveTargets.values()];
+    const targets = targetRecords.map(({ item }) => item);
+    const ids = targetRecords.map(({ id }) => id);
     const buttons = targets.map((item) => item.querySelector("[data-record-file]")).filter(Boolean);
-    if (buttons.length !== targets.length) return;
+    if (buttons.length !== targets.length || ids.length !== targets.length) {
+        console.error("No se envió el retiro: IDs, elementos y payload no coinciden.");
+        return;
+    }
     const multiple = fileRemoveIsBulk;
     fileRemoveSubmitting = true;
     if (fileRemoveConfirm) {
@@ -2555,8 +2943,8 @@ async function submitFileRemoval() {
         const data = new FormData();
         data.append("_csrf", fileRemoveConfig.dataset.csrf || "");
         data.append("material_id", fileRemoveConfig.dataset.materialId || "");
-        if (multiple) buttons.forEach((button) => data.append("file_ids[]", button.dataset.fileId || ""));
-        else data.append("file_id", buttons[0].dataset.fileId || "");
+        if (multiple) ids.forEach((id) => data.append("file_ids[]", id));
+        else data.append("file_id", ids[0]);
         data.append("action", multiple ? "remove_multiple" : "remove");
         const response = await fetch(fileRemoveConfig.dataset.endpoint || "", {
             method: "POST", body: data, credentials: "same-origin",
@@ -2572,8 +2960,22 @@ async function submitFileRemoval() {
         fileRemoveSubmitting = false;
         closeFileRemoveDialog(true);
         removeNeutralFileItems(removedItems, payload.package);
+        if (payload.presentation_file_id) {
+            const presentation = neutralFileButtons.find(
+                (button) => String(button.dataset.fileId) === String(payload.presentation_file_id)
+            );
+            if (presentation) syncPresentationFile(presentation);
+        } else if (buttons.some((button) => button.dataset.filePresentation === "true")) {
+            syncPresentationFile(null);
+        }
         setFileSelectionMode(false);
-        showRecordUploadToast(result.message || (multiple ? `${removedItems.length} archivos retirados correctamente.` : "Archivo retirado correctamente."));
+        const removedPresentation = buttons.some((button) => button.dataset.filePresentation === "true");
+        showRecordUploadToast(
+            removedPresentation
+                ? "Archivo retirado correctamente. El expediente quedó sin presentación."
+                : (result.message || (multiple ? `${removedItems.length} archivos retirados correctamente.` : "Archivo retirado correctamente.")),
+            "success"
+        );
     } catch (error) {
         if (fileRemoveError) {
             fileRemoveError.textContent = error instanceof Error ? error.message : "No fue posible retirar el archivo.";
@@ -2603,8 +3005,19 @@ fileSelectionRemove?.addEventListener("click", () => {
 fileRemoveCancel?.addEventListener("click", () => closeFileRemoveDialog());
 fileRemoveClose?.addEventListener("click", () => closeFileRemoveDialog());
 fileRemoveConfirm?.addEventListener("click", submitFileRemoval);
+fileRemoveReplacementSelect?.addEventListener("change", () => {
+    if (fileRemoveConfirm && !fileRemoveSubmitting) {
+        fileRemoveConfirm.disabled = !fileRemoveReplacementSelect.value;
+    }
+});
 fileRemoveDialog?.addEventListener("click", (event) => {
     if (event.target === fileRemoveDialog) closeFileRemoveDialog();
+});
+presentationConfirmCancel?.addEventListener("click", () => closePresentationConfirmDialog());
+presentationConfirmClose?.addEventListener("click", () => closePresentationConfirmDialog());
+presentationConfirmSubmit?.addEventListener("click", submitPresentationChange);
+presentationConfirmDialog?.addEventListener("click", (event) => {
+    if (event.target === presentationConfirmDialog) closePresentationConfirmDialog();
 });
 globalFileToggle?.addEventListener("click", () => {
     if (globalFileMenu?.hidden) openGlobalFileMenu();
@@ -2634,11 +3047,32 @@ globalFileMenu?.addEventListener("keydown", (event) => {
         items[next]?.focus();
     }
 });
+globalFileActions?.addEventListener("focusout", (event) => {
+    if (!globalFileActions.contains(event.relatedTarget)) closeGlobalFileMenu();
+});
 document.addEventListener("click", (event) => {
     if (openNeutralFileMenu && !openNeutralFileMenu.contains(event.target)) closeNeutralFileMenu();
     if (globalFileActions && !globalFileActions.contains(event.target)) closeGlobalFileMenu();
 });
 document.addEventListener("keydown", (event) => {
+    if (presentationConfirmDialog && !presentationConfirmDialog.hidden) {
+        if (event.key === "Escape" && !presentationConfirmSubmitting) {
+            event.preventDefault();
+            closePresentationConfirmDialog();
+            return;
+        }
+        if (event.key === "Tab") {
+            const controls = [presentationConfirmClose, presentationConfirmCancel, presentationConfirmSubmit]
+                .filter((control) => control && !control.disabled);
+            const index = controls.indexOf(document.activeElement);
+            const next = event.shiftKey
+                ? (index <= 0 ? controls.length - 1 : index - 1)
+                : (index === controls.length - 1 ? 0 : index + 1);
+            event.preventDefault();
+            controls[next]?.focus();
+        }
+        return;
+    }
     if (fileRemoveDialog && !fileRemoveDialog.hidden) {
         if (event.key === "Escape" && !fileRemoveSubmitting) {
             event.preventDefault();

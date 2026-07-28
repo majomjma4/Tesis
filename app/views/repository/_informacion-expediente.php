@@ -18,7 +18,6 @@ $formValues = is_array($recordForm['values'] ?? null) ? $recordForm['values'] : 
 .ed-discard-card.is-save>i{background:rgba(37,99,235,.1);color:var(--primary)}
 @media(max-width:650px){.ed-form-grid{grid-template-columns:1fr}.ed-form-field.is-wide{grid-column:auto}.ed-form-card{padding:17px}.ed-form-actions{position:static;align-items:stretch;flex-direction:column}.ed-form-actions>div{display:grid;grid-template-columns:1fr 1fr}.ed-form-button{min-height:44px}.ed-discard-actions{grid-template-columns:1fr}.ed-discard-actions .ed-form-button:first-child{order:-1}}
 </style>
-<?php if (($recordForm['success_message'] ?? '') !== ''): ?><p class="ed-form-status" role="status"><?= e($recordForm['success_message']) ?></p><?php endif; ?>
 <?php if ($recordMode === 'edit'): ?>
     <div class="ed-form-error-summary" role="alert" tabindex="-1" hidden data-record-error-summary><strong>No fue posible guardar los cambios.</strong><p data-record-error-message>Revisa la información señalada.</p></div>
     <p class="ed-form-status" role="status" aria-live="polite" hidden data-record-form-status></p>

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 final class SupportMaterialModel
 {
+    private const PREVIEW_EXTENSIONS = ['pdf','docx','txt','png','jpg','jpeg','webp'];
+
     public function getAll(): array
     {
         return $this->listing('published');
@@ -12,6 +14,15 @@ final class SupportMaterialModel
     public function getWithdrawn(): array
     {
         return $this->listing('withdrawn');
+    }
+
+    public function getAdminMaterials(): array
+    {
+        $statement = Database::connection()->query(
+            $this->baseQuery()
+            . " WHERE sm.status IN ('draft','published') ORDER BY sm.publication_date DESC,sm.id DESC"
+        );
+        return array_map([$this, 'hydrate'], $statement->fetchAll());
     }
 
     public function categories(): array
@@ -147,7 +158,7 @@ final class SupportMaterialModel
               publication_date,status,keywords_json,created_by,updated_by)
              VALUES
              (:category_id,:title,:material_type,:description,:full_description,:publisher,
-              :publication_date,'published',:keywords_json,:created_by,:updated_by)"
+              :publication_date,'draft',:keywords_json,:created_by,:updated_by)"
         );
         $statement->execute($payload);
         return (int) $database->lastInsertId();
@@ -161,9 +172,6 @@ final class SupportMaterialModel
         $material = $this->findById($id, true);
         if ($material === null) {
             throw new InvalidArgumentException('El material ya no está disponible.');
-        }
-        if ($status === 'published' && $material['files_count'] < 1) {
-            throw new InvalidArgumentException('Agrega al menos un archivo antes de restaurar el material.');
         }
         Database::connection()->prepare(
             "UPDATE support_materials SET status=:status,
@@ -187,20 +195,13 @@ final class SupportMaterialModel
             throw new InvalidArgumentException('El material ya no está disponible.');
         }
         $database = Database::connection();
-        $isPrimary = !empty($file['is_primary']);
-        if ($isPrimary) {
-            $database->prepare(
-                'UPDATE support_material_files SET is_primary=0
-                 WHERE material_id=:id AND deleted_at IS NULL'
-            )->execute(['id' => $materialId]);
-        }
         $statement = $database->prepare(
             'INSERT INTO support_material_files
              (material_id,original_name,storage_name,relative_path,extension,mime_type,
-              size_bytes,is_primary,is_package,sort_order,created_by)
+              size_bytes,is_package,sort_order,created_by)
              VALUES
              (:material_id,:original_name,:storage_name,:relative_path,:extension,:mime_type,
-              :size_bytes,:is_primary,0,
+              :size_bytes,0,
               (SELECT COALESCE(MAX(existing.sort_order),0)+1 FROM support_material_files existing
                WHERE existing.material_id=:sort_material_id),:created_by)'
         );
@@ -212,7 +213,6 @@ final class SupportMaterialModel
             'extension' => $file['extension'],
             'mime_type' => $file['mime_type'],
             'size_bytes' => $file['size_bytes'],
-            'is_primary' => $isPrimary ? 1 : 0,
             'sort_material_id' => $materialId,
             'created_by' => $actor,
         ]);
@@ -249,7 +249,7 @@ final class SupportMaterialModel
         }
         $placeholders = implode(',', array_fill(0, count($fileIds), '?'));
         $statement = $database->prepare(
-            'SELECT id,original_name,extension,size_bytes,is_primary,is_package,deleted_at
+            'SELECT id,original_name,extension,size_bytes,is_package,deleted_at
              FROM support_material_files
              WHERE material_id=? AND id IN (' . $placeholders . ')
              FOR UPDATE'
@@ -260,7 +260,6 @@ final class SupportMaterialModel
         $filesById = [];
         foreach ($rows as $file) {
             if ($file['deleted_at'] !== null) throw new InvalidArgumentException('Uno o más archivos ya fueron retirados.');
-            if ((int) $file['is_primary'] === 1) throw new InvalidArgumentException('El archivo principal no puede retirarse.');
             if ((int) $file['is_package'] === 1) throw new InvalidArgumentException('El paquete institucional no puede retirarse.');
             $filesById[(int) $file['id']] = $file;
         }
@@ -280,6 +279,71 @@ final class SupportMaterialModel
                 'size_bytes' => (int) $file['size_bytes'],
             ];
         }, $fileIds);
+    }
+
+    public function setPresentationFile(int $materialId, ?int $fileId, int $actor, ?int $expectedCurrentId = null): array
+    {
+        if ($materialId < 1 || ($fileId !== null && $fileId < 1)) {
+            throw new InvalidArgumentException('El archivo seleccionado no es válido.');
+        }
+        $database = Database::connection();
+        $material = $this->findByIdForUpdate($materialId);
+        if ($material === null) throw new InvalidArgumentException('El material ya no está disponible.');
+        $file = null;
+        if ($fileId !== null) {
+            $statement = $database->prepare(
+                'SELECT id,original_name,extension,mime_type,is_package,deleted_at
+                 FROM support_material_files
+                 WHERE material_id=:material_id AND id=:file_id FOR UPDATE'
+            );
+            $statement->execute(['material_id' => $materialId, 'file_id' => $fileId]);
+            $file = $statement->fetch();
+            if (!$file || $file['deleted_at'] !== null || (int) $file['is_package'] === 1
+                || !$this->isPreviewCompatible($file)) {
+                throw new InvalidArgumentException(
+                    'Selecciona un archivo activo y compatible con la vista previa.'
+                );
+            }
+        }
+        $previousId = isset($material['presentation_file_id'])
+            ? (int) $material['presentation_file_id']
+            : null;
+        if ($fileId === null) {
+            if (!$previousId) {
+                throw new InvalidArgumentException('La presentación ya había sido eliminada.');
+            }
+            if ($expectedCurrentId !== null && $previousId !== $expectedCurrentId) {
+                throw new InvalidArgumentException('El archivo ya no es la presentación actual.');
+            }
+        }
+        $database->prepare(
+            'UPDATE support_materials
+             SET presentation_file_id=:file_id,updated_by=:actor
+             WHERE id=:material_id'
+        )->execute(['file_id' => $fileId, 'actor' => $actor, 'material_id' => $materialId]);
+        return [
+            'previous_file_id' => $previousId ?: null,
+            'file_id' => $fileId,
+            'name' => $file === null ? null : (string) $file['original_name'],
+        ];
+    }
+
+    public function eligiblePresentationFiles(int $materialId, array $excludeIds = []): array
+    {
+        $material = $this->findById($materialId, true);
+        if ($material === null) return [];
+        $excluded = array_fill_keys(array_map('intval', $excludeIds), true);
+        return array_values(array_filter(
+            $material['files'],
+            fn (array $file): bool => !isset($excluded[$file['id']])
+                && !$file['package']
+                && $this->isPreviewCompatible($file)
+        ));
+    }
+
+    public function isPreviewCompatible(array $file): bool
+    {
+        return in_array($this->resolveFileExtension($file), self::PREVIEW_EXTENSIONS, true);
     }
 
     public function incrementDownloads(int $materialId): void
@@ -313,10 +377,14 @@ final class SupportMaterialModel
         $statement = Database::connection()->prepare(
             'SELECT * FROM support_material_files
              WHERE material_id=:id AND deleted_at IS NULL
-             ORDER BY is_primary DESC,is_package ASC,sort_order,id'
+             ORDER BY is_package ASC,sort_order,id'
         );
         $statement->execute(['id' => $material['id']]);
-        $files = array_map(function (array $file): array {
+        $presentationId = isset($material['presentation_file_id'])
+            ? (int) $material['presentation_file_id']
+            : 0;
+        $files = array_map(function (array $file) use ($presentationId): array {
+            $extension = $this->resolveFileExtension($file);
             $path = ROOT_PATH . '/storage/support-materials/' . str_replace(
                 ['/', '\\'],
                 DIRECTORY_SEPARATOR,
@@ -325,11 +393,12 @@ final class SupportMaterialModel
             return [
                 'id' => (int) $file['id'],
                 'name' => $file['original_name'],
-                'format' => strtoupper($file['extension']),
+                'format' => $extension !== '' ? strtoupper($extension) : 'FILE',
                 'path' => $path,
-                'primary' => (bool) $file['is_primary'],
+                'presentation' => (int) $file['id'] === $presentationId,
                 'package' => (bool) $file['is_package'],
-                'extension' => strtolower($file['extension']),
+                'extension' => $extension,
+                'mime_type' => strtolower((string) ($file['mime_type'] ?? '')),
                 'size_bytes' => (int) $file['size_bytes'],
                 'size' => ArchiveService::formatBytes((int) $file['size_bytes']),
             ];
@@ -337,8 +406,10 @@ final class SupportMaterialModel
 
         $regularFiles = array_values(array_filter($files, static fn (array $file): bool => !$file['package']));
         $package = current(array_filter($files, static fn (array $file): bool => $file['package'])) ?: null;
-        $primary = current(array_filter($regularFiles, static fn (array $file): bool => $file['primary']))
-            ?: ($regularFiles[0] ?? null);
+        $presentation = current(array_filter(
+            $regularFiles,
+            static fn (array $file): bool => $file['presentation']
+        )) ?: null;
         $date = new DateTimeImmutable($material['publication_date']);
         $keywords = json_decode((string) ($material['keywords_json'] ?? '[]'), true);
 
@@ -349,20 +420,45 @@ final class SupportMaterialModel
         $material['publication_date_iso'] = $date->format('Y-m-d');
         $material['publication_date'] = $this->spanishDate($date);
         $material['status_key'] = $material['status'];
-        $material['status'] = $material['status'] === 'published' ? 'Disponible' : 'Retirado';
+        $material['status'] = match ($material['status']) {
+            'published' => 'Disponible',
+            'draft' => 'Borrador',
+            default => 'Retirado',
+        };
         $material['downloads'] = (int) $material['download_count'];
         $material['keywords'] = is_array($keywords) ? array_values($keywords) : [];
         $material['files'] = $regularFiles;
         $material['files_count'] = count($regularFiles);
-        $material['primary_file'] = $primary;
-        $material['additional_files'] = array_values(array_filter(
-            $regularFiles,
-            static fn (array $file): bool => $primary === null || $file['id'] !== $primary['id']
-        ));
+        $material['presentation_file'] = $presentation;
+        $material['additional_files'] = $regularFiles;
         $material['size_bytes'] = array_sum(array_column($regularFiles, 'size_bytes'));
         $material['size'] = ArchiveService::formatBytes($material['size_bytes']);
         if ($package !== null) $material['package'] = $package;
         return $material;
+    }
+
+    private function resolveFileExtension(array $file): string
+    {
+        $allowed = ['pdf','doc','docx','txt','zip','png','jpg','jpeg','webp','xls','xlsx','ppt','pptx'];
+        $fromName = strtolower(pathinfo((string) ($file['original_name'] ?? ''), PATHINFO_EXTENSION));
+        $stored = strtolower(ltrim((string) ($file['extension'] ?? ''), '.'));
+        if ($fromName === 'jpeg') $fromName = 'jpg';
+        if ($stored === 'jpeg') $stored = 'jpg';
+        $mime = strtolower((string) ($file['mime_type'] ?? ''));
+        $fromMime = match ($mime) {
+            'application/pdf' => 'pdf',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'text/plain' => 'txt',
+            'application/zip', 'application/x-zip-compressed' => 'zip',
+            'image/png' => 'png',
+            'image/jpeg' => 'jpg',
+            'image/webp' => 'webp',
+            default => '',
+        };
+        if (in_array($fromName, $allowed, true)) return $fromName;
+        if ($fromMime !== '') return $fromMime;
+        return in_array($stored, $allowed, true) ? $stored : '';
     }
 
     private function spanishDate(DateTimeImmutable $date): string

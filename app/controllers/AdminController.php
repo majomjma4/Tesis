@@ -15,8 +15,8 @@ final class AdminController
     private function trashSession():AuthSessionService{$s=new AuthSessionService();if(!$s->validateCsrf('admin_trash',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);return $s;}
     public function notifications():void{$model=new AdminNotificationModel();$error=null;try{$data=$model->dashboard(PaginationService::request());}catch(Throwable $e){error_log('Admin notifications: '.$e->getMessage());$error='No fue posible consultar el centro de notificaciones.';$data=['users'=>[],'projects'=>[],'sent'=>[],'pagination'=>['total'=>0],'summary'=>['sent'=>0,'recipients'=>0,'today'=>0]];}$s=new AuthSessionService();View::render('admin/notifications',['currentPage'=>'notifications','title'=>'Notificaciones | Administración','bodyClass'=>'admin-notifications-page','pageStyles'=>[asset('css/admin-notifications.css')],'pageScript'=>asset('js/admin-notifications.js'),'adminNotifications'=>$data,'pagePagination'=>$data['pagination'],'adminNotificationsError'=>$error,'adminNotificationCsrf'=>$s->csrfToken('admin_notifications'),'adminNotificationSendEndpoint'=>route('admin-notification-send')]);}
     public function sendNotification():void{$this->requirePost();$s=new AuthSessionService();if(!$s->validateCsrf('admin_notifications',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);try{$result=(new AdminNotificationModel())->send($_POST,(int)$s->userId());$this->json(true,'Notificación enviada a '.$result['recipients'].' destinatarios.',$result);}catch(InvalidArgumentException $e){$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){error_log('Admin send notification: '.$e->getMessage());$this->json(false,'No fue posible enviar la notificación.',[],500);}}
-    public function repository():void{$model=new AdminRepositoryModel();$error=null;try{$summary=$model->summary();$catalogRequest=PaginationService::request();$catalogRequest['size']=100;$published=$model->listing('published',$catalogRequest);$projects=$published['items'];$pagination=$published['pagination'];$catalogs=$model->filterCatalogs();$withdrawnPublications=$model->withdrawnPublications();$materialModel=new SupportMaterialModel();$supportMaterials=$materialModel->getAll();$withdrawnMaterials=$materialModel->getWithdrawn();$materialCategories=$materialModel->categories();}catch(Throwable $e){error_log('Admin repository: '.$e->getMessage());$error='No fue posible consultar las publicaciones.';$projects=[];$pagination=['total'=>0];$summary=['eligible'=>0,'published'=>0,'incomplete'=>0];$catalogs=['types'=>[],'periods'=>[]];$withdrawnPublications=[];$supportMaterials=[];$withdrawnMaterials=[];$materialCategories=[];}$s=new AuthSessionService();View::render('admin/repository',['currentPage'=>'repository','title'=>'Repositorio | Administración','bodyClass'=>'admin-repository-page','pageStyles'=>[asset('css/admin-repository.css')],'pageScript'=>asset('js/admin-repository.js'),'repositoryProjects'=>$projects,'pagePagination'=>$pagination,'repositorySummary'=>$summary,'repositoryError'=>$error,'repositoryCatalogs'=>$catalogs,'withdrawnPublications'=>$withdrawnPublications,'supportMaterials'=>$supportMaterials,'withdrawnMaterials'=>$withdrawnMaterials,'materialCategories'=>$materialCategories,'repositoryCsrf'=>$s->csrfToken('admin_repository'),'repositoryPublishEndpoint'=>route('admin-repository-publish'),'materialSaveEndpoint'=>route('admin-support-material-save'),'materialStatusEndpoint'=>route('admin-support-material-status'),'materialFileEndpoint'=>route('admin-support-material-file')]);}
-    public function publishProject():void{$this->requirePost();$s=new AuthSessionService();if(!$s->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);try{$action=(string)($_POST['action']??'');$model=new AdminRepositoryModel();if($action==='publish')$this->json(false,'La publicación depende del flujo académico y no puede realizarse desde la administración.',[],403);if($action==='restore'){$model->restorePublication((int)($_POST['id']??0),(int)$s->userId());$this->json(true,'La publicación fue restaurada correctamente.');}$model->setPublished((int)($_POST['id']??0),false,(int)$s->userId());$this->json(true,'Proyecto retirado del repositorio. Permanece disponible en Proyectos.');}catch(InvalidArgumentException $e){$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){error_log('Publish project: '.$e->getMessage());$this->json(false,'No fue posible actualizar la publicación.',[],500);}}
+    public function repository():void{$model=new AdminRepositoryModel();$error=null;try{$summary=$model->summary();$catalogRequest=PaginationService::request();$catalogRequest['size']=100;$published=$model->listing('published',$catalogRequest);$projects=$published['items'];$pagination=$published['pagination'];$catalogs=$model->filterCatalogs();$withdrawnPublications=$model->withdrawnPublications();$materialModel=new SupportMaterialModel();$supportMaterials=$materialModel->getAdminMaterials();$withdrawnMaterials=$materialModel->getWithdrawn();$materialCategories=$materialModel->categories();}catch(Throwable $e){error_log('Admin repository: '.$e->getMessage());$error='No fue posible consultar las publicaciones.';$projects=[];$pagination=['total'=>0];$summary=['eligible'=>0,'published'=>0,'incomplete'=>0];$catalogs=['types'=>[],'periods'=>[]];$withdrawnPublications=[];$supportMaterials=[];$withdrawnMaterials=[];$materialCategories=[];}$s=new AuthSessionService();View::render('admin/repository',['currentPage'=>'repository','title'=>'Repositorio | Administración','bodyClass'=>'admin-repository-page','pageStyles'=>[asset('css/admin-repository.css')],'pageScript'=>asset('js/admin-repository.js'),'repositoryProjects'=>$projects,'pagePagination'=>$pagination,'repositorySummary'=>$summary,'repositoryError'=>$error,'repositoryCatalogs'=>$catalogs,'withdrawnPublications'=>$withdrawnPublications,'supportMaterials'=>$supportMaterials,'withdrawnMaterials'=>$withdrawnMaterials,'materialCategories'=>$materialCategories,'repositoryCsrf'=>$s->csrfToken('admin_repository'),'repositoryPublishEndpoint'=>route('admin-repository-publish'),'materialSaveEndpoint'=>route('admin-support-material-save'),'materialStatusEndpoint'=>route('admin-support-material-status'),'materialFileEndpoint'=>route('admin-support-material-file')]);}
+    public function publishProject():void{$this->requirePost();$s=new AuthSessionService();if(!$s->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);try{$action=(string)($_POST['action']??'');$model=new AdminRepositoryModel();if($action==='presentation'||$action==='unpresentation'){$model->setPresentationFile((int)($_POST['id']??0),$action==='presentation'?(int)($_POST['file_id']??0):null,(int)$s->userId());$this->json(true,$action==='unpresentation'?'Archivo de presentación eliminado.':'Archivo de presentación actualizado correctamente.');}if($action==='publish')$this->json(false,'La publicación depende del flujo académico y no puede realizarse desde la administración.',[],403);if($action==='restore'){$model->restorePublication((int)($_POST['id']??0),(int)$s->userId());$this->json(true,'La publicación fue restaurada correctamente.');}$model->setPublished((int)($_POST['id']??0),false,(int)$s->userId());$this->json(true,'Proyecto retirado del repositorio. Permanece disponible en Proyectos.');}catch(InvalidArgumentException $e){$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){error_log('Publish project: '.$e->getMessage());$this->json(false,'No fue posible actualizar la publicación.',[],500);}}
 
     public function saveSupportMaterial():void
     {
@@ -25,7 +25,7 @@ final class AdminController
             error_log('Support material file upload rejected before parsing: request body exceeded PHP limits or was malformed.');
             $this->json(false,'La carga supera los límites permitidos por el servidor.',[],422);
         }
-        if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);
+        if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La solicitud contiene un token CSRF inválido.',[],419);
         $id=(int)($_POST['id']??0);$title=$this->normalizeAuditText($_POST['title']??'');
         try{
             $result=Database::transaction(function(PDO $database)use($id,$title,$session):array{
@@ -125,7 +125,30 @@ final class AdminController
         $this->requirePost();$session=new AuthSessionService();
         if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);
         $id=(int)($_POST['id']??0);$status=(string)($_POST['status']??'');
-        try{$model=new SupportMaterialModel();$material=$model->findById($id,true);$model->setStatus($id,$status,(int)$session->userId());$restoring=$status==='published';(new AdminActivityService())->record((int)$session->userId(),$restoring?'support_material_restored':'support_material_withdrawn',$restoring?'Restauró material de apoyo':'Retiró material de apoyo','Repositorio','support_material',$id,$material['title']??'Material #'.$id);$this->json(true,$restoring?'Material restaurado y visible nuevamente.':'Material retirado del repositorio.');}
+        try{
+            $model=new SupportMaterialModel();$actor=(int)$session->userId();
+            $material=Database::transaction(function(PDO $database)use($model,$id,$status,$actor):array{
+                $material=$model->findByIdForUpdate($id);
+                if($material===null)throw new InvalidArgumentException('El material ya no está disponible.');
+                if($status==='published'){
+                    $requestedPresentation=(int)($_POST['presentation_file_id']??0);
+                    if($requestedPresentation>0&&$requestedPresentation!==(int)($material['presentation_file_id']??0)){
+                        $change=$model->setPresentationFile($id,$requestedPresentation,$actor);
+                        (new AdminActivityService($database))->record(
+                            $actor,empty($change['previous_file_id'])?'support_material.presentation_selected':'support_material.presentation_changed',
+                            empty($change['previous_file_id'])?'Seleccionó el archivo de presentación':'Cambió el archivo de presentación',
+                            'Repositorio','support_material',$id,$change['name'],'correct',
+                            ['previous_file_id'=>$change['previous_file_id'],'new_file_id'=>$change['file_id'],'context'=>'publication']
+                        );
+                    }
+                }
+                $model->setStatus($id,$status,$actor);
+                return $material;
+            });
+            $publishing=$status==='published';
+            (new AdminActivityService())->record($actor,$publishing?'support_material_published':'support_material_withdrawn',$publishing?'Publicó material de apoyo':'Retiró material de apoyo','Repositorio','support_material',$id,$material['title']??'Material #'.$id);
+            $this->json(true,$publishing?'Material publicado correctamente.':'Material retirado del repositorio.');
+        }
         catch(InvalidArgumentException $error){$this->json(false,$error->getMessage(),[],422);}
         catch(Throwable $error){error_log('Support material status: '.$error->getMessage());$this->json(false,'No fue posible actualizar el material.',[],500);}
     }
@@ -133,10 +156,30 @@ final class AdminController
     public function changeSupportMaterialFile():void
     {
         $this->requirePost();$session=new AuthSessionService();
-        if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);
+        if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La solicitud contiene un token CSRF inválido.',[],419);
         $materialId=(int)($_POST['material_id']??0);$action=(string)($_POST['action']??'add');
         try{
             $model=new SupportMaterialModel();
+            if($action==='presentation'||$action==='unpresentation'){
+                $requestedFileId=(int)($_POST['file_id']??0);
+                if($requestedFileId<1)throw new InvalidArgumentException('El archivo seleccionado no es válido.');
+                $fileId=$action==='presentation'?$requestedFileId:null;$actor=(int)$session->userId();
+                $change=Database::transaction(function(PDO $database)use($model,$materialId,$fileId,$requestedFileId,$actor):array{
+                    if($model->findByIdForUpdate($materialId)===null)throw new InvalidArgumentException('El material ya no está disponible.');
+                    $change=$model->setPresentationFile($materialId,$fileId,$actor,$fileId===null?$requestedFileId:null);
+                    $elementLabel=$change['name']??'Archivo #'.$requestedFileId;
+                    (new AdminActivityService($database))->record(
+                        $actor,
+                        $fileId===null?'support_material.presentation_removed':(empty($change['previous_file_id'])?'support_material.presentation_selected':'support_material.presentation_changed'),
+                        $fileId===null?'Quitó el archivo de presentación':(empty($change['previous_file_id'])?'Seleccionó el archivo de presentación':'Cambió el archivo de presentación'),
+                        'Repositorio','support_material',$materialId,$elementLabel,'correct',
+                        ['previous_file_id'=>$change['previous_file_id'],'new_file_id'=>$change['file_id']]
+                    );
+                    return $change;
+                });
+                $this->json(true,$fileId===null?'Archivo de presentación eliminado correctamente.':'Archivo de presentación actualizado correctamente.',
+                    ['file_id'=>$requestedFileId,'presentation'=>$fileId!==null]+$change);
+            }
             if($action==='remove'||$action==='remove_multiple'){
                 $rawIds=$action==='remove_multiple'?($_POST['file_ids']??[]):[$_POST['file_id']??0];
                 if(!is_array($rawIds))$this->json(false,'La selección de archivos no es válida.',[],422);
@@ -147,6 +190,15 @@ final class AdminController
                 $removed=Database::transaction(function(PDO $database)use($model,$materialId,$fileIds,$actor):array{
                     $material=$model->findByIdForUpdate($materialId);
                     if($material===null)throw new InvalidArgumentException('El material ya no está disponible.');
+                    $presentationId=(int)($material['presentation_file_id']??0);
+                    if($presentationId>0&&in_array($presentationId,$fileIds,true)){
+                        $change=$model->setPresentationFile($materialId,null,$actor);
+                        (new AdminActivityService($database))->record(
+                            $actor,'support_material.presentation_removed','Quitó el archivo de presentación',
+                            'Repositorio','support_material',$materialId,null,'correct',
+                            ['previous_file_id'=>$change['previous_file_id'],'new_file_id'=>null,'reason'=>'presentation_file_retired']
+                        );
+                    }
                     $files=$model->removeAdditionalFiles($materialId,$fileIds,$actor);
                     $activity=new AdminActivityService($database);
                     foreach($files as $file)$activity->record(
@@ -168,8 +220,10 @@ final class AdminController
                     'source'=>(string)$package['source'],
                     'download_url'=>!empty($package['available'])?route('support-material-package-download').'&material_id='.$materialId:'',
                 ];
+                $currentPresentationId=(int)($material['presentation_file_id']??0);
                 $this->json(true,$message,['removed'=>$removed,'removed_file_ids'=>$removedIds,'removed_count'=>$removedCount,
                     'available_count'=>$availableCount,'updated_available_count'=>$availableCount,
+                    'presentation_file_id'=>$currentPresentationId,
                     'package'=>$packageDescriptor,'updated_package_descriptor'=>$packageDescriptor,
                 ]);
             }
@@ -187,13 +241,12 @@ final class AdminController
             if(array_sum(array_map(static fn(array $upload):int=>(int)($upload['size']??0),$uploads))>(int)$limits['max_operation_bytes']){
                 $this->json(false,'La selección completa supera el límite de 35 MB por operación.',[],422);
             }
-            $added=[];$failed=[];$actor=(int)$session->userId();$multipleRequest=isset($_FILES['files']);
+            $added=[];$failed=[];$actor=(int)$session->userId();
             foreach($uploads as $upload){
                 $displayName=mb_substr(basename(str_replace('\\','/',(string)($upload['name']??'Archivo'))),0,200);
                 $stored=null;
                 try{
                     $stored=$fileService->store($materialId,$upload);
-                    $stored['is_primary']=!$multipleRequest&&isset($_POST['is_primary']);
                     $fileId=Database::transaction(function(PDO $database)use($model,$materialId,$stored,$actor):int{
                         if($model->findByIdForUpdate($materialId)===null)throw new InvalidArgumentException('El material ya no está disponible.');
                         if($model->hasActiveFileEquivalent($materialId,(string)$stored['original_name'],(int)$stored['size_bytes'])){
@@ -205,7 +258,7 @@ final class AdminController
                             'Repositorio','support_material',$materialId,$stored['original_name'],'correct',[
                                 'file_id'=>$id,'name'=>$stored['original_name'],'extension'=>$stored['extension'],
                                 'mime_type'=>$stored['mime_type'],'size_bytes'=>$stored['size_bytes'],
-                                'is_primary'=>(bool)$stored['is_primary'],'is_package'=>false,
+                                'is_package'=>false,
                             ]
                         );
                         return $id;
@@ -215,7 +268,7 @@ final class AdminController
                     $added[]=[
                         'id'=>$fileId,'name'=>$stored['original_name'],'extension'=>$extension,
                         'type'=>mb_strtoupper($extension),'size_label'=>ArchiveService::formatBytes((int)$stored['size_bytes']),
-                        'size_bytes'=>(int)$stored['size_bytes'],'is_primary'=>(bool)$stored['is_primary'],
+                        'size_bytes'=>(int)$stored['size_bytes'],
                         'is_archive'=>$extension==='zip',
                         'preview_supported'=>in_array($extension,['pdf','docx','png','jpg','jpeg','webp','txt'],true)||$extension==='zip',
                         'preview_type'=>$extension==='zip'?'zip':(in_array($extension,['jpg','jpeg','png','webp'],true)?'image':$extension),
@@ -247,7 +300,14 @@ final class AdminController
             $this->json(true,$message,$data,$failedCount>0?207:200);
         }
         catch(InvalidArgumentException $error){$this->json(false,$error->getMessage(),[],422);}
-        catch(Throwable $error){error_log('Support material file: '.$error->getMessage());$this->json(false,'No fue posible actualizar los archivos.',[],500);}
+        catch(Throwable $error){
+            error_log(sprintf(
+                'Support material file endpoint=admin-support-material-file action=%s material_id=%d file_id=%d actor=%d: %s in %s:%d code=%s',
+                $action,$materialId,(int)($_POST['file_id']??0),(int)($session->userId()??0),
+                $error->getMessage(),$error->getFile(),$error->getLine(),(string)$error->getCode()
+            ));
+            $this->json(false,'No fue posible completar la acción sobre el archivo.',[],500);
+        }
     }
     public function academic():void{$model=new AdminAcademicModel();$error=null;try{$data=$model->dashboard();}catch(Throwable $e){error_log('Admin academic: '.$e->getMessage());$error='No fue posible consultar la configuración académica.';$data=['periods'=>[],'types'=>[],'promotion'=>['source'=>null,'target'=>null,'projects'=>0,'suggested'=>null]];}$s=new AuthSessionService();View::render('admin/academic',['currentPage'=>'admin-academic','title'=>'Gestión académica | Administración','bodyClass'=>'admin-academic-page','pageStyles'=>[asset('css/admin-academic.css')],'pageScript'=>asset('js/admin-academic.js'),'academic'=>$data,'academicError'=>$error,'academicCsrf'=>$s->csrfToken('admin_academic'),'academicEndpoints'=>['save'=>route('admin-academic-save'),'promote'=>route('admin-academic-promote')]]);}
     public function saveAcademic():void{$this->requirePost();$s=new AuthSessionService();if(!$s->validateCsrf('admin_academic',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);$entity=(string)($_POST['entity']??'');$id=(int)($_POST['id']??0);$action=(string)($_POST['action']??'save');$failedLabel=$entity==='period'?($action==='delete'?'Intentó eliminar una planificación':($id?'Intentó editar una planificación':'Intentó planificar el siguiente período')):($action==='deactivate'?'Intentó desactivar un tipo de proyecto':($action==='activate'?'Intentó activar un tipo de proyecto':($id?'Intentó editar un tipo de proyecto':'Intentó crear un tipo de proyecto')));$element=$entity==='period'?'Período académico':(string)($_POST['name']??'Tipo de proyecto');try{(new AdminAcademicModel())->save($entity,$_POST,(int)$s->userId());$this->json(true,'Información académica guardada correctamente.');}catch(InvalidArgumentException $e){$this->activityFailure($s,'academic_'.$entity.'_'.$action,$failedLabel,'Gestión académica',$entity,$id?:null,$element,$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,'academic_'.$entity.'_'.$action,$failedLabel,'Gestión académica',$entity,$id?:null,$element,$e);error_log('Save academic: '.$e->getMessage());$this->json(false,'No fue posible guardar la información.',[],500);}}
@@ -258,7 +318,7 @@ final class AdminController
         try{$result=$model->listing($filters,PaginationService::request());$projects=$result['items'];$pagination=$result['pagination'];$summary=$model->summary();$catalogs=$model->catalogs();}catch(Throwable $exception){error_log('Admin projects: '.$exception->getMessage());$error='No fue posible consultar los proyectos.';$projects=[];$pagination=['total'=>0];$summary=['total'=>0,'development'=>0,'review'=>0,'approved'=>0,'defense'=>0];$catalogs=['types'=>[],'careers'=>[],'periods'=>[],'teachers'=>[]];}
         $session=new AuthSessionService();View::render('admin/projects',['currentPage'=>'projects','title'=>'Proyectos | Administración','bodyClass'=>'admin-projects-page','pageStyles'=>[asset('css/admin-projects.css')],'pageScript'=>asset('js/admin-projects.js'),'projects'=>$projects,'pagePagination'=>$pagination,'projectSummary'=>$summary,'catalogs'=>$catalogs,'filters'=>$filters,'projectError'=>$error,'projectCsrf'=>$session->csrfToken('admin_projects'),'projectEndpoints'=>['save'=>route('admin-project-save'),'trash'=>route('admin-project-trash')]]);
     }
-    public function saveProject():void{$this->requirePost();$session=new AuthSessionService();if(!$session->validateCsrf('admin_projects',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión del formulario venció.',[],419);$id=(int)($_POST['id']??0);$title=trim((string)($_POST['title']??''));try{$payload=['title'=>$title,'subtitle'=>trim((string)($_POST['subtitle']??'')),'project_type_id'=>(int)($_POST['project_type_id']??0),'career_id'=>(int)($_POST['career_id']??0),'academic_period_id'=>(int)($_POST['academic_period_id']??0),'tutor_id'=>(int)($_POST['tutor_id']??0),'status'=>(string)($_POST['status']??'development')];$saved=(new AdminProjectModel())->save($payload,$id,(int)$session->userId());$this->json(true,$id?'Proyecto actualizado correctamente.':'Proyecto creado correctamente.',['id'=>$saved]);}catch(InvalidArgumentException $exception){if($id)$this->activityFailure($session,'project_status_changed','Intentó modificar el estado de un proyecto','Proyectos','project',$id,$title?:'Proyecto #'.$id,$exception);$this->json(false,$exception->getMessage(),[],422);}catch(Throwable $exception){if($id)$this->activityFailure($session,'project_status_changed','Intentó modificar el estado de un proyecto','Proyectos','project',$id,$title?:'Proyecto #'.$id,$exception);error_log('Admin save project: '.$exception->getMessage());$this->json(false,'No fue posible guardar el proyecto.',[],500);}}
+    public function saveProject():void{$this->requirePost();$session=new AuthSessionService();if(!$session->validateCsrf('admin_projects',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión del formulario venció.',[],419);$id=(int)($_POST['id']??0);$title=trim((string)($_POST['title']??''));try{$payload=['title'=>$title,'subtitle'=>trim((string)($_POST['subtitle']??'')),'project_type_id'=>(int)($_POST['project_type_id']??0),'career_id'=>(int)($_POST['career_id']??0),'academic_period_id'=>(int)($_POST['academic_period_id']??0),'tutor_id'=>(int)($_POST['tutor_id']??0),'status'=>(string)($_POST['status']??'development'),'presentation_file_id'=>(int)($_POST['presentation_file_id']??0)];$saved=(new AdminProjectModel())->save($payload,$id,(int)$session->userId());$this->json(true,$id?'Proyecto actualizado correctamente.':'Proyecto creado correctamente.',['id'=>$saved]);}catch(InvalidArgumentException $exception){if($id)$this->activityFailure($session,'project_status_changed','Intentó modificar el estado de un proyecto','Proyectos','project',$id,$title?:'Proyecto #'.$id,$exception);$this->json(false,$exception->getMessage(),[],422);}catch(Throwable $exception){if($id)$this->activityFailure($session,'project_status_changed','Intentó modificar el estado de un proyecto','Proyectos','project',$id,$title?:'Proyecto #'.$id,$exception);error_log('Admin save project: '.$exception->getMessage());$this->json(false,'No fue posible guardar el proyecto.',[],500);}}
     public function trashProject():void{$this->requirePost();$session=new AuthSessionService();if(!$session->validateCsrf('admin_projects',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión del formulario venció.',[],419);try{(new AdminProjectModel())->trash((int)($_POST['id']??0),(string)($_POST['reason']??''),(int)$session->userId());$this->json(true,'Proyecto enviado a la Papelera. Se conservará para restauración.');}catch(InvalidArgumentException $exception){$this->json(false,$exception->getMessage(),[],422);}catch(Throwable $exception){error_log('Admin trash project: '.$exception->getMessage());$this->json(false,'No fue posible enviar el proyecto a la Papelera.',[],500);}}
     public function users(): void
     {

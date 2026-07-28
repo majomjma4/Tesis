@@ -4,6 +4,47 @@ declare(strict_types=1);
 
 final class AdminRepositoryModel
 {
+    public function setPresentationFile(int $projectId, ?int $fileId, int $actor): void
+    {
+        if ($projectId < 1 || ($fileId !== null && $fileId < 1)) {
+            throw new InvalidArgumentException('El archivo seleccionado no es válido.');
+        }
+        Database::transaction(function (PDO $database) use ($projectId, $fileId, $actor): void {
+            $projectStatement = $database->prepare(
+                'SELECT id,title,presentation_file_id FROM projects
+                 WHERE id=:id AND deleted_at IS NULL FOR UPDATE'
+            );
+            $projectStatement->execute(['id' => $projectId]);
+            $project = $projectStatement->fetch();
+            if (!$project) throw new InvalidArgumentException('El proyecto ya no está disponible.');
+            $file = null;
+            if ($fileId !== null) {
+                $fileStatement = $database->prepare(
+                    "SELECT id,original_name FROM project_files
+                     WHERE id=:file_id AND project_id=:project_id AND deleted_at IS NULL
+                       AND LOWER(extension) IN ('pdf','docx','txt','png','jpg','jpeg','webp')
+                     FOR UPDATE"
+                );
+                $fileStatement->execute(['file_id' => $fileId, 'project_id' => $projectId]);
+                $file = $fileStatement->fetch();
+                if (!$file) throw new InvalidArgumentException('Selecciona un archivo compatible con la vista previa.');
+            }
+            $previousId = (int) ($project['presentation_file_id'] ?? 0);
+            $database->prepare(
+                'UPDATE projects SET presentation_file_id=:file_id WHERE id=:project_id'
+            )->execute(['file_id' => $fileId, 'project_id' => $projectId]);
+            (new ProjectAuditService($database))->record(
+                $projectId,
+                $actor,
+                $fileId === null ? 'project.presentation_removed' : ($previousId > 0 ? 'project.presentation_changed' : 'project.presentation_selected'),
+                'project_file',
+                $fileId,
+                ['presentation_file_id' => $previousId ?: null],
+                ['presentation_file_id' => $fileId, 'file_name' => $file['original_name'] ?? null]
+            );
+        });
+    }
+
     public function listing(string $filter = '', array $pagination = []): array
     {
         $eligible = "((pt.code='thesis' AND p.status='tribunal_approved') OR (pt.code<>'thesis' AND p.status='approved'))";
@@ -197,17 +238,6 @@ final class AdminRepositoryModel
                 );
             }
 
-            $files = $database->prepare(
-                'SELECT COUNT(*) FROM project_files
-                WHERE project_id=:id AND deleted_at IS NULL'
-            );
-            $files->execute(['id' => $id]);
-            if ((int) $files->fetchColumn() < 1) {
-                throw new InvalidArgumentException(
-                    'El proyecto no puede restaurarse porque ya no conserva documentos publicados.'
-                );
-            }
-
             $database->prepare(
                 "UPDATE projects
                 SET status='published',published_at=CURRENT_TIMESTAMP
@@ -255,17 +285,6 @@ final class AdminRepositoryModel
                         $required === 'tribunal_approved'
                             ? 'La tesis debe estar Aprobada por el Tribunal antes de publicarse.'
                             : 'El proyecto debe estar aprobado antes de publicarse.'
-                    );
-                }
-
-                $files = $database->prepare(
-                    'SELECT COUNT(*) FROM project_files
-                    WHERE project_id=:id AND deleted_at IS NULL'
-                );
-                $files->execute(['id' => $id]);
-                if ((int) $files->fetchColumn() < 1) {
-                    throw new InvalidArgumentException(
-                        'Agrega al menos un documento final antes de publicar.'
                     );
                 }
 

@@ -26,6 +26,10 @@
     const withdrawnModal = document.querySelector("#arWithdrawnModal");
     const materialEditModal = document.querySelector("#arMaterialEditModal");
     const materialFilesModal = document.querySelector("#arMaterialFilesModal");
+    const presentationModal = document.querySelector("#arPresentationModal");
+    const presentationForm = document.querySelector("#arPresentationForm");
+    const presentationOptions = presentationModal?.querySelector("[data-presentation-options]");
+    const presentationError = presentationModal?.querySelector("[data-presentation-error]");
     const materialEditForm = document.querySelector("#arMaterialEditForm");
     const materialFileForm = document.querySelector("#arMaterialFileForm");
     const materialFilesList = document.querySelector("#arMaterialFilesList");
@@ -34,17 +38,39 @@
     const confirmationText = document.querySelector("#arConfirmText");
     const confirmationAccept = confirmation?.querySelector("[data-confirm-accept]");
     const confirmationCancel = confirmation?.querySelector("[data-confirm-cancel]");
-    const toast = document.querySelector("#arToast");
+    const toastStack = document.querySelector("#arToastStack");
     const tooltip = document.querySelector("#arTooltip");
     if (withdrawnModal) document.body.append(withdrawnModal);
     if (materialEditModal) document.body.append(materialEditModal);
     if (materialFilesModal) document.body.append(materialFilesModal);
+    if (presentationModal) document.body.append(presentationModal);
     if (confirmation) document.body.append(confirmation);
-    if (toast) document.body.append(toast);
+    if (toastStack) document.body.append(toastStack);
     if (tooltip) document.body.append(tooltip);
     let activeTab = "projects";
-    let toastTimer = null;
+    const toastRegistry = new Map();
+    const toastDurations = { success: 3800, info: 4000, warning: 5000, error: 5600 };
     const originalText = new WeakMap();
+
+    const reflowToasts = (mutator) => {
+        const before = new Map(
+            [...toastStack.children].map((toast) => [toast, toast.getBoundingClientRect().top])
+        );
+        mutator();
+        [...toastStack.children].forEach((toast) => {
+            const previousTop = before.get(toast);
+            if (previousTop === undefined) return;
+            const delta = previousTop - toast.getBoundingClientRect().top;
+            if (!delta) return;
+            toast.style.transition = "none";
+            toast.style.transform = `translateY(${delta}px)`;
+            window.requestAnimationFrame(() => {
+                toast.style.transition = "transform 220ms ease";
+                toast.style.transform = "";
+                window.setTimeout(() => { toast.style.transition = ""; }, 230);
+            });
+        });
+    };
 
     const normalize = (value) => String(value || "")
         .normalize("NFD")
@@ -53,22 +79,45 @@
         .toLowerCase()
         .trim();
 
-    const showToast = (message, isError = false) => {
-        if (!toast) return;
-        window.clearTimeout(toastTimer);
-        const icon = toast.querySelector("i");
-        const text = toast.querySelector("span");
-        if (text) text.textContent = message;
-        if (icon) icon.className = isError ? "fa-solid fa-circle-exclamation" : "fa-solid fa-circle-check";
-        toast.classList.toggle("error", isError);
-        toast.hidden = false;
-        requestAnimationFrame(() => toast.classList.add("is-visible"));
-        toastTimer = window.setTimeout(() => {
-            toast.classList.remove("is-visible");
-            window.setTimeout(() => {
-                toast.hidden = true;
-            }, 220);
-        }, 3600);
+    const dismissToast = (key) => {
+        const entry = toastRegistry.get(key);
+        if (!entry) return;
+        window.clearTimeout(entry.timer);
+        entry.element.classList.add("is-leaving");
+        window.setTimeout(() => reflowToasts(() => entry.element.remove()), 210);
+        toastRegistry.delete(key);
+    };
+
+    const showToast = (message, type = "success") => {
+        if (!toastStack || !message) return;
+        const normalizedType = ["success", "info", "warning", "error"].includes(type) ? type : "info";
+        const key = `${normalizedType}:${message}`;
+        const existing = toastRegistry.get(key);
+        if (existing?.element?.isConnected) {
+            existing.count += 1;
+            existing.copy.textContent = `${message} ×${existing.count}`;
+            window.clearTimeout(existing.timer);
+            existing.timer = window.setTimeout(() => dismissToast(key), toastDurations[normalizedType]);
+            return;
+        }
+        const element = document.createElement("div");
+        const icon = document.createElement("i");
+        const copy = document.createElement("span");
+        const close = document.createElement("button");
+        const icons = { success: "fa-circle-check", info: "fa-circle-info", warning: "fa-triangle-exclamation", error: "fa-circle-xmark" };
+        element.className = `ar-toast ${normalizedType}`;
+        element.setAttribute("role", normalizedType === "error" ? "alert" : "status");
+        icon.className = `fa-solid ${icons[normalizedType]}`;
+        copy.textContent = message;
+        close.type = "button";
+        close.setAttribute("aria-label", "Cerrar mensaje");
+        close.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+        element.append(icon, copy, close);
+        toastStack.prepend(element);
+        const entry = { element, copy, count: 1, timer: null };
+        entry.timer = window.setTimeout(() => dismissToast(key), toastDurations[normalizedType]);
+        toastRegistry.set(key, entry);
+        close.addEventListener("click", () => dismissToast(key));
     };
 
     const requestConfirmation = (message, options = {}) => new Promise((resolve) => {
@@ -85,7 +134,7 @@
         confirmationAccept.focus();
         const close = (accepted) => {
             confirmation.hidden = true;
-            const secondaryModalOpen = [withdrawnModal, materialEditModal, materialFilesModal]
+            const secondaryModalOpen = [withdrawnModal, materialEditModal, materialFilesModal, presentationModal]
                 .some((modal) => modal && !modal.hidden);
             if (!secondaryModalOpen) document.body.classList.remove("modal-open");
             confirmationAccept.removeEventListener("click", accept);
@@ -185,7 +234,7 @@
                 sessionStorage.setItem("repositoryToast", result.message || "La publicación fue restaurada.");
                 window.location.reload();
             } catch (error) {
-                showToast(error.message || "No fue posible restaurar la publicación.", true);
+                showToast(error.message || "No fue posible restaurar la publicación.", "error");
                 button.disabled = false;
             }
         });
@@ -206,7 +255,7 @@
     const closeModal = (modal) => {
         if (!modal) return;
         modal.hidden = true;
-        if (![withdrawnModal, materialEditModal, materialFilesModal].some((item) => item && !item.hidden)) {
+        if (![withdrawnModal, materialEditModal, materialFilesModal, presentationModal].some((item) => item && !item.hidden)) {
             document.body.classList.remove("modal-open");
         }
     };
@@ -221,6 +270,103 @@
         modal?.addEventListener("click", (event) => {
             if (event.target === modal) closeModal(modal);
         });
+    });
+
+    let presentationMaterial = null;
+    const previewExtensions = new Set(["pdf", "docx", "txt", "png", "jpg", "jpeg", "webp"]);
+    const presentationIcon = (extension) => {
+        if (extension === "pdf") return "fa-file-pdf";
+        if (["doc", "docx"].includes(extension)) return "fa-file-word";
+        if (["png", "jpg", "jpeg", "webp"].includes(extension)) return "fa-file-image";
+        if (extension === "txt") return "fa-file-lines";
+        return "fa-file";
+    };
+    const publishPresentationChoice = async (fileId = "") => {
+        if (!presentationMaterial) return;
+        const material = presentationMaterial;
+        const submit = presentationForm?.querySelector("[type=submit]");
+        if (submit) submit.disabled = true;
+        const data = new FormData();
+        data.set("_csrf", config.dataset.csrf);
+        data.set("id", material.id);
+        data.set("status", "published");
+        if (fileId) data.set("presentation_file_id", fileId);
+        try {
+            const response = await fetch(config.dataset.materialStatus, { method: "POST", body: data });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.message);
+            sessionStorage.setItem("repositoryToast", result.message || "Material publicado correctamente.");
+            window.location.reload();
+        } catch (error) {
+            if (presentationError) {
+                presentationError.textContent = error.message || "No fue posible publicar el material.";
+                presentationError.hidden = false;
+            }
+            showToast(error.message || "No fue posible publicar el material.", "error");
+            if (submit) submit.disabled = false;
+        }
+    };
+    const closePresentationModal = () => publishPresentationChoice("");
+    document.querySelectorAll("[data-close-presentation]").forEach((button) => {
+        button.addEventListener("click", closePresentationModal);
+    });
+    presentationModal?.addEventListener("click", (event) => {
+        if (event.target === presentationModal) closePresentationModal();
+    });
+
+    const openPresentationModal = (material) => {
+        const eligible = (material.files || []).filter((file) =>
+            previewExtensions.has(String(file.extension || "").toLowerCase())
+        );
+        presentationMaterial = material;
+        presentationOptions?.replaceChildren();
+        if (presentationError) {
+            presentationError.hidden = true;
+            presentationError.textContent = "";
+        }
+        eligible.forEach((file) => {
+            const label = document.createElement("label");
+            const input = document.createElement("input");
+            const icon = document.createElement("i");
+            const copy = document.createElement("span");
+            const name = document.createElement("strong");
+            const meta = document.createElement("small");
+            label.className = "ar-presentation-option";
+            input.type = "radio";
+            input.name = "presentation_file_id";
+            input.value = file.id;
+            input.checked = eligible.length === 1 || Number(material.presentation_file_id) === Number(file.id);
+            icon.className = `fa-regular ${presentationIcon(String(file.extension || "").toLowerCase())}`;
+            name.textContent = file.name;
+            meta.textContent = `${file.format} · ${file.size}`;
+            copy.append(name, meta);
+            label.append(input, icon, copy);
+            presentationOptions?.append(label);
+        });
+        const submit = presentationForm?.querySelector("[type=submit]");
+        if (submit) submit.disabled = false;
+        presentationModal.querySelector("h2").textContent = "Seleccionar archivo de presentación (opcional)";
+        presentationModal.querySelector("header p").textContent = "Puedes elegir el archivo que se mostrará automáticamente cuando una persona ingrese al Expediente Digital. Esta elección es opcional y no afecta la importancia de los demás documentos.";
+        presentationModal.querySelector("footer [data-close-presentation]").textContent = "Omitir";
+        if (submit) submit.textContent = "Continuar";
+        openModal(presentationModal);
+    };
+    presentationOptions?.addEventListener("change", () => {
+        const submit = presentationForm?.querySelector("[type=submit]");
+        if (submit) submit.disabled = false;
+    });
+    document.querySelectorAll("[data-publish-material]").forEach((button) => {
+        button.addEventListener("click", () => {
+            const material = readMaterial(button);
+            if (material) openPresentationModal(material);
+        });
+    });
+    presentationForm?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const selected = presentationForm.querySelector("input[name=presentation_file_id]:checked");
+        const submit = presentationForm.querySelector("[type=submit]");
+        if (!presentationMaterial || submit.disabled) return;
+        publishPresentationChoice(selected?.value || "");
     });
 
     document.querySelectorAll("[data-edit-material]").forEach((button) => {
@@ -254,7 +400,7 @@
             sessionStorage.setItem("repositoryToast", result.message);
             window.location.reload();
         } catch (error) {
-            showToast(error.message || "No fue posible guardar el material.", true);
+            showToast(error.message || "No fue posible guardar el material.", "error");
             submit.disabled = false;
         }
     });
@@ -279,7 +425,7 @@
             const remove = document.createElement("button");
             name.textContent = file.name;
             meta.textContent = `${file.format} · ${file.size}`;
-            type.textContent = file.primary ? "Principal" : "Adicional";
+            type.textContent = file.presentation ? "Presentación" : "Archivo";
             remove.type = "button";
             remove.innerHTML = '<i class="fa-regular fa-trash-can"></i>';
             remove.setAttribute("aria-label", `Retirar ${file.name}`);
@@ -301,7 +447,7 @@
                     sessionStorage.setItem("repositoryToast", result.message);
                     window.location.reload();
                 } catch (error) {
-                    showToast(error.message || "No fue posible retirar el archivo.", true);
+                    showToast(error.message || "No fue posible retirar el archivo.", "error");
                 }
             });
             copy.append(name, meta);
@@ -333,7 +479,7 @@
             sessionStorage.setItem("repositoryToast", result.message);
             window.location.reload();
         } catch (error) {
-            showToast(error.message || "No fue posible agregar el archivo.", true);
+            showToast(error.message || "No fue posible agregar el archivo.", "error");
             submit.disabled = false;
         }
     });
@@ -358,7 +504,7 @@
                 sessionStorage.setItem("repositoryToast", result.message);
                 window.location.reload();
             } catch (error) {
-                showToast(error.message || "No fue posible retirar el material.", true);
+                showToast(error.message || "No fue posible retirar el material.", "error");
             }
         });
     });
@@ -381,7 +527,7 @@
                 sessionStorage.setItem("repositoryToast", result.message);
                 window.location.reload();
             } catch (error) {
-                showToast(error.message || "No fue posible restaurar el material.", true);
+                showToast(error.message || "No fue posible restaurar el material.", "error");
             }
         });
     });
@@ -622,7 +768,7 @@
                 sessionStorage.setItem("repositoryToast", result.message || "El repositorio se actualizó correctamente.");
                 window.location.reload();
             } catch (error) {
-                showToast(error.message || "No fue posible actualizar la publicación.", true);
+                showToast(error.message || "No fue posible actualizar la publicación.", "error");
                 button.disabled = false;
             }
         });

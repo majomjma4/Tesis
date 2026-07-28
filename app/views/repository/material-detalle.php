@@ -11,10 +11,10 @@
     $modeQuery = $mode === 'edit' ? '&mode=edit' : '&mode=view';
     $viewUrl = $detailUrl . '&mode=view&tab=information';
 
-    $materialFiles = array_values(array_filter(array_merge(
-        !empty($material['primary_file']) ? [$material['primary_file']] : [],
-        is_array($material['additional_files'] ?? null) ? $material['additional_files'] : []
-    ), 'is_array'));
+    $materialFiles = array_values(array_filter(
+        is_array($material['files'] ?? null) ? $material['files'] : [],
+        'is_array'
+    ));
     $documents = array_map(static function (array $file) use ($materialId, $previewActionUrl, $downloadActionUrl, $zipListActionUrl): array {
         $name = (string) ($file['name'] ?? 'Archivo sin nombre');
         $extension = mb_strtolower((string) ($file['extension'] ?? pathinfo($name, PATHINFO_EXTENSION)), 'UTF-8');
@@ -31,7 +31,7 @@
             'type' => (string) ($file['format'] ?? ($extension !== '' ? mb_strtoupper($extension, 'UTF-8') : 'Archivo')),
             'size' => (string) ($file['size'] ?? 'Tamaño no disponible'),
             'extension' => $extension,
-            'is_primary' => !empty($file['primary']),
+            'is_presentation' => !empty($file['presentation']),
             'is_package' => false,
             'preview_supported' => isset($previewTypes[$extension]) || $isZip,
             'preview_type' => $isZip ? 'zip' : ($previewTypes[$extension] ?? 'unsupported'),
@@ -51,9 +51,9 @@
 
     $publicationState = (string) ($material['status_key'] ?? 'published');
     $isPublished = $publicationState === 'published';
-    $primaryFile = $material['primary_file'] ?? null;
-    $downloadUrl = is_array($primaryFile) && !empty($primaryFile['id'])
-        ? $downloadActionUrl . '&material_id=' . $materialId . '&file_id=' . (int) $primaryFile['id']
+    $presentationFile = $material['presentation_file'] ?? null;
+    $downloadUrl = is_array($presentationFile) && !empty($presentationFile['id'])
+        ? $downloadActionUrl . '&material_id=' . $materialId . '&file_id=' . (int) $presentationFile['id']
         : null;
     $administratorView = !empty($isAdministrator);
 
@@ -130,8 +130,8 @@
             'method' => 'POST',
             'csrf_token' => (string) ($materialCsrfToken ?? ''),
             'cancel_url' => $viewUrl,
-            'success_url' => $viewUrl . '&saved=1',
-            'success_message' => (string) ($_GET['saved'] ?? '') === '1' ? 'Material actualizado correctamente.' : '',
+            'success_url' => $viewUrl,
+            'success_message' => '',
             'categories' => is_array($materialCategories ?? null) ? $materialCategories : [],
             'values' => [
                 'id' => $materialId,

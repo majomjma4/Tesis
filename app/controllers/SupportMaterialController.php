@@ -193,7 +193,7 @@ final class SupportMaterialController
         $this->ensureSession();
         $this->ensureGet();
         [$material, $file, $stream] = $this->resolveFileRequest();
-        if ($file['primary'] || ($file['package'] ?? false)) {
+        if ($file['presentation'] || ($file['package'] ?? false)) {
             (new SupportMaterialDownloadModel())->increment($material['id']);
         }
         session_write_close();

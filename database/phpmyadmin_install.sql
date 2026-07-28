@@ -438,7 +438,6 @@ CREATE TABLE support_material_files (
   extension VARCHAR(15) NOT NULL,
   mime_type VARCHAR(150) NOT NULL,
   size_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
-  is_primary TINYINT(1) NOT NULL DEFAULT 0,
   is_package TINYINT(1) NOT NULL DEFAULT 0,
   sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   created_by BIGINT UNSIGNED NULL,
@@ -477,11 +476,11 @@ INSERT INTO support_materials
 (5,1,1,'Reglamento de uso del material académico','Reglamento','Disposiciones generales para consultar y utilizar responsablemente los recursos institucionales.','Documento informativo sobre el uso responsable del material académico institucional.\n\nResume las condiciones de consulta, atribución y distribución de los recursos disponibles.','Instituto Superior Tecnológico "El Libertador"','2025-05-14','published',21,'["Reglamento","Recursos","Uso académico"]');
 
 INSERT INTO support_material_files
-(id,material_id,original_name,storage_name,relative_path,extension,mime_type,size_bytes,is_primary,is_package,sort_order) VALUES
-(1,1,'guia_perfil_tesis.pdf','guia_perfil_tesis.pdf','guia_perfil_tesis.pdf','pdf','application/pdf',689,1,0,1),
-(2,1,'lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt','lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt','lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt','txt','text/plain',87,0,0,2),
-(3,1,'material_tesis_completo.zip','material_tesis_completo.zip','material_tesis_completo.zip','zip','application/zip',777,0,1,3),
-(4,2,'seguimiento_practicas.docx','seguimiento_practicas.docx','seguimiento_practicas.docx','docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document',1029,1,0,1),
-(5,3,'instructivo_proyectos_pis.pdf','instructivo_proyectos_pis.pdf','instructivo_proyectos_pis.pdf','pdf','application/pdf',688,1,0,1),
-(6,4,'informe_vinculacion.docx','informe_vinculacion.docx','informe_vinculacion.docx','docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document',1023,1,0,1),
-(7,5,'reglamento_material_apoyo.txt','reglamento_material_apoyo.txt','reglamento_material_apoyo.txt','txt','text/plain',110,1,0,1);
+(id,material_id,original_name,storage_name,relative_path,extension,mime_type,size_bytes,is_package,sort_order) VALUES
+(1,1,'guia_perfil_tesis.pdf','guia_perfil_tesis.pdf','guia_perfil_tesis.pdf','pdf','application/pdf',689,0,1),
+(2,1,'lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt','lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt','lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt','txt','text/plain',87,0,2),
+(3,1,'material_tesis_completo.zip','material_tesis_completo.zip','material_tesis_completo.zip','zip','application/zip',777,1,3),
+(4,2,'seguimiento_practicas.docx','seguimiento_practicas.docx','seguimiento_practicas.docx','docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document',1029,0,1),
+(5,3,'instructivo_proyectos_pis.pdf','instructivo_proyectos_pis.pdf','instructivo_proyectos_pis.pdf','pdf','application/pdf',688,0,1),
+(6,4,'informe_vinculacion.docx','informe_vinculacion.docx','informe_vinculacion.docx','docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document',1023,0,1),
+(7,5,'reglamento_material_apoyo.txt','reglamento_material_apoyo.txt','reglamento_material_apoyo.txt','txt','text/plain',110,0,1);

@@ -21,8 +21,36 @@ final class AdminProjectModel
         if($f['type_id']>0){$w[]='p.project_type_id=:t';$x['t']=$f['type_id'];}
         if($f['period_id']>0){$w[]='p.academic_period_id=:a';$x['a']=$f['period_id'];}
         $from=" FROM projects p JOIN project_types pt ON pt.id=p.project_type_id JOIN careers c ON c.id=p.career_id JOIN academic_periods ap ON ap.id=p.academic_period_id LEFT JOIN users u ON u.id=p.tutor_id WHERE ".implode(' AND ',$w);
-        $sql="SELECT p.id,p.code,p.title,p.subtitle,p.status,p.project_type_id,p.career_id,p.academic_period_id,p.tutor_id,p.updated_at,pt.name type_name,c.name career_name,ap.name period_name,u.full_name tutor_name,(SELECT COUNT(*) FROM project_participants pp WHERE pp.project_id=p.id AND pp.status='active') participant_count".$from.' ORDER BY p.updated_at DESC';
-        return PaginationService::run(Database::connection(),'SELECT COUNT(*)'.$from,$sql,$x,$pagination?:PaginationService::request());
+        $sql="SELECT p.id,p.code,p.title,p.subtitle,p.status,p.project_type_id,p.career_id,p.academic_period_id,p.tutor_id,p.presentation_file_id,p.updated_at,pt.name type_name,c.name career_name,ap.name period_name,u.full_name tutor_name,(SELECT COUNT(*) FROM project_participants pp WHERE pp.project_id=p.id AND pp.status='active') participant_count".$from.' ORDER BY p.updated_at DESC';
+        $result=PaginationService::run(Database::connection(),'SELECT COUNT(*)'.$from,$sql,$x,$pagination?:PaginationService::request());
+        $files=Database::connection()->prepare(
+            "SELECT id,original_name name,extension,size_bytes
+             FROM project_files WHERE project_id=:project_id AND deleted_at IS NULL
+               AND LOWER(extension) IN ('pdf','docx','txt','png','jpg','jpeg','webp')
+             ORDER BY id"
+        );
+        foreach($result['items'] as &$item){
+            $files->execute(['project_id'=>$item['id']]);
+            $item['presentation_files']=array_map(static function(array $file):array{
+                $extension=strtolower((string)$file['extension']);
+                $format=in_array($extension,['jpg','jpeg'],true)?'JPG':strtoupper($extension);
+                $icon=match($extension){
+                    'pdf'=>'fa-regular fa-file-pdf',
+                    'docx'=>'fa-regular fa-file-word',
+                    'txt'=>'fa-regular fa-file-lines',
+                    'png','jpg','jpeg','webp'=>'fa-regular fa-file-image',
+                    default=>'fa-regular fa-file',
+                };
+                return [
+                    'id'=>(int)$file['id'],'name'=>(string)$file['name'],
+                    'extension'=>$extension,'format'=>$format,'icon'=>$icon,
+                    'size'=>ArchiveService::formatBytes((int)$file['size_bytes']),
+                ];
+            },$files->fetchAll());
+            $item['presentation_file_id']=(int)($item['presentation_file_id']??0);
+        }
+        unset($item);
+        return $result;
     }
     public function summary():array{$r=Database::connection()->query("SELECT COUNT(*) total,SUM(status='development') development,SUM(status IN ('under_review','changes_required')) review,SUM(status='approved') approved,SUM(status IN ('defense','tribunal_approved')) defense FROM projects WHERE deleted_at IS NULL")->fetch()?:[];return array_map('intval',$r);}
     public function catalogs():array{$d=Database::connection();return ['types'=>$d->query('SELECT id,code,name FROM project_types WHERE is_active=1 ORDER BY name')->fetchAll(),'careers'=>$d->query('SELECT id,name FROM careers WHERE is_active=1 ORDER BY name')->fetchAll(),'periods'=>$d->query("SELECT id,name FROM academic_periods WHERE status IN ('active','planned') ORDER BY (status='active') DESC, starts_on DESC")->fetchAll(),'teachers'=>$d->query("SELECT u.id,u.full_name FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.status='active' AND tp.can_tutor=1 ORDER BY u.full_name")->fetchAll()];}
@@ -36,9 +64,33 @@ final class AdminProjectModel
             $typeCode=(string)$type->fetchColumn();
             if($typeCode==='')throw new InvalidArgumentException('El tipo de proyecto ya no está disponible.');
             if($id){
-                $q=$d->prepare('SELECT id,code,title,subtitle,status,project_type_id,career_id,academic_period_id,tutor_id,created_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE');
+                $q=$d->prepare('SELECT id,code,title,subtitle,status,project_type_id,career_id,academic_period_id,tutor_id,presentation_file_id,created_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE');
                 $q->execute(['id'=>$id]);$before=$q->fetch();
                 if(!$before)throw new InvalidArgumentException('El proyecto ya no existe.');
+                if($v['status']==='published'){
+                    $requestedPresentation=(int)($v['presentation_file_id']??0);
+                    if($requestedPresentation>0){
+                        $candidate=$d->prepare(
+                            "SELECT id FROM project_files
+                             WHERE id=:file_id AND project_id=:project_id AND deleted_at IS NULL
+                               AND LOWER(extension) IN ('pdf','docx','txt','png','jpg','jpeg','webp')
+                             FOR UPDATE"
+                        );
+                        $candidate->execute(['file_id'=>$requestedPresentation,'project_id'=>$id]);
+                        if(!$candidate->fetchColumn())throw new InvalidArgumentException('El archivo de presentación seleccionado no es válido.');
+                        $d->prepare('UPDATE projects SET presentation_file_id=:file_id WHERE id=:id')
+                            ->execute(['file_id'=>$requestedPresentation,'id'=>$id]);
+                        if($requestedPresentation!==(int)($before['presentation_file_id']??0)){
+                            (new ProjectAuditService($d))->record(
+                                $id,$actor,
+                                empty($before['presentation_file_id'])?'project.presentation_selected':'project.presentation_changed',
+                                'project_file',$requestedPresentation,
+                                ['presentation_file_id'=>$before['presentation_file_id']?:null],
+                                ['presentation_file_id'=>$requestedPresentation]
+                            );
+                        }
+                    }
+                }
                 $incoming=['title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'project_type_id'=>$v['project_type_id'],'career_id'=>$v['career_id'],'academic_period_id'=>$v['academic_period_id'],'tutor_id'=>$tutor,'status'=>$v['status']];
                 $changed=[];
                 foreach($incoming as $field=>$value){

@@ -5,17 +5,21 @@
     const trashForm = document.querySelector('#apTrashForm');
     const cfg = document.querySelector('#apConfig');
     const saveConfirm = document.querySelector('#apSaveConfirm');
+    const presentationDialog = document.querySelector('#apPresentation');
+    const presentationOptions = presentationDialog?.querySelector('[data-presentation-options]');
+    const presentationError = presentationDialog?.querySelector('[data-presentation-error]');
     const editWarning = form?.querySelector('[data-edit-warning]');
     const advancedOptions = form?.querySelector('[data-advanced-options]');
     const manageParticipants = form?.querySelector('[data-manage-participants]');
     const manageFiles = form?.querySelector('[data-manage-files]');
-    const dialogLayers = [modal, trash, saveConfirm].filter(Boolean);
+    const dialogLayers = [modal, trash, saveConfirm, presentationDialog].filter(Boolean);
     dialogLayers.forEach(layer => { layer.hidden = true; });
     dialogLayers.forEach(layer => document.body.append(layer));
     const syncProjectDialogs = () => document.body.classList.toggle('project-dialog-open', dialogLayers.some(layer => !layer.hidden));
     new MutationObserver(syncProjectDialogs).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
     syncProjectDialogs();
     let pendingSaveData = null;
+    let activeProject = null;
     const enhanceQuickSelect = select => {
         const shell = document.createElement('div');
         shell.className = 'ap-quick-dropdown';
@@ -161,6 +165,7 @@
         return result;
     };
     const open = project => {
+        activeProject = project || null;
         document.body.append(modal);
         form.reset();
         for (const [key, value] of Object.entries(project || {})) if (form.elements[key]) form.elements[key].value = value ?? '';
@@ -209,10 +214,46 @@
         catch (error) { const message = document.querySelector('#apMessage'); message.textContent = error.message; message.className = 'ap-message error'; message.hidden = false; }
         finally { submit.disabled = false; }
     };
+    const openPresentationDialog = data => {
+        const files = Array.isArray(activeProject?.presentation_files) ? activeProject.presentation_files : [];
+        pendingSaveData = data;
+        presentationOptions.replaceChildren();
+        presentationError.hidden = true;
+        files.forEach(file => {
+            const option = document.createElement('label');
+            option.className = 'ap-presentation-option';
+            const input = document.createElement('input');
+            input.type = 'radio';
+            input.name = 'project_presentation_file';
+            input.value = String(file.id);
+            input.checked = files.length === 1 || String(file.id) === String(activeProject?.presentation_file_id || '');
+            const icon = document.createElement('i');
+            icon.className = file.icon || 'fa-regular fa-file';
+            icon.setAttribute('aria-hidden', 'true');
+            const copy = document.createElement('span');
+            const name = document.createElement('strong');
+            name.textContent = file.name || 'Archivo';
+            const meta = document.createElement('small');
+            meta.textContent = [file.format, file.size].filter(Boolean).join(' · ');
+            copy.append(name, meta);
+            option.append(input, icon, copy);
+            presentationOptions.append(option);
+        });
+        presentationDialog.querySelector('h2').textContent = 'Seleccionar archivo de presentación (opcional)';
+        presentationDialog.querySelector('.ap-presentation-copy').textContent = 'Puedes elegir el archivo que se mostrará automáticamente cuando una persona ingrese al Expediente Digital. Esta elección es opcional y no afecta la importancia de los demás documentos.';
+        presentationDialog.querySelectorAll('[data-cancel-presentation]').forEach(button => {
+            if (!button.getAttribute('aria-label')) button.textContent = 'Omitir';
+        });
+        presentationDialog.querySelector('[data-confirm-presentation]').textContent = 'Continuar';
+        presentationDialog.hidden = false;
+        (presentationOptions.querySelector('input:checked') || presentationDialog.querySelector('[data-cancel-presentation]'))?.focus();
+    };
     form?.addEventListener('submit', event => {
         event.preventDefault();
         const data = new FormData(form);
         ['career_id', 'academic_period_id', 'project_type_id', 'tutor_id', 'status'].forEach(name => data.set(name, form.elements[name].value));
+        const publishingFirstTime = data.get('status') === 'published' && activeProject?.status !== 'published';
+        if (publishingFirstTime) { openPresentationDialog(data); return; }
         if (!form.elements.id.value) { saveProject(data); return; }
         pendingSaveData = data;
         saveConfirm.hidden = false;
@@ -225,6 +266,24 @@
     });
     saveConfirm?.addEventListener('click', event => { if (event.target === saveConfirm) saveConfirm.querySelector('[data-cancel-save]')?.click(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape' && !saveConfirm?.hidden) saveConfirm.querySelector('[data-cancel-save]')?.click(); });
+    const cancelPresentation = () => {
+        const data = pendingSaveData;
+        presentationDialog.hidden = true;
+        pendingSaveData = null;
+        if (data) saveProject(data);
+    };
+    presentationDialog?.querySelectorAll('[data-cancel-presentation]').forEach(button => button.addEventListener('click', cancelPresentation));
+    presentationDialog?.querySelector('[data-confirm-presentation]')?.addEventListener('click', () => {
+        const selected = presentationOptions.querySelector('input:checked');
+        if (!pendingSaveData) return;
+        if (selected) pendingSaveData.set('presentation_file_id', selected.value);
+        const data = pendingSaveData;
+        pendingSaveData = null;
+        presentationDialog.hidden = true;
+        saveProject(data);
+    });
+    presentationDialog?.addEventListener('click', event => { if (event.target === presentationDialog) cancelPresentation(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !presentationDialog?.hidden) cancelPresentation(); });
     document.querySelectorAll('[data-trash]').forEach(button => button.addEventListener('click', () => {
         document.body.append(trash);
         trashForm.reset();

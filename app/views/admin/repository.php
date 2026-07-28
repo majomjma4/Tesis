@@ -200,21 +200,27 @@ $formatDate = static function (?string $date): string {
                             <span><i class="fa-solid fa-download"></i> <?= number_format((int) $material['downloads'], 0, ',', '.') ?> descargas</span>
                         </div>
                         <footer>
-                            <a class="ar-primary-action" href="<?= e(route('support-material-detail') . '&id=' . (int) $material['id']) ?>">
-                                <i class="fa-regular fa-eye"></i> Ver
-                            </a>
-                            <button class="ar-icon-action ar-danger-action" type="button" data-withdraw-material aria-label="Retirar material" data-tooltip="Retirar del repositorio">
-                                <i class="fa-solid fa-eye-slash"></i>
-                            </button>
+                            <?php if (($material['status_key'] ?? '') === 'draft'): ?>
+                                <button class="ar-primary-action" type="button" data-manage-material-files><i class="fa-solid fa-paperclip"></i> Gestionar archivos</button>
+                            <?php else: ?>
+                                <a class="ar-primary-action" href="<?= e(route('support-material-detail') . '&id=' . (int) $material['id']) ?>"><i class="fa-regular fa-eye"></i> Ver</a>
+                            <?php endif; ?>
+                            <?php if (($material['status_key'] ?? '') === 'draft'): ?>
+                                <button class="ar-icon-action" type="button" data-publish-material aria-label="Publicar material" data-tooltip="Publicar material"><i class="fa-solid fa-cloud-arrow-up"></i></button>
+                            <?php else: ?>
+                                <button class="ar-icon-action ar-danger-action" type="button" data-withdraw-material aria-label="Retirar material" data-tooltip="Retirar del repositorio"><i class="fa-solid fa-eye-slash"></i></button>
+                            <?php endif; ?>
                         </footer>
                         <script type="application/json" data-material-json><?= json_encode([
                             'id'=>$material['id'],'title'=>$material['title'],'category_id'=>(int)$material['category_id'],
                             'material_type'=>$material['material_type'],'description'=>$material['description'],
                             'full_description'=>$material['full_description'],'publisher'=>$material['publisher'],
                             'publication_date'=>$material['publication_date_iso'],'keywords'=>implode(', ',$material['keywords']),
+                            'status_key'=>$material['status_key'],'presentation_file_id'=>(int)($material['presentation_file']['id']??0),
                             'files'=>array_map(static fn(array $file):array=>[
                                 'id'=>$file['id'],'name'=>$file['name'],'format'=>$file['format'],
-                                'size'=>$file['size'],'primary'=>$file['primary'],
+                                'size'=>$file['size'],'presentation'=>$file['presentation'],
+                                'extension'=>$file['extension'],
                             ],$material['files']),
                         ], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?></script>
                     </article>
@@ -299,8 +305,18 @@ $formatDate = static function (?string $date): string {
                 <input type="hidden" name="material_id">
                 <input type="hidden" name="action" value="add">
                 <label>Agregar archivo<input name="file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.webp,.txt,.zip" required></label>
-                <label class="ar-primary-check"><input name="is_primary" type="checkbox" value="1"> Usar como archivo principal</label>
                 <footer><button type="button" data-close-material-files>Cerrar</button><button type="submit">Agregar archivo</button></footer>
+            </form>
+        </section>
+    </div>
+
+    <div class="ar-material-modal" id="arPresentationModal" hidden>
+        <section role="dialog" aria-modal="true" aria-labelledby="arPresentationTitle">
+            <header><div><span>Vista inicial</span><h2 id="arPresentationTitle">Elegir archivo de presentación</h2><p>Selecciona el archivo que se mostrará automáticamente cuando una persona ingrese a este expediente. Esta elección no indica que el archivo sea más importante que los demás.</p></div><button type="button" data-close-presentation aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button></header>
+            <form id="arPresentationForm">
+                <div class="ar-presentation-options" data-presentation-options></div>
+                <p class="ar-file-error" data-presentation-error hidden></p>
+                <footer><button type="button" data-close-presentation>Cancelar</button><button type="submit" disabled>Continuar con la publicación</button></footer>
             </form>
         </section>
     </div>
@@ -316,7 +332,7 @@ $formatDate = static function (?string $date): string {
             </div>
         </div>
     </div>
-    <div class="ar-toast" id="arToast" role="status" aria-live="polite" hidden><i class="fa-solid fa-circle-check"></i><span></span></div>
+    <div class="ar-toast-stack" id="arToastStack" role="region" aria-label="Notificaciones" aria-live="polite" aria-atomic="false"></div>
     <div class="ar-tooltip" id="arTooltip" role="tooltip" hidden></div>
     <div id="arConfig" data-endpoint="<?= e($repositoryPublishEndpoint) ?>" data-material-save="<?= e($materialSaveEndpoint) ?>" data-material-status="<?= e($materialStatusEndpoint) ?>" data-material-file="<?= e($materialFileEndpoint) ?>" data-csrf="<?= e($repositoryCsrf) ?>"></div>
 </div>

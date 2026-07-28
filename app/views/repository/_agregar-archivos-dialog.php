@@ -22,7 +22,7 @@ $extensions = is_array($limits['extensions'] ?? null) ? $limits['extensions'] : 
                 <input type="hidden" name="action" value="add">
                 <label class="ed-upload-picker" for="recordUploadInput">
                     <strong>Seleccionar uno o varios archivos</strong>
-                    <span>Los archivos válidos se agregarán como adicionales; el archivo principal no cambiará.</span>
+                    <span>Los archivos válidos se agregarán como documentos normales; el archivo de presentación solo cambia cuando lo indiques desde su menú.</span>
                     <input id="recordUploadInput" type="file" multiple data-upload-input accept="<?= e('.' . implode(',.', $extensions)) ?>">
                 </label>
                 <div class="ed-upload-list" data-upload-file-list></div>

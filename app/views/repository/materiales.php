@@ -21,7 +21,8 @@
                 <div class="repository-card-top"><span class="repository-document-icon"><i class="fa-solid fa-file-circle-check"></i></span><span class="project-status approved"><?= e($material['status']) ?></span></div>
                 <span class="repository-type"><?= e($material['type']) ?> · <?= e($material['pao_label']) ?></span>
                 <h3><?= e($material['title']) ?></h3><p><?= e($material['description']) ?></p>
-                <div class="repository-meta"><span><i class="fa-solid fa-folder-open"></i> <?= e($material['category_label']) ?></span><span><i class="fa-solid fa-file"></i> <?= e($material['primary_file']['format']) ?></span><span><i class="fa-solid fa-download"></i> <?= number_format($material['downloads'], 0, ',', '.') ?> descargas</span></div>
+                <?php $representativeFile = $material['presentation_file'] ?? ($material['files'][0] ?? null); ?>
+                <div class="repository-meta"><span><i class="fa-solid fa-folder-open"></i> <?= e($material['category_label']) ?></span><span><i class="fa-solid fa-file"></i> <?= e((string) ($representativeFile['format'] ?? 'Sin archivos')) ?></span><span><i class="fa-solid fa-download"></i> <?= number_format($material['downloads'], 0, ',', '.') ?> descargas</span></div>
                 <div class="repository-card-actions"><a class="open-btn repository-open-btn" href="<?= e($material['detail_url']) ?>">Ver documento <i class="fa-solid fa-arrow-right"></i></a></div>
             </article>
         <?php endforeach; ?>

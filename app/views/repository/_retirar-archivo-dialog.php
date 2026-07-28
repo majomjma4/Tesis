@@ -11,6 +11,7 @@
             <strong data-file-remove-name></strong>
             <ul class="ed-file-remove-list" data-file-remove-list hidden></ul>
             <p class="ed-file-remove-more" data-file-remove-more hidden></p>
+            <p class="ed-file-remove-warning" data-file-remove-presentation-warning hidden></p>
             <p class="ed-file-remove-error" data-file-remove-error role="alert" hidden></p>
         </div>
         <footer>
