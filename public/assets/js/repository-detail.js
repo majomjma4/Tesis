@@ -838,6 +838,10 @@ function resetNeutralViewer() {
 
 function setNeutralViewerState(state, message = "", retryButton = null) {
     if (!neutralViewerState || !neutralViewer) return;
+    if (state !== "loading" && neutralResourceTimer !== null) {
+        window.clearTimeout(neutralResourceTimer);
+        neutralResourceTimer = null;
+    }
     const settings = {
         loading: ["fa-spinner fa-spin", "Preparando vista previa", message || "Estamos cargando el archivo seleccionado."],
         unsupported: ["fa-eye-slash", "Vista previa no disponible para este formato.", message || "Descarga el archivo para consultar su contenido."],

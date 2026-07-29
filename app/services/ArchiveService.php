@@ -121,6 +121,7 @@ final class ArchiveService
             $entries = $this->isEmptyZip($zipPath)
                 ? []
                 : (class_exists('ZipArchive') ? $this->readEntriesWithZipArchive($zipPath) : $this->readEntriesWithPharData($zipPath));
+            $this->validateArchiveLimits($entries);
             $entry = null;
             foreach ($entries as $candidate) {
                 if (!$candidate['is_dir'] && $candidate['name'] === $normalizedPath) {
@@ -149,6 +150,8 @@ final class ArchiveService
                     return $this->downloadError('unreadable', 'No fue posible leer el archivo solicitado.');
                 }
             }
+            $stream = $this->bufferSeekableStream($stream, $archive, (int) $entry['size']);
+            $archive = null;
 
             return [
                 'success' => true,
@@ -161,6 +164,9 @@ final class ArchiveService
                 'stream' => $stream,
                 'archive' => $archive,
             ];
+        } catch (DomainException $exception) {
+            error_log('ArchiveService unsafe download: ' . $exception->getMessage());
+            return $this->downloadError('unsafe', 'El archivo interno supera los límites permitidos.');
         } catch (Throwable $exception) {
             error_log('ArchiveService download: ' . $exception->getMessage());
             return $this->downloadError('unreadable', 'No fue posible abrir el contenido del proyecto.');
@@ -170,6 +176,32 @@ final class ArchiveService
 
     // Inicio de validación y lectura del contenedor
     // Normaliza rutas e intercambia entre ZipArchive y PharData sin permitir recorridos inseguros.
+    private function bufferSeekableStream($source, ?ZipArchive $archive, int $expectedSize)
+    {
+        $buffer = fopen('php://temp/maxmemory:2097152', 'w+b');
+        if ($buffer === false) {
+            if (is_resource($source)) fclose($source);
+            if ($archive instanceof ZipArchive) $archive->close();
+            throw new RuntimeException('No fue posible preparar el archivo interno.');
+        }
+        try {
+            $copied = stream_copy_to_stream($source, $buffer, self::MAX_ENTRY_SIZE + 1);
+            if ($copied === false || $copied > self::MAX_ENTRY_SIZE || $copied !== $expectedSize) {
+                throw new RuntimeException('El contenido extraído no coincide con el tamaño esperado.');
+            }
+            if (!rewind($buffer)) {
+                throw new RuntimeException('No fue posible reposicionar el archivo interno.');
+            }
+            return $buffer;
+        } catch (Throwable $exception) {
+            fclose($buffer);
+            throw $exception;
+        } finally {
+            if (is_resource($source)) fclose($source);
+            if ($archive instanceof ZipArchive) $archive->close();
+        }
+    }
+
     private function normalizeInternalPath(string $path): ?string
     {
         if (str_contains($path, "\0")) {
