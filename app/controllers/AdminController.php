@@ -160,6 +160,135 @@ final class AdminController
         $materialId=(int)($_POST['material_id']??0);$action=(string)($_POST['action']??'add');
         try{
             $model=new SupportMaterialModel();
+            if($action==='list_restorable'){
+                if($model->findById($materialId,true)===null)$this->json(false,'El material ya no está disponible.',[],404);
+                $files=$model->restorableFiles($materialId);
+                $this->json(true,'Archivos retirados consultados correctamente.',[
+                    'files'=>$files,'count'=>count($files),'restore_hours'=>SupportMaterialModel::RESTORE_HOURS,
+                ]);
+            }
+            if($action==='inspect_restore'){
+                $fileId=(int)($_POST['file_id']??0);
+                $inspection=$model->inspectFileRestore($materialId,$fileId);
+                $this->json(true,'Archivo disponible para restaurar.',$inspection);
+            }
+            if($action==='purge_restorable'){
+                $fileIds=array_values(array_unique(array_map('intval',(array)($_POST['file_ids']??[]))));
+                $actor=(int)$session->userId();
+                $database=Database::connection();
+                $staged=[];
+                try{
+                    $database->beginTransaction();
+                    if($model->findByIdForUpdate($materialId)===null){
+                        throw new InvalidArgumentException('El material ya no está disponible.');
+                    }
+                    $files=$model->inspectPermanentFileDeletion($materialId,$fileIds,true);
+                    foreach($files as $file){
+                        $source=(string)$file['absolute_path'];
+                        $temporary=$source.'.purge-'.bin2hex(random_bytes(8));
+                        if(!rename($source,$temporary)){
+                            throw new RuntimeException('No fue posible preparar la eliminación física del archivo.');
+                        }
+                        $staged[]=['source'=>$source,'temporary'=>$temporary];
+                    }
+                    $model->markFilesPermanentlyDeleted($materialId,$fileIds,$actor);
+                    $auditFiles=array_map(static fn(array $file):array=>[
+                        'file_id'=>$file['id'],'original_name'=>$file['name'],
+                        'extension'=>$file['extension'],'size_bytes'=>$file['size_bytes'],
+                        'created_by'=>$file['created_by'],'created_by_name'=>$file['created_by_name'],
+                        'deleted_at'=>$file['deleted_at'],'deleted_by'=>$file['deleted_by'],
+                        'deleted_by_name'=>$file['deleted_by_name'],
+                    ],$files);
+                    (new AdminActivityService($database))->record(
+                        $actor,'support_material.file_purged',
+                        count($files)===1?'Eliminó definitivamente un archivo retirado':'Eliminó definitivamente archivos retirados',
+                        'Repositorio','support_material',$materialId,
+                        count($files)===1?$files[0]['name']:count($files).' archivos','correct',[
+                            'material_id'=>$materialId,'file_ids'=>$fileIds,'files'=>$auditFiles,
+                            'purged_at'=>(new DateTimeImmutable('now',new DateTimeZone('UTC')))->format(DATE_ATOM),
+                            'purged_by'=>$actor,'restore_hours'=>SupportMaterialModel::RESTORE_HOURS,
+                            'result'=>'correct',
+                        ]
+                    );
+                    $database->commit();
+                }catch(Throwable $error){
+                    if($database->inTransaction())$database->rollBack();
+                    foreach(array_reverse($staged) as $stagedFile){
+                        if(is_file($stagedFile['temporary'])&&!is_file($stagedFile['source'])){
+                            @rename($stagedFile['temporary'],$stagedFile['source']);
+                        }
+                    }
+                    throw $error;
+                }
+                foreach($staged as $stagedFile){
+                    if(is_file($stagedFile['temporary'])&&!unlink($stagedFile['temporary'])){
+                        error_log('Support material purge cleanup failed: '.$stagedFile['temporary']);
+                    }
+                }
+                $remaining=$model->restorableFiles($materialId);
+                $this->json(true,count($fileIds)===1?'Archivo eliminado definitivamente.':'Archivos eliminados definitivamente.',[
+                    'purged_file_ids'=>$fileIds,'restorable_count'=>count($remaining),
+                ]);
+            }
+            if($action==='restore'){
+                $fileId=(int)($_POST['file_id']??0);
+                $confirmedName=trim((string)($_POST['final_name']??''));
+                $actor=(int)$session->userId();
+                $restored=Database::transaction(function(PDO $database)use($model,$materialId,$fileId,$actor,$confirmedName):array{
+                    if($model->findByIdForUpdate($materialId)===null){
+                        throw new InvalidArgumentException('El material ya no está disponible.');
+                    }
+                    $restored=$model->restoreFile($materialId,$fileId,$actor,$confirmedName);
+                    (new AdminActivityService($database))->record(
+                        $actor,'support_material.file_restored','Restauró un archivo del material',
+                        'Repositorio','support_material',$materialId,$restored['final_name'],'correct',[
+                            'material_id'=>$materialId,
+                            'file_id'=>$fileId,
+                            'original_name'=>$restored['original_name'],
+                            'final_name'=>$restored['final_name'],
+                            'deleted_at'=>$restored['deleted_at'],
+                            'deleted_by'=>$restored['deleted_by'],
+                            'deleted_by_name'=>$restored['deleted_by_name'],
+                            'name_conflict'=>$restored['conflict'],
+                            'renamed'=>$restored['original_name']!==$restored['final_name'],
+                            'restore_hours'=>SupportMaterialModel::RESTORE_HOURS,
+                            'result'=>'correct',
+                        ]
+                    );
+                    return $restored;
+                });
+                $query='&material_id='.$materialId.'&file_id='.$fileId;
+                $extension=(string)$restored['extension'];
+                $material=$model->findById($materialId,true);
+                $activeFile=current(array_filter(
+                    (array)($material['files']??[]),
+                    static fn(array $file):bool=>(int)$file['id']===$fileId
+                ))?:null;
+                $package=$material?(new SupportMaterialPackageService())->describe($material):['available'=>false,'file_count'=>0,'source'=>'generated'];
+                $remaining=$model->restorableFiles($materialId);
+                $this->json(true,'Archivo restaurado correctamente.',[
+                    'file'=>[
+                        'id'=>$fileId,'name'=>$restored['final_name'],'extension'=>$extension,
+                        'type'=>mb_strtoupper($extension),'size_label'=>$restored['size'],
+                        'size_bytes'=>(int)$restored['size_bytes'],'is_archive'=>$extension==='zip',
+                        'preview_supported'=>in_array($extension,['pdf','docx','png','jpg','jpeg','webp','txt'],true)||$extension==='zip',
+                        'preview_type'=>$extension==='zip'?'zip':(in_array($extension,['jpg','jpeg','png','webp'],true)?'image':$extension),
+                        'preview_url'=>route('support-material-preview').$query,
+                        'zip_url'=>$extension==='zip'?route('support-material-zip-list').$query:'',
+                        'zip_entry_preview_url'=>$extension==='zip'?route('support-material-zip-entry-preview').$query:'',
+                        'zip_entry_download_url'=>$extension==='zip'?route('support-material-zip-entry-download').$query:'',
+                        'download_url'=>route('support-material-download').$query,
+                        'presentation'=>(bool)($activeFile['presentation']??false),
+                        'sort_order'=>(int)$restored['sort_order'],
+                    ],
+                    'restorable_count'=>count($remaining),
+                    'package'=>[
+                        'available'=>(bool)$package['available'],'file_count'=>(int)$package['file_count'],
+                        'source'=>(string)$package['source'],
+                        'download_url'=>!empty($package['available'])?route('support-material-package-download').'&material_id='.$materialId:'',
+                    ],
+                ]);
+            }
             if($action==='presentation'||$action==='unpresentation'){
                 $requestedFileId=(int)($_POST['file_id']??0);
                 if($requestedFileId<1)throw new InvalidArgumentException('El archivo seleccionado no es válido.');
@@ -179,6 +308,65 @@ final class AdminController
                 });
                 $this->json(true,$fileId===null?'Archivo de presentación eliminado correctamente.':'Archivo de presentación actualizado correctamente.',
                     ['file_id'=>$requestedFileId,'presentation'=>$fileId!==null]+$change);
+            }
+            if($action==='replace'){
+                $fileId=(int)($_POST['file_id']??0);
+                if($fileId<1)throw new InvalidArgumentException('El archivo seleccionado no es válido.');
+                $upload=$_FILES['file']??null;
+                if(!is_array($upload))throw new InvalidArgumentException('Selecciona el archivo de reemplazo.');
+                $actor=(int)$session->userId();
+                $fileService=new SupportMaterialFileService();
+                $stored=null;
+                try{
+                    $stored=$fileService->store($materialId,$upload);
+                    $replacement=Database::transaction(function(PDO $database)use($model,$materialId,$fileId,$stored,$actor):array{
+                        if($model->findByIdForUpdate($materialId)===null){
+                            throw new InvalidArgumentException('El material ya no está disponible.');
+                        }
+                        $replacement=$model->replaceFile($materialId,$fileId,$stored,$actor);
+                        (new AdminActivityService($database))->record(
+                            $actor,'support_material.file_replaced','Reemplazó un archivo del material',
+                            'Repositorio','support_material',$materialId,$stored['original_name'],'correct',[
+                                'file_id'=>$fileId,
+                                'version_id'=>$replacement['version_id'],
+                                'previous_file'=>$replacement['old'],
+                                'new_file'=>$replacement['new'],
+                                'presentation_unchanged'=>$replacement['presentation'],
+                            ]
+                        );
+                        return $replacement;
+                    });
+                }catch(Throwable $error){
+                    if(is_array($stored)&&!$fileService->discard($stored)){
+                        error_log('Support material replacement cleanup failed material='.$materialId.' file='.$fileId);
+                    }
+                    throw $error;
+                }
+                $extension=(string)$stored['extension'];
+                $query='&material_id='.$materialId.'&file_id='.$fileId;
+                $material=$model->findById($materialId,true);
+                $package=$material?(new SupportMaterialPackageService())->describe($material):['available'=>false,'file_count'=>0,'source'=>'generated'];
+                $this->json(true,'Archivo reemplazado correctamente.',[
+                    'file'=>[
+                        'id'=>$fileId,'name'=>$stored['original_name'],'extension'=>$extension,
+                        'type'=>mb_strtoupper($extension),'size_label'=>ArchiveService::formatBytes((int)$stored['size_bytes']),
+                        'size_bytes'=>(int)$stored['size_bytes'],'is_archive'=>$extension==='zip',
+                        'preview_supported'=>in_array($extension,['pdf','docx','png','jpg','jpeg','webp','txt'],true)||$extension==='zip',
+                        'preview_type'=>$extension==='zip'?'zip':(in_array($extension,['jpg','jpeg','png','webp'],true)?'image':$extension),
+                        'preview_url'=>route('support-material-preview').$query,
+                        'zip_url'=>$extension==='zip'?route('support-material-zip-list').$query:'',
+                        'download_url'=>route('support-material-download').$query,
+                        'presentation'=>(bool)$replacement['presentation'],
+                        'sort_order'=>(int)$replacement['sort_order'],
+                    ],
+                    'previous_file'=>$replacement['old'],
+                    'version_id'=>$replacement['version_id'],
+                    'package'=>[
+                        'available'=>(bool)$package['available'],'file_count'=>(int)$package['file_count'],
+                        'source'=>(string)$package['source'],
+                        'download_url'=>!empty($package['available'])?route('support-material-package-download').'&material_id='.$materialId:'',
+                    ],
+                ]);
             }
             if($action==='remove'||$action==='remove_multiple'){
                 $rawIds=$action==='remove_multiple'?($_POST['file_ids']??[]):[$_POST['file_id']??0];

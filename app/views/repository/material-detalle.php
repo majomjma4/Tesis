@@ -37,6 +37,7 @@
             'name' => $name,
             'type' => (string) ($file['format'] ?? ($extension !== '' ? mb_strtoupper($extension, 'UTF-8') : 'Archivo')),
             'size' => (string) ($file['size'] ?? 'Tamaño no disponible'),
+            'sort_order' => (int) ($file['sort_order'] ?? $fileId),
             'extension' => $extension,
             'is_presentation' => !empty($file['presentation']),
             'is_package' => false,
@@ -121,6 +122,7 @@
         'documents' => $documents,
         'archives' => $archives,
         'can_manage_files' => $administratorView,
+        'restorable_files' => is_array($restorableFiles ?? null) ? $restorableFiles : [],
         'file_upload' => [
             'endpoint' => (string) ($materialFileEndpoint ?? ''),
             'csrf_token' => (string) ($materialCsrfToken ?? ''),

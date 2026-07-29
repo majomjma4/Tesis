@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 final class SupportMaterialModel
 {
+    public const RESTORE_HOURS = 24;
     private const PREVIEW_EXTENSIONS = ['pdf','docx','txt','png','jpg','jpeg','webp'];
 
     public function getAll(): array
@@ -235,6 +236,100 @@ final class SupportMaterialModel
         return $statement->fetchColumn() !== false;
     }
 
+    public function replaceFile(int $materialId, int $fileId, array $replacement, int $actor): array
+    {
+        if ($materialId < 1 || $fileId < 1) {
+            throw new InvalidArgumentException('El archivo seleccionado no es válido.');
+        }
+        $database = Database::connection();
+        $statement = $database->prepare(
+            'SELECT file.*,material.presentation_file_id
+             FROM support_material_files file
+             JOIN support_materials material ON material.id=file.material_id
+             WHERE file.id=:file_id AND file.material_id=:material_id
+             FOR UPDATE'
+        );
+        $statement->execute(['file_id' => $fileId, 'material_id' => $materialId]);
+        $current = $statement->fetch();
+        if (!$current) throw new InvalidArgumentException('El archivo no pertenece a este material.');
+        if ($current['deleted_at'] !== null) throw new InvalidArgumentException('El archivo ya fue retirado.');
+        if ((int) $current['is_package'] === 1) {
+            throw new InvalidArgumentException('El paquete institucional no puede reemplazarse.');
+        }
+        if ((int) ($current['presentation_file_id'] ?? 0) === $fileId
+            && !$this->isPreviewCompatible($replacement)) {
+            throw new InvalidArgumentException(
+                'La presentación solo puede reemplazarse por un archivo compatible con la vista previa.'
+            );
+        }
+        $duplicate = $database->prepare(
+            'SELECT 1 FROM support_material_files
+             WHERE material_id=:material_id AND id<>:file_id
+               AND original_name=:original_name AND size_bytes=:size_bytes
+               AND deleted_at IS NULL LIMIT 1'
+        );
+        $duplicate->execute([
+            'material_id' => $materialId,
+            'file_id' => $fileId,
+            'original_name' => $replacement['original_name'],
+            'size_bytes' => $replacement['size_bytes'],
+        ]);
+        if ($duplicate->fetchColumn() !== false) {
+            throw new InvalidArgumentException('Ya existe un archivo activo con el mismo nombre y tamaño.');
+        }
+        $database->prepare(
+            'INSERT INTO support_material_file_versions
+             (file_id,material_id,original_name,storage_name,relative_path,extension,mime_type,size_bytes,replaced_by)
+             VALUES
+             (:file_id,:material_id,:original_name,:storage_name,:relative_path,:extension,:mime_type,:size_bytes,:actor)'
+        )->execute([
+            'file_id' => $fileId,
+            'material_id' => $materialId,
+            'original_name' => $current['original_name'],
+            'storage_name' => $current['storage_name'],
+            'relative_path' => $current['relative_path'],
+            'extension' => $current['extension'],
+            'mime_type' => $current['mime_type'],
+            'size_bytes' => $current['size_bytes'],
+            'actor' => $actor,
+        ]);
+        $versionId = (int) $database->lastInsertId();
+        $database->prepare(
+            'UPDATE support_material_files
+             SET original_name=:original_name,storage_name=:storage_name,
+                 relative_path=:relative_path,extension=:extension,
+                 mime_type=:mime_type,size_bytes=:size_bytes
+             WHERE id=:file_id AND material_id=:material_id AND deleted_at IS NULL'
+        )->execute([
+            'original_name' => $replacement['original_name'],
+            'storage_name' => $replacement['storage_name'],
+            'relative_path' => $replacement['relative_path'],
+            'extension' => $replacement['extension'],
+            'mime_type' => $replacement['mime_type'],
+            'size_bytes' => $replacement['size_bytes'],
+            'file_id' => $fileId,
+            'material_id' => $materialId,
+        ]);
+        return [
+            'file_id' => $fileId,
+            'version_id' => $versionId,
+            'presentation' => (int) ($current['presentation_file_id'] ?? 0) === $fileId,
+            'sort_order' => (int) $current['sort_order'],
+            'old' => [
+                'name' => (string) $current['original_name'],
+                'extension' => (string) $current['extension'],
+                'mime_type' => (string) $current['mime_type'],
+                'size_bytes' => (int) $current['size_bytes'],
+            ],
+            'new' => [
+                'name' => (string) $replacement['original_name'],
+                'extension' => (string) $replacement['extension'],
+                'mime_type' => (string) $replacement['mime_type'],
+                'size_bytes' => (int) $replacement['size_bytes'],
+            ],
+        ];
+    }
+
     public function removeAdditionalFile(int $materialId, int $fileId, int $actor): array
     {
         return $this->removeAdditionalFiles($materialId, [$fileId], $actor)[0];
@@ -279,6 +374,244 @@ final class SupportMaterialModel
                 'size_bytes' => (int) $file['size_bytes'],
             ];
         }, $fileIds);
+    }
+
+    public function restorableFiles(int $materialId): array
+    {
+        if ($materialId < 1) return [];
+        $statement = Database::connection()->prepare(
+            'SELECT file.id,file.material_id,file.original_name,file.relative_path,
+                    file.extension,file.mime_type,file.size_bytes,file.sort_order,
+                    file.deleted_at,file.deleted_by,user.full_name deleted_by_name
+             FROM support_material_files file
+             LEFT JOIN users user ON user.id=file.deleted_by
+             WHERE file.material_id=:material_id
+               AND file.deleted_at IS NOT NULL
+               AND file.purged_at IS NULL
+               AND file.deleted_at>DATE_SUB(UTC_TIMESTAMP(),INTERVAL ' . self::RESTORE_HOURS . ' HOUR)
+               AND file.deleted_at<=UTC_TIMESTAMP()
+               AND file.is_package=0
+             ORDER BY file.deleted_at DESC,file.id DESC'
+        );
+        $statement->execute(['material_id' => $materialId]);
+        $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $files = [];
+        foreach ($statement->fetchAll() as $file) {
+            $path = $this->supportFilePath((string) $file['relative_path']);
+            if (!is_file($path)) continue;
+            $deletedAt = new DateTimeImmutable((string) $file['deleted_at'], new DateTimeZone('UTC'));
+            $expiresAt = $deletedAt->modify('+' . self::RESTORE_HOURS . ' hours');
+            $remainingSeconds = max(0, $expiresAt->getTimestamp() - $now->getTimestamp());
+            if ($remainingSeconds < 1) continue;
+            $files[] = [
+                'id' => (int) $file['id'],
+                'material_id' => (int) $file['material_id'],
+                'name' => (string) $file['original_name'],
+                'extension' => $this->resolveFileExtension($file),
+                'mime_type' => (string) $file['mime_type'],
+                'size_bytes' => (int) $file['size_bytes'],
+                'size' => ArchiveService::formatBytes((int) $file['size_bytes']),
+                'sort_order' => (int) $file['sort_order'],
+                'deleted_at' => $deletedAt->format(DATE_ATOM),
+                'deleted_at_label' => $deletedAt->setTimezone(new DateTimeZone('America/Guayaquil'))->format('d/m/Y H:i'),
+                'deleted_by' => $file['deleted_by'] === null ? null : (int) $file['deleted_by'],
+                'deleted_by_name' => (string) ($file['deleted_by_name'] ?: 'Usuario no disponible'),
+                'remaining_seconds' => $remainingSeconds,
+                'remaining_label' => $this->restoreRemainingLabel($remainingSeconds),
+            ];
+        }
+        return $files;
+    }
+
+    public function inspectFileRestore(int $materialId, int $fileId, bool $lock = false): array
+    {
+        if ($materialId < 1 || $fileId < 1) {
+            throw new InvalidArgumentException('El archivo seleccionado no es válido.');
+        }
+        $database = Database::connection();
+        $statement = $database->prepare(
+            'SELECT file.*,user.full_name deleted_by_name
+             FROM support_material_files file
+             LEFT JOIN users user ON user.id=file.deleted_by
+             WHERE file.id=:file_id' . ($lock ? ' FOR UPDATE' : '')
+        );
+        $statement->execute(['file_id' => $fileId]);
+        $file = $statement->fetch();
+        if (!$file) throw new InvalidArgumentException('El archivo solicitado no existe.');
+        if ((int) $file['material_id'] !== $materialId) {
+            throw new InvalidArgumentException('El archivo no pertenece a este material.');
+        }
+        if ($file['deleted_at'] === null) {
+            throw new InvalidArgumentException('El archivo ya fue restaurado.');
+        }
+        if ($file['purged_at'] !== null) {
+            throw new InvalidArgumentException('Este archivo fue eliminado definitivamente y ya no se encuentra disponible.');
+        }
+        if ((int) $file['is_package'] === 1) {
+            throw new InvalidArgumentException('El paquete institucional no puede restaurarse desde esta opción.');
+        }
+        $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $deletedAt = new DateTimeImmutable((string) $file['deleted_at'], new DateTimeZone('UTC'));
+        $expiresAt = $deletedAt->modify('+' . self::RESTORE_HOURS . ' hours');
+        if ($deletedAt > $now || $expiresAt <= $now) {
+            throw new InvalidArgumentException('El plazo de 24 horas para restaurar este archivo expiró.');
+        }
+        $path = $this->supportFilePath((string) $file['relative_path']);
+        if (!is_file($path) || !is_readable($path)) {
+            throw new InvalidArgumentException('El archivo físico ya no está disponible y no puede restaurarse.');
+        }
+        $activeStatement = $database->prepare(
+            'SELECT id,original_name,relative_path
+             FROM support_material_files
+             WHERE material_id=:material_id AND deleted_at IS NULL AND is_package=0' . ($lock ? ' FOR UPDATE' : '')
+        );
+        $activeStatement->execute(['material_id' => $materialId]);
+        $activeFiles = $activeStatement->fetchAll();
+        $normalizedOriginal = $this->normalizeRestoreName((string) $file['original_name']);
+        $sameName = current(array_filter(
+            $activeFiles,
+            fn (array $active): bool => $this->normalizeRestoreName((string) $active['original_name']) === $normalizedOriginal
+        )) ?: null;
+        $conflict = false;
+        $finalName = (string) $file['original_name'];
+        if ($sameName !== null) {
+            $activePath = $this->supportFilePath((string) $sameName['relative_path']);
+            if (is_file($activePath) && is_readable($activePath)
+                && hash_equals((string) hash_file('sha256', $path), (string) hash_file('sha256', $activePath))) {
+                throw new InvalidArgumentException('Este archivo ya se encuentra disponible dentro del material.');
+            }
+            $conflict = true;
+            $finalName = $this->suggestRestoredName((string) $file['original_name'], $activeFiles);
+        }
+        $remainingSeconds = max(0, $expiresAt->getTimestamp() - $now->getTimestamp());
+        return [
+            'file_id' => $fileId,
+            'material_id' => $materialId,
+            'original_name' => (string) $file['original_name'],
+            'final_name' => $finalName,
+            'conflict' => $conflict,
+            'conflicting_name' => $sameName === null ? null : (string) $sameName['original_name'],
+            'deleted_at' => $deletedAt->format(DATE_ATOM),
+            'deleted_by' => $file['deleted_by'] === null ? null : (int) $file['deleted_by'],
+            'deleted_by_name' => (string) ($file['deleted_by_name'] ?: 'Usuario no disponible'),
+            'remaining_seconds' => $remainingSeconds,
+            'remaining_label' => $this->restoreRemainingLabel($remainingSeconds),
+            'extension' => $this->resolveFileExtension($file),
+            'mime_type' => (string) $file['mime_type'],
+            'size_bytes' => (int) $file['size_bytes'],
+            'size' => ArchiveService::formatBytes((int) $file['size_bytes']),
+            'sort_order' => (int) $file['sort_order'],
+        ];
+    }
+
+    public function restoreFile(int $materialId, int $fileId, int $actor, string $confirmedName): array
+    {
+        $inspection = $this->inspectFileRestore($materialId, $fileId, true);
+        if ($confirmedName === '' || $this->normalizeRestoreName($confirmedName)
+            !== $this->normalizeRestoreName((string) $inspection['final_name'])) {
+            throw new InvalidArgumentException('El conflicto cambió. Revisa nuevamente el nombre propuesto.');
+        }
+        $statement = Database::connection()->prepare(
+            'UPDATE support_material_files
+             SET original_name=:name,deleted_at=NULL,deleted_by=NULL
+             WHERE id=:file_id AND material_id=:material_id AND deleted_at IS NOT NULL'
+        );
+        $statement->execute([
+            'name' => $inspection['final_name'],
+            'file_id' => $fileId,
+            'material_id' => $materialId,
+        ]);
+        if ($statement->rowCount() !== 1) {
+            throw new InvalidArgumentException('El archivo ya fue restaurado.');
+        }
+        return $inspection;
+    }
+
+    public function inspectPermanentFileDeletion(int $materialId, array $fileIds, bool $lock = false): array
+    {
+        $fileIds = array_values(array_unique(array_filter(array_map('intval', $fileIds), static fn (int $id): bool => $id > 0)));
+        if ($materialId < 1 || !$fileIds || count($fileIds) > 20) {
+            throw new InvalidArgumentException('Selecciona entre uno y veinte archivos para eliminar definitivamente.');
+        }
+        $placeholders = implode(',', array_fill(0, count($fileIds), '?'));
+        $statement = Database::connection()->prepare(
+            'SELECT file.id,file.material_id,file.original_name,file.relative_path,file.extension,
+                    file.mime_type,file.size_bytes,file.created_by,file.deleted_at,file.deleted_by,file.purged_at,
+                    creator.full_name created_by_name,remover.full_name deleted_by_name
+             FROM support_material_files file
+             LEFT JOIN users creator ON creator.id=file.created_by
+             LEFT JOIN users remover ON remover.id=file.deleted_by
+             WHERE file.id IN (' . $placeholders . ')' . ($lock ? ' FOR UPDATE' : '')
+        );
+        $statement->execute($fileIds);
+        $rows = $statement->fetchAll();
+        $byId = [];
+        foreach ($rows as $row) $byId[(int) $row['id']] = $row;
+        $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $files = [];
+        foreach ($fileIds as $fileId) {
+            $file = $byId[$fileId] ?? null;
+            if (!$file) throw new InvalidArgumentException('Uno de los archivos solicitados no existe.');
+            if ((int) $file['material_id'] !== $materialId) {
+                throw new InvalidArgumentException('Uno de los archivos no pertenece a este material.');
+            }
+            if ($file['deleted_at'] === null) {
+                throw new InvalidArgumentException('Solo pueden eliminarse definitivamente archivos retirados.');
+            }
+            if ($file['purged_at'] !== null) {
+                throw new InvalidArgumentException('Uno de los archivos ya fue eliminado definitivamente.');
+            }
+            $deletedAt = new DateTimeImmutable((string) $file['deleted_at'], new DateTimeZone('UTC'));
+            if ($deletedAt > $now || $deletedAt->modify('+' . self::RESTORE_HOURS . ' hours') <= $now) {
+                throw new InvalidArgumentException('El plazo de restauración de uno de los archivos ya expiró.');
+            }
+            $path = $this->supportFilePath((string) $file['relative_path']);
+            if (!is_file($path) || !is_readable($path)) {
+                throw new InvalidArgumentException('El archivo físico ya no está disponible.');
+            }
+            $files[] = [
+                'id' => $fileId,
+                'name' => (string) $file['original_name'],
+                'extension' => $this->resolveFileExtension($file),
+                'size_bytes' => (int) $file['size_bytes'],
+                'created_by' => $file['created_by'] === null ? null : (int) $file['created_by'],
+                'created_by_name' => (string) ($file['created_by_name'] ?: 'Usuario no disponible'),
+                'deleted_at' => $deletedAt->format(DATE_ATOM),
+                'deleted_by' => $file['deleted_by'] === null ? null : (int) $file['deleted_by'],
+                'deleted_by_name' => (string) ($file['deleted_by_name'] ?: 'Usuario no disponible'),
+                'relative_path' => (string) $file['relative_path'],
+                'absolute_path' => $path,
+            ];
+        }
+        return $files;
+    }
+
+    public function markFilesPermanentlyDeleted(int $materialId, array $fileIds, int $actor): void
+    {
+        $fileIds = array_values(array_unique(array_map('intval', $fileIds)));
+        $placeholders = implode(',', array_fill(0, count($fileIds), '?'));
+        $statement = Database::connection()->prepare(
+            'UPDATE support_material_files
+             SET purged_at=UTC_TIMESTAMP(),purged_by=?
+             WHERE material_id=? AND id IN (' . $placeholders . ')
+               AND deleted_at IS NOT NULL AND purged_at IS NULL'
+        );
+        $statement->execute([$actor, $materialId, ...$fileIds]);
+        if ($statement->rowCount() !== count($fileIds)) {
+            throw new RuntimeException('No fue posible registrar la eliminación definitiva de todos los archivos.');
+        }
+    }
+
+    public function expiredFilesPendingPurge(int $limit = 100): array
+    {
+        $limit = max(1, min(500, $limit));
+        return Database::connection()->query(
+            'SELECT id,material_id,original_name,relative_path,size_bytes,deleted_at,deleted_by
+             FROM support_material_files
+             WHERE deleted_at IS NOT NULL AND purged_at IS NULL
+               AND deleted_at<=DATE_SUB(UTC_TIMESTAMP(),INTERVAL ' . self::RESTORE_HOURS . ' HOUR)
+             ORDER BY deleted_at,id LIMIT ' . $limit
+        )->fetchAll();
     }
 
     public function setPresentationFile(int $materialId, ?int $fileId, int $actor, ?int $expectedCurrentId = null): array
@@ -401,6 +734,7 @@ final class SupportMaterialModel
                 'mime_type' => strtolower((string) ($file['mime_type'] ?? '')),
                 'size_bytes' => (int) $file['size_bytes'],
                 'size' => ArchiveService::formatBytes((int) $file['size_bytes']),
+                'sort_order' => (int) $file['sort_order'],
             ];
         }, $statement->fetchAll());
 
@@ -459,6 +793,47 @@ final class SupportMaterialModel
         if (in_array($fromName, $allowed, true)) return $fromName;
         if ($fromMime !== '') return $fromMime;
         return in_array($stored, $allowed, true) ? $stored : '';
+    }
+
+    private function supportFilePath(string $relativePath): string
+    {
+        return ROOT_PATH . '/storage/support-materials/' . str_replace(
+            ['/', '\\'],
+            DIRECTORY_SEPARATOR,
+            $relativePath
+        );
+    }
+
+    private function normalizeRestoreName(string $name): string
+    {
+        return mb_strtolower(trim($name), 'UTF-8');
+    }
+
+    private function suggestRestoredName(string $originalName, array $activeFiles): string
+    {
+        $extension = pathinfo($originalName, PATHINFO_EXTENSION);
+        $base = pathinfo($originalName, PATHINFO_FILENAME);
+        $activeNames = array_fill_keys(array_map(
+            fn (array $file): string => $this->normalizeRestoreName((string) $file['original_name']),
+            $activeFiles
+        ), true);
+        for ($number = 1; $number < 10000; $number++) {
+            $suffix = $number === 1 ? ' (restaurado)' : ' (restaurado ' . $number . ')';
+            $candidate = $base . $suffix . ($extension === '' ? '' : '.' . $extension);
+            if (!isset($activeNames[$this->normalizeRestoreName($candidate)])) return $candidate;
+        }
+        throw new RuntimeException('No fue posible generar un nombre disponible para la restauración.');
+    }
+
+    private function restoreRemainingLabel(int $seconds): string
+    {
+        $totalMinutes = max(1, intdiv($seconds, 60));
+        $hours = intdiv($totalMinutes, 60);
+        $minutes = $totalMinutes % 60;
+        if ($hours > 0) {
+            return $hours . ' h' . ($minutes > 0 ? ' ' . sprintf('%02d', $minutes) . ' min' : '');
+        }
+        return $minutes . ' min';
     }
 
     private function spanishDate(DateTimeImmutable $date): string

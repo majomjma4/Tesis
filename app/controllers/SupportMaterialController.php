@@ -36,12 +36,16 @@ final class SupportMaterialController
         $materialModel = new SupportMaterialModel();
         $material = $materialId === false || $materialId === null ? null : $materialModel->findById((int) $materialId);
         $materialCategories = [];
+        $restorableFiles = [];
         if ($material === null) {
             http_response_code(404);
         } else {
             $material['downloads'] = (new SupportMaterialDownloadModel())->getTotal($material['id'], $material['downloads']);
             $material['package_descriptor'] = (new SupportMaterialPackageService())->describe($material);
-            if ($isAdministrator) $materialCategories = $materialModel->categories();
+            if ($isAdministrator) {
+                $materialCategories = $materialModel->categories();
+                $restorableFiles = $materialModel->restorableFiles((int) $material['id']);
+            }
         }
 
         View::render('repository/material-detalle', [
@@ -67,6 +71,7 @@ final class SupportMaterialController
             'materialCsrfToken' => $isAdministrator ? $session->csrfToken('admin_repository') : '',
             'materialCategories' => $materialCategories,
             'materialFileLimits' => $isAdministrator ? (new SupportMaterialFileService())->limits() : [],
+            'restorableFiles' => $restorableFiles,
         ]);
     }
     // Final de presentación de materiales
