@@ -1,6 +1,10 @@
 /storage/repository/*.zip
+# Materiales de apoyo generados por usuarios: privados y específicos de cada
+# instalación. Las excepciones siguientes son únicamente fixtures demostrativos
+# referenciados por database/snapshot.sql.
 /storage/support-materials/*
 !/storage/support-materials/.gitkeep
+!/storage/support-materials/README.md
 !/storage/support-materials/guia_perfil_tesis.pdf
 !/storage/support-materials/lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt
 !/storage/support-materials/material_tesis_completo.zip
