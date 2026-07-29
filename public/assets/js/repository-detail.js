@@ -711,6 +711,15 @@ function applyNeutralZoom(announce = false) {
             const baseScale = neutralDocxBaseScaleByContext.get(neutralDocxContextKey()) ?? 1;
             const effectiveScale = baseScale * userZoom;
             if (docxWrapper instanceof HTMLElement) {
+                const isCompactViewport = window.matchMedia("(max-width: 520px)").matches;
+                const isExpandedViewer = Boolean(neutralViewerOverlay && !neutralViewerOverlay.hidden);
+                const visiblePageGap = isCompactViewport ? 16 : (isExpandedViewer ? 28 : 24);
+                const visibleTailSpace = isCompactViewport ? 10 : (isExpandedViewer ? 16 : 12);
+                const safeScale = Math.max(0.01, effectiveScale);
+                docxWrapper.style.setProperty("--ed-docx-page-gap", `${visiblePageGap / safeScale}px`);
+                docxWrapper.style.setProperty("--ed-docx-page-tail-space", `${visibleTailSpace / safeScale}px`);
+                docxWrapper.style.setProperty("--ed-docx-page-shadow-y", `${2 / safeScale}px`);
+                docxWrapper.style.setProperty("--ed-docx-page-shadow-blur", `${10 / safeScale}px`);
                 docxWrapper.style.zoom = String(effectiveScale);
             }
             if (docxStage instanceof HTMLElement) {

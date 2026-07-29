@@ -3,7 +3,15 @@
     margin:0;
     padding:0;
     box-sizing:border-box;
+}
+/* El documento de docx-preview comparte el DOM con la plataforma. No se debe
+   asignar una fuente directamente a sus nodos: sus spans necesitan heredar la
+   tipografía que la librería genera para cada párrafo o estilo del DOCX. */
+*:not(:where(.ed-docx-render-wrapper, .ed-docx-render-wrapper *)){
     font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+}
+.ed-docx-render-wrapper{
+    font-family:initial;
 }
 :root{
     --app-shell-gutter:max(0px, calc((100vw - 1950px) / 2));
