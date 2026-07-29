@@ -527,6 +527,170 @@ final class SupportMaterialModel
         return $inspection;
     }
 
+    public function documentEvolution(int $materialId): array
+    {
+        if ($materialId < 1) return [];
+        $statement = Database::connection()->prepare(
+            'SELECT file.id file_id,file.material_id,file.original_name current_name,
+                    file.relative_path current_path,file.extension current_extension,
+                    file.mime_type current_mime,file.size_bytes current_size,
+                    file.created_at,file.created_by,file.deleted_at,file.purged_at,
+                    creator.full_name created_by_name,
+                    version.id version_id,version.original_name version_name,
+                    version.relative_path version_path,version.extension version_extension,
+                    version.mime_type version_mime,version.size_bytes version_size,
+                    version.replaced_at,version.replaced_by,replacer.full_name replaced_by_name
+             FROM support_material_files file
+             JOIN support_material_file_versions version
+               ON version.file_id=file.id AND version.material_id=file.material_id
+             LEFT JOIN users creator ON creator.id=file.created_by
+             LEFT JOIN users replacer ON replacer.id=version.replaced_by
+             WHERE file.material_id=:material_id
+             ORDER BY file.sort_order,file.id,version.replaced_at,version.id'
+        );
+        $statement->execute(['material_id' => $materialId]);
+        $rows = $statement->fetchAll();
+        if (!$rows) return [];
+
+        $auditStatement = Database::connection()->prepare(
+            "SELECT audit.id,audit.actor_user_id,audit.created_at,audit.details,
+                    actor.full_name actor_name
+             FROM admin_audit_log
+             audit LEFT JOIN users actor ON actor.id=audit.actor_user_id
+             WHERE audit.action='support_material.file_replaced'
+               AND audit.entity_type='support_material' AND audit.entity_id=:material_id
+             ORDER BY audit.created_at,audit.id"
+        );
+        $auditStatement->execute(['material_id' => $materialId]);
+        $audits = [];
+        foreach ($auditStatement->fetchAll() as $audit) {
+            $details = json_decode((string) ($audit['details'] ?? ''), true);
+            $versionId = (int) ($details['version_id'] ?? 0);
+            $fileId = (int) ($details['file_id'] ?? 0);
+            if ($versionId > 0 && $fileId > 0) $audits[$fileId . ':' . $versionId] = $audit;
+        }
+
+        $grouped = [];
+        foreach ($rows as $row) $grouped[(int) $row['file_id']][] = $row;
+        $groups = [];
+        foreach ($grouped as $fileId => $history) {
+            $versions = [];
+            foreach ($history as $index => $row) {
+                $audit = $audits[$fileId . ':' . (int) $row['version_id']] ?? null;
+                $createdBy = $index === 0
+                    ? (string) ($row['created_by_name'] ?: 'Responsable no disponible')
+                    : (string) ($history[$index - 1]['replaced_by_name']
+                        ?: ($audits[$fileId . ':' . (int) $history[$index - 1]['version_id']]['actor_name'] ?? '')
+                        ?: 'Responsable no disponible');
+                $createdAt = $index === 0
+                    ? (string) $row['created_at']
+                    : (string) $history[$index - 1]['replaced_at'];
+                $available = $this->storedSupportFileAvailable((string) $row['version_path']);
+                $versions[] = [
+                    'id' => (int) $row['version_id'],
+                    'file_id' => $fileId,
+                    'number' => $index + 1,
+                    'current' => false,
+                    'name' => (string) $row['version_name'],
+                    'extension' => $this->resolveFileExtension([
+                        'original_name' => $row['version_name'],
+                        'extension' => $row['version_extension'],
+                        'mime_type' => $row['version_mime'],
+                    ]),
+                    'size_bytes' => (int) $row['version_size'],
+                    'size' => ArchiveService::formatBytes((int) $row['version_size']),
+                    'created_at' => $createdAt,
+                    'date' => $this->evolutionDate($createdAt),
+                    'responsible' => $createdBy,
+                    'available' => $available,
+                    'preview_supported' => $available && $this->isPreviewCompatible([
+                        'original_name' => $row['version_name'],
+                        'extension' => $row['version_extension'],
+                        'mime_type' => $row['version_mime'],
+                    ]),
+                    'replacement_audit_id' => $audit === null ? null : (int) $audit['id'],
+                ];
+            }
+            $last = $history[count($history) - 1];
+            $currentNumber = count($history) + 1;
+            $currentAvailable = $last['deleted_at'] === null && $last['purged_at'] === null
+                && $this->storedSupportFileAvailable((string) $last['current_path']);
+            $versions[] = [
+                'id' => null,
+                'file_id' => $fileId,
+                'number' => $currentNumber,
+                'current' => true,
+                'name' => (string) $last['current_name'],
+                'extension' => $this->resolveFileExtension([
+                    'original_name' => $last['current_name'],
+                    'extension' => $last['current_extension'],
+                    'mime_type' => $last['current_mime'],
+                ]),
+                'size_bytes' => (int) $last['current_size'],
+                'size' => ArchiveService::formatBytes((int) $last['current_size']),
+                'created_at' => (string) $last['replaced_at'],
+                'date' => $this->evolutionDate((string) $last['replaced_at']),
+                'responsible' => (string) ($last['replaced_by_name']
+                    ?: ($audits[$fileId . ':' . (int) $last['version_id']]['actor_name'] ?? '')
+                    ?: 'Responsable no disponible'),
+                'available' => $currentAvailable,
+                'preview_supported' => $currentAvailable && $this->isPreviewCompatible([
+                    'original_name' => $last['current_name'],
+                    'extension' => $last['current_extension'],
+                    'mime_type' => $last['current_mime'],
+                ]),
+                'replacement_audit_id' => $audits[$fileId . ':' . (int) $last['version_id']]['id'] ?? null,
+            ];
+            $groups[] = [
+                'file_id' => $fileId,
+                'name' => (string) $last['current_name'],
+                'extension' => $versions[count($versions) - 1]['extension'],
+                'versions_count' => count($versions),
+                'available' => $currentAvailable,
+                'updated_at' => (string) $last['replaced_at'],
+                'updated_date' => $this->evolutionDate((string) $last['replaced_at']),
+                'responsible' => (string) ($last['replaced_by_name']
+                    ?: ($audits[$fileId . ':' . (int) $last['version_id']]['actor_name'] ?? '')
+                    ?: 'Responsable no disponible'),
+                'versions' => array_reverse($versions),
+            ];
+        }
+        return $groups;
+    }
+
+    public function findHistoricalVersion(int $materialId, int $fileId, int $versionId): ?array
+    {
+        if ($materialId < 1 || $fileId < 1 || $versionId < 1) return null;
+        $statement = Database::connection()->prepare(
+            'SELECT version.id,version.file_id,version.material_id,version.original_name name,
+                    version.relative_path,version.extension,version.mime_type,version.size_bytes
+             FROM support_material_file_versions version
+             JOIN support_material_files file
+               ON file.id=version.file_id AND file.material_id=version.material_id
+             WHERE version.id=:version_id AND version.file_id=:file_id
+               AND version.material_id=:material_id LIMIT 1'
+        );
+        $statement->execute([
+            'version_id' => $versionId,
+            'file_id' => $fileId,
+            'material_id' => $materialId,
+        ]);
+        $version = $statement->fetch();
+        if (!$version) return null;
+        $path = $this->supportFilePath((string) $version['relative_path']);
+        if (!$this->storedSupportFileAvailable((string) $version['relative_path'])) return null;
+        return [
+            'id' => (int) $version['id'],
+            'file_id' => (int) $version['file_id'],
+            'material_id' => (int) $version['material_id'],
+            'name' => (string) $version['name'],
+            'path' => $path,
+            'extension' => $this->resolveFileExtension($version),
+            'mime_type' => (string) $version['mime_type'],
+            'size_bytes' => (int) $version['size_bytes'],
+        ];
+    }
+
     public function inspectPermanentFileDeletion(int $materialId, array $fileIds, bool $lock = false): array
     {
         $fileIds = array_values(array_unique(array_filter(array_map('intval', $fileIds), static fn (int $id): bool => $id > 0)));
@@ -802,6 +966,26 @@ final class SupportMaterialModel
             DIRECTORY_SEPARATOR,
             $relativePath
         );
+    }
+
+    private function storedSupportFileAvailable(string $relativePath): bool
+    {
+        $base = realpath(ROOT_PATH . '/storage/support-materials');
+        $path = realpath($this->supportFilePath($relativePath));
+        return $base !== false && $path !== false
+            && str_starts_with(strtolower($path), strtolower($base . DIRECTORY_SEPARATOR))
+            && is_file($path) && is_readable($path);
+    }
+
+    private function evolutionDate(string $date): string
+    {
+        try {
+            return (new DateTimeImmutable($date, new DateTimeZone('UTC')))
+                ->setTimezone(new DateTimeZone('America/Guayaquil'))
+                ->format('d/m/Y H:i');
+        } catch (Throwable) {
+            return 'Fecha no disponible';
+        }
     }
 
     private function normalizeRestoreName(string $name): string

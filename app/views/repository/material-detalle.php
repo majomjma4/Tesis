@@ -135,7 +135,11 @@
             'source' => (string) ($packageDescriptor['source'] ?? 'generated'),
             'browsable' => false,
         ],
-        'versions' => [],
+        'versions' => is_array($documentEvolution ?? null) ? $documentEvolution : [],
+        'version_endpoints' => [
+            'preview' => (string) ($versionPreviewActionUrl ?? ''),
+            'download' => (string) ($versionDownloadActionUrl ?? ''),
+        ],
         'form' => [
             'action' => (string) ($materialSaveEndpoint ?? ''),
             'method' => 'POST',

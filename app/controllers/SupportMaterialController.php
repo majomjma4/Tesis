@@ -37,11 +37,13 @@ final class SupportMaterialController
         $material = $materialId === false || $materialId === null ? null : $materialModel->findById((int) $materialId);
         $materialCategories = [];
         $restorableFiles = [];
+        $documentEvolution = [];
         if ($material === null) {
             http_response_code(404);
         } else {
             $material['downloads'] = (new SupportMaterialDownloadModel())->getTotal($material['id'], $material['downloads']);
             $material['package_descriptor'] = (new SupportMaterialPackageService())->describe($material);
+            $documentEvolution = $materialModel->documentEvolution((int) $material['id']);
             if ($isAdministrator) {
                 $materialCategories = $materialModel->categories();
                 $restorableFiles = $materialModel->restorableFiles((int) $material['id']);
@@ -72,6 +74,9 @@ final class SupportMaterialController
             'materialCategories' => $materialCategories,
             'materialFileLimits' => $isAdministrator ? (new SupportMaterialFileService())->limits() : [],
             'restorableFiles' => $restorableFiles,
+            'documentEvolution' => $documentEvolution,
+            'versionPreviewActionUrl' => route('support-material-version-preview'),
+            'versionDownloadActionUrl' => route('support-material-version-download'),
         ]);
     }
     // Final de presentación de materiales
@@ -113,6 +118,63 @@ final class SupportMaterialController
         header('Content-Disposition: inline; filename*=UTF-8\'\'' . rawurlencode($file['name']));
         header('X-Content-Type-Options: nosniff');
         header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
+        header('Cache-Control: private, no-store, max-age=0');
+        fpassthru($stream);
+        fclose($stream);
+        exit;
+    }
+
+    public function versionPreview(): void
+    {
+        $this->ensureGetJson();
+        [$material, $version, $stream] = $this->resolveHistoricalVersionRequest(true);
+        $fileData = $this->buildPreviewFile($version, $stream);
+        $query = '&material_id=' . rawurlencode((string) $material['id'])
+            . '&file_id=' . rawurlencode((string) $version['file_id'])
+            . '&version_id=' . rawurlencode((string) $version['id']);
+        $preview = (new FilePreviewService())->prepare(
+            $fileData,
+            base_url('index.php?page=support-material-version-content' . $query),
+            base_url('index.php?page=support-material-version-download' . $query)
+        );
+        fclose($stream);
+        $this->sendJson(true, $preview['message'], ['preview' => $preview]);
+    }
+
+    public function versionContent(): void
+    {
+        $this->ensureSession();
+        $this->ensureGet();
+        [, $version, $stream] = $this->resolveHistoricalVersionRequest();
+        $fileData = $this->buildPreviewFile($version, $stream);
+        if (!(new FilePreviewService())->canStreamInline($fileData)) {
+            fclose($stream);
+            http_response_code(415);
+            $this->renderError('Este formato debe descargarse para consultarlo.');
+        }
+        session_write_close();
+        header('Content-Type: ' . $this->mimeFor($version['extension']));
+        header('Content-Length: ' . $version['size_bytes']);
+        header('Content-Disposition: inline; filename*=UTF-8\'\'' . rawurlencode($version['name']));
+        header('X-Content-Type-Options: nosniff');
+        header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
+        header('Cache-Control: private, no-store, max-age=0');
+        fpassthru($stream);
+        fclose($stream);
+        exit;
+    }
+
+    public function versionDownload(): void
+    {
+        $this->ensureSession();
+        $this->ensureGet();
+        [, $version, $stream] = $this->resolveHistoricalVersionRequest();
+        session_write_close();
+        $fallbackName = preg_replace('/[^A-Za-z0-9._-]/', '_', $version['name']) ?: 'version';
+        header('Content-Type: ' . $this->mimeFor($version['extension']));
+        header('Content-Length: ' . $version['size_bytes']);
+        header('Content-Disposition: attachment; filename="' . $fallbackName . '"; filename*=UTF-8\'\'' . rawurlencode($version['name']));
+        header('X-Content-Type-Options: nosniff');
         header('Cache-Control: private, no-store, max-age=0');
         fpassthru($stream);
         fclose($stream);
@@ -322,6 +384,35 @@ final class SupportMaterialController
             $this->failFileRequest($status, (string) ($entry['message'] ?? 'No fue posible abrir el archivo interno.'), $jsonResponse);
         }
         return [$material, $zipFile, $entry];
+    }
+
+    private function resolveHistoricalVersionRequest(bool $jsonResponse = false): array
+    {
+        $materialId = filter_var($_GET['material_id'] ?? null, FILTER_VALIDATE_INT);
+        $fileId = filter_var($_GET['file_id'] ?? null, FILTER_VALIDATE_INT);
+        $versionId = filter_var($_GET['version_id'] ?? null, FILTER_VALIDATE_INT);
+        if ($materialId === false || $fileId === false || $versionId === false
+            || $materialId === null || $fileId === null || $versionId === null) {
+            $this->failFileRequest(400, 'La versión solicitada no es válida.', $jsonResponse);
+        }
+        $model = new SupportMaterialModel();
+        $material = $model->findById((int) $materialId);
+        if ($material === null) {
+            $this->failFileRequest(404, 'El material solicitado no está disponible.', $jsonResponse);
+        }
+        $version = $model->findHistoricalVersion((int) $materialId, (int) $fileId, (int) $versionId);
+        if ($version === null) {
+            $this->failFileRequest(
+                404,
+                'Esta versión ya no se encuentra disponible en el sistema.',
+                $jsonResponse
+            );
+        }
+        $stream = fopen($version['path'], 'rb');
+        if ($stream === false) {
+            $this->failFileRequest(404, 'Esta versión ya no se encuentra disponible en el sistema.', $jsonResponse);
+        }
+        return [$material, $version, $stream];
     }
 
     private function closeArchiveEntry(array $entry): void

@@ -375,20 +375,28 @@ final class AdminController
                 $fileIds=array_values(array_unique(array_map(static fn(mixed $id):int=>(int)$id,$rawIds)));
                 if($fileIds===[]||in_array(0,$fileIds,true))$this->json(false,'Selecciona al menos un archivo válido.',[],422);
                 $actor=(int)$session->userId();
-                $removed=Database::transaction(function(PDO $database)use($model,$materialId,$fileIds,$actor):array{
+                $removal=Database::transaction(function(PDO $database)use($model,$materialId,$fileIds,$actor):array{
                     $material=$model->findByIdForUpdate($materialId);
                     if($material===null)throw new InvalidArgumentException('El material ya no está disponible.');
                     $presentationId=(int)($material['presentation_file_id']??0);
+                    $presentationChange=null;
                     if($presentationId>0&&in_array($presentationId,$fileIds,true)){
-                        $change=$model->setPresentationFile($materialId,null,$actor);
-                        (new AdminActivityService($database))->record(
-                            $actor,'support_material.presentation_removed','Quitó el archivo de presentación',
-                            'Repositorio','support_material',$materialId,null,'correct',
-                            ['previous_file_id'=>$change['previous_file_id'],'new_file_id'=>null,'reason'=>'presentation_file_retired']
-                        );
+                        $presentationChange=$model->setPresentationFile($materialId,null,$actor,$presentationId);
                     }
                     $files=$model->removeAdditionalFiles($materialId,$fileIds,$actor);
                     $activity=new AdminActivityService($database);
+                    if($presentationChange!==null){
+                        $presentationFile=current(array_filter(
+                            $files,
+                            static fn(array $file):bool=>(int)$file['id']===$presentationId
+                        ))?:null;
+                        $activity->record(
+                            $actor,'support_material.presentation_removed','Quitó el archivo de presentación',
+                            'Repositorio','support_material',$materialId,
+                            (string)($presentationFile['name']??'Archivo #'.$presentationId),'correct',
+                            ['previous_file_id'=>$presentationChange['previous_file_id'],'new_file_id'=>null,'reason'=>'presentation_file_retired']
+                        );
+                    }
                     foreach($files as $file)$activity->record(
                             $actor,'support_material.file_removed','Retiró un archivo del material',
                             'Repositorio','support_material',$materialId,$file['name'],'correct',[
@@ -396,8 +404,9 @@ final class AdminController
                                 'size_bytes'=>$file['size_bytes'],
                             ]
                         );
-                    return $files;
+                    return ['files'=>$files,'presentation_removed'=>$presentationChange!==null];
                 });
+                $removed=$removal['files'];
                 $material=$model->findById($materialId,true);
                 $package=$material?(new SupportMaterialPackageService())->describe($material):['available'=>false,'file_count'=>0,'source'=>'generated'];
                 $removedIds=array_values(array_map(static fn(array $file):int=>(int)$file['id'],$removed));
@@ -412,6 +421,7 @@ final class AdminController
                 $this->json(true,$message,['removed'=>$removed,'removed_file_ids'=>$removedIds,'removed_count'=>$removedCount,
                     'available_count'=>$availableCount,'updated_available_count'=>$availableCount,
                     'presentation_file_id'=>$currentPresentationId,
+                    'presentation_removed'=>(bool)$removal['presentation_removed'],
                     'package'=>$packageDescriptor,'updated_package_descriptor'=>$packageDescriptor,
                 ]);
             }

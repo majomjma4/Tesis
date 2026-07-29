@@ -513,6 +513,7 @@ const recordPersistentTabs = digitalRecord?.dataset.persistentTabs === "true";
 const recordTabLinks = [...(digitalRecord?.querySelectorAll("[data-record-tab-link]") ?? [])];
 const recordTabPanels = [...(digitalRecord?.querySelectorAll("[data-record-tab-panel]") ?? [])];
 let recordTabActivationSequence = 0;
+let documentEvolutionNeedsRefresh = false;
 
 function activatePersistentRecordTab(tabId, updateHistory = true) {
     if (!recordPersistentTabs || !["information", "files", "evolution"].includes(tabId)) return;
@@ -540,6 +541,7 @@ if (recordPersistentTabs) {
     recordTabLinks.forEach((link, index) => {
         link.addEventListener("click", (event) => {
             if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+            if (link.dataset.tabId === "evolution" && documentEvolutionNeedsRefresh) return;
             event.preventDefault();
             activatePersistentRecordTab(link.dataset.tabId || "information");
         });
@@ -1581,6 +1583,62 @@ function selectNeutralFile(button) {
     loadNeutralPreview(button);
 }
 
+function selectEvolutionVersion(button) {
+    if (!(button instanceof HTMLElement)) return;
+    document.querySelectorAll("[data-zip-entry-file].is-selected").forEach((item) => {
+        item.classList.remove("is-selected");
+        item.setAttribute("aria-selected", "false");
+    });
+    neutralFileButtons.forEach((item) => {
+        item.classList.remove("is-selected");
+        item.setAttribute("aria-selected", "false");
+    });
+    if (neutralViewerName) neutralViewerName.textContent = button.dataset.fileName ?? "Versión del archivo";
+    if (neutralViewer) neutralViewer.dataset.previewType = button.dataset.previewType ?? "unsupported";
+    const selectedPreviewType = button.dataset.previewType ?? "unsupported";
+    if (neutralViewerDocxNote) neutralViewerDocxNote.hidden = selectedPreviewType !== "docx";
+    neutralViewerBody?.classList.toggle("is-docx-content", selectedPreviewType === "docx");
+    neutralDocxHorizontalRatio = 0;
+    neutralZoomPercent = selectedPreviewType === "docx"
+        ? 100
+        : (neutralZoomByFile.get(button.dataset.fileId ?? "") ?? 100);
+    if (neutralViewerDocxTopScroll) neutralViewerDocxTopScroll.hidden = true;
+    setNeutralZoomControlsVisibility(false);
+    if (neutralViewerMeta) {
+        neutralViewerMeta.textContent = [
+            button.dataset.fileType ?? "Archivo",
+            button.dataset.fileSize ?? "Tamaño no disponible",
+            button.dataset.versionCurrent === "true" ? "Versión actual" : "Versión histórica",
+        ].filter(Boolean).join(" · ");
+    }
+    if (neutralViewerDownload) {
+        neutralViewerDownload.href = button.dataset.downloadUrl ?? "";
+        neutralViewerDownload.setAttribute("download", button.dataset.fileName ?? "version");
+        neutralViewerDownload.setAttribute("aria-label", `Descargar ${button.dataset.fileName ?? "la versión"}`);
+    }
+    if (neutralViewerDownloadLabel) {
+        neutralViewerDownloadLabel.textContent = downloadLabelFor(button.dataset.fileExtension ?? "");
+    }
+    activatePersistentRecordTab("files");
+    window.requestAnimationFrame(() => loadNeutralPreview(button));
+}
+
+const documentEvolution = digitalRecord?.querySelector("[data-document-evolution]");
+documentEvolution?.addEventListener("click", (event) => {
+    const previewButton = event.target.closest("[data-evolution-preview]");
+    if (previewButton instanceof HTMLElement) {
+        selectEvolutionVersion(previewButton);
+        return;
+    }
+    const versionButton = event.target.closest("[data-evolution-version]");
+    if (!(versionButton instanceof HTMLElement)) return;
+    const detail = versionButton.nextElementSibling;
+    if (!(detail instanceof HTMLElement) || !detail.matches("[data-evolution-version-detail]")) return;
+    const willOpen = detail.hidden;
+    versionButton.setAttribute("aria-expanded", String(willOpen));
+    detail.hidden = !willOpen;
+});
+
 function bindNeutralFileButton(button) {
     if (!(button instanceof HTMLElement) || button.dataset.fileBound === "true") return;
     button.dataset.fileBound = "true";
@@ -2606,6 +2664,17 @@ function ensureNeutralFileGroup(key) {
     return list;
 }
 
+function syncNeutralFilesEmptyState() {
+    const count = neutralFileButtons.length;
+    const emptyState = neutralFileList?.querySelector("[data-record-files-empty]");
+    emptyState?.toggleAttribute("hidden", count > 0);
+    const counter = neutralFileList?.querySelector("[data-record-file-count]");
+    if (counter) counter.textContent = `${count} ${count === 1 ? "archivo disponible" : "archivos disponibles"}`;
+    if (fileSelectionToggle) {
+        fileSelectionToggle.disabled = !neutralFileList?.querySelector("[data-file-select]");
+    }
+}
+
 function createPresentationMark() {
     const mark = document.createElement("span");
     mark.className = "ed-file-mark is-presentation";
@@ -2657,6 +2726,7 @@ function syncPresentationFile(targetButton) {
     });
     const presentationGroup = neutralFileList?.querySelector('[data-file-group="presentation"]');
     if (presentationGroup && !presentationGroup.querySelector("[data-record-file]")) presentationGroup.remove();
+    syncNeutralFilesEmptyState();
     if (targetButton) {
         selectNeutralFile(targetButton);
     } else {
@@ -2772,10 +2842,7 @@ function appendNeutralAddedFiles(files) {
         bindNeutralFileButton(button);
         bindNeutralFileMenu(item);
     });
-    neutralFileList?.querySelector("[data-record-files-empty]")?.setAttribute("hidden", "");
-    const count = neutralFileButtons.length;
-    const counter = neutralFileList?.querySelector("[data-record-file-count]");
-    if (counter) counter.textContent = `${count} ${count === 1 ? "archivo disponible" : "archivos disponibles"}`;
+    syncNeutralFilesEmptyState();
 }
 
 function updateNeutralPackage(packageData) {
@@ -3360,6 +3427,7 @@ async function submitFileReplacement() {
         fileReplaceSubmitting = false;
         applyFileReplacement(payload.file);
         updateNeutralPackage(payload.package);
+        documentEvolutionNeedsRefresh = true;
         closeFileReplaceDialog(true);
         showRecordUploadToast(result.message || "Archivo reemplazado correctamente.", "success");
     } catch (error) {
@@ -3960,10 +4028,7 @@ function removeNeutralFileItems(items, packageData) {
     groups.forEach((group) => {
         if (!group.querySelector("[data-record-file]")) group.remove();
     });
-    if (fileSelectionToggle) fileSelectionToggle.disabled = !neutralFileList?.querySelector("[data-file-select]");
-    const count = neutralFileButtons.length;
-    const counter = neutralFileList?.querySelector("[data-record-file-count]");
-    if (counter) counter.textContent = `${count} ${count === 1 ? "archivo disponible" : "archivos disponibles"}`;
+    syncNeutralFilesEmptyState();
     updateNeutralPackage(packageData);
     if (!selectedButton) return;
     neutralPreviewSequence += 1;
@@ -3977,7 +4042,6 @@ function removeNeutralFileItems(items, packageData) {
         if (neutralViewerName) neutralViewerName.textContent = "Archivo";
         if (neutralViewerMeta) neutralViewerMeta.textContent = "";
         setNeutralViewerState("empty");
-        neutralFileList?.querySelector("[data-record-files-empty]")?.removeAttribute("hidden");
     }
 }
 
@@ -4017,6 +4081,8 @@ async function submitFileRemoval() {
         const removedItems = confirmedIds.size
             ? targets.filter((item) => confirmedIds.has(String(item.querySelector("[data-record-file]")?.dataset.fileId || "")))
             : targets;
+        const removedPresentation = payload.presentation_removed === true
+            || buttons.some((button) => button.dataset.filePresentation === "true");
         fileRemoveSubmitting = false;
         closeFileRemoveDialog(true);
         removeNeutralFileItems(removedItems, payload.package);
@@ -4025,14 +4091,13 @@ async function submitFileRemoval() {
                 (button) => String(button.dataset.fileId) === String(payload.presentation_file_id)
             );
             if (presentation) syncPresentationFile(presentation);
-        } else if (buttons.some((button) => button.dataset.filePresentation === "true")) {
+        } else if (removedPresentation) {
             syncPresentationFile(null);
         }
         setFileSelectionMode(false);
         refreshRestorableFiles().catch((error) => {
             console.error("No fue posible actualizar los archivos restaurables.", error);
         });
-        const removedPresentation = buttons.some((button) => button.dataset.filePresentation === "true");
         showRecordUploadToast(
             removedPresentation
                 ? "Archivo retirado correctamente. El expediente quedó sin presentación."
