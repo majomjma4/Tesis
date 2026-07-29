@@ -32,6 +32,7 @@
             'webp' => 'image', 'docx' => 'docx', 'txt' => 'text',
         ];
         $isZip = $extension === 'zip';
+        $available = !empty($file['available']);
         return [
             'id' => $fileId,
             'name' => $name,
@@ -39,15 +40,16 @@
             'size' => (string) ($file['size'] ?? 'Tamaño no disponible'),
             'sort_order' => (int) ($file['sort_order'] ?? $fileId),
             'extension' => $extension,
+            'available' => $available,
             'is_presentation' => !empty($file['presentation']),
             'is_package' => false,
-            'preview_supported' => isset($previewTypes[$extension]) || $isZip,
+            'preview_supported' => $available && (isset($previewTypes[$extension]) || $isZip),
             'preview_type' => $isZip ? 'zip' : ($previewTypes[$extension] ?? 'unsupported'),
-            'preview_url' => $fileId > 0 ? (string) $previewActionUrl . $query : '',
-            'zip_url' => $isZip && $fileId > 0 ? (string) $zipListActionUrl . $query : '',
-            'zip_entry_preview_url' => $isZip && $fileId > 0 ? (string) $zipEntryPreviewActionUrl . $query : '',
-            'zip_entry_download_url' => $isZip && $fileId > 0 ? (string) $zipEntryDownloadActionUrl . $query : '',
-            'download_url' => $fileId > 0 ? (string) $downloadActionUrl . $query : '',
+            'preview_url' => $available && $fileId > 0 ? (string) $previewActionUrl . $query : '',
+            'zip_url' => $available && $isZip && $fileId > 0 ? (string) $zipListActionUrl . $query : '',
+            'zip_entry_preview_url' => $available && $isZip && $fileId > 0 ? (string) $zipEntryPreviewActionUrl . $query : '',
+            'zip_entry_download_url' => $available && $isZip && $fileId > 0 ? (string) $zipEntryDownloadActionUrl . $query : '',
+            'download_url' => $available && $fileId > 0 ? (string) $downloadActionUrl . $query : '',
         ];
     }, $materialFiles);
     $regularArchives = array_values(array_filter($documents, static fn (array $document): bool => ($document['extension'] ?? '') === 'zip'));

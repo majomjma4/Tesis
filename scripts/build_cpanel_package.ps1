@@ -22,6 +22,13 @@ if (Test-Path -LiteralPath $zipPath) {
 
 New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
 
+$supportStorage = Join-Path $projectRoot 'storage\support-materials'
+if (Test-Path -LiteralPath $supportStorage -PathType Container) {
+    Write-Output 'Se incluirá storage/support-materials con su estructura y archivos actuales.'
+} else {
+    Write-Warning 'No existe storage/support-materials; el paquete no contendrá archivos de materiales de apoyo.'
+}
+
 $items = @('.htaccess', '.user.ini.example', 'index.php', 'app', 'public', 'database', 'storage')
 foreach ($item in $items) {
     $source = Join-Path $projectRoot $item
@@ -38,6 +45,10 @@ foreach ($item in $items) {
     if (Test-Path -LiteralPath $secretPath) {
         Remove-Item -LiteralPath $secretPath -Force
     }
+}
+$localSnapshotBackup = Join-Path $packageRoot 'database\snapshot.before-portability.local.sql'
+if (Test-Path -LiteralPath $localSnapshotBackup) {
+    Remove-Item -LiteralPath $localSnapshotBackup -Force
 }
 
 Add-Type -AssemblyName System.IO.Compression

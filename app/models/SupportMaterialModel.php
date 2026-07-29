@@ -880,18 +880,21 @@ final class SupportMaterialModel
         $presentationId = isset($material['presentation_file_id'])
             ? (int) $material['presentation_file_id']
             : 0;
-        $files = array_map(function (array $file) use ($presentationId): array {
+        $fileService = new SupportMaterialFileService();
+        $files = array_map(function (array $file) use ($presentationId, $fileService): array {
             $extension = $this->resolveFileExtension($file);
-            $path = ROOT_PATH . '/storage/support-materials/' . str_replace(
+            $fallbackPath = ROOT_PATH . '/storage/support-materials/' . str_replace(
                 ['/', '\\'],
                 DIRECTORY_SEPARATOR,
                 $file['relative_path']
             );
+            $resolvedPath = $fileService->resolveRelativePath((string) $file['relative_path']);
             return [
                 'id' => (int) $file['id'],
                 'name' => $file['original_name'],
                 'format' => $extension !== '' ? strtoupper($extension) : 'FILE',
-                'path' => $path,
+                'path' => $resolvedPath ?? $fallbackPath,
+                'available' => $resolvedPath !== null,
                 'presentation' => (int) $file['id'] === $presentationId,
                 'package' => (bool) $file['is_package'],
                 'extension' => $extension,

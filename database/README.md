@@ -75,3 +75,47 @@ Para actualizar una instalación existente debe aplicarse
 `database/migrations/20260802_teacher_admin_privileges.sql`. Para transportar el
 estado completo actual basta con importar `database/snapshot.sql`, que ya
 contiene esa estructura.
+
+## Traslado entre computadoras
+
+`git clone` y `git pull` no descargan los archivos incorporados por los usuarios.
+La regla `/storage/support-materials/*` los mantiene fuera del repositorio; solo
+se conserva `.gitkeep` para crear la carpeta base.
+
+Para trasladar una instalación existente deben respaldarse y restaurarse como
+una sola unidad:
+
+1. Una exportación actual de la base de datos.
+2. La carpeta completa `storage/support-materials/`.
+
+Debe conservarse exactamente la estructura interna, incluidos los directorios
+por material y los nombres físicos almacenados. Importar solamente la base puede
+dejar registros sin archivos descargables. Copiar solamente `storage` puede
+dejar archivos sin registros asociados.
+
+Los archivos `app/config/app.local.php` y
+`app/config/database.local.php` deben crearse y configurarse separadamente en
+el equipo de destino a partir de sus archivos `.example`. Contienen
+configuración local y no deben añadirse al repositorio.
+
+Antes de habilitar acceso externo:
+
+- confirma permisos de escritura sobre `storage/support-materials`;
+- verifica `fileinfo` y `ZipArchive` o `PharData` con `php -m`;
+- configura `auth_required => true`;
+- importa `database/snapshot.sql`.
+
+El script `scripts/build_cpanel_package.ps1` incluye la carpeta `storage` con su
+estructura y archivos existentes, pero elimina `app.local.php` y
+`database.local.php` del paquete para no distribuir credenciales. Si se usa para
+una migración, revisa el mensaje emitido por el script para confirmar que
+`storage/support-materials` estaba presente al construirlo.
+
+La conciliación manual y no destructiva puede ejecutarse desde la raíz:
+
+```powershell
+C:\xampp\php\php.exe scripts\check_support_material_storage.php
+```
+
+El comando informa registros sin archivo y archivos sin registro. No elimina,
+mueve ni modifica archivos o datos.

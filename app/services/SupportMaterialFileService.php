@@ -86,16 +86,35 @@ final class SupportMaterialFileService
         ];
     }
 
+    public function resolveRelativePath(string $relativePath): ?string
+    {
+        if ($relativePath === '' || str_contains($relativePath, "\0")) return null;
+        $base = realpath(ROOT_PATH . '/storage/support-materials');
+        if ($base === false) return null;
+        $candidate = ROOT_PATH . '/storage/support-materials/' . str_replace(
+            ['/', '\\'],
+            DIRECTORY_SEPARATOR,
+            $relativePath
+        );
+        $path = realpath($candidate);
+        if ($path === false
+            || !str_starts_with(strtolower($path), strtolower($base . DIRECTORY_SEPARATOR))
+            || !is_file($path)
+            || !is_readable($path)) {
+            return null;
+        }
+        return $path;
+    }
+
+    public function isAvailable(string $relativePath): bool
+    {
+        return $this->resolveRelativePath($relativePath) !== null;
+    }
+
     public function discard(array $stored): bool
     {
-        $base = realpath(ROOT_PATH . '/storage/support-materials');
-        $candidate = (string) ($stored['absolute_path'] ?? '');
-        $path = realpath($candidate);
-        if ($base === false || $path === false
-            || !str_starts_with(strtolower($path), strtolower($base . DIRECTORY_SEPARATOR))
-            || !is_file($path)) {
-            return false;
-        }
+        $path = $this->resolveRelativePath((string) ($stored['relative_path'] ?? ''));
+        if ($path === null) return false;
         return @unlink($path);
     }
 }

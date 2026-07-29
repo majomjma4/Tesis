@@ -11,4 +11,5 @@
 /storage/private/projects/*
 /app/config/database.local.php
 /app/config/app.local.php
+/database/snapshot.before-portability.local.sql
 /dist/

@@ -353,6 +353,7 @@ final class SupportMaterialController
         $basePath = realpath(ROOT_PATH . '/storage/support-materials');
         $realPath = realpath($file['path']);
         if ($basePath === false || $realPath === false || !str_starts_with(strtolower($realPath), strtolower($basePath . DIRECTORY_SEPARATOR)) || !is_readable($realPath)) {
+            error_log('Support material file unavailable material=' . (int) $material['id'] . ' file=' . (int) $file['id']);
             $this->failFileRequest(404, 'El archivo solicitado no está disponible.', $jsonResponse);
         }
         $stream = fopen($realPath, 'rb');

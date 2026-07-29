@@ -7,7 +7,11 @@ $canManageFiles = !empty($digitalRecord['can_manage_files']) && !empty($digitalR
 $restorableFiles = is_array($digitalRecord['restorable_files'] ?? null) ? $digitalRecord['restorable_files'] : [];
 $selectableFiles = array_values(array_merge($documents, $archives));
 $retirableFiles = array_values(array_filter($selectableFiles, static fn (array $file): bool => empty($file['is_package'])));
-$selectedDocument = current(array_filter($selectableFiles, static fn (array $file): bool => !empty($file['is_presentation']))) ?: null;
+$selectedDocument = current(array_filter(
+    $selectableFiles,
+    static fn (array $file): bool => !empty($file['is_presentation'])
+        && (!array_key_exists('available', $file) || !empty($file['available']))
+)) ?: null;
 $documentGroups = array_filter([
     'Archivo de presentación' => array_values(array_filter($documents, static fn (array $document): bool => !empty($document['is_presentation']) && empty($document['is_package']))),
     'Archivos del material' => array_values(array_filter($documents, static fn (array $document): bool => empty($document['is_presentation']) && empty($document['is_package']))),
@@ -45,6 +49,7 @@ $visualForExtension = static function (string $extension): array {
 .ed-document-row small{display:block;margin-top:3px;color:var(--muted);font-size:10px}
 .ed-file-mark{flex:0 0 auto;padding:4px 7px;border:1px solid rgba(37,99,235,.2);border-radius:999px;background:rgba(37,99,235,.07);color:var(--primary);font-size:9px;font-weight:800}
 .ed-file-mark.is-package{border-color:var(--line);background:var(--surface-soft);color:var(--muted)}
+.ed-document-row.is-unavailable{cursor:default;opacity:.72}.ed-document-row.is-unavailable:hover{background:transparent}.ed-file-mark.is-unavailable{border-color:var(--line);background:var(--surface-soft);color:var(--muted)}
 .ed-viewer{min-height:360px;display:grid;grid-template-rows:auto 1fr}
 .ed-viewer-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px}
 .ed-viewer-head>.ed-back-to-files{grid-column:1/-1;justify-self:start}.ed-viewer-head>div{min-width:0}
@@ -108,7 +113,7 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
 <div class="ed-files-layout" data-record-files>
     <section class="ed-files-panel" aria-labelledby="recordFilesTitle">
         <header class="ed-files-heading">
-            <div><h2 id="recordFilesTitle">Archivos del material</h2><p data-record-file-count><?= count($selectableFiles) ?> <?= count($selectableFiles) === 1 ? 'archivo disponible' : 'archivos disponibles' ?></p></div>
+            <div><h2 id="recordFilesTitle">Archivos del material</h2><p data-record-file-count><?= count($selectableFiles) ?> <?= count($selectableFiles) === 1 ? 'archivo registrado' : 'archivos registrados' ?></p></div>
             <?php if (!empty($package['available']) || $canManageFiles): ?><div class="ed-files-global-actions" data-file-global-actions>
                 <button class="ed-files-global-toggle" type="button" data-file-global-toggle aria-label="Acciones de archivos del material" aria-haspopup="menu" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
                 <div class="ed-files-global-menu" data-file-global-menu role="menu" hidden>
@@ -136,16 +141,17 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
             <section class="ed-document-group" data-file-group="<?= e($groupKey) ?>" aria-labelledby="recordFileGroup<?= $documentIndex ?>">
                 <h3 id="recordFileGroup<?= $documentIndex ?>"><?= e($groupLabel) ?></h3>
                 <div class="ed-document-list" data-file-group-list role="listbox" aria-label="<?= e($groupLabel) ?>">
-                    <?php foreach ($groupDocuments as $document): $selected = !empty($document['is_presentation']); $fileVisual = $visualForExtension((string) ($document['extension'] ?? '')); $canRetire = $canManageFiles && empty($document['is_package']); $presentationEligible = !empty($document['preview_supported']) && empty($document['is_package']); ?>
+                    <?php foreach ($groupDocuments as $document): $selected = !empty($document['is_presentation']); $available = !array_key_exists('available', $document) || !empty($document['available']); $fileVisual = $visualForExtension((string) ($document['extension'] ?? '')); $canRetire = $canManageFiles && empty($document['is_package']); $presentationEligible = $available && !empty($document['preview_supported']) && empty($document['is_package']); ?>
                         <div class="ed-document-item" data-record-file-item>
                         <?php if ($canRetire): ?><input class="ed-file-checkbox" type="checkbox" data-file-select value="<?= (int) $document['id'] ?>" aria-label="Seleccionar <?= e($document['name']) ?>" hidden><?php endif; ?>
-                        <button class="ed-document-row<?= $selected ? ' is-selected' : '' ?>" type="button" role="option"
+                        <button class="ed-document-row<?= $selected ? ' is-selected' : '' ?><?= $available ? '' : ' is-unavailable' ?>" type="button" role="option"<?= $available ? '' : ' disabled' ?>
                             data-record-file data-file-id="<?= (int) $document['id'] ?>"
                             data-file-name="<?= e($document['name']) ?>" data-file-type="<?= e($fileVisual['label']) ?>"
                             data-file-size="<?= e($document['size']) ?>" data-file-extension="<?= e($document['extension']) ?>"
                             data-file-sort-order="<?= (int) ($document['sort_order'] ?? $documentIndex) ?>"
                             data-file-presentation="<?= !empty($document['is_presentation']) ? 'true' : 'false' ?>"
                             data-file-package="<?= !empty($document['is_package']) ? 'true' : 'false' ?>"
+                            data-file-available="<?= $available ? 'true' : 'false' ?>"
                             data-preview-supported="<?= !empty($document['preview_supported']) ? 'true' : 'false' ?>"
                             data-preview-type="<?= e($document['preview_type']) ?>"
                             data-preview-url="<?= e($document['preview_url']) ?>"
@@ -160,13 +166,13 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
                             <span class="ed-file-marks" data-file-marks>
                                 <?php if (!empty($document['is_presentation'])): ?><span class="ed-file-mark is-presentation" data-file-presentation-mark><i class="fa-solid fa-display" aria-hidden="true"></i> Presentación</span><?php endif; ?>
                                 <?php if (!empty($document['is_package'])): ?><span class="ed-file-mark is-package">Paquete</span><?php endif; ?>
+                                <?php if (!$available): ?><span class="ed-file-mark is-unavailable"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> Archivo no disponible</span><?php endif; ?>
                             </span>
                         </button>
                         <?php if ($canRetire): ?>
                             <button class="ed-file-menu-toggle" type="button" data-file-menu-toggle aria-haspopup="menu" aria-expanded="false" aria-label="Acciones de <?= e($document['name']) ?>"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
                             <div class="ed-file-menu" data-file-menu role="menu" hidden>
-                                <a role="menuitem" data-file-download-action href="<?= e($document['download_url']) ?>" download><i class="fa-solid fa-download" aria-hidden="true"></i>Descargar</a>
-                                <hr>
+                                <?php if ($available): ?><a role="menuitem" data-file-download-action href="<?= e($document['download_url']) ?>" download><i class="fa-solid fa-download" aria-hidden="true"></i>Descargar</a><hr><?php endif; ?>
                                 <button type="button" role="menuitem" data-file-replace-action><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>Reemplazar archivo</button>
                                 <?php if ($presentationEligible): ?><button type="button" role="menuitem" data-file-presentation-action><i class="fa-solid fa-display" aria-hidden="true"></i><?= !empty($document['is_presentation']) ? 'Quitar como archivo de presentación' : 'Usar como archivo de presentación' ?></button><?php endif; ?>
                                 <button type="button" role="menuitem" data-file-remove-action><i class="fa-solid fa-box-archive" aria-hidden="true"></i>Retirar archivo</button>

@@ -1,4 +1,4 @@
--- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
+﻿-- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
 --
 -- Host: localhost    Database: tesis
 -- ------------------------------------------------------
@@ -84,7 +84,7 @@ CREATE TABLE `academic_subjects` (
 
 LOCK TABLES `academic_subjects` WRITE;
 /*!40000 ALTER TABLE `academic_subjects` DISABLE KEYS */;
-INSERT INTO `academic_subjects` VALUES (7,1,2,4,'PROY-401','Proyecto Integrador IV',26),(8,1,2,6,'SEG-601','Seguridad de Aplicaciones',27),(9,1,2,8,'TIT-801','Unidad de Integración Curricular',28);
+INSERT INTO `academic_subjects` VALUES (7,1,2,4,'PROY-401','Proyecto Integrador IV',26),(8,1,2,6,'SEG-601','Seguridad de Aplicaciones',27),(9,1,2,8,'TIT-801','Unidad de IntegraciÃ³n Curricular',28);
 /*!40000 ALTER TABLE `academic_subjects` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -195,7 +195,7 @@ CREATE TABLE `notifications` (
 
 LOCK TABLES `notifications` WRITE;
 /*!40000 ALTER TABLE `notifications` DISABLE KEYS */;
-INSERT INTO `notifications` VALUES (10,24,22,'observation','Tienes observaciones nuevas','Revisa los comentarios registrados por tu tutora.','index.php?page=project-detail&id=22','Abrir proyecto','{\"demo\":true}',NULL,0,NULL,'2026-07-18 21:16:28','2026-07-19 21:16:28',NULL,NULL),(11,22,25,'status_change','Proyecto aprobado','El proyecto está listo para cargar sus documentos finales.','index.php?page=project-detail&id=25','Abrir proyecto','{\"demo\":true}',NULL,0,NULL,'2026-07-18 21:16:28','2026-07-19 21:16:28',NULL,NULL),(12,21,27,'repository','Proyecto publicado','El proyecto ya se encuentra publicado en el repositorio.','index.php?page=project-detail&id=27','Abrir proyecto','{\"demo\":true}',NULL,0,NULL,'2026-07-18 21:16:28','2026-07-19 21:16:28',NULL,NULL),(13,68,NULL,'system','Bienvenido al entorno de pruebas','Tu cuenta de estudiante esta lista para probar las funciones de la plataforma.','index.php?page=dashboard','Ir al inicio','{\"source\": \"test_setup\"}',NULL,0,NULL,'2026-07-21 19:30:21','2026-07-21 19:30:21',NULL,NULL),(14,68,NULL,'reminder','Revisa tus actividades pendientes','Consulta el panel para familiarizarte con entregas, observaciones y fechas academicas.','index.php?page=dashboard','Revisar panel','{\"source\": \"test_setup\"}',NULL,0,NULL,'2026-07-21 19:30:21','2026-07-21 19:30:21',NULL,NULL),(15,69,NULL,'review','Cuenta docente preparada','Tu cuenta docente esta lista para revisar proyectos y registrar observaciones de prueba.','index.php?page=dashboard','Ir al inicio','{\"source\": \"test_setup\"}',NULL,0,NULL,'2026-07-21 19:30:21','2026-07-21 19:30:21',NULL,NULL),(16,1,NULL,'system','Datos demostrativos preparados','El listado contiene registros suficientes para comprobar la paginación.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":1}',NULL,1,'2026-07-23 19:43:14','2026-07-23 03:45:56','2026-07-23 19:43:14',NULL,NULL),(17,1,NULL,'reminder','Revisión de proyecto pendiente','Comprueba el segundo bloque de resultados del listado.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":2}',NULL,1,'2026-07-23 03:55:53','2026-07-23 02:45:56','2026-07-23 03:55:53',NULL,NULL),(18,1,NULL,'status_change','Proyecto actualizado','Un proyecto demostrativo cambió de estado.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":3}',NULL,1,NULL,'2026-07-23 01:45:56','2026-07-23 03:45:56',NULL,NULL),(19,1,NULL,'repository','Proyecto publicado','Hay un nuevo proyecto disponible en el repositorio.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":4}',NULL,1,'2026-07-23 03:56:05','2026-07-23 00:45:56','2026-07-23 03:56:05',NULL,NULL),(20,1,NULL,'review','Revisión completada','La revisión académica fue registrada correctamente.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":5}',NULL,1,NULL,'2026-07-22 23:45:56','2026-07-23 03:45:56',NULL,NULL),(21,1,NULL,'observation','Nueva observación','Se agregó una observación al documento demostrativo.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":6}',NULL,1,'2026-07-23 05:33:57','2026-07-22 22:45:56','2026-07-23 05:33:57',NULL,NULL),(22,1,NULL,'system','Catálogo actualizado','Los datos institucionales fueron sincronizados.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":7}',NULL,1,NULL,'2026-07-22 03:45:56','2026-07-23 03:45:56',NULL,NULL),(23,1,NULL,'reminder','Actividad próxima','Existe una actividad académica programada.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":8}',NULL,0,NULL,'2026-07-21 03:45:56','2026-07-23 03:45:56',NULL,NULL),(24,1,NULL,'status_change','Estado aprobado','El proyecto demostrativo fue aprobado.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":9}',NULL,1,NULL,'2026-07-20 03:45:56','2026-07-23 03:45:56',NULL,NULL),(25,1,NULL,'repository','Documento disponible','El documento final ya puede consultarse.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":10}',NULL,0,NULL,'2026-07-19 03:45:56','2026-07-23 03:45:56',NULL,NULL),(26,1,NULL,'review','Comentarios registrados','La tutora agregó comentarios de revisión.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":11}',NULL,0,NULL,'2026-07-18 03:45:56','2026-07-23 03:45:56',NULL,NULL),(27,1,NULL,'system','Prueba de segunda página','Esta notificación permite verificar la navegación entre páginas.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":12}',NULL,0,NULL,'2026-07-17 03:45:56','2026-07-23 03:45:56',NULL,NULL);
+INSERT INTO `notifications` VALUES (10,24,22,'observation','Tienes observaciones nuevas','Revisa los comentarios registrados por tu tutora.','index.php?page=project-detail&id=22','Abrir proyecto','{\"demo\":true}',NULL,0,NULL,'2026-07-18 21:16:28','2026-07-19 21:16:28',NULL,NULL),(11,22,25,'status_change','Proyecto aprobado','El proyecto estÃ¡ listo para cargar sus documentos finales.','index.php?page=project-detail&id=25','Abrir proyecto','{\"demo\":true}',NULL,0,NULL,'2026-07-18 21:16:28','2026-07-19 21:16:28',NULL,NULL),(12,21,27,'repository','Proyecto publicado','El proyecto ya se encuentra publicado en el repositorio.','index.php?page=project-detail&id=27','Abrir proyecto','{\"demo\":true}',NULL,0,NULL,'2026-07-18 21:16:28','2026-07-19 21:16:28',NULL,NULL),(13,68,NULL,'system','Bienvenido al entorno de pruebas','Tu cuenta de estudiante esta lista para probar las funciones de la plataforma.','index.php?page=dashboard','Ir al inicio','{\"source\": \"test_setup\"}',NULL,0,NULL,'2026-07-21 19:30:21','2026-07-21 19:30:21',NULL,NULL),(14,68,NULL,'reminder','Revisa tus actividades pendientes','Consulta el panel para familiarizarte con entregas, observaciones y fechas academicas.','index.php?page=dashboard','Revisar panel','{\"source\": \"test_setup\"}',NULL,0,NULL,'2026-07-21 19:30:21','2026-07-21 19:30:21',NULL,NULL),(15,69,NULL,'review','Cuenta docente preparada','Tu cuenta docente esta lista para revisar proyectos y registrar observaciones de prueba.','index.php?page=dashboard','Ir al inicio','{\"source\": \"test_setup\"}',NULL,0,NULL,'2026-07-21 19:30:21','2026-07-21 19:30:21',NULL,NULL),(16,1,NULL,'system','Datos demostrativos preparados','El listado contiene registros suficientes para comprobar la paginaciÃ³n.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":1}',NULL,1,'2026-07-23 19:43:14','2026-07-23 03:45:56','2026-07-23 19:43:14',NULL,NULL),(17,1,NULL,'reminder','RevisiÃ³n de proyecto pendiente','Comprueba el segundo bloque de resultados del listado.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":2}',NULL,1,'2026-07-23 03:55:53','2026-07-23 02:45:56','2026-07-23 03:55:53',NULL,NULL),(18,1,NULL,'status_change','Proyecto actualizado','Un proyecto demostrativo cambiÃ³ de estado.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":3}',NULL,1,NULL,'2026-07-23 01:45:56','2026-07-23 03:45:56',NULL,NULL),(19,1,NULL,'repository','Proyecto publicado','Hay un nuevo proyecto disponible en el repositorio.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":4}',NULL,1,'2026-07-23 03:56:05','2026-07-23 00:45:56','2026-07-23 03:56:05',NULL,NULL),(20,1,NULL,'review','RevisiÃ³n completada','La revisiÃ³n acadÃ©mica fue registrada correctamente.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":5}',NULL,1,NULL,'2026-07-22 23:45:56','2026-07-23 03:45:56',NULL,NULL),(21,1,NULL,'observation','Nueva observaciÃ³n','Se agregÃ³ una observaciÃ³n al documento demostrativo.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":6}',NULL,1,'2026-07-23 05:33:57','2026-07-22 22:45:56','2026-07-23 05:33:57',NULL,NULL),(22,1,NULL,'system','CatÃ¡logo actualizado','Los datos institucionales fueron sincronizados.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":7}',NULL,1,NULL,'2026-07-22 03:45:56','2026-07-23 03:45:56',NULL,NULL),(23,1,NULL,'reminder','Actividad prÃ³xima','Existe una actividad acadÃ©mica programada.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":8}',NULL,0,NULL,'2026-07-21 03:45:56','2026-07-23 03:45:56',NULL,NULL),(24,1,NULL,'status_change','Estado aprobado','El proyecto demostrativo fue aprobado.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":9}',NULL,1,NULL,'2026-07-20 03:45:56','2026-07-23 03:45:56',NULL,NULL),(25,1,NULL,'repository','Documento disponible','El documento final ya puede consultarse.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":10}',NULL,0,NULL,'2026-07-19 03:45:56','2026-07-23 03:45:56',NULL,NULL),(26,1,NULL,'review','Comentarios registrados','La tutora agregÃ³ comentarios de revisiÃ³n.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":11}',NULL,0,NULL,'2026-07-18 03:45:56','2026-07-23 03:45:56',NULL,NULL),(27,1,NULL,'system','Prueba de segunda pÃ¡gina','Esta notificaciÃ³n permite verificar la navegaciÃ³n entre pÃ¡ginas.',NULL,NULL,'{\"source\":\"pagination_demo\",\"item\":12}',NULL,0,NULL,'2026-07-17 03:45:56','2026-07-23 03:45:56',NULL,NULL);
 /*!40000 ALTER TABLE `notifications` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -226,7 +226,7 @@ CREATE TABLE `observation_responses` (
 
 LOCK TABLES `observation_responses` WRITE;
 /*!40000 ALTER TABLE `observation_responses` DISABLE KEYS */;
-INSERT INTO `observation_responses` VALUES (4,7,24,'La justificación fue incorporada en la versión que estamos preparando.','2026-07-18 21:16:28');
+INSERT INTO `observation_responses` VALUES (4,7,24,'La justificaciÃ³n fue incorporada en la versiÃ³n que estamos preparando.','2026-07-18 21:16:28');
 /*!40000 ALTER TABLE `observation_responses` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -265,7 +265,7 @@ CREATE TABLE `project_audit_log` (
 
 LOCK TABLES `project_audit_log` WRITE;
 /*!40000 ALTER TABLE `project_audit_log` DISABLE KEYS */;
-INSERT INTO `project_audit_log` VALUES (10,22,1,'delivery_submitted','delivery',4,NULL,'{\"demo\":true}','Actividad demostrativa',NULL,NULL,'2026-07-18 21:16:28'),(11,25,1,'project_approved','project',25,NULL,'{\"demo\":true}','Actividad demostrativa',NULL,NULL,'2026-07-18 21:16:28'),(12,27,1,'project_published','project',27,NULL,'{\"demo\":true}','Actividad demostrativa',NULL,NULL,'2026-07-18 21:16:28'),(13,38,1,'project_updated','project',38,'{\"id\":38,\"title\":\"Monitoreo de infraestructura de red\",\"status\":\"published\"}','{\"title\":\"Monitoreo de infraestructura de red\",\"subtitle\":\"Prueba de paginación 10\",\"project_type_id\":2,\"career_id\":1,\"academic_period_id\":2,\"tutor_id\":70,\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-23 03:49:05'),(14,38,1,'project_updated','project',38,'{\"id\":38,\"title\":\"Monitoreo de infraestructura de red\",\"status\":\"approved\"}','{\"title\":\"Monitoreo de infraestructura de red\",\"subtitle\":\"Prueba de paginación 10\",\"project_type_id\":2,\"career_id\":1,\"academic_period_id\":2,\"tutor_id\":28,\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-23 03:49:12'),(15,38,1,'project_updated','project',38,'{\"id\":38,\"title\":\"Monitoreo de infraestructura de red\",\"status\":\"approved\"}','{\"title\":\"Monitoreo de infraestructura de redd\",\"subtitle\":\"Prueba de paginación 100\",\"project_type_id\":3,\"career_id\":1,\"academic_period_id\":2,\"tutor_id\":28,\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-23 03:49:22'),(16,25,1,'project_updated','project',25,'{\"id\":25,\"code\":\"VIN-2026-001\",\"title\":\"Alfabetización digital para emprendedores locales\",\"status\":\"approved\",\"project_type_id\":4,\"created_at\":\"2026-06-14 21:16:28\"}','{\"title\":\"Alfabetización digital para emprendedores locales\",\"subtitle\":\"Proyecto de vinculación con herramientas de comercio electrónico\",\"project_type_id\":4,\"career_id\":1,\"academic_period_id\":2,\"tutor_id\":71,\"status\":\"approved\",\"code\":\"VIN-2026-001\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-23 04:02:36'),(17,25,1,'project_trashed','project',25,'{\"id\":25,\"title\":\"Alfabetización digital para emprendedores locales\",\"status\":\"approved\"}','{\"deleted\":true}','Registro creado por error.','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-23 05:07:04'),(18,28,1,'project_trashed','project',28,'{\"id\":28,\"title\":\"Prototipo descartado de control de asistencia\",\"status\":\"development\"}','{\"deleted\":true}','No más xd','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-23 05:07:35'),(19,25,1,'project_published','project',25,'{\"id\":25,\"title\":\"Alfabetización digital para emprendedores locales\",\"status\":\"approved\",\"published_at\":null,\"type_code\":\"community\"}','{\"status\":\"published\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 04:18:51'),(20,25,1,'project_unpublished','project',25,'{\"id\":25,\"title\":\"Alfabetización digital para emprendedores locales\",\"status\":\"published\",\"published_at\":\"2026-07-24 04:18:51\",\"type_code\":\"community\"}','{\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 04:42:12'),(21,25,1,'project_republished','project',25,'{\"id\":25,\"title\":\"Alfabetización digital para emprendedores locales\",\"status\":\"approved\",\"published_at\":null,\"type_code\":\"community\"}','{\"status\":\"published\"}','Restauración de una publicación retirada','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 04:49:55'),(22,25,1,'project_unpublished','project',25,'{\"id\":25,\"title\":\"Alfabetización digital para emprendedores locales\",\"status\":\"published\",\"published_at\":\"2026-07-24 04:49:55\",\"type_code\":\"community\"}','{\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 04:59:37'),(23,25,1,'project_republished','project',25,'{\"id\":25,\"title\":\"Alfabetización digital para emprendedores locales\",\"status\":\"approved\",\"published_at\":null,\"type_code\":\"community\"}','{\"status\":\"published\"}','Restauración de una publicación retirada','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 04:59:50'),(24,25,1,'project_unpublished','project',25,'{\"id\":25,\"title\":\"Alfabetización digital para emprendedores locales\",\"status\":\"published\",\"published_at\":\"2026-07-24 04:59:50\",\"type_code\":\"community\"}','{\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 05:50:25'),(25,25,1,'project_republished','project',25,'{\"id\":25,\"title\":\"Alfabetización digital para emprendedores locales\",\"status\":\"approved\",\"published_at\":null,\"type_code\":\"community\"}','{\"status\":\"published\"}','Restauración de una publicación retirada','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 05:50:36'),(26,25,1,'project_unpublished','project',25,'{\"id\":25,\"title\":\"Alfabetización digital para emprendedores locales\",\"status\":\"published\",\"published_at\":\"2026-07-24 05:50:36\",\"type_code\":\"community\"}','{\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 05:50:40'),(27,25,1,'project_republished','project',25,'{\"id\":25,\"title\":\"Alfabetización digital para emprendedores locales\",\"status\":\"approved\",\"published_at\":null,\"type_code\":\"community\"}','{\"status\":\"published\"}','Restauración de una publicación retirada','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 05:50:44');
+INSERT INTO `project_audit_log` VALUES (10,22,1,'delivery_submitted','delivery',4,NULL,'{\"demo\":true}','Actividad demostrativa',NULL,NULL,'2026-07-18 21:16:28'),(11,25,1,'project_approved','project',25,NULL,'{\"demo\":true}','Actividad demostrativa',NULL,NULL,'2026-07-18 21:16:28'),(12,27,1,'project_published','project',27,NULL,'{\"demo\":true}','Actividad demostrativa',NULL,NULL,'2026-07-18 21:16:28'),(13,38,1,'project_updated','project',38,'{\"id\":38,\"title\":\"Monitoreo de infraestructura de red\",\"status\":\"published\"}','{\"title\":\"Monitoreo de infraestructura de red\",\"subtitle\":\"Prueba de paginaciÃ³n 10\",\"project_type_id\":2,\"career_id\":1,\"academic_period_id\":2,\"tutor_id\":70,\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-23 03:49:05'),(14,38,1,'project_updated','project',38,'{\"id\":38,\"title\":\"Monitoreo de infraestructura de red\",\"status\":\"approved\"}','{\"title\":\"Monitoreo de infraestructura de red\",\"subtitle\":\"Prueba de paginaciÃ³n 10\",\"project_type_id\":2,\"career_id\":1,\"academic_period_id\":2,\"tutor_id\":28,\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-23 03:49:12'),(15,38,1,'project_updated','project',38,'{\"id\":38,\"title\":\"Monitoreo de infraestructura de red\",\"status\":\"approved\"}','{\"title\":\"Monitoreo de infraestructura de redd\",\"subtitle\":\"Prueba de paginaciÃ³n 100\",\"project_type_id\":3,\"career_id\":1,\"academic_period_id\":2,\"tutor_id\":28,\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-23 03:49:22'),(16,25,1,'project_updated','project',25,'{\"id\":25,\"code\":\"VIN-2026-001\",\"title\":\"AlfabetizaciÃ³n digital para emprendedores locales\",\"status\":\"approved\",\"project_type_id\":4,\"created_at\":\"2026-06-14 21:16:28\"}','{\"title\":\"AlfabetizaciÃ³n digital para emprendedores locales\",\"subtitle\":\"Proyecto de vinculaciÃ³n con herramientas de comercio electrÃ³nico\",\"project_type_id\":4,\"career_id\":1,\"academic_period_id\":2,\"tutor_id\":71,\"status\":\"approved\",\"code\":\"VIN-2026-001\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-23 04:02:36'),(17,25,1,'project_trashed','project',25,'{\"id\":25,\"title\":\"AlfabetizaciÃ³n digital para emprendedores locales\",\"status\":\"approved\"}','{\"deleted\":true}','Registro creado por error.','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-23 05:07:04'),(18,28,1,'project_trashed','project',28,'{\"id\":28,\"title\":\"Prototipo descartado de control de asistencia\",\"status\":\"development\"}','{\"deleted\":true}','No mÃ¡s xd','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-23 05:07:35'),(19,25,1,'project_published','project',25,'{\"id\":25,\"title\":\"AlfabetizaciÃ³n digital para emprendedores locales\",\"status\":\"approved\",\"published_at\":null,\"type_code\":\"community\"}','{\"status\":\"published\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 04:18:51'),(20,25,1,'project_unpublished','project',25,'{\"id\":25,\"title\":\"AlfabetizaciÃ³n digital para emprendedores locales\",\"status\":\"published\",\"published_at\":\"2026-07-24 04:18:51\",\"type_code\":\"community\"}','{\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 04:42:12'),(21,25,1,'project_republished','project',25,'{\"id\":25,\"title\":\"AlfabetizaciÃ³n digital para emprendedores locales\",\"status\":\"approved\",\"published_at\":null,\"type_code\":\"community\"}','{\"status\":\"published\"}','RestauraciÃ³n de una publicaciÃ³n retirada','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 04:49:55'),(22,25,1,'project_unpublished','project',25,'{\"id\":25,\"title\":\"AlfabetizaciÃ³n digital para emprendedores locales\",\"status\":\"published\",\"published_at\":\"2026-07-24 04:49:55\",\"type_code\":\"community\"}','{\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 04:59:37'),(23,25,1,'project_republished','project',25,'{\"id\":25,\"title\":\"AlfabetizaciÃ³n digital para emprendedores locales\",\"status\":\"approved\",\"published_at\":null,\"type_code\":\"community\"}','{\"status\":\"published\"}','RestauraciÃ³n de una publicaciÃ³n retirada','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 04:59:50'),(24,25,1,'project_unpublished','project',25,'{\"id\":25,\"title\":\"AlfabetizaciÃ³n digital para emprendedores locales\",\"status\":\"published\",\"published_at\":\"2026-07-24 04:59:50\",\"type_code\":\"community\"}','{\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 05:50:25'),(25,25,1,'project_republished','project',25,'{\"id\":25,\"title\":\"AlfabetizaciÃ³n digital para emprendedores locales\",\"status\":\"approved\",\"published_at\":null,\"type_code\":\"community\"}','{\"status\":\"published\"}','RestauraciÃ³n de una publicaciÃ³n retirada','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 05:50:36'),(26,25,1,'project_unpublished','project',25,'{\"id\":25,\"title\":\"AlfabetizaciÃ³n digital para emprendedores locales\",\"status\":\"published\",\"published_at\":\"2026-07-24 05:50:36\",\"type_code\":\"community\"}','{\"status\":\"approved\"}',NULL,'::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 05:50:40'),(27,25,1,'project_republished','project',25,'{\"id\":25,\"title\":\"AlfabetizaciÃ³n digital para emprendedores locales\",\"status\":\"approved\",\"published_at\":null,\"type_code\":\"community\"}','{\"status\":\"published\"}','RestauraciÃ³n de una publicaciÃ³n retirada','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36','2026-07-24 05:50:44');
 /*!40000 ALTER TABLE `project_audit_log` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -336,7 +336,7 @@ CREATE TABLE `project_comments` (
 
 LOCK TABLES `project_comments` WRITE;
 /*!40000 ALTER TABLE `project_comments` DISABLE KEYS */;
-INSERT INTO `project_comments` VALUES (4,22,28,NULL,NULL,NULL,NULL,'El avance general es correcto. Prioricen las dos observaciones antes de la próxima entrega.','2026-07-17 21:16:28',NULL,NULL);
+INSERT INTO `project_comments` VALUES (4,22,28,NULL,NULL,NULL,NULL,'El avance general es correcto. Prioricen las dos observaciones antes de la prÃ³xima entrega.','2026-07-17 21:16:28',NULL,NULL);
 /*!40000 ALTER TABLE `project_comments` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -373,7 +373,7 @@ CREATE TABLE `project_deliveries` (
 
 LOCK TABLES `project_deliveries` WRITE;
 /*!40000 ALTER TABLE `project_deliveries` DISABLE KEYS */;
-INSERT INTO `project_deliveries` VALUES (4,22,66,1,'Informe de avance v1','Primera versión para revisión.','changes_required',24,'2026-07-13 21:16:28');
+INSERT INTO `project_deliveries` VALUES (4,22,66,1,'Informe de avance v1','Primera versiÃ³n para revisiÃ³n.','changes_required',24,'2026-07-13 21:16:28');
 /*!40000 ALTER TABLE `project_deliveries` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -439,7 +439,7 @@ CREATE TABLE `project_events` (
 
 LOCK TABLES `project_events` WRITE;
 /*!40000 ALTER TABLE `project_events` DISABLE KEYS */;
-INSERT INTO `project_events` VALUES (10,22,'Entrega de versión corregida','delivery','high','2026-07-28','Fecha académica demostrativa para validar calendario y alertas.',0,1,'2026-07-19 21:16:28'),(11,25,'Validación de documentos finales','review','medium','2026-08-04','Fecha académica demostrativa para validar calendario y alertas.',0,1,'2026-07-19 21:16:28'),(12,23,'Reunión de seguimiento','meeting','medium','2026-08-11','Fecha académica demostrativa para validar calendario y alertas.',0,1,'2026-07-19 21:16:28');
+INSERT INTO `project_events` VALUES (10,22,'Entrega de versiÃ³n corregida','delivery','high','2026-07-28','Fecha acadÃ©mica demostrativa para validar calendario y alertas.',0,1,'2026-07-19 21:16:28'),(11,25,'ValidaciÃ³n de documentos finales','review','medium','2026-08-04','Fecha acadÃ©mica demostrativa para validar calendario y alertas.',0,1,'2026-07-19 21:16:28'),(12,23,'ReuniÃ³n de seguimiento','meeting','medium','2026-08-11','Fecha acadÃ©mica demostrativa para validar calendario y alertas.',0,1,'2026-07-19 21:16:28');
 /*!40000 ALTER TABLE `project_events` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -550,7 +550,7 @@ CREATE TABLE `project_observations` (
 
 LOCK TABLES `project_observations` WRITE;
 /*!40000 ALTER TABLE `project_observations` DISABLE KEYS */;
-INSERT INTO `project_observations` VALUES (7,22,4,NULL,28,'Metodología','Página 18','Explicar el criterio utilizado para seleccionar la muestra y justificar su tamaño.','pending','2026-07-15 21:16:28',NULL),(8,22,4,NULL,28,'Referencias','Página 31','Unificar las referencias bibliográficas con el formato APA 7.','addressed','2026-07-16 21:16:28',NULL);
+INSERT INTO `project_observations` VALUES (7,22,4,NULL,28,'MetodologÃ­a','PÃ¡gina 18','Explicar el criterio utilizado para seleccionar la muestra y justificar su tamaÃ±o.','pending','2026-07-15 21:16:28',NULL),(8,22,4,NULL,28,'Referencias','PÃ¡gina 31','Unificar las referencias bibliogrÃ¡ficas con el formato APA 7.','addressed','2026-07-16 21:16:28',NULL);
 /*!40000 ALTER TABLE `project_observations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -616,7 +616,7 @@ CREATE TABLE `project_stages` (
 
 LOCK TABLES `project_stages` WRITE;
 /*!40000 ALTER TABLE `project_stages` DISABLE KEYS */;
-INSERT INTO `project_stages` VALUES (64,22,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(65,22,'development','Desarrollo',2,'current',NULL),(66,22,'review','Revisión',3,'upcoming',NULL),(67,23,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(68,23,'development','Desarrollo',2,'current',NULL),(69,23,'review','Revisión',3,'upcoming',NULL),(70,24,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(71,24,'development','Desarrollo',2,'current',NULL),(72,24,'review','Revisión',3,'upcoming',NULL),(73,25,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(74,25,'development','Desarrollo',2,'current',NULL),(75,25,'review','Revisión',3,'upcoming',NULL),(76,26,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(77,26,'development','Desarrollo',2,'current',NULL),(78,26,'review','Revisión',3,'upcoming',NULL),(79,27,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(80,27,'development','Desarrollo',2,'completed','2026-07-07 23:16:28'),(81,27,'review','Revisión',3,'completed','2026-07-07 23:16:28'),(82,28,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(83,28,'development','Desarrollo',2,'current',NULL),(84,28,'review','Revisión',3,'upcoming',NULL);
+INSERT INTO `project_stages` VALUES (64,22,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(65,22,'development','Desarrollo',2,'current',NULL),(66,22,'review','RevisiÃ³n',3,'upcoming',NULL),(67,23,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(68,23,'development','Desarrollo',2,'current',NULL),(69,23,'review','RevisiÃ³n',3,'upcoming',NULL),(70,24,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(71,24,'development','Desarrollo',2,'current',NULL),(72,24,'review','RevisiÃ³n',3,'upcoming',NULL),(73,25,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(74,25,'development','Desarrollo',2,'current',NULL),(75,25,'review','RevisiÃ³n',3,'upcoming',NULL),(76,26,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(77,26,'development','Desarrollo',2,'current',NULL),(78,26,'review','RevisiÃ³n',3,'upcoming',NULL),(79,27,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(80,27,'development','Desarrollo',2,'completed','2026-07-07 23:16:28'),(81,27,'review','RevisiÃ³n',3,'completed','2026-07-07 23:16:28'),(82,28,'registration','Registro',1,'completed','2026-07-07 23:16:28'),(83,28,'development','Desarrollo',2,'current',NULL),(84,28,'review','RevisiÃ³n',3,'upcoming',NULL);
 /*!40000 ALTER TABLE `project_stages` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -643,7 +643,7 @@ CREATE TABLE `project_types` (
 
 LOCK TABLES `project_types` WRITE;
 /*!40000 ALTER TABLE `project_types` DISABLE KEYS */;
-INSERT INTO `project_types` VALUES (1,'thesis','Titulación',1),(2,'pis','Proyecto integrador de saberes',1),(3,'practice','Prácticas preprofesionales',1),(4,'community','Proyecto de vinculación',1),(30,'thesis_profile','Perfil de tesis',1);
+INSERT INTO `project_types` VALUES (1,'thesis','TitulaciÃ³n',1),(2,'pis','Proyecto integrador de saberes',1),(3,'practice','PrÃ¡cticas preprofesionales',1),(4,'community','Proyecto de vinculaciÃ³n',1),(30,'thesis_profile','Perfil de tesis',1);
 /*!40000 ALTER TABLE `project_types` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -708,7 +708,7 @@ CREATE TABLE `projects` (
 
 LOCK TABLES `projects` WRITE;
 /*!40000 ALTER TABLE `projects` DISABLE KEYS */;
-INSERT INTO `projects` VALUES (22,'TIT-2026-001',1,1,2,'Sistema inteligente para la gestión de turnos médicos','Plataforma web accesible para centros de salud','Proyecto demostrativo con información realista para validar las herramientas administrativas.','group',5,9,28,28,'under_review','review',NULL,NULL,NULL,NULL,24,'2026-06-14 21:16:28','2026-07-23 03:53:54',NULL,NULL,NULL),(23,'PIS-2026-001',2,1,2,'Aplicación móvil para rutas de transporte urbano','Seguimiento de recorridos y alertas para usuarios','Proyecto demostrativo con información realista para validar las herramientas administrativas.','group',5,7,26,26,'development','development',NULL,NULL,NULL,NULL,20,'2026-06-14 21:16:28','2026-07-23 03:53:54',NULL,NULL,NULL),(24,'PRA-2026-001',3,1,2,'Automatización del inventario de equipos tecnológicos','Práctica preprofesional aplicada al control institucional','Proyecto demostrativo con información realista para validar las herramientas administrativas.','group',5,8,27,27,'changes_required','review',NULL,NULL,NULL,NULL,23,'2026-06-14 21:16:28','2026-07-23 03:53:54',NULL,NULL,NULL),(25,'VIN-2026-001',4,1,2,'Alfabetización digital para emprendedores locales','Proyecto de vinculación con herramientas de comercio electrónico','Proyecto demostrativo con información realista para validar las herramientas administrativas.','group',5,7,26,71,'published','final_documents','2026-07-17 21:16:28',NULL,NULL,'2026-07-24 05:50:44',22,'2026-06-14 21:16:28','2026-07-24 05:50:44',NULL,NULL,NULL),(26,'TIT-2026-002',1,1,2,'Modelo de detección temprana de riesgos académicos','Análisis de indicadores para acompañamiento estudiantil','Proyecto demostrativo con información realista para validar las herramientas administrativas.','group',5,9,28,28,'defense','defense',NULL,NULL,'2026-07-11 21:16:28',NULL,24,'2026-06-14 21:16:28','2026-07-23 03:53:54',NULL,NULL,NULL),(27,'PIS-2026-002',2,1,2,'Panel de monitoreo energético para laboratorios','Visualización en tiempo real de consumo eléctrico','Proyecto demostrativo con información realista para validar las herramientas administrativas.','group',5,7,27,27,'published','published',NULL,NULL,'2026-07-11 21:16:28','2026-07-16 21:16:28',21,'2026-06-14 21:16:28','2026-07-23 03:53:54',NULL,NULL,NULL),(28,'PIS-2026-003',2,1,2,'Prototipo descartado de control de asistencia','Registro creado para probar la papelera administrativa','Proyecto demostrativo con información realista para validar las herramientas administrativas.','group',5,7,26,26,'development','registration',NULL,NULL,NULL,NULL,25,'2026-06-14 21:16:28','2026-07-23 05:07:55',NULL,NULL,NULL),(29,'PIS-2026-004',2,1,2,'Sistema de reservas para laboratorios','Prueba de paginación 1','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',72,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(30,'PIS-2026-005',2,1,2,'Aplicación de control de asistencia','Prueba de paginación 2','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',73,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(31,'PIS-2026-006',2,1,2,'Portal de seguimiento de tutorías','Prueba de paginación 3','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',74,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(32,'PIS-2026-007',2,1,2,'Gestor documental para secretaría','Prueba de paginación 4','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',75,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(33,'PIS-2026-008',2,1,2,'Panel de indicadores estudiantiles','Prueba de paginación 5','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',76,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(34,'PIS-2026-009',2,1,2,'Plataforma de encuestas académicas','Prueba de paginación 6','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',77,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(35,'PIS-2026-010',2,1,2,'Sistema de préstamos tecnológicos','Prueba de paginación 7','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',72,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(36,'PIS-2026-011',2,1,2,'Agenda institucional inteligente','Prueba de paginación 8','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',73,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(37,'PIS-2026-012',2,1,2,'Repositorio de recursos didácticos','Prueba de paginación 9','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',74,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(38,'PRA-2026-002',3,1,2,'Monitoreo de infraestructura de redd','Prueba de paginación 100','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,28,'approved','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',75,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL);
+INSERT INTO `projects` VALUES (22,'TIT-2026-001',1,1,2,'Sistema inteligente para la gestiÃ³n de turnos mÃ©dicos','Plataforma web accesible para centros de salud','Proyecto demostrativo con informaciÃ³n realista para validar las herramientas administrativas.','group',5,9,28,28,'under_review','review',NULL,NULL,NULL,NULL,24,'2026-06-14 21:16:28','2026-07-23 03:53:54',NULL,NULL,NULL),(23,'PIS-2026-001',2,1,2,'AplicaciÃ³n mÃ³vil para rutas de transporte urbano','Seguimiento de recorridos y alertas para usuarios','Proyecto demostrativo con informaciÃ³n realista para validar las herramientas administrativas.','group',5,7,26,26,'development','development',NULL,NULL,NULL,NULL,20,'2026-06-14 21:16:28','2026-07-23 03:53:54',NULL,NULL,NULL),(24,'PRA-2026-001',3,1,2,'AutomatizaciÃ³n del inventario de equipos tecnolÃ³gicos','PrÃ¡ctica preprofesional aplicada al control institucional','Proyecto demostrativo con informaciÃ³n realista para validar las herramientas administrativas.','group',5,8,27,27,'changes_required','review',NULL,NULL,NULL,NULL,23,'2026-06-14 21:16:28','2026-07-23 03:53:54',NULL,NULL,NULL),(25,'VIN-2026-001',4,1,2,'AlfabetizaciÃ³n digital para emprendedores locales','Proyecto de vinculaciÃ³n con herramientas de comercio electrÃ³nico','Proyecto demostrativo con informaciÃ³n realista para validar las herramientas administrativas.','group',5,7,26,71,'published','final_documents','2026-07-17 21:16:28',NULL,NULL,'2026-07-24 05:50:44',22,'2026-06-14 21:16:28','2026-07-24 05:50:44',NULL,NULL,NULL),(26,'TIT-2026-002',1,1,2,'Modelo de detecciÃ³n temprana de riesgos acadÃ©micos','AnÃ¡lisis de indicadores para acompaÃ±amiento estudiantil','Proyecto demostrativo con informaciÃ³n realista para validar las herramientas administrativas.','group',5,9,28,28,'defense','defense',NULL,NULL,'2026-07-11 21:16:28',NULL,24,'2026-06-14 21:16:28','2026-07-23 03:53:54',NULL,NULL,NULL),(27,'PIS-2026-002',2,1,2,'Panel de monitoreo energÃ©tico para laboratorios','VisualizaciÃ³n en tiempo real de consumo elÃ©ctrico','Proyecto demostrativo con informaciÃ³n realista para validar las herramientas administrativas.','group',5,7,27,27,'published','published',NULL,NULL,'2026-07-11 21:16:28','2026-07-16 21:16:28',21,'2026-06-14 21:16:28','2026-07-23 03:53:54',NULL,NULL,NULL),(28,'PIS-2026-003',2,1,2,'Prototipo descartado de control de asistencia','Registro creado para probar la papelera administrativa','Proyecto demostrativo con informaciÃ³n realista para validar las herramientas administrativas.','group',5,7,26,26,'development','registration',NULL,NULL,NULL,NULL,25,'2026-06-14 21:16:28','2026-07-23 05:07:55',NULL,NULL,NULL),(29,'PIS-2026-004',2,1,2,'Sistema de reservas para laboratorios','Prueba de paginaciÃ³n 1','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',72,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(30,'PIS-2026-005',2,1,2,'AplicaciÃ³n de control de asistencia','Prueba de paginaciÃ³n 2','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',73,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(31,'PIS-2026-006',2,1,2,'Portal de seguimiento de tutorÃ­as','Prueba de paginaciÃ³n 3','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',74,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(32,'PIS-2026-007',2,1,2,'Gestor documental para secretarÃ­a','Prueba de paginaciÃ³n 4','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',75,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(33,'PIS-2026-008',2,1,2,'Panel de indicadores estudiantiles','Prueba de paginaciÃ³n 5','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',76,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(34,'PIS-2026-009',2,1,2,'Plataforma de encuestas acadÃ©micas','Prueba de paginaciÃ³n 6','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',77,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(35,'PIS-2026-010',2,1,2,'Sistema de prÃ©stamos tecnolÃ³gicos','Prueba de paginaciÃ³n 7','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',72,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(36,'PIS-2026-011',2,1,2,'Agenda institucional inteligente','Prueba de paginaciÃ³n 8','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',73,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(37,'PIS-2026-012',2,1,2,'Repositorio de recursos didÃ¡cticos','Prueba de paginaciÃ³n 9','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,70,'published','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',74,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL),(38,'PRA-2026-002',3,1,2,'Monitoreo de infraestructura de redd','Prueba de paginaciÃ³n 100','Proyecto demostrativo para validar listados extensos.','group',NULL,NULL,70,28,'approved','published','2026-07-23 03:45:56',NULL,'2026-07-23 03:45:56','2026-07-23 03:45:56',75,'2026-07-23 03:45:56','2026-07-23 03:53:54',NULL,NULL,NULL);
 /*!40000 ALTER TABLE `projects` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -736,7 +736,7 @@ CREATE TABLE `research_lines` (
 
 LOCK TABLES `research_lines` WRITE;
 /*!40000 ALTER TABLE `research_lines` DISABLE KEYS */;
-INSERT INTO `research_lines` VALUES (5,1,'Desarrollo de software y transformación digital',1),(6,1,'Seguridad, datos e infraestructura tecnológica',1);
+INSERT INTO `research_lines` VALUES (5,1,'Desarrollo de software y transformaciÃ³n digital',1),(6,1,'Seguridad, datos e infraestructura tecnolÃ³gica',1);
 /*!40000 ALTER TABLE `research_lines` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -855,7 +855,7 @@ CREATE TABLE `support_material_categories` (
 
 LOCK TABLES `support_material_categories` WRITE;
 /*!40000 ALTER TABLE `support_material_categories` DISABLE KEYS */;
-INSERT INTO `support_material_categories` VALUES (1,'tesis','Tesis',1,'2026-07-24 00:02:12','2026-07-24 00:02:12'),(2,'practicas','Prácticas',1,'2026-07-24 00:02:12','2026-07-24 00:08:52'),(3,'proyecto-pis','Proyectos PIS',1,'2026-07-24 00:02:12','2026-07-24 00:02:12'),(4,'vinculacion','Vinculación',1,'2026-07-24 00:02:12','2026-07-24 00:08:52');
+INSERT INTO `support_material_categories` VALUES (1,'tesis','Tesis',1,'2026-07-24 00:02:12','2026-07-24 00:02:12'),(2,'practicas','PrÃ¡cticas',1,'2026-07-24 00:02:12','2026-07-24 00:08:52'),(3,'proyecto-pis','Proyectos PIS',1,'2026-07-24 00:02:12','2026-07-24 00:02:12'),(4,'vinculacion','VinculaciÃ³n',1,'2026-07-24 00:02:12','2026-07-24 00:08:52');
 /*!40000 ALTER TABLE `support_material_categories` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -950,7 +950,7 @@ CREATE TABLE `support_materials` (
 
 LOCK TABLES `support_materials` WRITE;
 /*!40000 ALTER TABLE `support_materials` DISABLE KEYS */;
-INSERT INTO `support_materials` VALUES (1,1,2,'Guía para la elaboración del perfil de tesis','Guía','Orientaciones para estructurar correctamente el perfil y preparar el proceso de titulación.','Esta guía reúne los criterios institucionales para elaborar el perfil de tesis.\n\nIncluye recomendaciones para delimitar el tema, formular objetivos, organizar antecedentes y presentar la propuesta académica.','Instituto Superior Tecnológico \"El Libertador\"','2026-07-08','published',86,'[\"Perfil de tesis\",\"Titulación\",\"Metodología\"]',NULL,NULL,NULL,NULL,'2026-07-24 00:02:12','2026-07-24 00:13:49'),(2,2,2,'Formato de seguimiento de prácticas preprofesionales','Formato','Formato institucional para registrar actividades, horas cumplidas y evidencias de prácticas.','Documento editable destinado al seguimiento periódico de las prácticas preprofesionales.\n\nPermite registrar actividades, resultados, evidencias y validaciones del responsable institucional.','Instituto Superior Tecnológico \"El Libertador\"','2026-06-20','published',63,'[\"Prácticas\",\"Seguimiento\",\"Evidencias\"]',NULL,NULL,NULL,NULL,'2026-07-24 00:02:12','2026-07-24 00:13:49'),(3,3,2,'Instructivo para proyectos PIS','Instructivo','Pasos y criterios para organizar entregables, evidencias y presentación de proyectos integradores.','Este instructivo explica el flujo recomendado para desarrollar proyectos PIS.\n\nDetalla la organización de equipos, entregables mínimos, evidencias y criterios generales de presentación.','Instituto Superior Tecnológico \"El Libertador\"','2025-12-12','published',49,'[\"PIS\",\"Entregables\",\"Proyectos\"]',NULL,NULL,NULL,NULL,'2026-07-24 00:02:12','2026-07-24 00:43:30'),(4,4,2,'Formato de informe de vinculación','Plantilla','Plantilla editable para documentar actividades, beneficiarios, resultados e impacto comunitario.','Plantilla institucional para presentar el informe de las actividades de vinculación.\n\nOrganiza objetivos, participantes, resultados, evidencias e indicadores de impacto comunitario.','Instituto Superior Tecnológico \"El Libertador\"','2025-11-30','published',38,'[\"Vinculación\",\"Informe\",\"Impacto\"]',NULL,NULL,NULL,NULL,'2026-07-24 00:02:12','2026-07-24 00:43:30'),(5,1,2,'Reglamento de uso del material académico','Reglamento','Disposiciones generales para consultar y utilizar responsablemente los recursos institucionales.','Documento informativo sobre el uso responsable del material académico institucional.\n\nResume las condiciones de consulta, atribución y distribución de los recursos disponibles.','Instituto Superior Tecnológico \"El Libertador\"','2025-05-14','published',21,'[\"Reglamento\",\"Recursos\",\"Uso académico\"]',NULL,NULL,NULL,NULL,'2026-07-24 00:02:12','2026-07-24 00:43:30');
+INSERT INTO `support_materials` VALUES (1,1,2,'GuÃ­a para la elaboraciÃ³n del perfil de tesis','GuÃ­a','Orientaciones para estructurar correctamente el perfil y preparar el proceso de titulaciÃ³n.','Esta guÃ­a reÃºne los criterios institucionales para elaborar el perfil de tesis.\n\nIncluye recomendaciones para delimitar el tema, formular objetivos, organizar antecedentes y presentar la propuesta acadÃ©mica.','Instituto Superior TecnolÃ³gico \"El Libertador\"','2026-07-08','published',86,'[\"Perfil de tesis\",\"TitulaciÃ³n\",\"MetodologÃ­a\"]',NULL,NULL,NULL,NULL,'2026-07-24 00:02:12','2026-07-24 00:13:49'),(2,2,2,'Formato de seguimiento de prÃ¡cticas preprofesionales','Formato','Formato institucional para registrar actividades, horas cumplidas y evidencias de prÃ¡cticas.','Documento editable destinado al seguimiento periÃ³dico de las prÃ¡cticas preprofesionales.\n\nPermite registrar actividades, resultados, evidencias y validaciones del responsable institucional.','Instituto Superior TecnolÃ³gico \"El Libertador\"','2026-06-20','published',63,'[\"PrÃ¡cticas\",\"Seguimiento\",\"Evidencias\"]',NULL,NULL,NULL,NULL,'2026-07-24 00:02:12','2026-07-24 00:13:49'),(3,3,2,'Instructivo para proyectos PIS','Instructivo','Pasos y criterios para organizar entregables, evidencias y presentaciÃ³n de proyectos integradores.','Este instructivo explica el flujo recomendado para desarrollar proyectos PIS.\n\nDetalla la organizaciÃ³n de equipos, entregables mÃ­nimos, evidencias y criterios generales de presentaciÃ³n.','Instituto Superior TecnolÃ³gico \"El Libertador\"','2025-12-12','published',49,'[\"PIS\",\"Entregables\",\"Proyectos\"]',NULL,NULL,NULL,NULL,'2026-07-24 00:02:12','2026-07-24 00:43:30'),(4,4,2,'Formato de informe de vinculaciÃ³n','Plantilla','Plantilla editable para documentar actividades, beneficiarios, resultados e impacto comunitario.','Plantilla institucional para presentar el informe de las actividades de vinculaciÃ³n.\n\nOrganiza objetivos, participantes, resultados, evidencias e indicadores de impacto comunitario.','Instituto Superior TecnolÃ³gico \"El Libertador\"','2025-11-30','published',38,'[\"VinculaciÃ³n\",\"Informe\",\"Impacto\"]',NULL,NULL,NULL,NULL,'2026-07-24 00:02:12','2026-07-24 00:43:30'),(5,1,2,'Reglamento de uso del material acadÃ©mico','Reglamento','Disposiciones generales para consultar y utilizar responsablemente los recursos institucionales.','Documento informativo sobre el uso responsable del material acadÃ©mico institucional.\n\nResume las condiciones de consulta, atribuciÃ³n y distribuciÃ³n de los recursos disponibles.','Instituto Superior TecnolÃ³gico \"El Libertador\"','2025-05-14','published',21,'[\"Reglamento\",\"Recursos\",\"Uso acadÃ©mico\"]',NULL,NULL,NULL,NULL,'2026-07-24 00:02:12','2026-07-24 00:43:30');
 /*!40000 ALTER TABLE `support_materials` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -976,7 +976,7 @@ CREATE TABLE `system_settings` (
 
 LOCK TABLES `system_settings` WRITE;
 /*!40000 ALTER TABLE `system_settings` DISABLE KEYS */;
-INSERT INTO `system_settings` VALUES ('file_extensions','[\"pdf\",\"docx\",\"zip\"]',NULL,'2026-07-19 06:14:20'),('file_max_mb','20',NULL,'2026-07-19 06:14:20'),('file_total_max_mb','50',NULL,'2026-07-19 06:14:20'),('institution_name','Instituto Superior Tecnológico El Libertador',NULL,'2026-07-19 06:14:20'),('project_code_digits','3',NULL,'2026-07-22 23:04:39'),('project_code_prefixes','{\"thesis\":\"TIT\",\"thesis_profile\":\"PFT\",\"pis\":\"PIS\",\"practice\":\"PRA\",\"community\":\"VIN\"}',NULL,'2026-07-22 23:04:39');
+INSERT INTO `system_settings` VALUES ('file_extensions','[\"pdf\",\"docx\",\"zip\"]',NULL,'2026-07-19 06:14:20'),('file_max_mb','20',NULL,'2026-07-19 06:14:20'),('file_total_max_mb','50',NULL,'2026-07-19 06:14:20'),('institution_name','Instituto Superior TecnolÃ³gico El Libertador',NULL,'2026-07-19 06:14:20'),('project_code_digits','3',NULL,'2026-07-22 23:04:39'),('project_code_prefixes','{\"thesis\":\"TIT\",\"thesis_profile\":\"PFT\",\"pis\":\"PIS\",\"practice\":\"PRA\",\"community\":\"VIN\"}',NULL,'2026-07-22 23:04:39');
 /*!40000 ALTER TABLE `system_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1088,6 +1088,231 @@ UNLOCK TABLES;
 --
 -- Dumping routines for database 'tesis'
 --
+
+--
+-- Snapshot schema synchronization: 20260804-20260809
+-- Preserva los datos demostrativos anteriores y lleva su estructura al esquema actual.
+--
+
+-- Historial administrativo de materiales de apoyo.
+-- MariaDB: ejecutar una sola vez sobre la base de datos de la aplicaciÃ³n.
+-- No modifica ni elimina registros existentes.
+
+ALTER TABLE admin_audit_log
+    ADD INDEX idx_admin_audit_entity_date (entity_type, entity_id, created_at);
+
+-- Separa el archivo de presentaciÃ³n del documento destacado (is_primary).
+-- presentation_file_id define exclusivamente la vista inicial del expediente.
+
+ALTER TABLE support_materials
+    MODIFY status ENUM('draft','published','withdrawn') NOT NULL DEFAULT 'draft',
+    ADD COLUMN presentation_file_id BIGINT UNSIGNED NULL AFTER status;
+
+ALTER TABLE projects
+    ADD COLUMN presentation_file_id BIGINT UNSIGNED NULL AFTER published_at;
+
+UPDATE support_materials material
+SET presentation_file_id = (
+    SELECT file.id
+    FROM support_material_files file
+    WHERE file.material_id = material.id
+      AND file.deleted_at IS NULL
+      AND file.is_package = 0
+      AND LOWER(file.extension) IN ('pdf','docx','txt','png','jpg','jpeg','webp')
+    ORDER BY file.is_primary DESC, file.sort_order, file.id
+    LIMIT 1
+)
+WHERE material.presentation_file_id IS NULL;
+
+UPDATE projects project
+SET presentation_file_id = (
+    SELECT file.id
+    FROM project_files file
+    WHERE file.project_id = project.id
+      AND file.deleted_at IS NULL
+      AND LOWER(file.extension) IN ('pdf','docx','txt','png','jpg','jpeg','webp')
+    ORDER BY file.id
+    LIMIT 1
+)
+WHERE project.presentation_file_id IS NULL;
+
+-- Los registros demostrativos publicados sin documentos reales vuelven al
+-- Ãºltimo estado acadÃ©mico vÃ¡lido; no deben fingir una publicaciÃ³n incompleta.
+UPDATE projects project
+JOIN project_types type ON type.id = project.project_type_id
+SET project.status = IF(type.code = 'thesis', 'tribunal_approved', 'approved'),
+    project.published_at = NULL
+WHERE project.status = 'published'
+  AND project.presentation_file_id IS NULL;
+
+ALTER TABLE support_materials
+    ADD KEY idx_support_material_presentation (presentation_file_id),
+    ADD CONSTRAINT fk_support_material_presentation
+        FOREIGN KEY (presentation_file_id) REFERENCES support_material_files(id),
+    ADD CONSTRAINT chk_support_material_published_presentation
+        CHECK (status <> 'published' OR presentation_file_id IS NOT NULL);
+
+ALTER TABLE projects
+    ADD KEY idx_project_presentation (presentation_file_id),
+    ADD CONSTRAINT fk_project_presentation
+        FOREIGN KEY (presentation_file_id) REFERENCES project_files(id),
+    ADD CONSTRAINT chk_project_published_presentation
+        CHECK (status <> 'published' OR presentation_file_id IS NOT NULL);
+
+DELIMITER $$
+
+CREATE TRIGGER trg_support_material_presentation_insert
+BEFORE INSERT ON support_materials
+FOR EACH ROW
+BEGIN
+    IF NEW.presentation_file_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1
+        FROM support_material_files file
+        WHERE file.id = NEW.presentation_file_id
+          AND file.material_id = NEW.id
+          AND file.deleted_at IS NULL
+          AND file.is_package = 0
+          AND LOWER(file.extension) IN ('pdf','docx','txt','png','jpg','jpeg','webp')
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'El archivo de presentaciÃ³n del material no es vÃ¡lido';
+    END IF;
+END$$
+
+CREATE TRIGGER trg_support_material_presentation_update
+BEFORE UPDATE ON support_materials
+FOR EACH ROW
+BEGIN
+    IF NEW.presentation_file_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1
+        FROM support_material_files file
+        WHERE file.id = NEW.presentation_file_id
+          AND file.material_id = NEW.id
+          AND file.deleted_at IS NULL
+          AND file.is_package = 0
+          AND LOWER(file.extension) IN ('pdf','docx','txt','png','jpg','jpeg','webp')
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'El archivo de presentaciÃ³n del material no es vÃ¡lido';
+    END IF;
+END$$
+
+CREATE TRIGGER trg_project_presentation_update
+BEFORE UPDATE ON projects
+FOR EACH ROW
+BEGIN
+    IF NEW.presentation_file_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1
+        FROM project_files file
+        WHERE file.id = NEW.presentation_file_id
+          AND file.project_id = NEW.id
+          AND file.deleted_at IS NULL
+          AND LOWER(file.extension) IN ('pdf','docx','txt','png','jpg','jpeg','webp')
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'El archivo de presentaciÃ³n del proyecto no es vÃ¡lido';
+    END IF;
+END$$
+
+CREATE TRIGGER trg_support_presentation_file_retire
+BEFORE UPDATE ON support_material_files
+FOR EACH ROW
+BEGIN
+    IF OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL AND EXISTS (
+        SELECT 1
+        FROM support_materials material
+        WHERE material.presentation_file_id = OLD.id
+          AND material.status = 'published'
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Selecciona otro archivo de presentaciÃ³n antes de retirar el actual';
+    END IF;
+END$$
+
+CREATE TRIGGER trg_project_presentation_file_retire
+BEFORE UPDATE ON project_files
+FOR EACH ROW
+BEGIN
+    IF OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL AND EXISTS (
+        SELECT 1
+        FROM projects project
+        WHERE project.presentation_file_id = OLD.id
+          AND project.status = 'published'
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Selecciona otro archivo de presentaciÃ³n antes de retirar el actual';
+    END IF;
+END$$
+
+DELIMITER ;
+
+-- Hace opcional el archivo de presentaciÃ³n sin mezclarlo con el destacado.
+-- Conserva las claves forÃ¡neas y los triggers que validan pertenencia,
+-- disponibilidad y compatibilidad cuando presentation_file_id no es NULL.
+
+ALTER TABLE support_materials
+    DROP CONSTRAINT chk_support_material_published_presentation;
+
+ALTER TABLE projects
+    DROP CONSTRAINT chk_project_published_presentation;
+
+DROP TRIGGER IF EXISTS trg_support_presentation_file_retire;
+DROP TRIGGER IF EXISTS trg_project_presentation_file_retire;
+
+-- Estos proyectos de paginaciÃ³n fueron sembrados explÃ­citamente como
+-- publicados y 20260805 los degradÃ³ Ãºnicamente por no poseer archivos.
+-- PIS-2026-013 no se incluye: su auditorÃ­a demuestra que ya habÃ­a sido
+-- cambiado manualmente a aprobado antes de la migraciÃ³n obligatoria.
+UPDATE projects
+SET status = 'published',
+    published_at = COALESCE(published_at, closed_at, approved_at, created_at)
+WHERE code IN (
+    'PIS-2026-004','PIS-2026-005','PIS-2026-006',
+    'PIS-2026-007','PIS-2026-008','PIS-2026-009',
+    'PIS-2026-010','PIS-2026-011','PIS-2026-012'
+)
+  AND status = 'approved'
+  AND current_stage = 'published'
+  AND presentation_file_id IS NULL;
+
+-- Elimina el estado redundante de documento destacado.
+-- La vista inicial del expediente depende exclusivamente de presentation_file_id.
+
+ALTER TABLE support_material_files
+  DROP COLUMN IF EXISTS is_primary;
+
+-- Conserva versiones retiradas cuando un archivo de material es reemplazado.
+
+CREATE TABLE IF NOT EXISTS support_material_file_versions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  file_id BIGINT UNSIGNED NOT NULL,
+  material_id BIGINT UNSIGNED NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  storage_name VARCHAR(255) NOT NULL,
+  relative_path VARCHAR(500) NOT NULL,
+  extension VARCHAR(15) NOT NULL,
+  mime_type VARCHAR(150) NOT NULL,
+  size_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  replaced_by BIGINT UNSIGNED NULL,
+  replaced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_support_file_version_file
+    FOREIGN KEY (file_id) REFERENCES support_material_files(id),
+  CONSTRAINT fk_support_file_version_material
+    FOREIGN KEY (material_id) REFERENCES support_materials(id),
+  CONSTRAINT fk_support_file_version_actor
+    FOREIGN KEY (replaced_by) REFERENCES users(id),
+  INDEX idx_support_file_version_history (file_id, replaced_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Conserva la evidencia histÃ³rica cuando un archivo retirado se elimina fÃ­sicamente.
+
+ALTER TABLE support_material_files
+  ADD COLUMN purged_at DATETIME NULL AFTER deleted_by,
+  ADD COLUMN purged_by BIGINT UNSIGNED NULL AFTER purged_at,
+  ADD CONSTRAINT fk_support_file_purged_by
+    FOREIGN KEY (purged_by) REFERENCES users(id),
+  ADD INDEX idx_support_file_restore_window (material_id, deleted_at, purged_at);
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

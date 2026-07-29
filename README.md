@@ -253,6 +253,34 @@ La estructura y los datos transportables actuales se encuentran en
 y crear la cuenta administrativa inicial están disponibles en
 `database/README.md`.
 
+## Requisitos de una instalación nueva
+
+- PHP con `fileinfo`.
+- PHP con `ZipArchive` o, en su defecto, soporte funcional para `PharData`.
+- MariaDB/MySQL y permisos de escritura sobre `storage/support-materials`.
+- Copiar `app/config/app.local.php.example` como `app/config/app.local.php`.
+- Copiar `app/config/database.local.php.example` como
+  `app/config/database.local.php` y completar las credenciales locales.
+- Configurar `auth_required => true` antes de exponer el sistema.
+- Importar el `database/snapshot.sql` actualizado.
+
+Para comprobar los módulos disponibles:
+
+```powershell
+C:\xampp\php\php.exe -m
+```
+
+En otros entornos puede utilizarse `php -m`. La salida debe incluir `fileinfo`
+y `zip`; si `zip` no está disponible, comprueba que PHP pueda utilizar
+`PharData`:
+
+```powershell
+php -r "echo class_exists('PharData') ? 'PharData disponible' : 'PharData no disponible';"
+```
+
+Los archivos `app.local.php` y `database.local.php` son configuraciones privadas
+de cada instalación y no deben publicarse en Git.
+
 # Funcionalidades implementadas
 
 ✔ Sistema de autenticación
