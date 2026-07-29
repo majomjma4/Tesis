@@ -8,6 +8,8 @@
     const typeFilter = document.querySelector("#arTypeFilter");
     const periodFilter = document.querySelector("#arPeriodFilter");
     const categoryFilter = document.querySelector("#arCategoryFilter");
+    const materialStatusFilter = document.querySelector("#arMaterialStatusFilter");
+    const clearMaterialFilters = document.querySelector("#arClearMaterialFilters");
     const paginationControls = Object.fromEntries(
         [...document.querySelectorAll("[data-pagination-for]")].map((pagination) => [
             pagination.dataset.paginationFor,
@@ -23,7 +25,6 @@
         projects: { page: 1, size: 10 },
         materials: { page: 1, size: 10 },
     };
-    const withdrawnModal = document.querySelector("#arWithdrawnModal");
     const materialEditModal = document.querySelector("#arMaterialEditModal");
     const materialFilesModal = document.querySelector("#arMaterialFilesModal");
     const presentationModal = document.querySelector("#arPresentationModal");
@@ -40,7 +41,6 @@
     const confirmationCancel = confirmation?.querySelector("[data-confirm-cancel]");
     const toastStack = document.querySelector("#arToastStack");
     const tooltip = document.querySelector("#arTooltip");
-    if (withdrawnModal) document.body.append(withdrawnModal);
     if (materialEditModal) document.body.append(materialEditModal);
     if (materialFilesModal) document.body.append(materialFilesModal);
     if (presentationModal) document.body.append(presentationModal);
@@ -129,12 +129,13 @@
         confirmationText.textContent = message;
         confirmationAccept.textContent = options.acceptLabel || "Confirmar";
         confirmationAccept.classList.toggle("danger", options.danger !== false);
+        confirmationAccept.classList.toggle("restore-material-confirm-primary", options.variant === "restore-material");
         confirmation.hidden = false;
         document.body.classList.add("modal-open");
         confirmationAccept.focus();
         const close = (accepted) => {
             confirmation.hidden = true;
-            const secondaryModalOpen = [withdrawnModal, materialEditModal, materialFilesModal, presentationModal]
+            const secondaryModalOpen = [materialEditModal, materialFilesModal, presentationModal]
                 .some((modal) => modal && !modal.hidden);
             if (!secondaryModalOpen) document.body.classList.remove("modal-open");
             confirmationAccept.removeEventListener("click", accept);
@@ -186,58 +187,12 @@
         trigger.addEventListener("click", hideTooltip);
     });
 
-    const closeWithdrawnModal = () => {
-        if (!withdrawnModal) return;
-        withdrawnModal.hidden = true;
-        document.body.classList.remove("modal-open");
-    };
-
-    document.querySelector("#arOpenWithdrawn")?.addEventListener("click", () => {
-        withdrawnModal.hidden = false;
-        document.body.classList.add("modal-open");
-        withdrawnModal.querySelector("[data-close-withdrawn]")?.focus();
-    });
-    withdrawnModal?.querySelector("[data-close-withdrawn]")?.addEventListener("click", closeWithdrawnModal);
-    withdrawnModal?.addEventListener("click", (event) => {
-        if (event.target === withdrawnModal) closeWithdrawnModal();
-    });
     document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && withdrawnModal && !withdrawnModal.hidden && confirmation?.hidden) {
-            closeWithdrawnModal();
-        } else if (event.key === "Escape" && materialEditModal && !materialEditModal.hidden && confirmation?.hidden) {
+        if (event.key === "Escape" && materialEditModal && !materialEditModal.hidden && confirmation?.hidden) {
             closeModal(materialEditModal);
         } else if (event.key === "Escape" && materialFilesModal && !materialFilesModal.hidden && confirmation?.hidden) {
             closeModal(materialFilesModal);
         }
-    });
-
-    document.querySelectorAll("[data-restore-publication]").forEach((button) => {
-        button.addEventListener("click", async () => {
-            const confirmed = await requestConfirmation(
-                "¿Deseas restaurar este proyecto en el repositorio? Volverá a estar visible para estudiantes y docentes.",
-                {
-                    title: "Restaurar publicación",
-                    acceptLabel: "Restaurar publicación",
-                    danger: false,
-                }
-            );
-            if (!confirmed) return;
-            button.disabled = true;
-            const data = new FormData();
-            data.set("_csrf", config.dataset.csrf);
-            data.set("id", button.dataset.id);
-            data.set("action", "restore");
-            try {
-                const response = await fetch(config.dataset.endpoint, { method: "POST", body: data });
-                const result = await response.json();
-                if (!response.ok || !result.success) throw new Error(result.message);
-                sessionStorage.setItem("repositoryToast", result.message || "La publicación fue restaurada.");
-                window.location.reload();
-            } catch (error) {
-                showToast(error.message || "No fue posible restaurar la publicación.", "error");
-                button.disabled = false;
-            }
-        });
     });
 
     const readMaterial = (trigger) => {
@@ -255,7 +210,7 @@
     const closeModal = (modal) => {
         if (!modal) return;
         modal.hidden = true;
-        if (![withdrawnModal, materialEditModal, materialFilesModal, presentationModal].some((item) => item && !item.hidden)) {
+        if (![materialEditModal, materialFilesModal, presentationModal].some((item) => item && !item.hidden)) {
             document.body.classList.remove("modal-open");
         }
     };
@@ -377,6 +332,8 @@
                 const field = materialEditForm.elements.namedItem(name);
                 if (field && !Array.isArray(value)) field.value = String(value ?? "");
             });
+            const publicationDisplay = materialEditForm.querySelector("[data-material-publication-date]");
+            if (publicationDisplay) publicationDisplay.textContent = material.publication_date || "Sin publicar";
             openModal(materialEditModal);
         });
     });
@@ -485,27 +442,17 @@
     });
 
     document.querySelectorAll("[data-withdraw-material]").forEach((button) => {
-        button.addEventListener("click", async () => {
+        button.addEventListener("click", () => {
             const material = readMaterial(button);
             if (!material) return;
-            const confirmed = await requestConfirmation(
-                `¿Estás seguro de retirar “${material.title}”? Dejará de estar visible, pero podrás restaurarlo.`,
-                { title: "Retirar material", acceptLabel: "Retirar material", danger: true }
-            );
-            if (!confirmed) return;
-            const data = new FormData();
-            data.set("_csrf", config.dataset.csrf);
-            data.set("id", material.id);
-            data.set("status", "withdrawn");
-            try {
-                const response = await fetch(config.dataset.materialStatus, { method: "POST", body: data });
-                const result = await response.json();
-                if (!response.ok || !result.success) throw new Error(result.message);
-                sessionStorage.setItem("repositoryToast", result.message);
-                window.location.reload();
-            } catch (error) {
-                showToast(error.message || "No fue posible retirar el material.", "error");
-            }
+            window.SupportMaterialAdminActions.open({
+                trigger: button, type: "withdraw", action: "publication",
+                endpoint: config.dataset.materialStatus, csrf: config.dataset.csrf, material,
+                onSuccess: result => {
+                    sessionStorage.setItem("repositoryToast", result.message);
+                    window.location.reload();
+                },
+            });
         });
     });
 
@@ -513,9 +460,10 @@
         button.addEventListener("click", async () => {
             const confirmed = await requestConfirmation(
                 "¿Deseas restaurar este material de apoyo en el repositorio?",
-                { title: "Restaurar material", acceptLabel: "Restaurar material", danger: false }
+                { title: "Restaurar material", acceptLabel: "Restaurar material", danger: false, variant: "restore-material" }
             );
             if (!confirmed) return;
+            button.disabled = true;
             const data = new FormData();
             data.set("_csrf", config.dataset.csrf);
             data.set("id", button.dataset.id);
@@ -528,6 +476,7 @@
                 window.location.reload();
             } catch (error) {
                 showToast(error.message || "No fue posible restaurar el material.", "error");
+                button.disabled = false;
             }
         });
     });
@@ -652,6 +601,7 @@
         const type = normalize(typeFilter?.value);
         const period = normalize(periodFilter?.value);
         const category = normalize(categoryFilter?.value);
+        const materialStatus = materialStatusFilter?.value || "all";
         const size = Number(controls?.size?.value || state.size || 10);
         state.size = size;
         const items = [...document.querySelectorAll(`[data-repository-item="${activeTab}"]`)];
@@ -662,7 +612,10 @@
             const matchesType = activeTab !== "projects" || !type || normalize(item.dataset.type) === type;
             const matchesPeriod = activeTab !== "projects" || !period || normalize(item.dataset.period) === period;
             const matchesCategory = activeTab !== "materials" || !category || normalize(item.dataset.category) === category;
-            return matchesSearch && matchesType && matchesPeriod && matchesCategory;
+            const matchesMaterialStatus = activeTab !== "materials"
+                || materialStatus === "all"
+                || item.dataset.materialState === materialStatus;
+            return matchesSearch && matchesType && matchesPeriod && matchesCategory && matchesMaterialStatus;
         });
 
         const totalPages = Math.max(1, Math.ceil(matches.length / size));
@@ -678,26 +631,40 @@
         });
 
         const count = document.querySelector(activeTab === "projects" ? "#arProjectCount" : "#arMaterialCount");
+        const materialCountText = document.querySelector("#arMaterialCountText");
         const empty = document.querySelector(activeTab === "projects" ? "#arProjectsEmpty" : "#arMaterialsEmpty");
         const hasCriteria = Boolean(
-            query || type || category
+            query || type || category || (activeTab === "materials" && materialStatus !== "all")
             || (period && !periodFilter?.matches("[data-fixed-filter]"))
         );
         if (count) count.textContent = String(matches.length);
+        if (activeTab === "materials" && materialCountText) {
+            materialCountText.textContent = `${matches.length} ${matches.length === 1 ? "resultado visible" : "resultados visibles"}`;
+        }
         if (empty) {
             empty.hidden = matches.length > 0;
             const title = empty.querySelector("h2");
             const description = empty.querySelector("p");
             if (title) {
-                title.textContent = hasCriteria
-                    ? "No se encontraron resultados con los criterios seleccionados."
+                title.textContent = activeTab === "materials" && query
+                    ? "No se encontraron materiales que coincidan con la búsqueda."
+                    : activeTab === "materials" && materialStatus === "withdrawn"
+                        ? "No existen publicaciones retiradas con los filtros seleccionados."
+                    : activeTab === "materials" && category
+                        ? "No se encontraron materiales en esta categoría."
+                    : hasCriteria
+                    ? activeTab === "materials"
+                        ? "No se encontraron materiales con los filtros seleccionados."
+                        : "No se encontraron resultados con los criterios seleccionados."
                     : activeTab === "projects"
                         ? "No hay proyectos publicados disponibles."
                         : "No hay materiales de apoyo disponibles.";
             }
             if (description) {
                 description.textContent = hasCriteria
-                    ? "Prueba con otros términos o restablece los filtros."
+                    ? activeTab === "materials"
+                        ? "Prueba con otros términos o ajusta el estado y la categoría."
+                        : "Prueba con otros términos o restablece los filtros."
                     : activeTab === "projects"
                         ? "Los proyectos aparecerán después de completar su publicación oficial."
                         : "Los recursos institucionales publicados aparecerán en esta sección.";
@@ -705,6 +672,11 @@
         }
 
         if (clearSearch) clearSearch.hidden = !search?.value;
+        if (clearMaterialFilters) {
+            const hasActiveMaterialFilters = activeTab === "materials"
+                && Boolean(query || category || materialStatus !== "all");
+            clearMaterialFilters.hidden = !hasActiveMaterialFilters;
+        }
         renderPagination(matches.length, size, state, controls);
     }
 
@@ -731,6 +703,12 @@
     [typeFilter, periodFilter, categoryFilter].forEach((control) => {
         control?.addEventListener("change", () => updateResults(true));
     });
+    materialStatusFilter?.addEventListener("change", () => {
+        const url = new URL(window.location.href);
+        url.searchParams.set("status", materialStatusFilter.value);
+        window.history.replaceState({}, "", url);
+        updateResults(true);
+    });
     Object.entries(paginationControls).forEach(([tab, controls]) => {
         controls.size?.addEventListener("change", () => {
             paginationState[tab].size = Number(controls.size.value || 10);
@@ -743,6 +721,19 @@
         search.value = "";
         search.focus();
         updateResults(true);
+    });
+    clearMaterialFilters?.addEventListener("click", () => {
+        if (search) search.value = "";
+        if (categoryFilter) {
+            categoryFilter.value = "";
+            categoryFilter.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        if (materialStatusFilter) {
+            materialStatusFilter.value = "all";
+            materialStatusFilter.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        updateResults(true);
+        search?.focus();
     });
     document.querySelectorAll("[data-publish]").forEach((button) => {
         button.addEventListener("click", async () => {
@@ -780,6 +771,13 @@
         showToast(storedToast);
     }
     const requestedTab = new URLSearchParams(location.search).get("tab");
+    const requestedMaterialStatus = new URLSearchParams(location.search).get("status");
+    const allowedMaterialStatuses = new Set(["all", "available", "unavailable", "withdrawn"]);
+    if (materialStatusFilter) {
+        materialStatusFilter.value = allowedMaterialStatuses.has(requestedMaterialStatus)
+            ? requestedMaterialStatus
+            : "all";
+    }
     selectTab(requestedTab === "materials" ? "materials" : "projects");
     const requestedMaterialEdit = new URLSearchParams(location.search).get("edit_material");
     if (requestedMaterialEdit) {
@@ -796,6 +794,8 @@
                 const field = materialEditForm.elements.namedItem(name);
                 if (field && !Array.isArray(value)) field.value = String(value ?? "");
             });
+            const publicationDisplay = materialEditForm.querySelector("[data-material-publication-date]");
+            if (publicationDisplay) publicationDisplay.textContent = material.publication_date || "Sin publicar";
             openModal(materialEditModal);
         }
     }

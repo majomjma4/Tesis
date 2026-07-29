@@ -34,10 +34,11 @@ final class SupportMaterialController
         $isAdministrator = $session->hasAdminAccess();
         $materialId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
         $materialModel = new SupportMaterialModel();
-        $material = $materialId === false || $materialId === null ? null : $materialModel->findById((int) $materialId);
+        $material = $materialId === false || $materialId === null ? null : $materialModel->findById((int) $materialId, $isAdministrator);
         $materialCategories = [];
         $restorableFiles = [];
         $documentEvolution = [];
+        $hasUnreadAdministrativeActivity = false;
         if ($material === null) {
             http_response_code(404);
         } else {
@@ -47,13 +48,17 @@ final class SupportMaterialController
             if ($isAdministrator) {
                 $materialCategories = $materialModel->categories();
                 $restorableFiles = $materialModel->restorableFiles((int) $material['id']);
+                $hasUnreadAdministrativeActivity = (new AdminActivityModel())->hasUnreadSupportMaterialEvents(
+                    (int) $session->userId(), (int) $material['id']
+                );
             }
         }
 
         View::render('repository/material-detalle', [
             'currentPage' => 'repository',
             'title' => $material === null ? 'Material no encontrado | Repositorio' : $material['title'] . ' | Material de apoyo',
-            'pageScript' => asset('js/repository-detail.js'),
+            'pageScript' => asset('js/material-admin-actions.js'),
+            'pageScripts' => [asset('js/repository-detail.js')],
             'material' => $material,
             'repositoryUrl' => route('repository'),
             'materialsUrl' => route('support-materials'),
@@ -68,6 +73,7 @@ final class SupportMaterialController
             'materialEditUrl' => $material === null ? '' : route('support-material-detail') . '&id=' . (int) $material['id'] . '&mode=edit&tab=information',
             'materialSaveEndpoint' => route('admin-support-material-save'),
             'materialFileEndpoint' => $isAdministrator ? route('admin-support-material-file') : '',
+            'materialStatusEndpoint' => $isAdministrator ? route('admin-support-material-status') : '',
             'materialHistoryEndpoint' => $isAdministrator ? route('admin-support-material-history') . '&id=' . (int) ($material['id'] ?? 0) : '',
             'materialHistoryCleanupEndpoint' => $isAdministrator ? route('admin-support-material-history-cleanup') : '',
             'materialCsrfToken' => $isAdministrator ? $session->csrfToken('admin_repository') : '',
@@ -75,6 +81,7 @@ final class SupportMaterialController
             'materialFileLimits' => $isAdministrator ? (new SupportMaterialFileService())->limits() : [],
             'restorableFiles' => $restorableFiles,
             'documentEvolution' => $documentEvolution,
+            'hasUnreadAdministrativeActivity' => $hasUnreadAdministrativeActivity,
             'versionPreviewActionUrl' => route('support-material-version-preview'),
             'versionDownloadActionUrl' => route('support-material-version-download'),
         ]);
@@ -277,6 +284,10 @@ final class SupportMaterialController
             http_response_code(404);
             $this->renderError('El material solicitado no está disponible.');
         }
+        if (empty($material['is_available'])) {
+            http_response_code(404);
+            $this->renderError('El material está publicado, pero temporalmente no está disponible para consulta o descarga.');
+        }
         try {
             $package = (new SupportMaterialPackageService())->prepare($material);
             $stream = fopen($package['path'], 'rb');
@@ -344,6 +355,9 @@ final class SupportMaterialController
         $material = $materialId === false || $materialId === null ? null : $model->findById((int) $materialId);
         if ($material === null) {
             $this->failFileRequest(404, 'El material solicitado no está disponible.', $jsonResponse);
+        }
+        if (empty($material['is_available'])) {
+            $this->failFileRequest(404, 'El material está publicado, pero temporalmente no está disponible para consulta o descarga.', $jsonResponse);
         }
         $file = $fileId === false || $fileId === null ? null : $model->findFile($material, (int) $fileId);
         if ($file === null || !in_array($file['extension'], self::ALLOWED_EXTENSIONS, true)) {

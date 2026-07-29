@@ -14,14 +14,53 @@ final class SupportMaterialModel
 
     public function getWithdrawn(): array
     {
-        return $this->listing('withdrawn');
+        $materials = $this->listing('withdrawn');
+        if ($materials === []) return [];
+
+        $ids = array_column($materials, 'id');
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $statement = Database::connection()->prepare(
+            "SELECT audit.entity_id,audit.created_at,u.full_name actor_name,audit.details
+             FROM admin_audit_log audit
+             INNER JOIN (
+                SELECT entity_id,MAX(id) latest_id
+                FROM admin_audit_log
+                WHERE entity_type='support_material'
+                  AND action='support_material_withdrawn'
+                  AND result='correct'
+                  AND entity_id IN ({$placeholders})
+                GROUP BY entity_id
+             ) latest ON latest.latest_id=audit.id
+             LEFT JOIN users u ON u.id=audit.actor_user_id"
+        );
+        $statement->execute($ids);
+        $withdrawals = [];
+        foreach ($statement->fetchAll() as $event) {
+            $details = json_decode((string) ($event['details'] ?? '{}'), true);
+            $withdrawals[(int) $event['entity_id']] = [
+                'withdrawn_event_at' => $event['created_at'],
+                'withdrawn_by_name' => (string) ($event['actor_name'] ?? ''),
+                'withdrawal_reason' => is_array($details) ? (string) ($details['reason'] ?? '') : '',
+                'withdrawal_reason_detail' => is_array($details) ? (string) ($details['reason_detail'] ?? '') : '',
+            ];
+        }
+        foreach ($materials as &$material) {
+            $material += $withdrawals[(int) $material['id']] ?? [
+                'withdrawn_event_at' => $material['withdrawn_at'] ?? null,
+                'withdrawn_by_name' => '',
+                'withdrawal_reason' => '',
+                'withdrawal_reason_detail' => '',
+            ];
+        }
+        unset($material);
+        return $materials;
     }
 
     public function getAdminMaterials(): array
     {
         $statement = Database::connection()->query(
             $this->baseQuery()
-            . " WHERE sm.status IN ('draft','published') ORDER BY sm.publication_date DESC,sm.id DESC"
+            . " WHERE sm.status IN ('draft','published') AND sm.deleted_at IS NULL AND sm.purged_at IS NULL ORDER BY sm.publication_date DESC,sm.id DESC"
         );
         return array_map([$this, 'hydrate'], $statement->fetchAll());
     }
@@ -38,7 +77,7 @@ final class SupportMaterialModel
     {
         if ($materialId < 1) return null;
         $where = $includeWithdrawn ? '' : " AND sm.status='published'";
-        $statement = Database::connection()->prepare($this->baseQuery() . " WHERE sm.id=:id{$where}");
+        $statement = Database::connection()->prepare($this->baseQuery() . " WHERE sm.id=:id AND sm.deleted_at IS NULL AND sm.purged_at IS NULL{$where}");
         $statement->execute(['id' => $materialId]);
         $row = $statement->fetch();
         return $row ? $this->hydrate($row) : null;
@@ -47,7 +86,7 @@ final class SupportMaterialModel
     public function findByIdForUpdate(int $materialId): ?array
     {
         if ($materialId < 1) return null;
-        $statement = Database::connection()->prepare($this->baseQuery() . ' WHERE sm.id=:id FOR UPDATE');
+        $statement = Database::connection()->prepare($this->baseQuery() . ' WHERE sm.id=:id AND sm.deleted_at IS NULL AND sm.purged_at IS NULL FOR UPDATE');
         $statement->execute(['id' => $materialId]);
         $material = $statement->fetch();
         if (!$material) return null;
@@ -88,7 +127,7 @@ final class SupportMaterialModel
         $fullDescription = trim((string) ($input['full_description'] ?? ''));
         $publisher = trim((string) ($input['publisher'] ?? ''));
         $categoryId = (int) ($input['category_id'] ?? 0);
-        $publicationDate = trim((string) ($input['publication_date'] ?? ''));
+        $publicationDate = null;
         $keywords = array_values(array_unique(array_filter(array_map(
             'trim',
             preg_split('/[,;\n]+/u', (string) ($input['keywords'] ?? '')) ?: []
@@ -109,11 +148,6 @@ final class SupportMaterialModel
         if ($publisher === '' || mb_strlen($publisher) > 180) {
             throw new InvalidArgumentException('Ingresa el responsable de la publicación.');
         }
-        $date = DateTimeImmutable::createFromFormat('Y-m-d', $publicationDate);
-        if (!$date || $date->format('Y-m-d') !== $publicationDate) {
-            throw new InvalidArgumentException('La fecha de publicación no es válida.');
-        }
-
         $database = Database::connection();
         $category = $database->prepare(
             'SELECT COUNT(*) FROM support_material_categories WHERE id=:id AND is_active=1'
@@ -140,15 +174,17 @@ final class SupportMaterialModel
                 throw new InvalidArgumentException('El material ya no está disponible.');
             }
             $payload['id'] = $id;
+            $updatePayload = $payload;
+            unset($updatePayload['publication_date']);
             $statement = $database->prepare(
                 'UPDATE support_materials SET
                  category_id=:category_id,title=:title,material_type=:material_type,
                  description=:description,full_description=:full_description,
-                 publisher=:publisher,publication_date=:publication_date,
+                 publisher=:publisher,
                  keywords_json=:keywords_json,updated_by=:updated_by
                  WHERE id=:id'
             );
-            $statement->execute($payload);
+            $statement->execute($updatePayload);
             return $id;
         }
 
@@ -165,29 +201,61 @@ final class SupportMaterialModel
         return (int) $database->lastInsertId();
     }
 
-    public function setStatus(int $id, string $status, int $actor): void
+    public function setStatus(int $id, string $status, int $actor): array
     {
         if (!in_array($status, ['published', 'withdrawn'], true)) {
             throw new InvalidArgumentException('El estado solicitado no es válido.');
         }
-        $material = $this->findById($id, true);
+        $material = $this->findByIdForUpdate($id);
         if ($material === null) {
             throw new InvalidArgumentException('El material ya no está disponible.');
         }
+        if ((string) $material['status'] === $status) {
+            throw new InvalidArgumentException($status === 'published'
+                ? 'El material ya está publicado.'
+                : 'El material ya está retirado.');
+        }
         Database::connection()->prepare(
             "UPDATE support_materials SET status=:status,
+             publication_date=IF(:status_for_publication_date='published',COALESCE(publication_date,UTC_DATE()),publication_date),
+             published_at=IF(:status_for_publication='published',COALESCE(published_at,UTC_TIMESTAMP()),published_at),
              withdrawn_at=IF(:status_for_date='withdrawn',CURRENT_TIMESTAMP,NULL),
              withdrawn_by=IF(:status_for_actor='withdrawn',:withdrawn_actor,NULL),
              updated_by=:updated_actor
              WHERE id=:id"
         )->execute([
             'status' => $status,
+            'status_for_publication_date' => $status,
+            'status_for_publication' => $status,
             'status_for_date' => $status,
             'status_for_actor' => $status,
             'withdrawn_actor' => $actor,
             'updated_actor' => $actor,
             'id' => $id,
         ]);
+        return [
+            'previous_status' => (string) $material['status'],
+            'was_previously_published' => !empty($material['published_at']),
+        ];
+    }
+
+    public function setAvailability(int $id, bool $available, int $actor): bool
+    {
+        $material = $this->findByIdForUpdate($id);
+        if ($material === null) throw new InvalidArgumentException('El material ya no está disponible.');
+        if ((string) $material['status'] !== 'published') {
+            throw new InvalidArgumentException('La disponibilidad solo puede cambiarse en materiales publicados.');
+        }
+        $previous = (bool) $material['is_available'];
+        if ($previous === $available) {
+            throw new InvalidArgumentException($available
+                ? 'El material ya está disponible.'
+                : 'El material ya está marcado como no disponible.');
+        }
+        Database::connection()->prepare(
+            'UPDATE support_materials SET is_available=:available,updated_by=:actor WHERE id=:id'
+        )->execute(['available' => $available ? 1 : 0, 'actor' => $actor, 'id' => $id]);
+        return $previous;
     }
 
     public function addFile(int $materialId, array $file, int $actor): int
@@ -805,6 +873,14 @@ final class SupportMaterialModel
         $previousId = isset($material['presentation_file_id'])
             ? (int) $material['presentation_file_id']
             : null;
+        $previousName = null;
+        if ($previousId) {
+            $previousStatement = $database->prepare(
+                'SELECT original_name FROM support_material_files WHERE id=:id AND material_id=:material_id'
+            );
+            $previousStatement->execute(['id'=>$previousId,'material_id'=>$materialId]);
+            $previousName = $previousStatement->fetchColumn() ?: null;
+        }
         if ($fileId === null) {
             if (!$previousId) {
                 throw new InvalidArgumentException('La presentación ya había sido eliminada.');
@@ -822,6 +898,8 @@ final class SupportMaterialModel
             'previous_file_id' => $previousId ?: null,
             'file_id' => $fileId,
             'name' => $file === null ? null : (string) $file['original_name'],
+            'previous_name' => $previousName,
+            'new_name' => $file === null ? null : (string) $file['original_name'],
         ];
     }
 
@@ -854,7 +932,7 @@ final class SupportMaterialModel
     private function listing(string $status): array
     {
         $statement = Database::connection()->prepare(
-            $this->baseQuery() . ' WHERE sm.status=:status ORDER BY sm.publication_date DESC,sm.id DESC'
+            $this->baseQuery() . ' WHERE sm.status=:status AND sm.deleted_at IS NULL AND sm.purged_at IS NULL ORDER BY sm.publication_date DESC,sm.id DESC'
         );
         $statement->execute(['status' => $status]);
         return array_map([$this, 'hydrate'], $statement->fetchAll());
@@ -911,18 +989,21 @@ final class SupportMaterialModel
             $regularFiles,
             static fn (array $file): bool => $file['presentation']
         )) ?: null;
-        $date = new DateTimeImmutable($material['publication_date']);
+        $publicationDateValue = trim((string) ($material['publication_date'] ?? ''));
+        $date = new DateTimeImmutable($publicationDateValue !== '' ? $publicationDateValue : (string)($material['created_at'] ?? 'now'));
         $keywords = json_decode((string) ($material['keywords_json'] ?? '[]'), true);
 
         $material['id'] = (int) $material['id'];
         $material['type'] = $material['material_type'];
         $material['pao_label'] = $material['period_name'] ?: 'Sin período asociado';
         $material['year'] = $date->format('Y');
-        $material['publication_date_iso'] = $date->format('Y-m-d');
-        $material['publication_date'] = $this->spanishDate($date);
+        $material['publication_date_iso'] = $publicationDateValue;
+        $material['publication_date'] = $publicationDateValue !== '' ? $this->spanishDate($date) : 'Sin publicar';
         $material['status_key'] = $material['status'];
+        $material['is_available'] = (bool) ($material['is_available'] ?? true);
+        $material['published_at'] = $material['published_at'] ?? null;
         $material['status'] = match ($material['status']) {
-            'published' => 'Disponible',
+            'published' => $material['is_available'] ? 'Disponible' : 'No disponible',
             'draft' => 'Borrador',
             default => 'Retirado',
         };

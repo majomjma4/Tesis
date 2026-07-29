@@ -1839,7 +1839,6 @@ function fieldForServerMessage(message) {
     if (normalized.includes("descripción corta")) return "description";
     if (normalized.includes("descripción completa")) return "full_description";
     if (normalized.includes("responsable")) return "publisher";
-    if (normalized.includes("fecha de publicación")) return "publication_date";
     return "";
 }
 
@@ -2123,22 +2122,58 @@ function renderHistoryItem(item) {
         item.changes.forEach((change) => {
             const block = historyElement("section", "ed-history-change");
             block.append(historyElement("h3", "", change.label || change.field || "Campo"));
-            [["Anterior:", change.old], ["Nuevo:", change.new]].forEach(([label, value]) => {
-                const wrapper = historyElement("div", "ed-history-value");
-                wrapper.append(historyElement("strong", "", label));
-                wrapper.append(historyElement("span", "", historyTextValue(value, change.field)));
-                block.append(wrapper);
-            });
+            const transition = historyElement("div", "ed-history-transition");
+            transition.append(
+                historyElement("span", "ed-history-transition__previous", historyTextValue(change.old, change.field)),
+                historyElement("i", "fa-solid fa-arrow-right ed-history-transition__arrow"),
+                historyElement("span", "ed-history-transition__new", historyTextValue(change.new, change.field))
+            );
+            block.append(transition);
             changes.append(block);
         });
         article.append(changes);
+    } else if (Array.isArray(item.details) && item.details.length) {
+        const details = historyElement("div", "ed-history-changes");
+        const block = historyElement("section", "ed-history-change");
+        const remaining = new Map(item.details.filter(detail => detail?.value).map(detail => [detail.key || detail.label, detail]));
+        const appendTransition = (label, previousKeys, newKeys) => {
+            const previousKey = previousKeys.find(key => remaining.has(key));
+            const newKey = newKeys.find(key => remaining.has(key));
+            if (!previousKey || !newKey) return;
+            const previous = remaining.get(previousKey);
+            const next = remaining.get(newKey);
+            const wrapper = historyElement("div", "ed-history-value ed-history-value--transition");
+            wrapper.append(historyElement("strong", "", label));
+            const transition = historyElement("div", "ed-history-transition");
+            transition.append(
+                historyElement("span", "ed-history-transition__previous", previous.value),
+                historyElement("i", "fa-solid fa-arrow-right ed-history-transition__arrow"),
+                historyElement("span", "ed-history-transition__new", next.value)
+            );
+            wrapper.append(transition);
+            block.append(wrapper);
+            remaining.delete(previousKey);
+            remaining.delete(newKey);
+        };
+        appendTransition("Estado", ["previous_status"], ["new_status"]);
+        appendTransition("Disponibilidad", ["previous_available", "previous_availability"], ["is_available", "new_availability"]);
+        appendTransition("Archivo", ["previous_file", "old_file_name"], ["new_file", "new_file_name"]);
+        appendTransition("Presentación", ["previous_name", "presentation_previous"], ["new_name", "presentation_new"]);
+        remaining.forEach(detail => {
+            const wrapper = historyElement("div", "ed-history-value");
+            wrapper.append(historyElement("strong", "", detail.label));
+            wrapper.append(historyElement("span", "", detail.value));
+            block.append(wrapper);
+        });
+        if (block.childElementCount) {
+            details.append(block);
+            article.append(details);
+        }
     } else if (item.legacy_without_details) {
         const legacy = historyElement("div", "ed-history-legacy");
         legacy.append(historyElement("strong", "", "Registro antiguo"));
         legacy.append(historyElement("span", "", "Este evento fue registrado antes de habilitar el detalle de cambios."));
         article.append(legacy);
-    } else {
-        article.append(historyElement("p", "ed-history-empty-detail", "No existen detalles adicionales para esta acción."));
     }
     return article;
 }
@@ -2192,6 +2227,9 @@ async function loadRecordHistory(reset = false) {
         items.forEach((item) => recordHistoryList?.append(renderHistoryItem(item)));
         recordHistoryOffset = nextOffset;
         recordHistoryLoaded = true;
+        if (initialLoad) {
+            document.querySelectorAll("[data-record-unread-dot],[data-record-history-unread-dot],[data-record-unread-text]").forEach(element => { element.hidden = true; });
+        }
     } catch {
         if (initialLoad) {
             recordHistoryLoaded = false;
@@ -2566,6 +2604,7 @@ function getNeutralFileVisualType(extension) {
 function showRecordUploadToast(message, type = "success", options = {}) {
     if (!recordToastStack || !message) return;
     const normalizedType = ["success", "info", "warning", "error"].includes(type) ? type : "info";
+    if (normalizedType === "success") window.markRecordHistoryUnread?.();
     const key = `${normalizedType}:${message}`;
     let existing = recordToastRegistry.get(key);
     if (options.freshAttempt && existing?.element?.isConnected) {
@@ -4304,3 +4343,208 @@ document.addEventListener("keydown", (event) => {
         closeNeutralFileMenu(true);
     }
 });
+// Acciones administrativas generales del material de apoyo.
+(() => {
+    if (window.SupportMaterialAdminActions) {
+        const record = document.querySelector('[data-digital-record][data-entity-type="support_material"]');
+        const setAdministrativeUnread = (unread) => {
+            document.querySelectorAll("[data-record-unread-dot],[data-record-history-unread-dot],[data-record-unread-text]")
+                .forEach(element => { element.hidden = !unread; });
+        };
+        window.markRecordHistoryUnread = () => setAdministrativeUnread(true);
+        record?.querySelectorAll("[data-record-admin-action]").forEach(button => button.addEventListener("click", () => {
+            const action = button.dataset.recordAdminAction;
+            const withdrawing = action === "publication" && record.dataset.recordStatus === "published";
+            window.SupportMaterialAdminActions.open({
+                trigger: button,
+                type: action === "availability" ? (record.dataset.recordAvailable === "1" ? "availability_off" : "availability_on") : (action === "publication" ? (record.dataset.recordStatus === "published" ? "withdraw" : "publish") : "trash"),
+                action,
+                available: record.dataset.recordAvailable === "1",
+                endpoint: record.dataset.adminEndpoint,
+                csrf: record.dataset.adminCsrf,
+                material: { id: record.dataset.recordId, title: document.querySelector("#digitalRecordTitle")?.textContent || "" },
+                onSuccess: result => {
+                    setAdministrativeUnread(true);
+                    if (action === "trash" || withdrawing) {
+                        sessionStorage.setItem("repositoryToast", result.message);
+                        window.location.assign(result.data?.redirect || record.dataset.adminRedirect);
+                        return;
+                    }
+                    window.location.reload();
+                },
+            });
+        }));
+        return;
+    }
+    const record = document.querySelector('[data-digital-record][data-entity-type="support_material"]');
+    const dialog = document.querySelector("[data-record-admin-dialog]");
+    if (!record || !dialog || !record.dataset.adminEndpoint) return;
+    if (dialog.parentElement !== document.body) document.body.append(dialog);
+    const form = dialog.querySelector("[data-record-admin-form]");
+    const title = dialog.querySelector("[data-record-admin-title]");
+    const message = dialog.querySelector("[data-record-admin-message]");
+    const reasonWrap = dialog.querySelector("[data-record-admin-reason-wrap]");
+    const reasons = dialog.querySelector("[data-record-admin-reasons]");
+    const reasonOptions = [...dialog.querySelectorAll('input[name="trash_reason"]')];
+    const reason = dialog.querySelector("[data-record-admin-reason]");
+    const error = dialog.querySelector("[data-record-admin-error]");
+    const confirmButton = dialog.querySelector("[data-record-admin-confirm]");
+    const cancelButton = dialog.querySelector("[data-record-admin-cancel]");
+    const closeButton = dialog.querySelector("[data-record-admin-close]");
+    const confirmLabel = dialog.querySelector("[data-record-admin-confirm-label]");
+    const unreadDots = [...document.querySelectorAll("[data-record-unread-dot]")];
+    const unreadTexts = [...document.querySelectorAll("[data-record-unread-text]")];
+    const historyUnreadDot = document.createElement("span");
+    historyUnreadDot.className = "ed-unread-dot";
+    historyUnreadDot.dataset.recordHistoryUnreadDot = "";
+    historyUnreadDot.setAttribute("aria-hidden", "true");
+    const historyUnreadText = document.createElement("span");
+    historyUnreadText.className = "ed-sr-only";
+    historyUnreadText.textContent = "Hay actividad administrativa nueva";
+    recordHistoryTrigger?.append(historyUnreadDot, historyUnreadText);
+    const setUnread = unread => {
+        [...unreadDots, historyUnreadDot].forEach(dot => { dot.hidden = !unread; });
+        [...unreadTexts, historyUnreadText].forEach(text => { text.hidden = !unread; });
+        recordHistoryLoaded = unread ? false : recordHistoryLoaded;
+        if (unread && recordHistoryOverlay && !recordHistoryOverlay.hidden && recordHistoryNotice) {
+            recordHistoryNotice.textContent = "Hay actividad administrativa nueva. Cierra y vuelve a abrir el historial para actualizarlo.";
+            recordHistoryNotice.hidden = false;
+        }
+    };
+    window.markRecordHistoryUnread = () => setUnread(true);
+    setUnread(!unreadDots.every(dot => dot.hidden));
+    let pendingAction = "";
+    let processing = false;
+    let returnFocus = null;
+
+    const descriptions = {
+        availability: () => record.dataset.recordAvailable === "1"
+            ? ["Marcar como no disponible", "El material permanecerá publicado, pero los usuarios no podrán consultar ni descargar sus archivos hasta que vuelva a estar disponible."]
+            : ["Marcar como disponible", "El material volverá a estar disponible para consulta y descarga."],
+        publication: () => record.dataset.recordStatus === "published"
+            ? ["Retirar publicación", "El material dejará de mostrarse como publicado. No será enviado automáticamente a Papelera: conservará su información y archivos y podrá volver a publicarse posteriormente."]
+            : ["Publicar material", "El material volverá a mostrarse en el Repositorio. Se aplicarán las mismas validaciones del flujo de publicación existente."],
+        trash: () => ["Enviar a Papelera", "El material dejará de estar disponible en el Repositorio. Sus archivos y metadatos permanecerán temporalmente recuperables según la política de Papelera y la acción quedará registrada."],
+    };
+
+    const open = action => {
+        returnFocus = document.activeElement;
+        pendingAction = action;
+        const [heading, copy] = descriptions[action]();
+        title.textContent = heading;
+        message.textContent = copy;
+        reasons.hidden = action !== "trash";
+        reasonWrap.hidden = true;
+        reasonOptions.forEach(option => { option.checked = false; });
+        reason.value = "";
+        error.hidden = true;
+        confirmLabel.textContent = action === "trash" ? "Enviar a Papelera" : "Confirmar";
+        confirmButton.disabled = action === "trash";
+        closeDigitalRecordMenu?.();
+        dialog.hidden = false;
+        document.documentElement.classList.add("file-remove-open");
+        document.body.classList.add("file-remove-open");
+        closeButton.focus();
+    };
+    const close = () => {
+        if (processing) return;
+        dialog.hidden = true;
+        document.documentElement.classList.remove("file-remove-open");
+        document.body.classList.remove("file-remove-open");
+        if (returnFocus instanceof HTMLElement) returnFocus.focus();
+    };
+    record.querySelectorAll("[data-record-admin-action]").forEach(button => {
+        button.addEventListener("click", () => open(button.dataset.recordAdminAction));
+    });
+    cancelButton.addEventListener("click", close);
+    closeButton.addEventListener("click", close);
+    reasonOptions.forEach(option => option.addEventListener("change", () => {
+        const custom = option.checked && option.value === "other";
+        reasonWrap.hidden = !custom;
+        if (!custom) reason.value = "";
+        confirmButton.disabled = false;
+        if (custom) reason.focus();
+    }));
+    dialog.addEventListener("click", event => { if (event.target === dialog && !processing) close(); });
+    document.addEventListener("keydown", event => {
+        if (dialog.hidden || event.key !== "Escape") return;
+        event.preventDefault();
+        close();
+    });
+
+    const updateUi = data => {
+        record.dataset.recordStatus = data.status_key;
+        record.dataset.recordAvailable = data.is_available ? "1" : "0";
+        const published = data.status_key === "published";
+        const badge = record.querySelector("[data-record-status-label]");
+        badge?.classList.toggle("is-success", published);
+        badge?.classList.toggle("is-neutral", !published);
+        if (badge) {
+            badge.querySelector("i").className = `fa-solid ${published ? "fa-circle-check" : "fa-circle-minus"}`;
+            badge.querySelector("span").textContent = data.status_label;
+        }
+        const availability = record.querySelector('[data-record-meta="availability"] dd');
+        if (availability) availability.textContent = published ? data.availability_label : "No aplica";
+        const availabilityAction = record.querySelector('[data-record-admin-action="availability"]');
+        availabilityAction.hidden = !published;
+        availabilityAction.querySelector("span").textContent = data.is_available ? "Marcar como no disponible" : "Marcar como disponible";
+        const publicationAction = record.querySelector('[data-record-admin-action="publication"]');
+        publicationAction.querySelector("span").textContent = published ? "Retirar publicación" : "Publicar material";
+        publicationAction.querySelector("i").className = `fa-solid ${published ? "fa-eye-slash" : "fa-eye"}`;
+    };
+
+    form.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (processing) return;
+        const selectedReason = reasonOptions.find(option => option.checked);
+        if (pendingAction === "trash" && (!selectedReason || (selectedReason.value === "other" && reason.value.trim().length < 5))) {
+            error.textContent = "Selecciona un motivo o completa el detalle con al menos cinco caracteres.";
+            error.hidden = false;
+            if (!selectedReason) reasonOptions[0]?.focus();
+            else reason.focus();
+            return;
+        }
+        processing = true;
+        confirmButton.disabled = true;
+        cancelButton.disabled = true;
+        closeButton.disabled = true;
+        error.hidden = true;
+        confirmLabel.textContent = pendingAction === "publication"
+            ? (record.dataset.recordStatus === "published" ? "Retirando publicación…" : "Publicando material…")
+            : pendingAction === "availability" ? "Actualizando disponibilidad…" : "Enviando a Papelera…";
+        const body = new FormData();
+        body.set("_csrf", record.dataset.adminCsrf);
+        body.set("id", record.dataset.recordId);
+        body.set("action", pendingAction);
+        if (pendingAction === "availability") body.set("is_available", record.dataset.recordAvailable === "1" ? "0" : "1");
+        if (pendingAction === "publication") body.set("status", record.dataset.recordStatus === "published" ? "withdrawn" : "published");
+        if (pendingAction === "trash") {
+            body.set("reason_code", selectedReason.value);
+            body.set("reason_detail", selectedReason.value === "other" ? reason.value.trim() : "");
+        }
+        try {
+            const response = await fetch(record.dataset.adminEndpoint, { method: "POST", body, credentials: "same-origin" });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.message || "No fue posible completar la acción.");
+            if (pendingAction === "trash") {
+                sessionStorage.setItem("repositoryToast", result.message);
+                window.location.assign(result.data?.redirect || record.dataset.adminRedirect);
+                return;
+            }
+            updateUi(result.data);
+            setUnread(true);
+            processing = false;
+            close();
+            if (typeof showRecordUploadToast === "function") showRecordUploadToast(result.message, "success");
+        } catch (requestError) {
+            error.textContent = requestError.message;
+            error.hidden = false;
+        } finally {
+            processing = false;
+            confirmButton.disabled = false;
+            cancelButton.disabled = false;
+            closeButton.disabled = false;
+            if (!dialog.hidden) confirmLabel.textContent = pendingAction === "trash" ? "Enviar a Papelera" : "Confirmar";
+        }
+    });
+})();

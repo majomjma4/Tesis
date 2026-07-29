@@ -1313,6 +1313,38 @@ ALTER TABLE support_material_files
     FOREIGN KEY (purged_by) REFERENCES users(id),
   ADD INDEX idx_support_file_restore_window (material_id, deleted_at, purged_at);
 
+-- Acciones administrativas generales del material de apoyo.
+ALTER TABLE support_materials
+  ADD COLUMN published_at DATETIME NULL AFTER publication_date,
+  ADD COLUMN is_available TINYINT(1) NOT NULL DEFAULT 1 AFTER status,
+  ADD COLUMN deleted_at DATETIME NULL AFTER withdrawn_by,
+  ADD COLUMN deleted_by BIGINT UNSIGNED NULL AFTER deleted_at,
+  ADD COLUMN deletion_reason VARCHAR(500) NULL AFTER deleted_by,
+  ADD COLUMN purged_at DATETIME NULL AFTER deletion_reason,
+  ADD COLUMN purged_by BIGINT UNSIGNED NULL AFTER purged_at,
+  ADD CONSTRAINT fk_support_material_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id),
+  ADD CONSTRAINT fk_support_material_purged_by FOREIGN KEY (purged_by) REFERENCES users(id),
+  ADD INDEX idx_support_material_visibility (status,is_available,deleted_at,purged_at),
+  ADD INDEX idx_support_material_trash (deleted_at,purged_at);
+
+UPDATE support_materials
+SET published_at=TIMESTAMP(publication_date,'00:00:00')
+WHERE published_at IS NULL AND status IN ('published','withdrawn');
+
+CREATE TABLE IF NOT EXISTS support_material_audit_reads (
+  user_id BIGINT UNSIGNED NOT NULL,
+  material_id BIGINT UNSIGNED NOT NULL,
+  last_seen_audit_id BIGINT UNSIGNED NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id,material_id),
+  CONSTRAINT fk_support_material_audit_read_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_support_material_audit_read_material FOREIGN KEY (material_id) REFERENCES support_materials(id) ON DELETE CASCADE,
+  INDEX idx_support_material_audit_read_event (last_seen_audit_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE support_materials
+  MODIFY publication_date DATE NULL;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

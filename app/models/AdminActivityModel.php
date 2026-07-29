@@ -33,13 +33,42 @@ final class AdminActivityModel
         $rows = $statement->fetchAll();
         $hasMore = count($rows) > $limit;
         if ($hasMore) array_pop($rows);
+        $snapshotMaxAuditId = $offset === 0 && $rows !== [] ? (int) $rows[0]['id'] : 0;
 
         return [
             'items' => array_map([$this, 'normalize'], $rows),
             'has_more' => $hasMore,
             'next_offset' => $offset + count($rows),
             'incomplete_count' => $this->countIncompleteSupportMaterialEvents($entityId),
+            'max_audit_id' => $snapshotMaxAuditId,
         ];
+    }
+
+    public function hasUnreadSupportMaterialEvents(int $userId, int $materialId): bool
+    {
+        $statement = Database::connection()->prepare(
+            "SELECT EXISTS(
+                SELECT 1 FROM admin_audit_log audit
+                LEFT JOIN support_material_audit_reads seen
+                  ON seen.user_id=:user_id AND seen.material_id=:material_id
+                WHERE audit.entity_type='support_material' AND audit.entity_id=:material_id_again
+                  AND audit.result='correct' AND audit.id>COALESCE(seen.last_seen_audit_id,0)
+            )"
+        );
+        $statement->execute(['user_id'=>$userId,'material_id'=>$materialId,'material_id_again'=>$materialId]);
+        return (bool) $statement->fetchColumn();
+    }
+
+    public function markSupportMaterialSeen(int $userId, int $materialId, int $auditId): void
+    {
+        if ($userId < 1 || $materialId < 1 || $auditId < 1) return;
+        Database::connection()->prepare(
+            'INSERT INTO support_material_audit_reads(user_id,material_id,last_seen_audit_id)
+             VALUES(:user_id,:material_id,:audit_id)
+             ON DUPLICATE KEY UPDATE
+               last_seen_audit_id=GREATEST(last_seen_audit_id,VALUES(last_seen_audit_id)),
+               updated_at=UTC_TIMESTAMP()'
+        )->execute(['user_id'=>$userId,'material_id'=>$materialId,'audit_id'=>$auditId]);
     }
 
     public function countIncompleteSupportMaterialEvents(int $materialId): int
@@ -124,6 +153,13 @@ final class AdminActivityModel
     private function normalize(array $row): array
     {
         $changes = $this->recoverableChanges($row['details'] ?? null);
+        $changes = array_map(function(array $change): array {
+            $field=(string)($change['field']??'');
+            $change['label']=$this->fieldLabel($field,(string)($change['label']??''));
+            $change['old']=$this->displayValue($field,$change['old']??null);
+            $change['new']=$this->displayValue($field,$change['new']??null);
+            return $change;
+        },$changes);
         $decodedDetails = json_decode((string) ($row['details'] ?? ''), true);
         $cleanupDetails = (string) $row['action'] === 'support_material.history_cleaned' && is_array($decodedDetails)
             ? [
@@ -131,6 +167,13 @@ final class AdminActivityModel
                 'reason' => (string) ($decodedDetails['reason'] ?? ''),
             ]
             : null;
+        $metadata = is_array($decodedDetails) ? $decodedDetails : [];
+        unset($metadata['changes'], $metadata['schema_version']);
+        if((array_key_exists('reason',$metadata)||array_key_exists('reason_label',$metadata)||array_key_exists('reason_code',$metadata))
+            && trim((string)($metadata['reason']??''))===''){
+            $metadata['reason']=(string)($metadata['reason_label']??$metadata['reason_code']??'');
+        }
+        unset($metadata['reason_label']);
         $legacyWithoutDetails = in_array((string) $row['action'], ['support_material.updated', 'support_material_updated'], true)
             && $changes === [];
 
@@ -156,7 +199,49 @@ final class AdminActivityModel
             'has_details' => $changes !== [],
             'legacy_without_details' => $legacyWithoutDetails,
             'cleanup' => $cleanupDetails,
+            'details' => $this->detailRows((string) $row['action'], $metadata),
         ];
+    }
+
+    private function detailRows(string $action, array $details): array
+    {
+        $labels = [
+            'name'=>'Archivo','original_name'=>'Archivo retirado','final_name'=>'Nombre final restaurado',
+            'file_name'=>'Archivo','old_file_name'=>'Archivo anterior','new_file_name'=>'Archivo nuevo',
+            'extension'=>'Tipo','mime_type'=>'Tipo MIME','size'=>'Tamaño','size_bytes'=>'Tamaño','reason'=>'Motivo',
+            'reason_detail'=>'Detalle','previous_status'=>'Estado anterior','new_status'=>'Estado nuevo',
+            'previous_availability'=>'Disponibilidad anterior','new_availability'=>'Disponibilidad nueva',
+            'previous_available'=>'Disponibilidad anterior','is_available'=>'Disponibilidad nueva',
+            'available'=>'Disponibilidad','availability'=>'Disponibilidad','renamed'=>'Renombrado por conflicto',
+            'presentation'=>'Era presentación','presentation_unchanged'=>'Presentación conservada',
+            'previous_file'=>'Archivo anterior','new_file'=>'Archivo nuevo',
+            'presentation_previous'=>'Presentación anterior','presentation_new'=>'Presentación nueva',
+            'previous_name'=>'Presentación anterior','new_name'=>'Presentación nueva',
+            'name_conflict'=>'Conflicto de nombre','deleted_by_name'=>'Retirado por','actor'=>'Realizado por',
+            'destination'=>'Destino','previous_trash_reason'=>'Motivo anterior de Papelera',
+        ];
+        $rows = [];
+        foreach ($details as $key=>$value) {
+            if (str_ends_with((string)$key, '_id') || in_array($key, ['restore_hours','deleted_by','deleted_at','purged_at','purged_by','republication','context','is_package','reason_code','result'], true)) continue;
+            if ($value===null || (is_string($value) && trim($value)==='')) continue;
+            if (is_array($value)) {
+                if (in_array($key, ['previous_file','new_file'], true)) {
+                    $name=(string)($value['original_name']??$value['name']??'');
+                    $size=isset($value['size_bytes'])?ArchiveService::formatBytes((int)$value['size_bytes']):'';
+                    $value=trim($name.($size!==''?' · '.$size:''));
+                } elseif ($key==='files') {
+                    $value=implode(', ',array_map(static fn(array $file):string=>
+                        (string)($file['original_name']??$file['name']??'Archivo')
+                        .(isset($file['size_bytes'])?' · '.ArchiveService::formatBytes((int)$file['size_bytes']):''),
+                        array_filter($value,'is_array')
+                    ));
+                    $labels[$key]='Archivos';
+                } else continue;
+            }
+            if (in_array($key,['size','size_bytes'],true)) $value=ArchiveService::formatBytes((int)$value);
+            $rows[]=['key'=>(string)$key,'label'=>$labels[$key]??$this->fieldLabel((string)$key),'value'=>$this->displayValue((string)$key,$value)];
+        }
+        return $rows;
     }
 
     private function actionLabel(string $action, string $fallback): string
@@ -165,8 +250,81 @@ final class AdminActivityModel
             'support_material.updated', 'support_material_updated' => 'Editó la información del material',
             'support_material.created', 'support_material_created' => 'Creó el material de apoyo',
             'support_material.history_cleaned' => 'Realizó una depuración del historial administrativo',
+            'support_material.published', 'support_material_published' => 'Publicó el material de apoyo',
+            'support_material.withdrawn', 'support_material_withdrawn' => 'Retiró la publicación del material',
+            'support_material.availability_changed', 'support_material_availability_changed' => 'Cambió la disponibilidad del material',
+            'support_material.trashed', 'support_material_trashed' => 'Envió el material a Papelera',
+            'support_material.restored', 'support_material_restored' => 'Restauró el material',
+            'support_material.file_added' => 'Agregó un archivo al material',
+            'support_material.file_removed' => 'Retiró un archivo del material',
+            'support_material.file_replaced' => 'Reemplazó un archivo del material',
+            'support_material.file_restored' => 'Restauró un archivo del material',
+            'support_material.file_purged' => 'Eliminó definitivamente un archivo',
+            'support_material.presentation_selected' => 'Seleccionó el archivo de presentación',
+            'support_material.presentation_changed' => 'Cambió el archivo de presentación',
+            'support_material.presentation_removed' => 'Quitó el archivo de presentación',
             default => $fallback !== '' ? $fallback : 'Se actualizó el material',
         };
+    }
+
+    private function fieldLabel(string $field,string $fallback=''):string
+    {
+        $labels=[
+            'previous_status'=>'Estado anterior','new_status'=>'Estado nuevo','status'=>'Estado',
+            'previous_availability'=>'Disponibilidad anterior','new_availability'=>'Disponibilidad nueva',
+            'previous_available'=>'Disponibilidad anterior','is_available'=>'Disponibilidad nueva',
+            'reason'=>'Motivo','reason_detail'=>'Detalle','file_name'=>'Archivo',
+            'old_file_name'=>'Archivo anterior','new_file_name'=>'Archivo nuevo',
+            'presentation_previous'=>'Presentación anterior','presentation_new'=>'Presentación nueva',
+            'mime_type'=>'Tipo MIME','size'=>'Tamaño','size_bytes'=>'Tamaño','actor'=>'Realizado por',
+        ];
+        if(isset($labels[$field]))return $labels[$field];
+        if($fallback!==''&&!preg_match('/^[a-z0-9_.-]+$/i',$fallback))return $fallback;
+        return $this->readableTechnicalText($fallback!==''?$fallback:$field);
+    }
+
+    private function displayValue(string $field,mixed $value):string
+    {
+        if($value===null||$value==='')return 'Vacío';
+        if(is_bool($value)){
+            return in_array($field,['available','availability','previous_available','is_available','previous_availability','new_availability'],true)
+                ?($value?'Disponible':'No disponible')
+                :($value?'Sí':'No');
+        }
+        if(is_int($value)||is_float($value))return (string)$value;
+        $text=trim((string)$value);$normalized=mb_strtolower($text);
+        $values=[
+            'published'=>'Publicado','withdrawn'=>'Publicación retirada','draft'=>'Borrador',
+            'trash'=>'En Papelera','trashed'=>'En Papelera','papelera'=>'En Papelera',
+            'available'=>'Disponible','unavailable'=>'No disponible','active'=>'Activo','inactive'=>'Inactivo',
+            'true'=>'Sí','false'=>'No','yes'=>'Sí','no'=>'No',
+            'outdated'=>'Información desactualizada','outdated_information'=>'Información desactualizada',
+            'incorrect'=>'Publicación incorrecta','incorrect_publication'=>'Publicación incorrecta',
+            'replaced'=>'Material reemplazado','material_replaced'=>'Material reemplazado',
+            'administrative_review'=>'Revisión administrativa','temporary_review'=>'Revisión administrativa',
+            'pending_review'=>'Revisión pendiente','temporary_update'=>'Actualización temporal del contenido',
+            'files_pending'=>'Archivos pendientes de corrección','temporary_suspension'=>'Acceso suspendido temporalmente',
+            'corrections_completed'=>'Correcciones completadas','content_updated'=>'Contenido actualizado',
+            'files_verified'=>'Archivos verificados','review_completed'=>'Revisión administrativa finalizada',
+            'incomplete_files'=>'Archivos incompletos','duplicate'=>'Contenido duplicado',
+            'not_required'=>'Ya no es requerido','other'=>'Otro motivo',
+        ];
+        if(isset($values[$normalized]))return $values[$normalized];
+        $technicalFields=['status','previous_status','new_status','availability','previous_availability','new_availability','reason','reason_code','destination'];
+        return in_array($field,$technicalFields,true)?$this->readableTechnicalText($text):$text;
+    }
+
+    private function readableTechnicalText(string $value):string
+    {
+        $text=mb_strtolower(trim(str_replace(['.','-','_'],' ',$value)));
+        if($text==='')return 'Sin información';
+        $words=['pending'=>'pendiente','review'=>'revisión','temporary'=>'temporal','administrative'=>'administrativa',
+            'information'=>'información','outdated'=>'desactualizada','incorrect'=>'incorrecta','publication'=>'publicación',
+            'material'=>'material','replaced'=>'reemplazado','available'=>'disponible','unavailable'=>'no disponible',
+            'previous'=>'anterior','new'=>'nuevo','status'=>'estado','reason'=>'motivo','detail'=>'detalle',
+            'file'=>'archivo','name'=>'nombre','presentation'=>'presentación','active'=>'activo','inactive'=>'inactivo'];
+        $translated=array_map(static fn(string $word):string=>$words[$word]??$word,preg_split('/\s+/u',$text)?:[]);
+        return ucfirst(implode(' ',$translated));
     }
 
     private function formatDate(DateTimeImmutable $date): string

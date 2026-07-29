@@ -410,12 +410,19 @@ CREATE TABLE support_materials (
   description VARCHAR(500) NOT NULL,
   full_description TEXT NOT NULL,
   publisher VARCHAR(180) NOT NULL,
-  publication_date DATE NOT NULL,
+  publication_date DATE NULL,
+  published_at DATETIME NULL,
   status ENUM('published','withdrawn') NOT NULL DEFAULT 'published',
+  is_available TINYINT(1) NOT NULL DEFAULT 1,
   download_count INT UNSIGNED NOT NULL DEFAULT 0,
   keywords_json LONGTEXT NULL,
   withdrawn_at DATETIME NULL,
   withdrawn_by BIGINT UNSIGNED NULL,
+  deleted_at DATETIME NULL,
+  deleted_by BIGINT UNSIGNED NULL,
+  deletion_reason VARCHAR(500) NULL,
+  purged_at DATETIME NULL,
+  purged_by BIGINT UNSIGNED NULL,
   created_by BIGINT UNSIGNED NULL,
   updated_by BIGINT UNSIGNED NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -423,10 +430,14 @@ CREATE TABLE support_materials (
   CONSTRAINT fk_support_material_category FOREIGN KEY (category_id) REFERENCES support_material_categories(id),
   CONSTRAINT fk_support_material_period FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id),
   CONSTRAINT fk_support_material_withdrawn_by FOREIGN KEY (withdrawn_by) REFERENCES users(id),
+  CONSTRAINT fk_support_material_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id),
+  CONSTRAINT fk_support_material_purged_by FOREIGN KEY (purged_by) REFERENCES users(id),
   CONSTRAINT fk_support_material_created_by FOREIGN KEY (created_by) REFERENCES users(id),
   CONSTRAINT fk_support_material_updated_by FOREIGN KEY (updated_by) REFERENCES users(id),
   INDEX idx_support_material_status_date (status, publication_date),
   INDEX idx_support_material_category (category_id)
+  ,INDEX idx_support_material_visibility (status,is_available,deleted_at,purged_at)
+  ,INDEX idx_support_material_trash (deleted_at,purged_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE support_material_files (
@@ -471,6 +482,17 @@ CREATE TABLE support_material_file_versions (
   CONSTRAINT fk_support_file_version_material FOREIGN KEY (material_id) REFERENCES support_materials(id),
   CONSTRAINT fk_support_file_version_actor FOREIGN KEY (replaced_by) REFERENCES users(id),
   INDEX idx_support_file_version_history (file_id, replaced_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE support_material_audit_reads (
+  user_id BIGINT UNSIGNED NOT NULL,
+  material_id BIGINT UNSIGNED NOT NULL,
+  last_seen_audit_id BIGINT UNSIGNED NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id,material_id),
+  CONSTRAINT fk_support_material_audit_read_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_support_material_audit_read_material FOREIGN KEY (material_id) REFERENCES support_materials(id) ON DELETE CASCADE,
+  INDEX idx_support_material_audit_read_event (last_seen_audit_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO roles (code, name) VALUES

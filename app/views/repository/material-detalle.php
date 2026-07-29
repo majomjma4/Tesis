@@ -15,7 +15,9 @@
         is_array($material['files'] ?? null) ? $material['files'] : [],
         'is_array'
     ));
+    $materialAvailable = !empty($material['is_available']);
     $documents = array_map(static function (array $file) use (
+        $materialAvailable,
         $materialId,
         $previewActionUrl,
         $downloadActionUrl,
@@ -32,7 +34,7 @@
             'webp' => 'image', 'docx' => 'docx', 'txt' => 'text',
         ];
         $isZip = $extension === 'zip';
-        $available = !empty($file['available']);
+        $available = $materialAvailable && !empty($file['available']);
         return [
             'id' => $fileId,
             'name' => $name,
@@ -56,7 +58,7 @@
     $documents = array_values(array_filter($documents, static fn (array $document): bool => ($document['extension'] ?? '') !== 'zip'));
     $packageDescriptor = is_array($material['package_descriptor'] ?? null) ? $material['package_descriptor'] : [];
     $archives = $regularArchives;
-    $packageAvailable = !empty($packageDescriptor['available']);
+    $packageAvailable = $materialAvailable && !empty($packageDescriptor['available']);
     $packageDownloadUrl = $packageAvailable
         ? (string) $packageDownloadActionUrl . '&material_id=' . $materialId
         : '';
@@ -91,18 +93,17 @@
             ['label' => 'Publicación', 'value' => (string) ($material['publication_date'] ?? '')],
             ['label' => 'Categoría', 'value' => (string) ($material['category_label'] ?? '')],
             ['label' => 'Periodo', 'value' => (string) ($material['pao_label'] ?? '')],
-            ['label' => 'Disponibilidad', 'value' => $isPublished ? 'Disponible' : 'No disponible', 'tone' => 'secondary'],
+            ['key' => 'availability', 'label' => 'Disponibilidad', 'value' => $isPublished ? ($materialAvailable ? 'Disponible' : 'No disponible') : 'No aplica', 'tone' => 'secondary'],
         ], static fn (array $item): bool => $item['value'] !== '')),
         'actions' => $mode === 'edit' ? [] : array_values(array_filter([
             $administratorView ? ['id' => 'edit', 'label' => 'Editar', 'kind' => 'primary', 'icon' => 'fa-pen-to-square', 'url' => $materialEditUrl ?: null, 'enabled' => $materialEditUrl !== ''] : null,
             ['id' => 'download', 'label' => 'Descargar', 'kind' => 'secondary', 'icon' => 'fa-download', 'url' => $downloadUrl, 'enabled' => $downloadUrl !== null],
-            ['id' => 'share', 'label' => 'Compartir', 'kind' => 'secondary', 'icon' => 'fa-share-nodes', 'url' => null, 'enabled' => false],
         ])),
         'menu_actions' => $administratorView && $mode === 'view' ? [
-            ['label' => 'Cambiar disponibilidad', 'icon' => 'fa-toggle-on', 'enabled' => false, 'danger' => false],
-            ['label' => $isPublished ? 'Retirar publicación' : 'Publicar material', 'icon' => $isPublished ? 'fa-eye-slash' : 'fa-eye', 'enabled' => false, 'danger' => false],
-            ['label' => 'Ver historial administrativo', 'icon' => 'fa-clock-rotate-left', 'enabled' => true, 'danger' => false, 'action' => 'admin-history', 'separator' => true],
-            ['label' => 'Enviar a Papelera', 'icon' => 'fa-trash-can', 'enabled' => false, 'danger' => true],
+            ['label' => $materialAvailable ? 'Marcar como no disponible' : 'Marcar como disponible', 'icon' => 'fa-toggle-on', 'enabled' => true, 'hidden' => !$isPublished, 'danger' => false, 'action' => 'availability'],
+            ['label' => $isPublished ? 'Retirar publicación' : 'Publicar material', 'icon' => $isPublished ? 'fa-eye-slash' : 'fa-eye', 'enabled' => true, 'danger' => false, 'action' => 'publication'],
+            ['label' => 'Ver historial administrativo', 'icon' => 'fa-clock-rotate-left', 'enabled' => true, 'danger' => false, 'action' => 'admin-history', 'separator' => true, 'unread' => !empty($hasUnreadAdministrativeActivity)],
+            ['label' => 'Enviar a Papelera', 'icon' => 'fa-trash-can', 'enabled' => true, 'danger' => true, 'action' => 'trash'],
         ] : [],
         'tabs' => [
             ['id' => 'information', 'label' => 'Información', 'icon' => 'fa-file-lines', 'url' => $detailUrl . $modeQuery . '&tab=information'],
@@ -110,6 +111,14 @@
             ['id' => 'evolution', 'label' => 'Evolución documental', 'icon' => 'fa-clock-rotate-left', 'url' => $detailUrl . $modeQuery . '&tab=evolution'],
         ],
         'active_tab' => $activeTab,
+        'admin_actions' => [
+            'endpoint' => (string) ($materialStatusEndpoint ?? ''),
+            'csrf_token' => (string) ($materialCsrfToken ?? ''),
+            'status' => $publicationState,
+            'is_available' => $materialAvailable,
+            'redirect' => $administratorView ? route('admin-repository') . '&tab=materials' : (string) $repositoryUrl,
+            'has_unread' => !empty($hasUnreadAdministrativeActivity),
+        ],
         'information_sections' => [
             ['id' => 'description', 'title' => 'Descripción', 'icon' => 'fa-align-left', 'type' => 'prose', 'content' => (string) ($material['full_description'] ?? $material['description'] ?? '')],
             ['id' => 'institutional', 'title' => 'Información institucional', 'icon' => 'fa-building-columns', 'type' => 'metadata', 'content' => array_values(array_filter([
@@ -158,7 +167,7 @@
                 'description' => (string) ($material['description'] ?? ''),
                 'full_description' => (string) ($material['full_description'] ?? ''),
                 'publisher' => (string) ($material['publisher'] ?? ''),
-                'publication_date' => (string) ($material['publication_date_iso'] ?? ''),
+                'publication_date_label' => (string) ($material['publication_date'] ?? 'Sin publicar'),
                 'period' => (string) ($material['pao_label'] ?? ''),
                 'keywords' => implode(', ', array_map('strval', (array) ($material['keywords'] ?? []))),
             ],

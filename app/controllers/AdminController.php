@@ -8,9 +8,26 @@ final class AdminController
     public function reports():void{$from=$this->reportDate('from',date('Y-m-01'));$to=$this->reportDate('to',date('Y-m-d'));$model=new AdminReportModel();$error=null;try{$data=$model->dashboard($from,$to,PaginationService::request());}catch(Throwable $e){error_log('Admin reports: '.$e->getMessage());$error='No fue posible generar los reportes.';$data=['summary'=>['users'=>0,'projects'=>0,'deliveries'=>0,'actions'=>0],'roles'=>[],'statuses'=>[],'activity'=>[],'pagination'=>['total'=>0]];}View::render('admin/reports',['currentPage'=>'admin-reports','title'=>'Reportes | Administración','bodyClass'=>'admin-reports-page','pageStyles'=>[asset('css/admin-reports.css')],'reportData'=>$data,'pagePagination'=>$data['pagination'],'reportFrom'=>$from,'reportTo'=>$to,'reportError'=>$error]);}
     public function exportReport():never{$type=(string)($_GET['type']??'');$from=$this->reportDate('from',date('Y-m-01'));$to=$this->reportDate('to',date('Y-m-d'));if(!in_array($type,['users','projects','audit'],true)){http_response_code(422);exit('Reporte no válido.');}try{$report=(new AdminReportModel())->export($type,$from,$to);header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="reporte-'.$type.'-'.$from.'-'.$to.'.csv"');echo "\xEF\xBB\xBF";$out=fopen('php://output','wb');fputcsv($out,$report['headers'],';');foreach($report['rows'] as $row){$safe=array_map(static fn($cell):string=>preg_match('/^[=+\-@]/u',(string)$cell)?"'".(string)$cell:(string)$cell,array_values($row));fputcsv($out,$safe,';');}fclose($out);exit;}catch(Throwable $e){error_log('Export report: '.$e->getMessage());http_response_code(500);exit('No fue posible generar el reporte.');}}
     private function reportDate(string $key,string $fallback):string{$value=(string)($_GET[$key]??$fallback);$date=DateTimeImmutable::createFromFormat('Y-m-d',$value);return $date&&$date->format('Y-m-d')===$value?$value:$fallback;}
-    public function trash():void{$model=new AdminTrashModel();$type=(string)($_GET['trash_type']??'users');$error=null;try{$data=$model->dashboard($type,PaginationService::request());}catch(Throwable $e){error_log('Admin trash: '.$e->getMessage());$error='No fue posible consultar la Papelera.';$data=['users'=>[],'projects'=>[],'pagination'=>['total'=>0],'active_type'=>'users','summary'=>['users'=>0,'projects'=>0,'expired'=>0]];}$s=new AuthSessionService();View::render('admin/trash',['currentPage'=>'admin-trash','title'=>'Papelera | Administración','bodyClass'=>'admin-trash-page','pageStyles'=>[asset('css/admin-trash.css')],'pageScript'=>asset('js/admin-trash.js'),'trashData'=>$data,'pagePagination'=>$data['pagination'],'trashError'=>$error,'trashCsrf'=>$s->csrfToken('admin_trash'),'trashEndpoints'=>['user'=>route('admin-trash-user'),'restore'=>route('admin-trash-restore'),'purge'=>route('admin-trash-purge')]]);}
+    public function trash():void
+    {
+        $model=new AdminTrashModel();$type=(string)($_GET['trash_type']??'users');$error=null;
+        try{
+            $data=$type==='materials'
+                ?$model->supportMaterialDashboard(PaginationService::request())
+                :$model->dashboard($type,PaginationService::request());
+            $data['materials']=$data['materials']??[];
+            $data['summary']['materials']=(int)Database::connection()->query(
+                'SELECT COUNT(*) FROM support_materials WHERE deleted_at IS NOT NULL AND purged_at IS NULL'
+            )->fetchColumn();
+        }catch(Throwable $e){
+            error_log('Admin trash: '.$e->getMessage());$error='No fue posible consultar la Papelera.';
+            $data=['users'=>[],'projects'=>[],'materials'=>[],'pagination'=>['total'=>0],'active_type'=>'users','summary'=>['users'=>0,'projects'=>0,'materials'=>0,'expired'=>0]];
+        }
+        $s=new AuthSessionService();
+        View::render('admin/trash',['currentPage'=>'admin-trash','title'=>'Papelera | Administración','bodyClass'=>'admin-trash-page','pageStyles'=>[asset('css/admin-trash.css')],'pageScript'=>asset('js/admin-trash.js'),'trashData'=>$data,'pagePagination'=>$data['pagination'],'trashError'=>$error,'trashCsrf'=>$s->csrfToken('admin_trash'),'trashEndpoints'=>['user'=>route('admin-trash-user'),'restore'=>route('admin-trash-restore'),'purge'=>route('admin-trash-purge')]]);
+    }
     public function trashUser():void{$this->requirePost();$s=$this->trashSession();$id=(int)($_POST['id']??0);try{(new AdminTrashModel())->trashUser($id,(string)($_POST['reason']??''),(int)$s->userId());$this->json(true,'Usuario enviado a la Papelera y acceso revocado.');}catch(InvalidArgumentException $e){$this->activityFailure($s,'user_trashed','Intentó enviar un usuario a la papelera','Papelera','user',$id,'Usuario #'.$id,$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,'user_trashed','Intentó enviar un usuario a la papelera','Papelera','user',$id,'Usuario #'.$id,$e);error_log('Trash user: '.$e->getMessage());$this->json(false,'No fue posible eliminar el usuario.',[],500);}}
-    public function restoreTrash():void{$this->requirePost();$s=$this->trashSession();$entity=(string)($_POST['entity']??'');$id=(int)($_POST['id']??0);try{(new AdminTrashModel())->restore($entity,$id,(int)$s->userId());$this->json(true,'Elemento restaurado correctamente.');}catch(InvalidArgumentException $e){$this->activityFailure($s,$entity.'_restored','Intentó restaurar un elemento desde la papelera','Papelera',$entity,$id,ucfirst($entity).' #'.$id,$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,$entity.'_restored','Intentó restaurar un elemento desde la papelera','Papelera',$entity,$id,ucfirst($entity).' #'.$id,$e);$this->json(false,'No fue posible restaurar el elemento.',[],500);}}
+    public function restoreTrash():void{$this->requirePost();$s=$this->trashSession();$entity=(string)($_POST['entity']??'');$id=(int)($_POST['id']??0);try{$trash=new AdminTrashModel();if($entity==='support_material')$trash->restoreSupportMaterial($id,(int)$s->userId());else $trash->restore($entity,$id,(int)$s->userId());$this->json(true,'Elemento restaurado correctamente.');}catch(InvalidArgumentException $e){$this->activityFailure($s,$entity.'_restored','Intentó restaurar un elemento desde la papelera','Papelera',$entity,$id,ucfirst($entity).' #'.$id,$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,$entity.'_restored','Intentó restaurar un elemento desde la papelera','Papelera',$entity,$id,ucfirst($entity).' #'.$id,$e);$this->json(false,'No fue posible restaurar el elemento.',[],500);}}
     public function purgeTrash():void{$this->requirePost();$s=$this->trashSession();try{$r=(new AdminTrashModel())->purgeExpired((int)$s->userId());$this->json(true,'Se procesaron '.$r['users'].' usuarios y '.$r['projects'].' proyectos vencidos.',$r);}catch(Throwable $e){$this->activityFailure($s,'trash_purged','Intentó ejecutar la eliminación definitiva','Papelera','trash',null,'Elementos vencidos',$e);error_log('Purge trash: '.$e->getMessage());$this->json(false,'No fue posible procesar los elementos vencidos.',[],500);}}
     private function trashSession():AuthSessionService{$s=new AuthSessionService();if(!$s->validateCsrf('admin_trash',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);return $s;}
     public function notifications():void{$model=new AdminNotificationModel();$error=null;try{$data=$model->dashboard(PaginationService::request());}catch(Throwable $e){error_log('Admin notifications: '.$e->getMessage());$error='No fue posible consultar el centro de notificaciones.';$data=['users'=>[],'projects'=>[],'sent'=>[],'pagination'=>['total'=>0],'summary'=>['sent'=>0,'recipients'=>0,'today'=>0]];}$s=new AuthSessionService();View::render('admin/notifications',['currentPage'=>'notifications','title'=>'Notificaciones | Administración','bodyClass'=>'admin-notifications-page','pageStyles'=>[asset('css/admin-notifications.css')],'pageScript'=>asset('js/admin-notifications.js'),'adminNotifications'=>$data,'pagePagination'=>$data['pagination'],'adminNotificationsError'=>$error,'adminNotificationCsrf'=>$s->csrfToken('admin_notifications'),'adminNotificationSendEndpoint'=>route('admin-notification-send')]);}
@@ -45,7 +62,6 @@ final class AdminController
                         'description'=>['label'=>'Descripción corta','old'=>$this->normalizeAuditText($current['description']??'',true),'new'=>$this->normalizeAuditText($_POST['description']??'',true)],
                         'full_description'=>['label'=>'Descripción completa','old'=>$this->normalizeAuditText($current['full_description']??'',true),'new'=>$this->normalizeAuditText($_POST['full_description']??'',true)],
                         'publisher'=>['label'=>'Responsable','old'=>$this->normalizeAuditText($current['publisher']??''),'new'=>$this->normalizeAuditText($_POST['publisher']??'')],
-                        'publication_date'=>['label'=>'Fecha de publicación','old'=>$this->normalizeAuditDate($current['publication_date_iso']??''),'new'=>$this->normalizeAuditDate($_POST['publication_date']??'')],
                     ];
                     foreach($auditableFields as $field=>$change){
                         if($change['old']!==$change['new'])$auditChanges[]=['field'=>$field]+$change;
@@ -80,7 +96,13 @@ final class AdminController
         if($id===false||$id===null||(int)$id<1)$this->json(false,'El material solicitado no es válido.',[],422);
         if((new SupportMaterialModel())->findById((int)$id,true)===null)$this->json(false,'El material solicitado no existe.',[],404);
         try{
-            $history=(new AdminActivityModel())->forEntity('support_material',(int)$id,20,$offset===false?0:(int)$offset);
+            $activityModel=new AdminActivityModel();
+            $history=$activityModel->forEntity('support_material',(int)$id,20,$offset===false?0:(int)$offset);
+            if(($offset===false?0:(int)$offset)===0){
+                $session=new AuthSessionService();
+                $activityModel->markSupportMaterialSeen((int)$session->userId(),(int)$id,(int)($history['max_audit_id']??0));
+                $history['has_unread']=false;
+            }
             $this->json(true,'Historial administrativo cargado.',$history);
         }catch(Throwable $error){
             error_log('Support material history: '.$error->getMessage());
@@ -124,12 +146,54 @@ final class AdminController
     {
         $this->requirePost();$session=new AuthSessionService();
         if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);
-        $id=(int)($_POST['id']??0);$status=(string)($_POST['status']??'');
+        $id=(int)($_POST['id']??0);$status=(string)($_POST['status']??'');$action=(string)($_POST['action']??'publication');
         try{
             $model=new SupportMaterialModel();$actor=(int)$session->userId();
-            $material=Database::transaction(function(PDO $database)use($model,$id,$status,$actor):array{
+            $reasonCode=(string)($_POST['reason_code']??'');$reasonDetail=trim((string)($_POST['reason_detail']??''));
+            $administrativeReasons=[
+                'temporary_update'=>'Actualización temporal del contenido','administrative_review'=>'Revisión administrativa',
+                'files_pending'=>'Archivos pendientes de corrección','outdated'=>'Información desactualizada',
+                'temporary_suspension'=>'Acceso suspendido temporalmente','corrections_completed'=>'Correcciones completadas',
+                'content_updated'=>'Contenido actualizado','files_verified'=>'Archivos verificados',
+                'review_completed'=>'Revisión administrativa finalizada','incorrect'=>'Publicación incorrecta',
+                'pending_review'=>'Material pendiente de revisión','incomplete_files'=>'Archivos incompletos',
+                'replaced'=>'Material reemplazado','duplicate'=>'Contenido duplicado','not_required'=>'Ya no es requerido',
+                'other'=>'Otro motivo',
+            ];
+            $reasonRequired=$action==='availability'||$action==='trash'||$status==='withdrawn';
+            if($reasonRequired&&!isset($administrativeReasons[$reasonCode]))throw new InvalidArgumentException('Selecciona un motivo válido.');
+            if($reasonCode!==''&&!isset($administrativeReasons[$reasonCode]))throw new InvalidArgumentException('Selecciona un motivo válido.');
+            $allowedReasonCodes=$action==='trash'
+                ?['duplicate','outdated','replaced','incorrect','not_required','other']
+                :($action==='availability'
+                    ?((string)($_POST['is_available']??'')==='1'
+                        ?['corrections_completed','content_updated','files_verified','review_completed','other']
+                        :['temporary_update','administrative_review','files_pending','outdated','temporary_suspension','other'])
+                    :($status==='withdrawn'
+                        ?['incorrect','outdated','pending_review','incomplete_files','replaced','other']
+                        :['review_completed','content_updated','corrections_completed','other']));
+            if($reasonCode!==''&&!in_array($reasonCode,$allowedReasonCodes,true))throw new InvalidArgumentException('El motivo no corresponde a la acción solicitada.');
+            if($reasonCode==='other'&&mb_strlen($reasonDetail)<5)throw new InvalidArgumentException('Detalla el motivo con al menos cinco caracteres.');
+            if(mb_strlen($reasonDetail)>300)throw new InvalidArgumentException('El detalle del motivo supera los 300 caracteres.');
+            $reasonLabel=$reasonCode===''?'':$administrativeReasons[$reasonCode];
+            if($action==='trash'){
+                $redirect=route('admin-repository').'&tab=materials';
+                Database::transaction(function(PDO $database)use($id,$reasonLabel,$actor,$reasonCode,$reasonDetail):void{
+                    (new AdminTrashModel())->trashSupportMaterialAtomic($database,$id,$reasonLabel,$actor,$reasonCode,$reasonDetail);
+                });
+                $this->json(true,'Material enviado a Papelera correctamente.',['redirect'=>$redirect]);
+            }
+            $material=Database::transaction(function(PDO $database)use($model,$id,$status,$action,$actor,$reasonCode,$reasonLabel,$reasonDetail):array{
                 $material=$model->findByIdForUpdate($id);
                 if($material===null)throw new InvalidArgumentException('El material ya no está disponible.');
+                if($action==='availability'){
+                    $available=filter_var($_POST['is_available']??null,FILTER_VALIDATE_BOOL,FILTER_NULL_ON_FAILURE);
+                    if($available===null)throw new InvalidArgumentException('La disponibilidad solicitada no es válida.');
+                    $previous=$model->setAvailability($id,$available,$actor);
+                    (new AdminActivityService($database))->record($actor,'support_material_availability_changed',$available?'Marcó material como disponible':'Marcó material como no disponible','Repositorio','support_material',$id,(string)$material['title'],'correct',['previous_available'=>$previous,'is_available'=>$available,'reason_code'=>$reasonCode,'reason'=>$reasonLabel,'reason_detail'=>$reasonDetail]);
+                    $material['availability_result']=$available;
+                    return $material;
+                }
                 if($status==='published'){
                     $requestedPresentation=(int)($_POST['presentation_file_id']??0);
                     if($requestedPresentation>0&&$requestedPresentation!==(int)($material['presentation_file_id']??0)){
@@ -138,19 +202,25 @@ final class AdminController
                             $actor,empty($change['previous_file_id'])?'support_material.presentation_selected':'support_material.presentation_changed',
                             empty($change['previous_file_id'])?'Seleccionó el archivo de presentación':'Cambió el archivo de presentación',
                             'Repositorio','support_material',$id,$change['name'],'correct',
-                            ['previous_file_id'=>$change['previous_file_id'],'new_file_id'=>$change['file_id'],'context'=>'publication']
+                            ['previous_file_id'=>$change['previous_file_id'],'new_file_id'=>$change['file_id'],'previous_name'=>$change['previous_name'],'new_name'=>$change['new_name'],'context'=>'publication']
                         );
                     }
                 }
-                $model->setStatus($id,$status,$actor);
+                $change=$model->setStatus($id,$status,$actor);
+                $publishing=$status==='published';
+                (new AdminActivityService($database))->record($actor,$publishing?'support_material_published':'support_material_withdrawn',$publishing?'Publicó material de apoyo':'Retiró material de apoyo','Repositorio','support_material',$id,$material['title']??'Material #'.$id,'correct',['previous_status'=>$change['previous_status'],'new_status'=>$status,'reason_code'=>$reasonCode,'reason'=>$reasonLabel,'reason_detail'=>$reasonDetail,'republication'=>$publishing&&$change['was_previously_published']]);
                 return $material;
             });
+            if($action==='availability'){
+                $available=(bool)$material['availability_result'];
+                $this->json(true,$available?'El material volvió a estar disponible para consulta y descarga.':'El material permanece publicado, pero ya no admite consulta ni descarga.',['status_key'=>'published','status_label'=>'Publicado','is_available'=>$available,'availability_label'=>$available?'Disponible':'No disponible']);
+            }
             $publishing=$status==='published';
-            (new AdminActivityService())->record($actor,$publishing?'support_material_published':'support_material_withdrawn',$publishing?'Publicó material de apoyo':'Retiró material de apoyo','Repositorio','support_material',$id,$material['title']??'Material #'.$id);
-            $this->json(true,$publishing?'Material publicado correctamente.':'Material retirado del repositorio.');
+            $updated=$model->findById($id,true);
+            $this->json(true,$publishing?'Material publicado correctamente.':'Material retirado del repositorio.',['status_key'=>$updated['status_key'],'status_label'=>$publishing?'Publicado':'Retirado','is_available'=>(bool)$updated['is_available'],'availability_label'=>$updated['is_available']?'Disponible':'No disponible','published_at'=>$updated['published_at']]);
         }
         catch(InvalidArgumentException $error){$this->json(false,$error->getMessage(),[],422);}
-        catch(Throwable $error){error_log('Support material status: '.$error->getMessage());$this->json(false,'No fue posible actualizar el material.',[],500);}
+        catch(Throwable $error){error_log('Support material status: '.$error->getMessage());$this->json(false,'No se pudo completar la acción. No se realizaron cambios.',[],500);}
     }
 
     public function changeSupportMaterialFile():void
@@ -302,7 +372,7 @@ final class AdminController
                         $fileId===null?'support_material.presentation_removed':(empty($change['previous_file_id'])?'support_material.presentation_selected':'support_material.presentation_changed'),
                         $fileId===null?'Quitó el archivo de presentación':(empty($change['previous_file_id'])?'Seleccionó el archivo de presentación':'Cambió el archivo de presentación'),
                         'Repositorio','support_material',$materialId,$elementLabel,'correct',
-                        ['previous_file_id'=>$change['previous_file_id'],'new_file_id'=>$change['file_id']]
+                        ['previous_file_id'=>$change['previous_file_id'],'new_file_id'=>$change['file_id'],'previous_name'=>$change['previous_name'],'new_name'=>$change['new_name']]
                     );
                     return $change;
                 });
@@ -394,14 +464,14 @@ final class AdminController
                             $actor,'support_material.presentation_removed','Quitó el archivo de presentación',
                             'Repositorio','support_material',$materialId,
                             (string)($presentationFile['name']??'Archivo #'.$presentationId),'correct',
-                            ['previous_file_id'=>$presentationChange['previous_file_id'],'new_file_id'=>null,'reason'=>'presentation_file_retired']
+                            ['previous_file_id'=>$presentationChange['previous_file_id'],'new_file_id'=>null,'previous_name'=>$presentationChange['previous_name'],'new_name'=>null,'reason'=>'presentation_file_retired']
                         );
                     }
                     foreach($files as $file)$activity->record(
                             $actor,'support_material.file_removed','Retiró un archivo del material',
                             'Repositorio','support_material',$materialId,$file['name'],'correct',[
                                 'file_id'=>$file['id'],'name'=>$file['name'],'extension'=>$file['extension'],
-                                'size_bytes'=>$file['size_bytes'],
+                                'size_bytes'=>$file['size_bytes'],'presentation'=>(int)$file['id']===$presentationId,
                             ]
                         );
                     return ['files'=>$files,'presentation_removed'=>$presentationChange!==null];
