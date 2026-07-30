@@ -130,6 +130,25 @@ final class RepositoryModel
                 'keywords' => ['Demostración', 'Paginación', 'Software'],
             ];
         }
+        if (Database::isEnabled()) {
+            try {
+                $unavailableIds = array_map(
+                    'intval',
+                    Database::connection()->query(
+                        "SELECT id FROM projects
+                         WHERE status='published' AND is_available=0 AND deleted_at IS NULL"
+                    )->fetchAll(PDO::FETCH_COLUMN)
+                );
+                if ($unavailableIds !== []) {
+                    $projects = array_values(array_filter(
+                        $projects,
+                        static fn (array $project): bool => !in_array((int) $project['id'], $unavailableIds, true)
+                    ));
+                }
+            } catch (Throwable $exception) {
+                error_log('Repository project availability: ' . $exception->getMessage());
+            }
+        }
         return $projects;
     }
 

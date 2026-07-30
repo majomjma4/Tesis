@@ -144,6 +144,7 @@ $formatDate = static function (?string $date): string {
                     ]); ?>
                     <article class="ar-project-card"
                         data-repository-item="projects"
+                        data-project-available="<?= !empty($project['is_available']) ? '1' : '0' ?>"
                         data-type-code="<?= e($project['type_code']) ?>"
                         data-search="<?= e(mb_strtolower($projectSearch, 'UTF-8')) ?>"
                         data-type="<?= e(mb_strtolower($project['type_name'], 'UTF-8')) ?>"
@@ -168,8 +169,11 @@ $formatDate = static function (?string $date): string {
                             <a class="ar-primary-action" href="<?= e(route('project-detail') . '&id=' . (int) $project['id'] . '&tab=information') ?>">
                                 <i class="fa-solid fa-diagram-project"></i> Abrir expediente
                             </a>
+                            <button class="ar-icon-action ar-availability-action" data-project-availability data-id="<?= (int) $project['id'] ?>" data-available="<?= !empty($project['is_available']) ? '1' : '0' ?>" data-tooltip="<?= !empty($project['is_available']) ? 'Marcar como no disponible' : 'Marcar como disponible' ?>" type="button" aria-label="<?= !empty($project['is_available']) ? 'Marcar proyecto como no disponible' : 'Marcar proyecto como disponible' ?>">
+                                <i class="fa-solid <?= !empty($project['is_available']) ? 'fa-ban' : 'fa-circle-check' ?>"></i>
+                            </button>
                             <button class="ar-icon-action ar-danger-action" data-publish="unpublish" data-id="<?= (int) $project['id'] ?>" data-tooltip="Retirar del repositorio" type="button" aria-label="Retirar del repositorio">
-                                <i class="fa-solid fa-eye-slash"></i>
+                                <i class="fa-solid fa-box-archive"></i>
                             </button>
                         </footer>
                     </article>
@@ -252,7 +256,8 @@ $formatDate = static function (?string $date): string {
                             <?php if ($materialState === 'withdrawn'): ?>
                                 <button class="ar-primary-action ar-restore-catalog-action" type="button" data-restore-material data-id="<?= (int) $material['id'] ?>"><i class="fa-solid fa-rotate-left"></i> Restaurar material</button>
                             <?php else: ?>
-                                <button class="ar-icon-action ar-danger-action" type="button" data-withdraw-material aria-label="Retirar material" data-tooltip="Retirar del repositorio"><i class="fa-solid fa-eye-slash"></i></button>
+                                <button class="ar-icon-action ar-availability-action" type="button" data-material-availability data-available="<?= !empty($material['is_available']) ? '1' : '0' ?>" aria-label="<?= !empty($material['is_available']) ? 'Marcar material como no disponible' : 'Marcar material como disponible' ?>" data-tooltip="<?= !empty($material['is_available']) ? 'Marcar como no disponible' : 'Marcar como disponible' ?>"><i class="fa-solid <?= !empty($material['is_available']) ? 'fa-ban' : 'fa-circle-check' ?>"></i></button>
+                                <button class="ar-icon-action ar-danger-action" type="button" data-withdraw-material aria-label="Retirar material" data-tooltip="Retirar del repositorio"><i class="fa-solid fa-box-archive"></i></button>
                             <?php endif; ?>
                         </footer>
                         <script type="application/json" data-material-json><?= json_encode([
@@ -260,7 +265,7 @@ $formatDate = static function (?string $date): string {
                             'material_type'=>$material['material_type'],'description'=>$material['description'],
                             'full_description'=>$material['full_description'],'publisher'=>$material['publisher'],
                             'publication_date'=>$material['publication_date_iso'],'keywords'=>implode(', ',$material['keywords']),
-                            'status_key'=>$material['status_key'],'presentation_file_id'=>(int)($material['presentation_file']['id']??0),
+                            'status_key'=>$material['status_key'],'is_available'=>!empty($material['is_available']),'presentation_file_id'=>(int)($material['presentation_file']['id']??0),
                             'files'=>array_map(static fn(array $file):array=>[
                                 'id'=>$file['id'],'name'=>$file['name'],'format'=>$file['format'],
                                 'size'=>$file['size'],'presentation'=>$file['presentation'],

@@ -74,7 +74,8 @@
             'webp' => 'image', 'docx' => 'docx', 'txt' => 'text',
         ];
         $isZip = $extension === 'zip';
-        $available = $materialAvailable && !empty($file['available']);
+        $physicalAvailable = !empty($file['available']);
+        $available = $materialAvailable && $physicalAvailable;
         return [
             'id' => $fileId,
             'name' => $name,
@@ -83,6 +84,8 @@
             'sort_order' => (int) ($file['sort_order'] ?? $fileId),
             'extension' => $extension,
             'available' => $available,
+            'physical_available' => $physicalAvailable,
+            'material_available' => $materialAvailable,
             'is_presentation' => !empty($file['presentation']),
             'is_package' => false,
             'preview_supported' => $available && (isset($previewTypes[$extension]) || $isZip),
@@ -110,6 +113,17 @@
         ? $downloadActionUrl . '&material_id=' . $materialId . '&file_id=' . (int) $presentationFile['id']
         : null;
     $administratorView = !empty($isAdministrator);
+    $classificationLabels = array_values(array_filter(
+        array_map('strval', (array) ($material['keywords'] ?? [])),
+        static fn (string $label): bool => trim($label) !== ''
+    ));
+    $relatedResources = array_values(array_filter(
+        (array) ($material['related_resources'] ?? []),
+        static fn (mixed $resource): bool => is_array($resource)
+            ? trim((string) ($resource['title'] ?? $resource['label'] ?? $resource['name'] ?? '')) !== ''
+            : trim((string) $resource) !== ''
+    ));
+    $registeredFileCount = count($materialFiles);
 
     $digitalRecord = [
         'entity' => ['type' => 'support_material', 'id' => $materialId],
@@ -129,20 +143,18 @@
             'status_tone' => $isPublished ? 'success' : 'neutral',
         ],
         'metadata' => array_values(array_filter([
-            ['label' => 'Responsable', 'value' => (string) ($material['publisher'] ?? '')],
-            ['label' => 'Publicación', 'value' => (string) ($material['publication_date'] ?? '')],
-            ['label' => 'Última actualización', 'value' => $updatedAtLabel],
-            ['label' => 'Categoría', 'value' => (string) ($material['category_label'] ?? '')],
-            ['label' => 'Periodo', 'value' => (string) ($material['pao_label'] ?? '')],
+            ['key' => 'publication', 'label' => 'Publicación', 'value' => (string) ($material['publication_date'] ?? '')],
+            ['key' => 'updated', 'label' => 'Última actualización', 'value' => $updatedAtLabel],
+            ['key' => 'period', 'label' => 'Periodo académico', 'value' => (string) ($material['pao_label'] ?? '')],
             ['key' => 'availability', 'label' => 'Disponibilidad', 'value' => $isPublished ? ($materialAvailable ? 'Disponible' : 'No disponible') : 'No aplica', 'tone' => 'secondary'],
         ], static fn (array $item): bool => $item['value'] !== '')),
         'actions' => $mode === 'edit' ? [] : array_values(array_filter([
-            $administratorView ? ['id' => 'edit', 'label' => 'Editar', 'kind' => 'primary', 'icon' => 'fa-pen-to-square', 'url' => $materialEditUrl ?: null, 'enabled' => $materialEditUrl !== ''] : null,
-            ['id' => 'download', 'label' => 'Descargar', 'kind' => 'secondary', 'icon' => 'fa-download', 'url' => $downloadUrl, 'enabled' => $downloadUrl !== null],
+            $administratorView ? ['id' => 'edit', 'label' => 'Editar', 'kind' => 'primary', 'icon' => 'fa-pen-to-square', 'url' => $materialEditUrl ?: null, 'enabled' => $materialEditUrl !== '', 'modal' => true] : null,
+            ['id' => 'download', 'label' => 'Descargar', 'kind' => 'secondary', 'icon' => 'fa-download', 'icon_style' => 'fa-solid', 'url' => $downloadUrl, 'enabled' => $downloadUrl !== null, 'download' => true],
         ])),
         'menu_actions' => $administratorView && $mode === 'view' ? [
-            ['label' => $materialAvailable ? 'Marcar como no disponible' : 'Marcar como disponible', 'icon' => 'fa-toggle-on', 'enabled' => true, 'hidden' => !$isPublished, 'danger' => false, 'action' => 'availability'],
-            ['label' => $isPublished ? 'Retirar publicación' : 'Publicar material', 'icon' => $isPublished ? 'fa-eye-slash' : 'fa-eye', 'enabled' => true, 'danger' => false, 'action' => 'publication'],
+            ['label' => $materialAvailable ? 'Marcar como no disponible' : 'Marcar como disponible', 'icon' => $materialAvailable ? 'fa-ban' : 'fa-circle-check', 'enabled' => true, 'hidden' => !$isPublished, 'danger' => false, 'action' => 'availability'],
+            ['label' => $isPublished ? 'Retirar publicación' : 'Publicar material', 'icon' => $isPublished ? 'fa-box-archive' : 'fa-box-open', 'enabled' => true, 'danger' => false, 'action' => 'publication'],
             ['label' => 'Ver historial administrativo', 'icon' => 'fa-clock-rotate-left', 'enabled' => true, 'danger' => false, 'action' => 'admin-history', 'separator' => true, 'unread' => !empty($hasUnreadAdministrativeActivity)],
             ['label' => 'Enviar a Papelera', 'icon' => 'fa-trash-can', 'enabled' => true, 'danger' => true, 'action' => 'trash'],
         ] : [],
@@ -162,14 +174,20 @@
         ],
         'information_sections' => [
             ['id' => 'description', 'title' => 'Descripción', 'icon' => 'fa-align-left', 'type' => 'prose', 'content' => (string) ($material['full_description'] ?? $material['description'] ?? '')],
-            ['id' => 'institutional', 'title' => 'Información institucional', 'icon' => 'fa-building-columns', 'type' => 'metadata', 'content' => array_values(array_filter([
-                ['label' => 'Categoría', 'value' => (string) ($material['category_label'] ?? '')],
-                ['label' => 'Tipo', 'value' => (string) ($material['type'] ?? '')],
-                ['label' => 'Responsable', 'value' => (string) ($material['publisher'] ?? '')],
-                ['label' => 'Periodo', 'value' => (string) ($material['pao_label'] ?? '')],
+            ['id' => 'institutional', 'title' => 'Ficha del material', 'icon' => 'fa-building-columns', 'type' => 'metadata', 'content' => array_values(array_filter([
+                ['key' => 'document-type', 'label' => 'Tipo documental', 'value' => (string) ($material['type'] ?? '')],
+                ['key' => 'category', 'label' => 'Categoría', 'value' => (string) ($material['category_label'] ?? '')],
+                ['key' => 'responsible', 'label' => 'Responsable', 'value' => (string) ($material['publisher'] ?? '')],
+                ['key' => 'files', 'label' => 'Archivos registrados', 'value' => $registeredFileCount . ($registeredFileCount === 1 ? ' archivo' : ' archivos')],
             ], static fn (array $item): bool => $item['value'] !== ''))],
-            ['id' => 'keywords', 'title' => 'Palabras clave', 'icon' => 'fa-tags', 'type' => 'tags', 'content' => array_values(array_filter(array_map('strval', (array) ($material['keywords'] ?? []))))],
-            ['id' => 'related', 'title' => 'Recursos relacionados', 'icon' => 'fa-link', 'type' => 'empty', 'content' => 'No existen recursos relacionados para este expediente.'],
+            ['id' => 'keywords', 'title' => 'Clasificación', 'icon' => 'fa-tags', 'type' => 'tags', 'content' => $classificationLabels],
+            ...($relatedResources !== [] ? [[
+                'id' => 'related',
+                'title' => 'Recursos relacionados',
+                'icon' => 'fa-link',
+                'type' => 'related',
+                'content' => $relatedResources,
+            ]] : []),
         ],
         'documents' => $documents,
         'archives' => $archives,
@@ -184,6 +202,8 @@
             'available' => $packageAvailable,
             'download_url' => $packageDownloadUrl,
             'file_count' => (int) ($packageDescriptor['file_count'] ?? count($documents)),
+            'size' => (string) ($packageDescriptor['size'] ?? ''),
+            'size_bytes' => (int) ($packageDescriptor['size_bytes'] ?? 0),
             'source' => (string) ($packageDescriptor['source'] ?? 'generated'),
             'browsable' => false,
         ],

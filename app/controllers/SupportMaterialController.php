@@ -45,7 +45,23 @@ final class SupportMaterialController
             $material['downloads'] = (new SupportMaterialDownloadModel())->getTotal($material['id'], $material['downloads']);
             $material['information_updated_at'] = $materialModel->lastInformationUpdateAt((int) $material['id']);
             $material['editable_keywords'] = $materialModel->normalizeExistingKeywords((array) ($material['keywords'] ?? []));
-            $material['package_descriptor'] = (new SupportMaterialPackageService())->describe($material);
+            $packageService = new SupportMaterialPackageService();
+            $material['package_descriptor'] = $packageService->describe($material);
+            if (!empty($material['package_descriptor']['available'])) {
+                try {
+                    $preparedPackage = $packageService->prepare($material);
+                    $material['package_descriptor']['size_bytes'] = (int) ($preparedPackage['size_bytes']
+                        ?? filesize((string) $preparedPackage['path'])
+                        ?: 0);
+                    $material['package_descriptor']['size'] = ArchiveService::formatBytes(
+                        (int) $material['package_descriptor']['size_bytes']
+                    );
+                    $material['package_descriptor']['source'] = (string) $preparedPackage['source'];
+                } catch (Throwable $exception) {
+                    error_log('Support material package prewarm: ' . $exception->getMessage());
+                    $material['package_descriptor']['available'] = false;
+                }
+            }
             $documentEvolution = $materialModel->documentEvolution((int) $material['id']);
             if ($isAdministrator) {
                 $materialCategories = $materialModel->categories();

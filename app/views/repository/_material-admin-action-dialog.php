@@ -13,6 +13,9 @@
 .sma-combobox{width:100%;min-height:42px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-soft);color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;font:inherit}.sma-combobox:focus-visible{border-color:var(--primary);outline:3px solid color-mix(in srgb,var(--primary) 20%,transparent)}.sma-combobox-list{position:fixed;z-index:15050;max-height:min(280px,45vh);padding:5px;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 18px 44px rgba(15,23,42,.28);overflow-y:auto;overscroll-behavior:contain}.sma-combobox-list[hidden]{display:none!important}.sma-combobox-option{width:100%;min-height:42px;padding:8px 10px;border:0;border-radius:7px;background:transparent;color:var(--text);display:flex;align-items:center;font:inherit;font-size:13px;text-align:left}.sma-combobox-option:hover,.sma-combobox-option.is-active{background:var(--surface-soft);color:var(--primary)}.sma-combobox-option[aria-selected=true]{font-weight:850}
 @media(max-width:620px){.sma-overlay{place-items:start center}.sma-dialog{width:100%;margin:auto 0}}
 .sma-combobox-list{box-sizing:border-box;max-height:none;overflow-y:hidden;scrollbar-gutter:auto}
+/* Los controles del diálogo comparten la escala funcional de los formularios administrativos. */
+.sma-field label{font-size:13px}.sma-field select,.sma-field textarea,.sma-combobox{font-size:13px;line-height:1.45}.sma-summary dt{font-size:12px}.sma-summary dd{font-size:14px;line-height:1.45}.sma-error{font-size:13px;line-height:1.45}
+.sma-dialog button:focus-visible,.sma-dialog textarea:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 28%,transparent);outline-offset:2px}
 </style>
 <div class="sma-overlay" data-sma-overlay hidden>
     <section class="sma-dialog" role="dialog" aria-modal="true" aria-labelledby="smaTitle" aria-describedby="smaDescription">

@@ -35,6 +35,33 @@
     let returnFocus = null;
     let reasonMenuActive = false;
     let outsideClosedDropdown = false;
+    let backgroundState = [];
+    let previousBodyOverflow = "";
+    let previousHtmlOverflow = "";
+
+    const lockBackground = () => {
+        previousBodyOverflow = document.body.style.overflow;
+        previousHtmlOverflow = document.documentElement.style.overflow;
+        backgroundState = [...document.body.children]
+            .filter(element => ![overlay, reasonList].includes(element) && !["SCRIPT", "STYLE"].includes(element.tagName))
+            .map(element => ({ element, inert: element.inert, ariaHidden: element.getAttribute("aria-hidden") }));
+        backgroundState.forEach(({ element }) => {
+            element.inert = true;
+            element.setAttribute("aria-hidden", "true");
+        });
+        document.body.style.overflow = "hidden";
+        document.documentElement.style.overflow = "hidden";
+    };
+    const unlockBackground = () => {
+        backgroundState.forEach(({ element, inert, ariaHidden }) => {
+            element.inert = inert;
+            if (ariaHidden === null) element.removeAttribute("aria-hidden");
+            else element.setAttribute("aria-hidden", ariaHidden);
+        });
+        backgroundState = [];
+        document.body.style.overflow = previousBodyOverflow;
+        document.documentElement.style.overflow = previousHtmlOverflow;
+    };
 
     const definitions = {
         availability_off: {
@@ -159,7 +186,7 @@
             materialRow.hidden = config.type !== "trash";
             materialLabel.textContent = config.material.title || "";
             submitLabel.textContent = currentDefinition().submit;
-            submit.focus();
+            back.focus();
         } else reason.focus();
     };
     const close = () => {
@@ -168,6 +195,7 @@
         overlay.hidden = true;
         document.documentElement.classList.remove("sma-open");
         document.body.classList.remove("sma-open");
+        unlockBackground();
         returnFocus?.focus?.();
     };
     const open = options => {
@@ -182,6 +210,7 @@
             option.id = `smaReasonOption-${index}`;
             option.setAttribute("role", "option");
             option.setAttribute("aria-selected", "false");
+            option.tabIndex = -1;
             option.dataset.value = value;
             option.textContent = label;
             option.addEventListener("click", () => chooseReason(option));
@@ -192,6 +221,7 @@
         description.textContent = "Selecciona el motivo y revisa la advertencia antes de confirmar.";
         next.disabled = true; submit.disabled = false; cancel.disabled = false; closeButton.disabled = false;
         setStep("select");
+        lockBackground();
         overlay.hidden = false;
         document.documentElement.classList.add("sma-open");
         document.body.classList.add("sma-open");
@@ -249,14 +279,29 @@
         if (!reasonList.hidden && event.target !== reasonList && !reasonList.contains(event.target)) closeReasonList();
     }, true);
     document.addEventListener("keydown", event => {
-        if (overlay.hidden || event.key !== "Escape") return;
-        if (document.activeElement === reason && reasonMenuActive) {
+        if (overlay.hidden) return;
+        if (event.key === "Escape") {
+            if (document.activeElement === reason && reasonMenuActive) {
+                event.preventDefault();
+                reasonMenuActive = false;
+                return;
+            }
             event.preventDefault();
-            reasonMenuActive = false;
+            close();
             return;
         }
+        if (event.key !== "Tab") return;
+        if (reasonMenuActive) closeReasonList(false);
+        const controls = [...overlay.querySelectorAll(
+            'button:not(:disabled):not([hidden]),input:not(:disabled):not([hidden]),textarea:not(:disabled):not([hidden]),[tabindex]:not([tabindex="-1"])'
+        )].filter(control => control.getClientRects().length > 0);
+        if (!controls.length) return;
+        const index = controls.indexOf(document.activeElement);
+        const nextIndex = event.shiftKey
+            ? (index <= 0 ? controls.length - 1 : index - 1)
+            : (index === controls.length - 1 ? 0 : index + 1);
         event.preventDefault();
-        close();
+        controls[nextIndex]?.focus();
     });
     submit.addEventListener("click", async () => {
         if (processing) return;

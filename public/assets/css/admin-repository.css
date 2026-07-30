@@ -49,6 +49,7 @@
 .ar-primary-action{min-height:34px;padding:0 11px;border-radius:9px;background:var(--blue);color:#fff;text-decoration:none;font-size:.75rem;font-weight:800;display:inline-flex;align-items:center;gap:7px}
 .ar-icon-action{width:34px;height:34px;margin-left:auto;padding:0;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);text-decoration:none;display:grid;place-items:center;cursor:pointer}
 .ar-icon-action+.ar-icon-action{margin-left:0}.ar-icon-action:hover{border-color:var(--blue);color:var(--blue)}.ar-danger-action:hover{border-color:#dc2626;color:#dc2626}
+.ar-availability-action:hover{border-color:#d97706;color:#b45309;background:#fffbeb}.ar-availability-action:focus-visible{outline:3px solid rgba(217,119,6,.2);outline-offset:2px}
 .ar-material-icon{width:38px;height:38px;border-radius:11px;background:rgba(var(--card-accent),.1);color:rgb(var(--card-accent));display:grid;place-items:center}
 .ar-material-card header>div{display:grid;gap:2px}.ar-material-card header>div span{color:var(--muted);font-size:.68rem}.ar-material-card header>div strong{font-size:.78rem}
 .ar-available{margin-left:auto;padding:5px 8px;border-radius:999px;background:rgba(16,185,129,.11);color:#07845f;font-size:.65rem;font-weight:850}

@@ -456,6 +456,56 @@
         });
     });
 
+    document.querySelectorAll("[data-material-availability]").forEach((button) => {
+        button.addEventListener("click", () => {
+            const material = readMaterial(button);
+            if (!material) return;
+            const available = button.dataset.available === "1";
+            window.SupportMaterialAdminActions.open({
+                trigger: button,
+                type: available ? "availability_off" : "availability_on",
+                action: "availability",
+                endpoint: config.dataset.materialStatus,
+                csrf: config.dataset.csrf,
+                material: { ...material, is_available: available },
+                onSuccess: result => {
+                    sessionStorage.setItem("repositoryToast", result.message);
+                    window.location.reload();
+                },
+            });
+        });
+    });
+
+    document.querySelectorAll("[data-project-availability]").forEach((button) => {
+        button.addEventListener("click", async () => {
+            const available = button.dataset.available === "1";
+            const message = available
+                ? "El proyecto permanecerá publicado, pero no estará disponible temporalmente para consulta."
+                : "El proyecto volverá a estar disponible para consulta.";
+            if (!await requestConfirmation(message, {
+                title: available ? "Marcar como no disponible" : "Marcar como disponible",
+                acceptLabel: available ? "Marcar como no disponible" : "Marcar como disponible",
+                danger: false,
+            })) return;
+            button.disabled = true;
+            const data = new FormData();
+            data.set("_csrf", config.dataset.csrf);
+            data.set("id", button.dataset.id);
+            data.set("action", "availability");
+            data.set("is_available", available ? "0" : "1");
+            try {
+                const response = await fetch(config.dataset.endpoint, { method: "POST", body: data });
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.message);
+                sessionStorage.setItem("repositoryToast", result.message);
+                window.location.reload();
+            } catch (error) {
+                showToast(error.message || "No fue posible actualizar la disponibilidad.", "error");
+                button.disabled = false;
+            }
+        });
+    });
+
     document.querySelectorAll("[data-restore-material]").forEach((button) => {
         button.addEventListener("click", async () => {
             const confirmed = await requestConfirmation(

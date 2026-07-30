@@ -62,6 +62,11 @@ final class SupportMaterialFileService
         if (!move_uploaded_file($temporaryPath, $destination)) {
             throw new RuntimeException('No fue posible guardar el archivo recibido.');
         }
+        $sha256 = hash_file('sha256', $destination);
+        if (!is_string($sha256) || !preg_match('/^[a-f0-9]{64}$/', $sha256)) {
+            @unlink($destination);
+            throw new RuntimeException('No fue posible calcular la integridad del archivo recibido.');
+        }
 
         return [
             'original_name' => $originalName,
@@ -70,6 +75,7 @@ final class SupportMaterialFileService
             'extension' => $extension,
             'mime_type' => $mime,
             'size_bytes' => $size,
+            'sha256' => $sha256,
             'absolute_path' => $destination,
         ];
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 final class SupportMaterialModel
 {
     public const RESTORE_HOURS = 24;
+    private const MAX_CLASSIFICATION_TAGS = 4;
     public const KEYWORD_CATALOG = [
         'Tesis','Perfil de tesis','Titulación','Investigación','Metodología','Normativa',
         'Reglamento','Formato','Plantilla','Guía documental','Vinculación','Proyecto PIS',
@@ -159,11 +160,15 @@ final class SupportMaterialModel
                 static fn (string $keyword): string => trim((string) preg_replace('/\s+/u', ' ', $keyword)),
                 preg_split('/[,;\n]+/u', (string) ($input['keywords'] ?? '')) ?: []
             );
-            return array_values(array_unique(array_filter($keywords, static fn (string $keyword): bool => $keyword !== '')));
+            $resolved = array_values(array_unique(array_filter($keywords, static fn (string $keyword): bool => $keyword !== '')));
+            if (count($resolved) > self::MAX_CLASSIFICATION_TAGS) {
+                throw new InvalidArgumentException('Máximo 4 etiquetas de clasificación.');
+            }
+            return $resolved;
         }
         $submitted = $input['keywords_selected'] ?? [];
         if (!is_array($submitted)) {
-            throw new InvalidArgumentException('La selección de palabras clave no es válida.');
+            throw new InvalidArgumentException('La selección de clasificación no es válida.');
         }
         $existingNormalized = $this->normalizeExistingKeywords($existing);
         $catalog = $this->keywordCatalogMap();
@@ -179,15 +184,15 @@ final class SupportMaterialModel
             if ($key === 'perfil') $key = $this->keywordKey('Perfil de tesis');
             $display = $catalog[$key] ?? $legacy[$key] ?? null;
             if ($display === null) {
-                throw new InvalidArgumentException('La selección contiene una palabra clave no permitida.');
+                throw new InvalidArgumentException('La selección contiene una etiqueta de clasificación no permitida.');
             }
             $dedupeKey = $this->keywordKey($display);
             if (isset($seen[$dedupeKey])) continue;
             $seen[$dedupeKey] = true;
             $resolved[] = $display;
         }
-        if (count($resolved) > 8) {
-            throw new InvalidArgumentException('Puedes seleccionar un máximo de 8 palabras clave.');
+        if (count($resolved) > self::MAX_CLASSIFICATION_TAGS) {
+            throw new InvalidArgumentException('Máximo 4 etiquetas de clasificación.');
         }
         return $resolved;
     }
@@ -327,13 +332,16 @@ final class SupportMaterialModel
         if ($material === null) {
             throw new InvalidArgumentException('El material ya no está disponible.');
         }
-        if ((string) $material['status'] === $status) {
+        $targetAvailability = $status === 'published';
+        if ((string) $material['status'] === $status
+            && (bool) $material['is_available'] === $targetAvailability) {
             throw new InvalidArgumentException($status === 'published'
                 ? 'El material ya está publicado.'
                 : 'El material ya está retirado.');
         }
         Database::connection()->prepare(
             "UPDATE support_materials SET status=:status,
+             is_available=:is_available,
              publication_date=IF(:status_for_publication_date='published',COALESCE(publication_date,UTC_DATE()),publication_date),
              published_at=IF(:status_for_publication='published',COALESCE(published_at,UTC_TIMESTAMP()),published_at),
              withdrawn_at=IF(:status_for_date='withdrawn',CURRENT_TIMESTAMP,NULL),
@@ -342,6 +350,7 @@ final class SupportMaterialModel
              WHERE id=:id"
         )->execute([
             'status' => $status,
+            'is_available' => $targetAvailability ? 1 : 0,
             'status_for_publication_date' => $status,
             'status_for_publication' => $status,
             'status_for_date' => $status,
@@ -352,6 +361,9 @@ final class SupportMaterialModel
         ]);
         return [
             'previous_status' => (string) $material['status'],
+            'new_status' => $status,
+            'previous_available' => (bool) $material['is_available'],
+            'is_available' => $targetAvailability,
             'was_previously_published' => !empty($material['published_at']),
         ];
     }
@@ -384,10 +396,10 @@ final class SupportMaterialModel
         $statement = $database->prepare(
             'INSERT INTO support_material_files
              (material_id,original_name,storage_name,relative_path,extension,mime_type,
-              size_bytes,is_package,sort_order,created_by)
+              size_bytes,sha256,is_package,sort_order,created_by)
              VALUES
              (:material_id,:original_name,:storage_name,:relative_path,:extension,:mime_type,
-              :size_bytes,0,
+              :size_bytes,:sha256,0,
               (SELECT COALESCE(MAX(existing.sort_order),0)+1 FROM support_material_files existing
                WHERE existing.material_id=:sort_material_id),:created_by)'
         );
@@ -399,6 +411,7 @@ final class SupportMaterialModel
             'extension' => $file['extension'],
             'mime_type' => $file['mime_type'],
             'size_bytes' => $file['size_bytes'],
+            'sha256' => $this->normalizedSha256($file['sha256'] ?? null),
             'sort_material_id' => $materialId,
             'created_by' => $actor,
         ]);
@@ -462,20 +475,42 @@ final class SupportMaterialModel
         if ($duplicate->fetchColumn() !== false) {
             throw new InvalidArgumentException('Ya existe un archivo activo con el mismo nombre y tamaño.');
         }
+        $currentSha256 = $this->normalizedSha256($current['sha256'] ?? null)
+            ?? $this->storedFileSha256((string) $current['relative_path']);
+        if ($currentSha256 === null) {
+            throw new RuntimeException('No fue posible verificar la integridad del archivo anterior.');
+        }
+        $replacementSha256 = $this->normalizedSha256($replacement['sha256'] ?? null)
+            ?? $this->storedFileSha256((string) ($replacement['relative_path'] ?? ''));
+        if ($replacementSha256 === null) {
+            throw new RuntimeException('No fue posible verificar la integridad del archivo nuevo.');
+        }
+        $nextVersionStatement = $database->prepare(
+            'SELECT COALESCE(MAX(version_number),0)+1
+             FROM support_material_file_versions
+             WHERE file_id=:file_id AND material_id=:material_id'
+        );
+        $nextVersionStatement->execute(['file_id' => $fileId, 'material_id' => $materialId]);
+        $versionNumber = (int) $nextVersionStatement->fetchColumn();
+        if ($versionNumber < 1) {
+            throw new RuntimeException('No fue posible asignar el número de versión.');
+        }
         $database->prepare(
             'INSERT INTO support_material_file_versions
-             (file_id,material_id,original_name,storage_name,relative_path,extension,mime_type,size_bytes,replaced_by)
+             (file_id,material_id,version_number,original_name,storage_name,relative_path,extension,mime_type,size_bytes,sha256,replaced_by)
              VALUES
-             (:file_id,:material_id,:original_name,:storage_name,:relative_path,:extension,:mime_type,:size_bytes,:actor)'
+             (:file_id,:material_id,:version_number,:original_name,:storage_name,:relative_path,:extension,:mime_type,:size_bytes,:sha256,:actor)'
         )->execute([
             'file_id' => $fileId,
             'material_id' => $materialId,
+            'version_number' => $versionNumber,
             'original_name' => $current['original_name'],
             'storage_name' => $current['storage_name'],
             'relative_path' => $current['relative_path'],
             'extension' => $current['extension'],
             'mime_type' => $current['mime_type'],
             'size_bytes' => $current['size_bytes'],
+            'sha256' => $currentSha256,
             'actor' => $actor,
         ]);
         $versionId = (int) $database->lastInsertId();
@@ -483,7 +518,7 @@ final class SupportMaterialModel
             'UPDATE support_material_files
              SET original_name=:original_name,storage_name=:storage_name,
                  relative_path=:relative_path,extension=:extension,
-                 mime_type=:mime_type,size_bytes=:size_bytes
+                 mime_type=:mime_type,size_bytes=:size_bytes,sha256=:sha256
              WHERE id=:file_id AND material_id=:material_id AND deleted_at IS NULL'
         )->execute([
             'original_name' => $replacement['original_name'],
@@ -492,12 +527,14 @@ final class SupportMaterialModel
             'extension' => $replacement['extension'],
             'mime_type' => $replacement['mime_type'],
             'size_bytes' => $replacement['size_bytes'],
+            'sha256' => $replacementSha256,
             'file_id' => $fileId,
             'material_id' => $materialId,
         ]);
         return [
             'file_id' => $fileId,
             'version_id' => $versionId,
+            'version_number' => $versionNumber,
             'presentation' => (int) ($current['presentation_file_id'] ?? 0) === $fileId,
             'sort_order' => (int) $current['sort_order'],
             'old' => [
@@ -721,7 +758,7 @@ final class SupportMaterialModel
                     file.mime_type current_mime,file.size_bytes current_size,
                     file.created_at,file.created_by,file.deleted_at,file.purged_at,
                     creator.full_name created_by_name,
-                    version.id version_id,version.original_name version_name,
+                    version.id version_id,version.version_number,version.original_name version_name,
                     version.relative_path version_path,version.extension version_extension,
                     version.mime_type version_mime,version.size_bytes version_size,
                     version.replaced_at,version.replaced_by,replacer.full_name replaced_by_name
@@ -731,7 +768,7 @@ final class SupportMaterialModel
              LEFT JOIN users creator ON creator.id=file.created_by
              LEFT JOIN users replacer ON replacer.id=version.replaced_by
              WHERE file.material_id=:material_id
-             ORDER BY file.sort_order,file.id,version.replaced_at,version.id'
+             ORDER BY file.sort_order,file.id,version.version_number'
         );
         $statement->execute(['material_id' => $materialId]);
         $rows = $statement->fetchAll();
@@ -774,7 +811,7 @@ final class SupportMaterialModel
                 $versions[] = [
                     'id' => (int) $row['version_id'],
                     'file_id' => $fileId,
-                    'number' => $index + 1,
+                    'number' => (int) $row['version_number'],
                     'current' => false,
                     'name' => (string) $row['version_name'],
                     'extension' => $this->resolveFileExtension([
@@ -797,7 +834,10 @@ final class SupportMaterialModel
                 ];
             }
             $last = $history[count($history) - 1];
-            $currentNumber = count($history) + 1;
+            $currentNumber = max(array_map(
+                static fn (array $item): int => (int) $item['version_number'],
+                $history
+            )) + 1;
             $currentAvailable = $last['deleted_at'] === null && $last['purged_at'] === null
                 && $this->storedSupportFileAvailable((string) $last['current_path']);
             $versions[] = [
@@ -1176,6 +1216,23 @@ final class SupportMaterialModel
         return $base !== false && $path !== false
             && str_starts_with(strtolower($path), strtolower($base . DIRECTORY_SEPARATOR))
             && is_file($path) && is_readable($path);
+    }
+
+    private function normalizedSha256(mixed $value): ?string
+    {
+        if (!is_string($value)) return null;
+        $hash = strtolower(trim($value));
+        return preg_match('/^[a-f0-9]{64}$/', $hash) === 1 ? $hash : null;
+    }
+
+    private function storedFileSha256(string $relativePath): ?string
+    {
+        $path = (new SupportMaterialFileService())->resolveRelativePath($relativePath);
+        if ($path === null) return null;
+        $hash = hash_file('sha256', $path);
+        return is_string($hash) && preg_match('/^[a-f0-9]{64}$/', $hash) === 1
+            ? strtolower($hash)
+            : null;
     }
 
     private function evolutionDate(string $date): string

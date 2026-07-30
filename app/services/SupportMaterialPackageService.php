@@ -35,6 +35,7 @@ final class SupportMaterialPackageService
                 'temporary' => false,
                 'file_count' => $description['file_count'],
                 'source' => 'stored',
+                'size_bytes' => (int) filesize($storedPath),
             ];
         }
         $regularFiles = array_values(array_filter(
@@ -99,15 +100,50 @@ final class SupportMaterialPackageService
 
     private function generate(array $files, int $materialId): array
     {
-        $temporaryBase = tempnam(sys_get_temp_dir(), 'support_package_');
-        if ($temporaryBase === false) throw new RuntimeException('No fue posible preparar el paquete.');
-        $zipPath = $temporaryBase . '.zip';
+        $signatureParts = [];
+        foreach ($files as $file) {
+            $path = $this->resolveStoredPath((string) ($file['path'] ?? ''));
+            if ($path === null) throw new RuntimeException('No fue posible incorporar todos los archivos al paquete.');
+            $signatureParts[] = [
+                'id' => (int) ($file['id'] ?? 0),
+                'path' => str_replace('\\', '/', (string) ($file['path'] ?? '')),
+                'size' => (int) ($file['size_bytes'] ?? 0),
+                'modified' => (int) (filemtime($path) ?: 0),
+            ];
+        }
+        $cacheDirectory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'tesis-support-material-packages';
+        if (!is_dir($cacheDirectory) && !mkdir($cacheDirectory, 0775, true) && !is_dir($cacheDirectory)) {
+            throw new RuntimeException('No fue posible preparar la caché del paquete.');
+        }
+        $signature = hash('sha256', json_encode($signatureParts, JSON_UNESCAPED_SLASHES) ?: '');
+        $zipPath = $cacheDirectory . DIRECTORY_SEPARATOR . 'material-' . $materialId . '-' . $signature . '.zip';
+        if (is_file($zipPath) && is_readable($zipPath) && (int) filesize($zipPath) > 0) {
+            return ['path' => $zipPath, 'temporary' => false, 'file_count' => count($files), 'source' => 'cached', 'size_bytes' => (int) filesize($zipPath)];
+        }
+        $lockPath = $cacheDirectory . DIRECTORY_SEPARATOR . 'material-' . $materialId . '.lock';
+        $lock = fopen($lockPath, 'c');
+        if ($lock === false || !flock($lock, LOCK_EX)) {
+            if (is_resource($lock)) fclose($lock);
+            throw new RuntimeException('No fue posible bloquear la preparación del paquete.');
+        }
+        if (is_file($zipPath) && is_readable($zipPath) && (int) filesize($zipPath) > 0) {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+            return ['path' => $zipPath, 'temporary' => false, 'file_count' => count($files), 'source' => 'cached', 'size_bytes' => (int) filesize($zipPath)];
+        }
+        $temporaryBase = tempnam($cacheDirectory, 'building-');
+        if ($temporaryBase === false) {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+            throw new RuntimeException('No fue posible preparar el paquete.');
+        }
+        $buildingPath = $temporaryBase . '.zip';
         @unlink($temporaryBase);
         $usedNames = [];
         try {
             if (class_exists('ZipArchive')) {
                 $archive = new ZipArchive();
-                if ($archive->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+                if ($archive->open($buildingPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
                     throw new RuntimeException('No fue posible crear el paquete.');
                 }
                 try {
@@ -122,7 +158,7 @@ final class SupportMaterialPackageService
                     $archive->close();
                 }
             } else {
-                $archive = new PharData($zipPath);
+                $archive = new PharData($buildingPath);
                 foreach ($files as $file) {
                     $name = $this->uniqueSafeName((string) $file['name'], $usedNames);
                     $sourcePath = $this->resolveStoredPath((string) ($file['path'] ?? ''));
@@ -133,11 +169,21 @@ final class SupportMaterialPackageService
                 }
                 unset($archive);
             }
-            if (!is_file($zipPath) || filesize($zipPath) === false) throw new RuntimeException('No fue posible finalizar el paquete.');
-            return ['path' => $zipPath, 'temporary' => true, 'file_count' => count($files), 'source' => 'generated'];
+            if (!is_file($buildingPath) || filesize($buildingPath) === false) throw new RuntimeException('No fue posible finalizar el paquete.');
+            if (!@rename($buildingPath, $zipPath)) {
+                if (!is_file($zipPath)) throw new RuntimeException('No fue posible conservar el paquete preparado.');
+                @unlink($buildingPath);
+            }
+            foreach (glob($cacheDirectory . DIRECTORY_SEPARATOR . 'material-' . $materialId . '-*.zip') ?: [] as $cached) {
+                if ($cached !== $zipPath && is_file($cached)) @unlink($cached);
+            }
+            return ['path' => $zipPath, 'temporary' => false, 'file_count' => count($files), 'source' => 'cached', 'size_bytes' => (int) filesize($zipPath)];
         } catch (Throwable $exception) {
-            if (is_file($zipPath)) @unlink($zipPath);
+            if (is_file($buildingPath)) @unlink($buildingPath);
             throw $exception;
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
         }
     }
 

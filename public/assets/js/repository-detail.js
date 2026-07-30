@@ -504,6 +504,34 @@ digitalRecordMenuTrigger?.addEventListener("click", () => {
     digitalRecordMenuTrigger.setAttribute("aria-expanded", String(willOpen));
     if (willOpen) digitalRecordMenuPanel.querySelector("button:not([disabled])")?.focus();
 });
+digitalRecordMenuTrigger?.addEventListener("keydown", (event) => {
+    if (!["ArrowDown", "ArrowUp"].includes(event.key) || !digitalRecordMenuPanel) return;
+    event.preventDefault();
+    digitalRecordMenuPanel.hidden = false;
+    digitalRecordMenuTrigger.setAttribute("aria-expanded", "true");
+    const items = [...digitalRecordMenuPanel.querySelectorAll('[role="menuitem"]:not([disabled]):not([hidden])')];
+    (event.key === "ArrowUp" ? items.at(-1) : items[0])?.focus();
+});
+digitalRecordMenuPanel?.addEventListener("keydown", (event) => {
+    const items = [...digitalRecordMenuPanel.querySelectorAll('[role="menuitem"]:not([disabled]):not([hidden])')];
+    const index = items.indexOf(document.activeElement);
+    if (event.key === "Escape") {
+        event.preventDefault();
+        closeDigitalRecordMenu(true);
+        return;
+    }
+    if (event.key === "Tab") {
+        closeDigitalRecordMenu();
+        return;
+    }
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key) || !items.length) return;
+    event.preventDefault();
+    const next = event.key === "Home" ? 0
+        : event.key === "End" ? items.length - 1
+            : event.key === "ArrowUp" ? (index <= 0 ? items.length - 1 : index - 1)
+                : (index >= items.length - 1 ? 0 : index + 1);
+    items[next]?.focus();
+});
 
 document.addEventListener("click", (event) => {
     if (digitalRecordMenu && !digitalRecordMenu.contains(event.target)) closeDigitalRecordMenu();
@@ -527,6 +555,7 @@ function activatePersistentRecordTab(tabId, updateHistory = true) {
     recordTabLinks.forEach((link) => {
         const active = link === targetLink;
         link.setAttribute("aria-selected", String(active));
+        link.tabIndex = active ? 0 : -1;
         if (active) link.setAttribute("aria-current", "page");
         else link.removeAttribute("aria-current");
     });
@@ -546,6 +575,11 @@ if (recordPersistentTabs) {
             activatePersistentRecordTab(link.dataset.tabId || "information");
         });
         link.addEventListener("keydown", (event) => {
+            if (event.key === " ") {
+                event.preventDefault();
+                activatePersistentRecordTab(link.dataset.tabId || "information");
+                return;
+            }
             if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
             event.preventDefault();
             let nextIndex = index;
@@ -892,7 +926,7 @@ function setNeutralViewerState(state, message = "", retryButton = null) {
     copy.textContent = description;
     wrapper.append(icon, heading, copy);
     if (["unsupported", "error", "missing"].includes(state)) {
-        const selected = neutralFileButtons.find((button) => button.getAttribute("aria-selected") === "true")
+        const selected = neutralFileButtons.find((button) => button.getAttribute("aria-pressed") === "true")
             || document.querySelector('[data-zip-entry-file][aria-selected="true"]');
         if (selected) {
             const name = document.createElement("strong");
@@ -1008,7 +1042,7 @@ async function loadNeutralZipTreePath(zipButton, path, container, depth) {
 function selectNeutralZipEntry(zipButton, entryButton) {
     neutralFileButtons.forEach((item) => {
         item.classList.remove("is-selected");
-        item.setAttribute("aria-selected", "false");
+        item.setAttribute("aria-pressed", "false");
     });
     document.querySelectorAll("[data-zip-entry-file].is-selected").forEach((item) => {
         item.classList.remove("is-selected");
@@ -1053,6 +1087,20 @@ function renderNeutralZipTreeItems(zipButton, container, entries, depth) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "ed-zip-tree-row";
+        const moveTreeFocus = (event) => {
+            if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+            const tree = button.closest('[role="tree"]');
+            const rows = [...(tree?.querySelectorAll(".ed-zip-tree-row") ?? [])]
+                .filter((item) => item.getClientRects().length > 0);
+            if (!rows.length) return;
+            event.preventDefault();
+            const index = rows.indexOf(button);
+            const next = event.key === "Home" ? 0
+                : event.key === "End" ? rows.length - 1
+                    : event.key === "ArrowUp" ? Math.max(0, index - 1)
+                        : Math.min(rows.length - 1, index + 1);
+            rows[next]?.focus();
+        };
         const chevron = document.createElement("i");
         const icon = document.createElement("i");
         const copy = document.createElement("span");
@@ -1082,6 +1130,7 @@ function renderNeutralZipTreeItems(zipButton, container, entries, depth) {
             button.addEventListener("keydown", (event) => {
                 if (event.key === "ArrowRight") { event.preventDefault(); toggle(true); }
                 if (event.key === "ArrowLeft") { event.preventDefault(); toggle(false); }
+                moveTreeFocus(event);
             });
             row.append(button, children);
             setNeutralZipFolderState(button, children, false);
@@ -1108,6 +1157,7 @@ function renderNeutralZipTreeItems(zipButton, container, entries, depth) {
         button.setAttribute("aria-label", `${button.dataset.fileName}, ${button.dataset.fileType}, ${button.dataset.fileSize}`);
         if (state.selectedPath === path) button.classList.add("is-selected");
         button.addEventListener("click", () => selectNeutralZipEntry(zipButton, button));
+        button.addEventListener("keydown", moveTreeFocus);
         row.append(button);
         container.append(row);
     });
@@ -1571,7 +1621,7 @@ function selectNeutralFile(button) {
     neutralFileButtons.forEach((item) => {
         const selected = item === button;
         item.classList.toggle("is-selected", selected);
-        item.setAttribute("aria-selected", String(selected));
+        item.setAttribute("aria-pressed", String(selected));
     });
     if (neutralViewerName) neutralViewerName.textContent = button.dataset.fileName ?? "Archivo";
     if (neutralViewer) neutralViewer.dataset.previewType = button.dataset.previewType ?? "unsupported";
@@ -1617,7 +1667,7 @@ function selectEvolutionVersion(button) {
     });
     neutralFileButtons.forEach((item) => {
         item.classList.remove("is-selected");
-        item.setAttribute("aria-selected", "false");
+        item.setAttribute("aria-pressed", "false");
     });
     if (neutralViewerName) neutralViewerName.textContent = button.dataset.fileName ?? "Versión del archivo";
     if (neutralViewer) neutralViewer.dataset.previewType = button.dataset.previewType ?? "unsupported";
@@ -1684,6 +1734,19 @@ function bindNeutralFileButton(button) {
         }
         selectNeutralFile(button);
     });
+    button.addEventListener("keydown", (event) => {
+        if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+        const list = button.closest("[data-file-group-list]");
+        const options = [...(list?.querySelectorAll('[data-record-file]:not(:disabled)') ?? [])];
+        if (!options.length) return;
+        event.preventDefault();
+        const index = options.indexOf(button);
+        const next = event.key === "Home" ? 0
+            : event.key === "End" ? options.length - 1
+                : event.key === "ArrowUp" ? Math.max(0, index - 1)
+                    : Math.min(options.length - 1, index + 1);
+        options[next]?.focus();
+    });
 }
 neutralFileButtons.forEach(bindNeutralFileButton);
 function initializeNeutralFiles() {
@@ -1726,7 +1789,7 @@ if (typeof ResizeObserver === "function" && neutralViewerDocx) {
 }
 
 neutralBackToFiles?.addEventListener("click", () => {
-    neutralFileButtons.find((button) => button.getAttribute("aria-selected") === "true")?.focus();
+    neutralFileButtons.find((button) => button.getAttribute("aria-pressed") === "true")?.focus();
 });
 protectNeutralDownload(neutralViewerDownload);
 protectNeutralDownload(neutralExpandedDownload);
@@ -1816,6 +1879,13 @@ const recordKeywordOptions = [...(recordKeywordSelector?.querySelectorAll('[name
 const recordKeywordChips = recordForm?.querySelector("[data-record-keyword-chips]");
 const recordKeywordSummary = recordKeywordSelector?.querySelector("[data-record-keyword-summary]");
 const recordKeywordLimit = recordKeywordSelector?.querySelector("[data-record-keyword-limit]");
+const recordEditModal = digitalRecord?.querySelector("[data-record-edit-modal]");
+const recordEditDialog = recordEditModal?.querySelector("[data-record-edit-dialog]");
+const recordEditScroll = recordEditModal?.querySelector("[data-record-edit-scroll]");
+const recordEditTrigger = digitalRecord?.querySelector("[data-record-edit-open]");
+const recordEditClose = recordEditModal?.querySelector("[data-record-edit-close]");
+const recordEditNavigation = [...(recordEditModal?.querySelectorAll("[data-record-modal-close]") ?? [])];
+if (recordEditModal && recordEditModal.parentElement !== document.body) document.body.append(recordEditModal);
 let recordKeywordPanelPlacement = null;
 const recordDiscardDialog = document.querySelector("[data-record-discard-dialog]");
 const recordSaveDialog = document.querySelector("[data-record-save-dialog]");
@@ -1835,6 +1905,12 @@ let recordBackgroundState = [];
 let recordBodyOverflow = "";
 let recordBodyPaddingRight = "";
 let recordHtmlOverflow = "";
+let recordEditReturnFocus = null;
+let recordEditBackgroundState = [];
+let recordEditBodyOverflow = "";
+let recordEditBodyPaddingRight = "";
+let recordEditHtmlOverflow = "";
+const recordModalCloseSentinel = "__close_record_edit_modal__";
 
 function normalizeRecordValue(control) {
     let value = String(control.value ?? "").replace(/\r\n?/g, "\n").normalize("NFC");
@@ -1936,15 +2012,15 @@ function openRecordKeywordSelector() {
 
 function renderRecordKeywordSelection() {
     const selected = recordKeywordOptions.filter((option) => option.checked);
-    const atLimit = selected.length >= 8;
+    const atLimit = selected.length >= 4;
     recordKeywordOptions.forEach((option) => {
         option.disabled = option.dataset.legacyRemoved === "true" || (atLimit && !option.checked);
         option.closest('[role="option"]')?.setAttribute("aria-selected", String(option.checked));
     });
     if (recordKeywordSummary) {
         recordKeywordSummary.textContent = selected.length
-            ? `${selected.length} ${selected.length === 1 ? "palabra seleccionada" : "palabras seleccionadas"}`
-            : "Selecciona palabras clave";
+            ? `${selected.length} ${selected.length === 1 ? "etiqueta seleccionada" : "etiquetas seleccionadas"}`
+            : "Selecciona etiquetas de clasificación";
     }
     if (recordKeywordLimit) recordKeywordLimit.hidden = !atLimit;
     if (!recordKeywordChips) return;
@@ -1972,13 +2048,16 @@ recordKeywordTrigger?.addEventListener("click", () => {
     if (recordKeywordPanel?.hidden) openRecordKeywordSelector();
     else closeRecordKeywordSelector(true);
 });
+recordKeywordSelector?.addEventListener("focusout", (event) => {
+    if (!recordKeywordSelector.contains(event.relatedTarget)) closeRecordKeywordSelector();
+});
 recordKeywordTrigger?.addEventListener("keydown", (event) => {
     if (!["ArrowDown", "Enter", " "].includes(event.key)) return;
     event.preventDefault();
     openRecordKeywordSelector();
 });
 recordKeywordOptions.forEach((option) => option.addEventListener("change", () => {
-    if (option.checked && recordKeywordOptions.filter((item) => item.checked).length > 8) {
+    if (option.checked && recordKeywordOptions.filter((item) => item.checked).length > 4) {
         option.checked = false;
         if (recordKeywordLimit) recordKeywordLimit.hidden = false;
     }
@@ -2004,6 +2083,30 @@ recordKeywordSearch?.addEventListener("input", () => {
     });
     sizeRecordKeywordPanel();
 });
+recordKeywordSearch?.addEventListener("keydown", (event) => {
+    if (!["ArrowDown", "End"].includes(event.key)) return;
+    const visible = recordKeywordOptions.filter((option) => !option.disabled && !option.closest("[data-keyword-search]")?.hidden);
+    if (!visible.length) return;
+    event.preventDefault();
+    (event.key === "End" ? visible.at(-1) : visible[0])?.focus();
+});
+recordKeywordOptions.forEach((option) => option.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        event.preventDefault();
+        closeRecordKeywordSelector(true);
+        return;
+    }
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    const visible = recordKeywordOptions.filter((item) => !item.disabled && !item.closest("[data-keyword-search]")?.hidden);
+    if (!visible.length) return;
+    event.preventDefault();
+    const index = visible.indexOf(option);
+    const next = event.key === "Home" ? 0
+        : event.key === "End" ? visible.length - 1
+            : event.key === "ArrowUp" ? Math.max(0, index - 1)
+                : Math.min(visible.length - 1, index + 1);
+    visible[next]?.focus();
+}));
 document.addEventListener("click", (event) => {
     if (recordKeywordSelector && !recordKeywordSelector.contains(event.target)) closeRecordKeywordSelector();
 });
@@ -2068,6 +2171,72 @@ function updateRecordDirtyState() {
     return dirty;
 }
 
+function lockRecordEditBackground(trigger) {
+    if (!recordEditModal) return;
+    const scrollbarWidth = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+    recordEditReturnFocus = trigger instanceof HTMLElement ? trigger : recordEditTrigger;
+    recordEditBodyOverflow = document.body.style.overflow;
+    recordEditBodyPaddingRight = document.body.style.paddingRight;
+    recordEditHtmlOverflow = document.documentElement.style.overflow;
+    recordEditBackgroundState = [...document.body.children]
+        .filter((element) => element !== recordEditModal && !["SCRIPT", "STYLE"].includes(element.tagName))
+        .map((element) => ({
+            element,
+            inert: element.inert,
+            ariaHidden: element.getAttribute("aria-hidden"),
+        }));
+    recordEditBackgroundState.forEach(({ element }) => {
+        element.inert = true;
+        element.setAttribute("aria-hidden", "true");
+    });
+    document.body.classList.add("ed-edit-modal-open");
+    document.documentElement.classList.add("ed-edit-modal-open");
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
+}
+
+function unlockRecordEditBackground(restoreFocus = true) {
+    recordEditBackgroundState.forEach(({ element, inert, ariaHidden }) => {
+        element.inert = inert;
+        if (ariaHidden === null) element.removeAttribute("aria-hidden");
+        else element.setAttribute("aria-hidden", ariaHidden);
+    });
+    recordEditBackgroundState = [];
+    document.body.classList.remove("ed-edit-modal-open");
+    document.documentElement.classList.remove("ed-edit-modal-open");
+    document.body.style.overflow = recordEditBodyOverflow;
+    document.body.style.paddingRight = recordEditBodyPaddingRight;
+    document.documentElement.style.overflow = recordEditHtmlOverflow;
+    if (restoreFocus && recordEditReturnFocus instanceof HTMLElement) recordEditReturnFocus.focus();
+    recordEditReturnFocus = null;
+}
+
+function openRecordEditModal(trigger) {
+    if (!recordEditModal || !recordEditDialog || recordIsSubmitting) return;
+    recordEditModal.hidden = false;
+    lockRecordEditBackground(trigger);
+    recordEditScroll?.scrollTo({ top: 0 });
+    updateRecordDirtyState();
+    requestAnimationFrame(() => recordEditClose?.focus());
+}
+
+function closeRecordEditModal(restoreFocus = true) {
+    if (!recordEditModal || recordEditModal.hidden || recordIsSubmitting) return;
+    closeRecordKeywordSelector();
+    recordEditModal.hidden = true;
+    unlockRecordEditBackground(restoreFocus);
+}
+
+function requestRecordEditClose(trigger) {
+    if (!recordEditModal || recordEditModal.hidden || recordIsSubmitting) return;
+    if (updateRecordDirtyState()) {
+        openRecordDiscardDialog(recordModalCloseSentinel, trigger);
+        return;
+    }
+    closeRecordEditModal(true);
+}
+
 function clearRecordErrors() {
     recordErrorSummary?.setAttribute("hidden", "");
     recordForm?.querySelectorAll("[aria-invalid]").forEach((field) => field.removeAttribute("aria-invalid"));
@@ -2100,7 +2269,7 @@ function fieldForServerMessage(message) {
     if (normalized.includes("tipo de material")) return "material_type_choice";
     if (normalized.includes("descripción corta")) return "description";
     if (normalized.includes("descripción completa")) return "full_description";
-    if (normalized.includes("palabra clave") || normalized.includes("palabras clave")) return "keywords_selected";
+    if (normalized.includes("clasificación") || normalized.includes("palabra clave") || normalized.includes("palabras clave")) return "keywords_selected";
     if (normalized.includes("responsable")) return "publisher";
     return "";
 }
@@ -2149,6 +2318,8 @@ function openRecordDiscardDialog(url, trigger) {
     if (!recordDiscardDialog) return;
     recordPendingNavigation = url;
     recordDiscardConfirmed = false;
+    recordDiscardDialog.inert = false;
+    recordDiscardDialog.removeAttribute("aria-hidden");
     lockRecordBackground(recordDiscardDialog, trigger);
     recordDiscardDialog.hidden = false;
     recordContinueButton?.focus();
@@ -2163,6 +2334,8 @@ function closeRecordDiscardDialog(restoreFocus = true) {
 
 function openRecordSaveDialog(trigger) {
     if (!recordSaveDialog || recordIsSubmitting) return;
+    recordSaveDialog.inert = false;
+    recordSaveDialog.removeAttribute("aria-hidden");
     lockRecordBackground(recordSaveDialog, trigger);
     recordSaveDialog.hidden = false;
     recordSaveContinueButton?.focus();
@@ -2251,6 +2424,16 @@ digitalRecord?.addEventListener("click", (event) => {
     openRecordDiscardDialog(link.href, link);
 });
 
+recordEditTrigger?.addEventListener("click", () => openRecordEditModal(recordEditTrigger));
+recordEditClose?.addEventListener("click", () => requestRecordEditClose(recordEditClose));
+recordEditNavigation.forEach((control) => control.addEventListener("click", (event) => {
+    event.preventDefault();
+    requestRecordEditClose(control);
+}));
+recordEditModal?.addEventListener("click", (event) => {
+    if (event.target === recordEditModal) requestRecordEditClose(recordEditDialog);
+});
+
 recordContinueButton?.addEventListener("click", () => closeRecordDiscardDialog(true));
 recordSaveContinueButton?.addEventListener("click", () => closeRecordSaveDialog(true));
 recordSaveConfirmButton?.addEventListener("click", submitRecordForm);
@@ -2260,6 +2443,11 @@ recordDiscardButton?.addEventListener("click", () => {
     recordIsDirty = false;
     if (recordForm) recordForm.dataset.dirty = "false";
     closeRecordDiscardDialog(false);
+    if (target === recordModalCloseSentinel) {
+        closeRecordEditModal(false);
+        window.location.assign(recordForm?.dataset.successUrl || window.location.href);
+        return;
+    }
     if (target) window.location.assign(target);
 });
 recordDiscardDialog?.addEventListener("click", (event) => {
@@ -2276,17 +2464,32 @@ window.addEventListener("beforeunload", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented) return;
     if (event.key === "Escape" && recordDiscardDialog && !recordDiscardDialog.hidden) {
+        event.preventDefault();
         closeRecordDiscardDialog(true);
+        return;
     }
     if (event.key === "Escape" && recordSaveDialog && !recordSaveDialog.hidden && !recordIsSubmitting) {
+        event.preventDefault();
         closeRecordSaveDialog(true);
+        return;
+    }
+    if (event.key === "Escape" && recordEditModal && !recordEditModal.hidden) {
+        event.preventDefault();
+        requestRecordEditClose(recordEditClose);
+        return;
     }
     const activeDialog = recordDiscardDialog && !recordDiscardDialog.hidden
         ? recordDiscardDialog
-        : (recordSaveDialog && !recordSaveDialog.hidden ? recordSaveDialog : null);
+        : (recordSaveDialog && !recordSaveDialog.hidden
+            ? recordSaveDialog
+            : (recordEditModal && !recordEditModal.hidden ? recordEditDialog : null));
     if (event.key === "Tab" && activeDialog) {
-        const controls = [...activeDialog.querySelectorAll("button:not(:disabled)")];
+        if (activeDialog === recordEditDialog && event.target.closest?.(".custom-select-panel")) return;
+        const controls = [...activeDialog.querySelectorAll(
+            'a[href],button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex="-1"])'
+        )].filter((control) => !control.hidden && control.getClientRects().length > 0);
         if (!controls.length) return;
         const currentIndex = controls.indexOf(document.activeElement);
         const nextIndex = event.shiftKey
@@ -3049,7 +3252,7 @@ function appendNeutralAddedFiles(files) {
         button.type = "button";
         button.className = "ed-document-row";
         button.setAttribute("role", "option");
-        button.setAttribute("aria-selected", "false");
+        button.setAttribute("aria-pressed", "false");
         Object.assign(button.dataset, {
             recordFile: "", fileId: String(file.id), fileName: file.name, fileType: visual.label,
             fileSize: file.size_label, fileExtension: visual.extension,
@@ -3096,6 +3299,8 @@ function appendNeutralAddedFiles(files) {
         menu.className = "ed-file-menu";
         menu.dataset.fileMenu = "";
         menu.setAttribute("role", "menu");
+        menu.id = `recordFileMenu-${file.id}`;
+        menuToggle.setAttribute("aria-controls", menu.id);
         menu.hidden = true;
         const downloadAction = document.createElement("a");
         downloadAction.dataset.fileDownloadAction = "";
@@ -3655,7 +3860,7 @@ function applyFileReplacement(file) {
     const item = button.closest("[data-record-file-item]");
     const oldGroup = item?.closest("[data-file-group]");
     const visual = getNeutralFileVisualType(file.extension);
-    const wasSelected = button.getAttribute("aria-selected") === "true";
+    const wasSelected = button.getAttribute("aria-pressed") === "true";
     Object.assign(button.dataset, {
         fileName: file.name,
         fileType: visual.label,
@@ -4305,7 +4510,7 @@ function removeNeutralFileItems(items, packageData) {
     if (!removedButtons.length) return;
     const removedSet = new Set(removedButtons);
     const removedPresentation = removedButtons.some((button) => button.dataset.filePresentation === "true");
-    const selectedButton = removedButtons.find((button) => button.getAttribute("aria-selected") === "true") || null;
+    const selectedButton = removedButtons.find((button) => button.getAttribute("aria-pressed") === "true") || null;
     let fallback = null;
     if (selectedButton) {
         const selectedIndex = neutralFileButtons.indexOf(selectedButton);
@@ -4748,9 +4953,10 @@ document.addEventListener("keydown", (event) => {
         const availabilityAction = record.querySelector('[data-record-admin-action="availability"]');
         availabilityAction.hidden = !published;
         availabilityAction.querySelector("span").textContent = data.is_available ? "Marcar como no disponible" : "Marcar como disponible";
+        availabilityAction.querySelector("i").className = `fa-solid ${data.is_available ? "fa-ban" : "fa-circle-check"}`;
         const publicationAction = record.querySelector('[data-record-admin-action="publication"]');
         publicationAction.querySelector("span").textContent = published ? "Retirar publicación" : "Publicar material";
-        publicationAction.querySelector("i").className = `fa-solid ${published ? "fa-eye-slash" : "fa-eye"}`;
+        publicationAction.querySelector("i").className = `fa-solid ${published ? "fa-box-archive" : "fa-box-open"}`;
     };
 
     form.addEventListener("submit", async event => {

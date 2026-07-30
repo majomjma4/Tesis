@@ -82,6 +82,7 @@ final class AdminRepositoryModel
                 p.summary,
                 p.status,
                 p.published_at,
+                p.is_available,
                 p.updated_at,
                 pt.code type_code,
                 pt.name type_name,
@@ -240,7 +241,7 @@ final class AdminRepositoryModel
 
             $database->prepare(
                 "UPDATE projects
-                SET status='published',published_at=CURRENT_TIMESTAMP
+                SET status='published',published_at=CURRENT_TIMESTAMP,is_available=1
                 WHERE id=:id"
             )->execute(['id' => $id]);
 
@@ -290,7 +291,7 @@ final class AdminRepositoryModel
 
                 $database->prepare(
                     "UPDATE projects
-                    SET status='published', published_at=CURRENT_TIMESTAMP
+                    SET status='published', published_at=CURRENT_TIMESTAMP,is_available=1
                     WHERE id=:id"
                 )->execute(['id' => $id]);
                 $after = ['status' => 'published'];
@@ -302,7 +303,7 @@ final class AdminRepositoryModel
 
                 $previous = $before['type_code'] === 'thesis' ? 'tribunal_approved' : 'approved';
                 $database->prepare(
-                    'UPDATE projects SET status=:status, published_at=NULL WHERE id=:id'
+                    'UPDATE projects SET status=:status, published_at=NULL,is_available=0 WHERE id=:id'
                 )->execute(['status' => $previous, 'id' => $id]);
                 $after = ['status' => $previous];
                 $action = 'project_unpublished';
@@ -316,6 +317,40 @@ final class AdminRepositoryModel
                 $id,
                 $before,
                 $after
+            );
+        });
+    }
+
+    public function setAvailability(int $id, bool $available, int $actor): void
+    {
+        if ($id < 1) throw new InvalidArgumentException('El proyecto no es válido.');
+        Database::transaction(function (PDO $database) use ($id, $available, $actor): void {
+            $query = $database->prepare(
+                "SELECT id,title,status,is_available FROM projects
+                 WHERE id=:id AND deleted_at IS NULL FOR UPDATE"
+            );
+            $query->execute(['id' => $id]);
+            $before = $query->fetch();
+            if (!$before) throw new InvalidArgumentException('El proyecto ya no está disponible.');
+            if ((string) $before['status'] !== 'published') {
+                throw new InvalidArgumentException('La disponibilidad solo puede cambiarse en proyectos publicados.');
+            }
+            if ((bool) $before['is_available'] === $available) {
+                throw new InvalidArgumentException($available
+                    ? 'El proyecto ya está disponible.'
+                    : 'El proyecto ya está marcado como no disponible.');
+            }
+            $database->prepare(
+                'UPDATE projects SET is_available=:available WHERE id=:id AND status=\'published\''
+            )->execute(['available' => $available ? 1 : 0, 'id' => $id]);
+            (new ProjectAuditService($database))->record(
+                $id,
+                $actor,
+                'project_availability_changed',
+                'project',
+                $id,
+                ['is_available' => (bool) $before['is_available']],
+                ['is_available' => $available]
             );
         });
     }

@@ -173,6 +173,7 @@ CREATE TABLE projects (
   defense_at DATETIME NULL,
   closed_at DATETIME NULL,
   published_at DATETIME NULL,
+  is_available TINYINT(1) NOT NULL DEFAULT 1,
   created_by BIGINT UNSIGNED NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -449,6 +450,7 @@ CREATE TABLE support_material_files (
   extension VARCHAR(15) NOT NULL,
   mime_type VARCHAR(150) NOT NULL,
   size_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  sha256 CHAR(64) NULL,
   is_package TINYINT(1) NOT NULL DEFAULT 0,
   sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   created_by BIGINT UNSIGNED NULL,
@@ -470,19 +472,35 @@ CREATE TABLE support_material_file_versions (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   file_id BIGINT UNSIGNED NOT NULL,
   material_id BIGINT UNSIGNED NOT NULL,
+  version_number INT UNSIGNED NOT NULL,
   original_name VARCHAR(255) NOT NULL,
   storage_name VARCHAR(255) NOT NULL,
   relative_path VARCHAR(500) NOT NULL,
   extension VARCHAR(15) NOT NULL,
   mime_type VARCHAR(150) NOT NULL,
   size_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  sha256 CHAR(64) NULL,
   replaced_by BIGINT UNSIGNED NULL,
   replaced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_support_file_version_file FOREIGN KEY (file_id) REFERENCES support_material_files(id),
   CONSTRAINT fk_support_file_version_material FOREIGN KEY (material_id) REFERENCES support_materials(id),
   CONSTRAINT fk_support_file_version_actor FOREIGN KEY (replaced_by) REFERENCES users(id),
+  CONSTRAINT chk_support_file_version_positive CHECK (version_number > 0),
+  UNIQUE KEY uq_support_file_version_number (file_id, version_number),
   INDEX idx_support_file_version_history (file_id, replaced_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DELIMITER $$
+CREATE TRIGGER trg_support_file_version_number_immutable
+BEFORE UPDATE ON support_material_file_versions
+FOR EACH ROW
+BEGIN
+  IF NOT (NEW.version_number <=> OLD.version_number) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT='El número de una versión documental es inmutable';
+  END IF;
+END$$
+DELIMITER ;
 
 CREATE TABLE support_material_audit_reads (
   user_id BIGINT UNSIGNED NOT NULL,

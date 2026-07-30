@@ -1111,6 +1111,10 @@ ALTER TABLE support_materials
 ALTER TABLE projects
     ADD COLUMN presentation_file_id BIGINT UNSIGNED NULL AFTER published_at;
 
+ALTER TABLE projects
+    ADD COLUMN is_available TINYINT(1) NOT NULL DEFAULT 1 AFTER published_at,
+    ADD INDEX idx_project_repository_visibility (status,is_available,deleted_at);
+
 UPDATE support_materials material
 SET presentation_file_id = (
     SELECT file.id
@@ -1281,18 +1285,23 @@ WHERE code IN (
 ALTER TABLE support_material_files
   DROP COLUMN IF EXISTS is_primary;
 
+ALTER TABLE support_material_files
+  ADD COLUMN sha256 CHAR(64) NULL AFTER size_bytes;
+
 -- Conserva versiones retiradas cuando un archivo de material es reemplazado.
 
 CREATE TABLE IF NOT EXISTS support_material_file_versions (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   file_id BIGINT UNSIGNED NOT NULL,
   material_id BIGINT UNSIGNED NOT NULL,
+  version_number INT UNSIGNED NOT NULL,
   original_name VARCHAR(255) NOT NULL,
   storage_name VARCHAR(255) NOT NULL,
   relative_path VARCHAR(500) NOT NULL,
   extension VARCHAR(15) NOT NULL,
   mime_type VARCHAR(150) NOT NULL,
   size_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  sha256 CHAR(64) NULL,
   replaced_by BIGINT UNSIGNED NULL,
   replaced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_support_file_version_file
@@ -1301,8 +1310,22 @@ CREATE TABLE IF NOT EXISTS support_material_file_versions (
     FOREIGN KEY (material_id) REFERENCES support_materials(id),
   CONSTRAINT fk_support_file_version_actor
     FOREIGN KEY (replaced_by) REFERENCES users(id),
+  CONSTRAINT chk_support_file_version_positive CHECK (version_number > 0),
+  UNIQUE INDEX uq_support_file_version_number (file_id, version_number),
   INDEX idx_support_file_version_history (file_id, replaced_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DELIMITER $$
+CREATE TRIGGER trg_support_file_version_number_immutable
+BEFORE UPDATE ON support_material_file_versions
+FOR EACH ROW
+BEGIN
+  IF NOT (NEW.version_number <=> OLD.version_number) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT='El número de una versión documental es inmutable';
+  END IF;
+END$$
+DELIMITER ;
 
 -- Conserva la evidencia histÃ³rica cuando un archivo retirado se elimina fÃ­sicamente.
 

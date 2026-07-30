@@ -121,6 +121,8 @@ El comando informa registros sin archivo y archivos sin registro. No elimina,
 mueve ni modifica archivos o datos.
 # Migraciones recientes
 
+- `migrations/20260813_project_repository_availability.sql`: separa la disponibilidad temporal de un proyecto publicado de su retiro del Repositorio.
+- `migrations/20260812_support_material_version_integrity.sql`: fija la numeración histórica por archivo lógico y agrega huellas SHA-256 para verificar archivos vigentes y versiones.
 - `migrations/20260810_support_material_admin_actions.sql`: agrega disponibilidad, primera publicación y baja lógica recuperable para materiales de apoyo.
 - `migrations/20260729_support_material_audit_reads.sql`: conserva por administrador y material el último evento del historial consultado.
 - `migrations/20260729_support_material_publication_date_readonly.sql`: permite que los borradores no tengan fecha y reserva su asignación para la publicación real.

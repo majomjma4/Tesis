@@ -205,6 +205,7 @@ final class AdminActivityModel
 
     private function detailRows(string $action, array $details): array
     {
+        $details = $this->relevantPresentationDetails($action, $details);
         $labels = [
             'name'=>'Archivo','original_name'=>'Archivo retirado','final_name'=>'Nombre final restaurado',
             'file_name'=>'Archivo','old_file_name'=>'Archivo anterior','new_file_name'=>'Archivo nuevo',
@@ -214,6 +215,7 @@ final class AdminActivityModel
             'previous_available'=>'Disponibilidad anterior','is_available'=>'Disponibilidad nueva',
             'available'=>'Disponibilidad','availability'=>'Disponibilidad','renamed'=>'Renombrado por conflicto',
             'presentation'=>'Era presentación','presentation_unchanged'=>'Presentación conservada',
+            'presentation_assignment'=>'Presentación',
             'previous_file'=>'Archivo anterior','new_file'=>'Archivo nuevo',
             'presentation_previous'=>'Presentación anterior','presentation_new'=>'Presentación nueva',
             'previous_name'=>'Presentación anterior','new_name'=>'Presentación nueva',
@@ -242,6 +244,48 @@ final class AdminActivityModel
             $rows[]=['key'=>(string)$key,'label'=>$labels[$key]??$this->fieldLabel((string)$key),'value'=>$this->displayValue((string)$key,$value)];
         }
         return $rows;
+    }
+
+    private function relevantPresentationDetails(string $action, array $details): array
+    {
+        if ($action !== 'support_material.file_replaced') return $details;
+
+        $previousKey = array_key_exists('presentation_previous', $details)
+            ? 'presentation_previous'
+            : (array_key_exists('presentation', $details) ? 'presentation' : null);
+        $newKey = array_key_exists('presentation_new', $details) ? 'presentation_new' : null;
+        $previous = $previousKey !== null ? $this->booleanDetailValue($details[$previousKey]) : null;
+        $new = $newKey !== null ? $this->booleanDetailValue($details[$newKey]) : null;
+
+        if ($previous !== null && $new !== null) {
+            unset($details['presentation_previous'], $details['presentation_new'], $details['presentation'], $details['presentation_unchanged']);
+            if ($previous && $new) {
+                $details['presentation_unchanged'] = true;
+            } elseif ($previous && !$new) {
+                $details['presentation_unchanged'] = false;
+            } elseif (!$previous && $new) {
+                $details['presentation_assignment'] = 'Convertido en archivo de presentación';
+            }
+            return $details;
+        }
+
+        if (array_key_exists('presentation_unchanged', $details)
+            && $this->booleanDetailValue($details['presentation_unchanged']) !== true) {
+            unset($details['presentation_unchanged']);
+        }
+        return $details;
+    }
+
+    private function booleanDetailValue(mixed $value): ?bool
+    {
+        if (is_bool($value)) return $value;
+        if (is_int($value) || is_float($value)) return (int) $value !== 0;
+        if (!is_string($value)) return null;
+        return match (mb_strtolower(trim($value), 'UTF-8')) {
+            '1', 'true', 'yes', 'sí', 'si' => true,
+            '0', 'false', 'no' => false,
+            default => null,
+        };
     }
 
     private function actionLabel(string $action, string $fallback): string
@@ -283,8 +327,9 @@ final class AdminActivityModel
         return $this->readableTechnicalText($fallback!==''?$fallback:$field);
     }
 
-    private function displayValue(string $field,mixed $value):string
+    private function displayValue(string $field,mixed $value,int $depth=0):string
     {
+        if(is_array($value))return $this->displayArrayValue($field,$value,$depth);
         if($value===null||$value==='')return 'Vacío';
         if(is_bool($value)){
             return in_array($field,['available','availability','previous_available','is_available','previous_availability','new_availability'],true)
@@ -292,7 +337,20 @@ final class AdminActivityModel
                 :($value?'Sí':'No');
         }
         if(is_int($value)||is_float($value))return (string)$value;
-        $text=trim((string)$value);$normalized=mb_strtolower($text);
+        if($value instanceof Stringable){
+            try{
+                $value=(string)$value;
+            }catch(Throwable){
+                return 'Objeto no representable';
+            }
+        }elseif(is_object($value)){
+            return 'Objeto '.get_debug_type($value);
+        }elseif(is_resource($value)){
+            return 'Recurso '.get_resource_type($value);
+        }elseif(!is_string($value)){
+            return 'Valor no representable';
+        }
+        $text=trim($value);$normalized=mb_strtolower($text);
         $values=[
             'published'=>'Publicado','withdrawn'=>'Publicación retirada','draft'=>'Borrador',
             'trash'=>'En Papelera','trashed'=>'En Papelera','papelera'=>'En Papelera',
@@ -312,6 +370,32 @@ final class AdminActivityModel
         if(isset($values[$normalized]))return $values[$normalized];
         $technicalFields=['status','previous_status','new_status','availability','previous_availability','new_availability','reason','reason_code','destination'];
         return in_array($field,$technicalFields,true)?$this->readableTechnicalText($text):$text;
+    }
+
+    private function displayArrayValue(string $field,array $value,int $depth):string
+    {
+        if($value===[])return 'Vacío';
+        if($depth>=8)return 'Estructura anidada';
+
+        $isList=$this->isListArray($value);
+        $formatted=[];
+        foreach($value as $key=>$item){
+            $itemField=$isList?$field:(string)$key;
+            $itemText=$this->displayValue($itemField,$item,$depth+1);
+            if(is_array($item)){
+                $itemIsList=$this->isListArray($item);
+                $itemText=($itemIsList?'[':'{').$itemText.($itemIsList?']':'}');
+            }
+            $formatted[]=$isList
+                ?$itemText
+                :$this->fieldLabel((string)$key).': '.$itemText;
+        }
+        return implode($isList?', ':'; ',$formatted);
+    }
+
+    private function isListArray(array $value):bool
+    {
+        return $value===[]||array_keys($value)===range(0,count($value)-1);
     }
 
     private function readableTechnicalText(string $value):string
