@@ -611,7 +611,9 @@ let neutralViewerBodyOverflow = "";
 let neutralViewerHtmlOverflow = "";
 let neutralFilesInitialized = false;
 let neutralViewerLayoutSequence = 0;
+let neutralPdfLayoutWidth = 0;
 let neutralDocxScrollSyncFrame = 0;
+let neutralDocxFitFrame = 0;
 let neutralDocxHorizontalRatio = 0;
 const neutralZipTreeStates = new Map();
 const neutralZoomByFile = new Map();
@@ -772,6 +774,20 @@ function fitNeutralDocxForCurrentContext() {
     });
 }
 
+function scheduleNeutralDocxFit() {
+    if (neutralDocxFitFrame) window.cancelAnimationFrame(neutralDocxFitFrame);
+    neutralDocxFitFrame = window.requestAnimationFrame(() => {
+        neutralDocxFitFrame = 0;
+        if (
+            neutralViewer?.dataset.viewerState !== "ready"
+            || !neutralViewerDocx?.classList.contains("is-docx-preview")
+            || neutralViewerDocx.hidden
+            || neutralViewerDocx.clientWidth <= 0
+        ) return;
+        fitNeutralDocxForCurrentContext();
+    });
+}
+
 function resetNeutralZoom() {
     if (neutralViewerDocx?.classList.contains("is-docx-preview") && neutralSelectedFileId) {
         neutralZoomPercent = 100;
@@ -803,15 +819,20 @@ function prepareNeutralDocxScale() {
 function buildPdfPreviewUrl(url) {
     const source = String(url || "").trim();
     if (!source) return "";
-    return `${source.split("#", 1)[0]}#page=1&view=Fit`;
+    return `${source.split("#", 1)[0]}#page=1&view=FitH`;
 }
 
 function resetNeutralViewer() {
+    if (neutralDocxFitFrame) {
+        window.cancelAnimationFrame(neutralDocxFitFrame);
+        neutralDocxFitFrame = 0;
+    }
     if (neutralResourceTimer !== null) {
         window.clearTimeout(neutralResourceTimer);
         neutralResourceTimer = null;
     }
     if (neutralViewerPdf) {
+        neutralPdfLayoutWidth = 0;
         neutralViewerPdf.hidden = true;
         neutralViewerPdf.classList.remove("is-preparing");
         neutralViewerPdf.style.removeProperty("width");
@@ -1158,7 +1179,9 @@ function showNeutralPreview(panel) {
 function refreshNeutralPdfLayout() {
     if (!neutralViewerPdf || !neutralViewerBody || neutralViewerPdf.hidden || neutralFilesPanel?.hidden) return;
     const width = Math.floor(neutralViewerBody.getBoundingClientRect().width);
-    if (width > 0) neutralViewerPdf.style.width = `${width}px`;
+    if (width < 1 || width === neutralPdfLayoutWidth) return;
+    neutralPdfLayoutWidth = width;
+    neutralViewerPdf.style.width = `${width}px`;
 }
 
 function refreshVisibleViewerLayout() {
@@ -1167,17 +1190,10 @@ function refreshVisibleViewerLayout() {
     const sequence = ++neutralViewerLayoutSequence;
     neutralViewer?.classList.toggle("viewer-expanded", Boolean(neutralViewerOverlay && !neutralViewerOverlay.hidden));
     neutralViewer?.classList.toggle("viewer-normal", !neutralViewerOverlay || neutralViewerOverlay.hidden);
-    neutralViewerPdf.style.removeProperty("width");
+    neutralPdfLayoutWidth = 0;
     window.requestAnimationFrame(() => {
         if (sequence !== neutralViewerLayoutSequence || neutralFilesPanel?.hidden) return;
-        const width = Math.floor(neutralViewerBody.getBoundingClientRect().width);
-        if (width < 1) return;
-        neutralViewerPdf.style.width = `${Math.max(1, width - 1)}px`;
-        neutralViewerPdf.getBoundingClientRect();
-        window.requestAnimationFrame(() => {
-            if (sequence !== neutralViewerLayoutSequence || neutralFilesPanel?.hidden) return;
-            neutralViewerPdf.style.width = `${width}px`;
-        });
+        refreshNeutralPdfLayout();
     });
 }
 
@@ -1439,6 +1455,7 @@ async function loadNeutralPreview(button) {
                 if (rendered) {
                     showNeutralPreview(neutralViewerDocx);
                     prepareNeutralDocxScale();
+                    scheduleNeutralDocxFit();
                     neutralViewerDocx.scrollLeft = 0;
                     neutralViewerDocx.scrollTop = 0;
                 }
@@ -1515,7 +1532,7 @@ function openNeutralExpandedViewer() {
     neutralViewer?.classList.add("viewer-expanded");
     window.requestAnimationFrame(() => {
         refreshNeutralPdfLayout();
-        window.requestAnimationFrame(fitNeutralDocxForCurrentContext);
+        scheduleNeutralDocxFit();
     });
     neutralExpandedClose?.focus();
 }
@@ -1541,7 +1558,7 @@ function closeNeutralExpandedViewer(restoreFocus = true) {
     neutralViewer?.classList.remove("viewer-expanded");
     neutralViewer?.classList.add("viewer-normal");
     refreshVisibleViewerLayout();
-    window.requestAnimationFrame(fitNeutralDocxForCurrentContext);
+    scheduleNeutralDocxFit();
     if (restoreFocus && neutralViewerReturnFocus instanceof HTMLElement) neutralViewerReturnFocus.focus();
     neutralViewerReturnFocus = null;
 }
@@ -1697,11 +1714,14 @@ digitalRecord?.addEventListener("digitalrecord:tabchange", (event) => {
 });
 window.addEventListener("resize", () => {
     refreshVisibleViewerLayout();
-    window.requestAnimationFrame(fitNeutralDocxForCurrentContext);
+    scheduleNeutralDocxFit();
 }, { passive: true });
 
 if (typeof ResizeObserver === "function" && neutralViewerDocx) {
-    const neutralDocxResizeObserver = new ResizeObserver(scheduleNeutralDocxTopScrollUpdate);
+    const neutralDocxResizeObserver = new ResizeObserver(() => {
+        scheduleNeutralDocxFit();
+        scheduleNeutralDocxTopScrollUpdate();
+    });
     neutralDocxResizeObserver.observe(neutralViewerDocx);
 }
 
@@ -1780,6 +1800,23 @@ const recordErrorSummary = digitalRecord?.querySelector("[data-record-error-summ
 const recordErrorMessage = recordErrorSummary?.querySelector("[data-record-error-message]");
 const recordFormStatus = digitalRecord?.querySelector("[data-record-form-status]");
 const recordDirtyMessage = digitalRecord?.querySelector("[data-record-dirty-message]");
+const recordDirtyMessageText = recordDirtyMessage?.querySelector("span");
+const recordDirtyMessageIcon = recordDirtyMessage?.querySelector("i");
+const recordSubmitButton = recordForm?.querySelector('[type="submit"]');
+const recordMaterialTypeChoice = recordForm?.elements.namedItem("material_type_choice");
+const recordMaterialTypeCustom = recordForm?.elements.namedItem("material_type_custom");
+const recordMaterialTypeCustomWrap = recordForm?.querySelector("[data-record-material-type-custom]");
+const recordMaterialTypeCount = recordForm?.querySelector("[data-record-material-type-count]");
+const recordKeywordSelector = recordForm?.querySelector("[data-record-keyword-selector]");
+const recordKeywordTrigger = recordKeywordSelector?.querySelector("[data-record-keyword-trigger]");
+const recordKeywordPanel = recordKeywordSelector?.querySelector("[data-record-keyword-panel]");
+const recordKeywordSearch = recordKeywordSelector?.querySelector("[data-record-keyword-search]");
+const recordKeywordOptionsContainer = recordKeywordSelector?.querySelector("[data-record-keyword-options]");
+const recordKeywordOptions = [...(recordKeywordSelector?.querySelectorAll('[name="keywords_selected[]"]') ?? [])];
+const recordKeywordChips = recordForm?.querySelector("[data-record-keyword-chips]");
+const recordKeywordSummary = recordKeywordSelector?.querySelector("[data-record-keyword-summary]");
+const recordKeywordLimit = recordKeywordSelector?.querySelector("[data-record-keyword-limit]");
+let recordKeywordPanelPlacement = null;
 const recordDiscardDialog = document.querySelector("[data-record-discard-dialog]");
 const recordSaveDialog = document.querySelector("[data-record-save-dialog]");
 if (recordDiscardDialog && recordDiscardDialog.parentElement !== document.body) document.body.append(recordDiscardDialog);
@@ -1799,14 +1836,222 @@ let recordBodyOverflow = "";
 let recordBodyPaddingRight = "";
 let recordHtmlOverflow = "";
 
-function recordFormEntries() {
-    if (!recordForm) return [];
-    return [...recordForm.elements]
-        .filter((control) => control.name && !["_csrf", "id"].includes(control.name) && !control.disabled)
-        .map((control) => [control.name, String(control.value ?? "").trim().replace(/\r\n/g, "\n")]);
+function normalizeRecordValue(control) {
+    let value = String(control.value ?? "").replace(/\r\n?/g, "\n").normalize("NFC");
+    if (control.name === "keywords") {
+        return [...new Set(value.split(/[,;\n]+/u)
+            .map((keyword) => keyword.replace(/[\p{Z}\t\f\v]+/gu, " ").replace(/\s+/gu, " ").trim().toLocaleLowerCase("es"))
+            .filter(Boolean))]
+            .sort((left, right) => left.localeCompare(right, "es"));
+    }
+    value = value.replace(/[\p{Z}\t\f\v]+/gu, " ");
+    if (["description", "full_description"].includes(control.name)) {
+        return value.split("\n").map((line) => line.trim()).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+    }
+    return value.replace(/\s+/gu, " ").trim();
 }
 
+function recordFormEntries() {
+    if (!recordForm) return [];
+    const entries = [...recordForm.elements]
+        .filter((control) => control.name
+            && !["_csrf", "id"].includes(control.name)
+            && !["material_type_choice", "material_type_custom"].includes(control.name)
+            && !control.disabled
+            && !control.readOnly
+            && !["button", "submit", "reset", "hidden"].includes(control.type)
+            && (!["checkbox", "radio"].includes(control.type) || control.checked))
+        .map((control) => [control.name, normalizeRecordValue(control)])
+        .sort(([left], [right]) => left.localeCompare(right));
+    if (recordMaterialTypeChoice instanceof HTMLSelectElement) {
+        const finalType = recordMaterialTypeChoice.value === "Otros"
+            ? normalizeRecordValue(recordMaterialTypeCustom)
+            : normalizeRecordValue(recordMaterialTypeChoice);
+        entries.push(["material_type", finalType]);
+        entries.sort(([left], [right]) => left.localeCompare(right));
+    }
+    return entries;
+}
+
+function closeRecordKeywordSelector(restoreFocus = false) {
+    if (!recordKeywordSelector || !recordKeywordPanel || !recordKeywordTrigger) return;
+    recordKeywordPanel.hidden = true;
+    recordKeywordSelector.classList.remove("is-open");
+    recordKeywordSelector.classList.remove("is-open-above");
+    recordKeywordPanelPlacement = null;
+    recordKeywordTrigger.setAttribute("aria-expanded", "false");
+    if (restoreFocus) recordKeywordTrigger.focus();
+}
+
+function sizeRecordKeywordPanel() {
+    if (!recordKeywordSelector || !recordKeywordPanel || !recordKeywordOptionsContainer || recordKeywordPanel.hidden) return;
+    const visibleOptions = [...recordKeywordOptionsContainer.querySelectorAll(".ed-keyword-option:not([hidden])")];
+    recordKeywordOptionsContainer.style.removeProperty("height");
+    recordKeywordOptionsContainer.style.removeProperty("max-height");
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    const viewportMargin = 8;
+    const panelGap = 6;
+    const triggerRect = recordKeywordTrigger.getBoundingClientRect();
+    const availableBelow = Math.max(0, viewportHeight - triggerRect.bottom - panelGap - viewportMargin);
+    const availableAbove = Math.max(0, triggerRect.top - panelGap - viewportMargin);
+    const panelChromeHeight = Math.max(0, recordKeywordPanel.scrollHeight - recordKeywordOptionsContainer.scrollHeight);
+    const candidates = visibleOptions.slice(0, 6);
+    const desiredOptionsHeight = candidates.reduce(
+        (height, option) => height + Math.ceil(option.getBoundingClientRect().height),
+        0
+    );
+    const desiredPanelHeight = panelChromeHeight + desiredOptionsHeight;
+    if (recordKeywordPanelPlacement === null) {
+        recordKeywordPanelPlacement = availableBelow >= desiredPanelHeight
+            ? "down"
+            : (availableAbove >= desiredPanelHeight ? "up" : (availableAbove > availableBelow ? "up" : "down"));
+    }
+    const opensAbove = recordKeywordPanelPlacement === "up";
+    recordKeywordSelector.classList.toggle("is-open-above", opensAbove);
+
+    const maximumPanelHeight = Math.max(0, opensAbove ? availableAbove : availableBelow);
+    const optionBudget = Math.max(0, maximumPanelHeight - panelChromeHeight);
+    let completeHeight = 0;
+    let completeRows = 0;
+    candidates.forEach((option) => {
+        const rowHeight = Math.ceil(option.getBoundingClientRect().height);
+        if (completeHeight + rowHeight <= optionBudget) {
+            completeHeight += rowHeight;
+            completeRows += 1;
+        }
+    });
+    recordKeywordOptionsContainer.style.height = `${Math.max(0, completeHeight)}px`;
+    recordKeywordOptionsContainer.style.maxHeight = `${Math.max(0, completeHeight)}px`;
+    recordKeywordOptionsContainer.style.overflowY = visibleOptions.length > completeRows ? "auto" : "hidden";
+}
+
+function openRecordKeywordSelector() {
+    if (!recordKeywordSelector || !recordKeywordPanel || !recordKeywordTrigger) return;
+    recordKeywordPanel.hidden = false;
+    recordKeywordSelector.classList.add("is-open");
+    recordKeywordTrigger.setAttribute("aria-expanded", "true");
+    sizeRecordKeywordPanel();
+    recordKeywordSearch?.focus();
+}
+
+function renderRecordKeywordSelection() {
+    const selected = recordKeywordOptions.filter((option) => option.checked);
+    const atLimit = selected.length >= 8;
+    recordKeywordOptions.forEach((option) => {
+        option.disabled = option.dataset.legacyRemoved === "true" || (atLimit && !option.checked);
+        option.closest('[role="option"]')?.setAttribute("aria-selected", String(option.checked));
+    });
+    if (recordKeywordSummary) {
+        recordKeywordSummary.textContent = selected.length
+            ? `${selected.length} ${selected.length === 1 ? "palabra seleccionada" : "palabras seleccionadas"}`
+            : "Selecciona palabras clave";
+    }
+    if (recordKeywordLimit) recordKeywordLimit.hidden = !atLimit;
+    if (!recordKeywordChips) return;
+    recordKeywordChips.replaceChildren(...selected.map((option) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "ed-keyword-chip";
+        chip.setAttribute("aria-label", `Quitar ${option.value}`);
+        const label = document.createElement("span");
+        label.textContent = option.value;
+        const icon = document.createElement("i");
+        icon.className = "fa-solid fa-xmark";
+        icon.setAttribute("aria-hidden", "true");
+        chip.append(label, icon);
+        chip.addEventListener("click", () => {
+            option.checked = false;
+            option.dispatchEvent(new Event("change", { bubbles: true }));
+            recordKeywordTrigger?.focus();
+        });
+        return chip;
+    }));
+}
+
+recordKeywordTrigger?.addEventListener("click", () => {
+    if (recordKeywordPanel?.hidden) openRecordKeywordSelector();
+    else closeRecordKeywordSelector(true);
+});
+recordKeywordTrigger?.addEventListener("keydown", (event) => {
+    if (!["ArrowDown", "Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    openRecordKeywordSelector();
+});
+recordKeywordOptions.forEach((option) => option.addEventListener("change", () => {
+    if (option.checked && recordKeywordOptions.filter((item) => item.checked).length > 8) {
+        option.checked = false;
+        if (recordKeywordLimit) recordKeywordLimit.hidden = false;
+    }
+    if (option.dataset.keywordLegacy === "true" && !option.checked) {
+        option.dataset.legacyRemoved = "true";
+        option.disabled = true;
+        const row = option.closest("[data-keyword-search]");
+        if (row) row.hidden = true;
+        sizeRecordKeywordPanel();
+    }
+    renderRecordKeywordSelection();
+    updateRecordDirtyState();
+}));
+recordKeywordSearch?.addEventListener("input", () => {
+    const normalizeSearch = (value) => value.normalize("NFD").replace(/\p{Mn}+/gu, "").trim().toLocaleLowerCase("es");
+    const query = normalizeSearch(recordKeywordSearch.value);
+    recordKeywordOptions.forEach((option) => {
+        const row = option.closest("[data-keyword-search]");
+        if (row) {
+            row.hidden = option.dataset.legacyRemoved === "true"
+                || (query !== "" && !normalizeSearch(String(row.dataset.keywordSearch || "")).includes(query));
+        }
+    });
+    sizeRecordKeywordPanel();
+});
+document.addEventListener("click", (event) => {
+    if (recordKeywordSelector && !recordKeywordSelector.contains(event.target)) closeRecordKeywordSelector();
+});
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && recordKeywordPanel && !recordKeywordPanel.hidden) {
+        event.preventDefault();
+        closeRecordKeywordSelector(true);
+    }
+});
+renderRecordKeywordSelection();
+window.addEventListener("resize", sizeRecordKeywordPanel, { passive: true });
+window.visualViewport?.addEventListener("resize", sizeRecordKeywordPanel, { passive: true });
+window.addEventListener("scroll", (event) => {
+    if (event.target === recordKeywordOptionsContainer || recordKeywordOptionsContainer?.contains(event.target)) return;
+    sizeRecordKeywordPanel();
+}, { passive: true });
+
 let recordInitialValues = JSON.stringify(recordFormEntries());
+
+function syncRecordMaterialType() {
+    if (!(recordMaterialTypeChoice instanceof HTMLSelectElement)
+        || !(recordMaterialTypeCustom instanceof HTMLInputElement)
+        || !recordMaterialTypeCustomWrap) return;
+    const custom = recordMaterialTypeChoice.value === "Otros";
+    const embeddedInPanel = Boolean(recordMaterialTypeCustomWrap.closest(".custom-select-panel"));
+    recordMaterialTypeCustomWrap.hidden = !custom || !embeddedInPanel;
+    recordMaterialTypeCustom.required = custom;
+    if (!custom) recordMaterialTypeCustom.value = "";
+    if (recordMaterialTypeCount) recordMaterialTypeCount.textContent = String([...recordMaterialTypeCustom.value].length);
+}
+
+recordMaterialTypeChoice?.addEventListener("change", () => {
+    syncRecordMaterialType();
+    updateRecordDirtyState();
+    if (recordMaterialTypeChoice.value === "Otros") recordMaterialTypeCustom?.focus();
+});
+recordMaterialTypeCustom?.addEventListener("input", () => {
+    if (recordMaterialTypeCount) recordMaterialTypeCount.textContent = String([...recordMaterialTypeCustom.value].length);
+});
+recordMaterialTypeCustom?.addEventListener("blur", () => {
+    const trimmedValue = recordMaterialTypeCustom.value.trim();
+    if (recordMaterialTypeCustom.value !== trimmedValue) {
+        recordMaterialTypeCustom.value = trimmedValue;
+        recordMaterialTypeCustom.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    updateRecordDirtyState();
+});
+syncRecordMaterialType();
 
 function recordFormIsDirty() {
     return Boolean(recordForm) && JSON.stringify(recordFormEntries()) !== recordInitialValues;
@@ -1816,7 +2061,10 @@ function updateRecordDirtyState() {
     const dirty = recordFormIsDirty();
     recordIsDirty = dirty;
     if (recordForm) recordForm.dataset.dirty = String(dirty);
-    if (recordDirtyMessage) recordDirtyMessage.textContent = dirty ? "Tienes cambios sin guardar." : "Sin cambios pendientes.";
+    if (recordSubmitButton) recordSubmitButton.disabled = !dirty || recordIsSubmitting;
+    recordDirtyMessage?.classList.toggle("is-dirty", dirty);
+    if (recordDirtyMessageText) recordDirtyMessageText.textContent = dirty ? "Hay cambios sin guardar." : "No hay cambios pendientes.";
+    if (recordDirtyMessageIcon) recordDirtyMessageIcon.className = `fa-solid ${dirty ? "fa-triangle-exclamation" : "fa-circle-check"}`;
     return dirty;
 }
 
@@ -1836,7 +2084,11 @@ function setRecordFieldError(field, message) {
 function showRecordError(message, fieldName = "") {
     if (recordErrorMessage) recordErrorMessage.textContent = message;
     recordErrorSummary?.removeAttribute("hidden");
-    if (fieldName) setRecordFieldError(recordForm?.elements.namedItem(fieldName), message);
+    if (fieldName === "keywords_selected") {
+        recordKeywordTrigger?.setAttribute("aria-invalid", "true");
+        const keywordError = recordForm?.querySelector('[data-field-error="keywords_selected"]');
+        if (keywordError) keywordError.textContent = message;
+    } else if (fieldName) setRecordFieldError(recordForm?.elements.namedItem(fieldName), message);
     recordErrorSummary?.focus();
 }
 
@@ -1844,9 +2096,11 @@ function fieldForServerMessage(message) {
     const normalized = message.toLocaleLowerCase("es");
     if (normalized.includes("título")) return "title";
     if (normalized.includes("categoría")) return "category_id";
-    if (normalized.includes("tipo de material")) return "material_type";
+    if (normalized.includes("especifica el tipo") || normalized.includes("personalizado")) return "material_type_custom";
+    if (normalized.includes("tipo de material")) return "material_type_choice";
     if (normalized.includes("descripción corta")) return "description";
     if (normalized.includes("descripción completa")) return "full_description";
+    if (normalized.includes("palabra clave") || normalized.includes("palabras clave")) return "keywords_selected";
     if (normalized.includes("responsable")) return "publisher";
     return "";
 }
@@ -1930,28 +2184,28 @@ recordForm?.addEventListener("submit", (event) => {
     clearRecordErrors();
     if (recordFormStatus) recordFormStatus.hidden = true;
 
-    if (!updateRecordDirtyState()) {
-        if (recordFormStatus) {
-            recordFormStatus.textContent = "No se detectaron cambios para guardar.";
-            recordFormStatus.hidden = false;
-            recordFormStatus.focus?.();
-        }
-        return;
-    }
+    if (!updateRecordDirtyState()) return;
 
     if (!recordForm.checkValidity()) {
         const invalidFields = [...recordForm.querySelectorAll(":invalid")];
         invalidFields.forEach((field) => setRecordFieldError(field, field.validationMessage));
         showRecordError("Revisa los campos señalados antes de guardar.");
+        if (invalidFields.includes(recordMaterialTypeCustom)) {
+            const materialTypeTrigger = recordMaterialTypeChoice?.closest(".custom-select")?.querySelector(".custom-select-trigger");
+            if (materialTypeTrigger?.getAttribute("aria-expanded") !== "true") materialTypeTrigger?.click();
+            requestAnimationFrame(() => recordMaterialTypeCustom?.focus());
+        }
         return;
     }
 
+    const materialTypeTrigger = recordMaterialTypeChoice?.closest(".custom-select")?.querySelector(".custom-select-trigger");
+    if (materialTypeTrigger?.getAttribute("aria-expanded") === "true") materialTypeTrigger.click();
     openRecordSaveDialog(recordForm.querySelector('[type="submit"]'));
 });
 
 async function submitRecordForm() {
     if (!recordForm || recordIsSubmitting) return;
-    const submitButton = recordForm.querySelector('[type="submit"]');
+    const submitButton = recordSubmitButton;
     if (submitButton) submitButton.disabled = true;
     if (recordSaveConfirmButton) recordSaveConfirmButton.disabled = true;
     if (recordSaveContinueButton) recordSaveContinueButton.disabled = true;
@@ -1967,15 +2221,12 @@ async function submitRecordForm() {
             updateRecordDirtyState();
             recordIsSubmitting = false;
             closeRecordSaveDialog(false);
-            if (recordFormStatus) {
-                recordFormStatus.textContent = result.message;
-                recordFormStatus.hidden = false;
-            }
             submitButton?.focus();
             return;
         }
-        recordIsDirty = false;
-        recordForm.dataset.dirty = "false";
+        recordInitialValues = JSON.stringify(recordFormEntries());
+        recordIsSubmitting = false;
+        updateRecordDirtyState();
         sessionStorage.setItem("digitalRecordToast", "Cambios guardados correctamente.");
         window.location.assign(recordForm.dataset.successUrl);
     } catch (error) {
@@ -1985,7 +2236,7 @@ async function submitRecordForm() {
         const message = error instanceof Error ? error.message : "No fue posible guardar los cambios.";
         showRecordError(message, fieldForServerMessage(message));
     } finally {
-        if (submitButton) submitButton.disabled = false;
+        updateRecordDirtyState();
         if (recordSaveConfirmButton) recordSaveConfirmButton.disabled = false;
         if (recordSaveContinueButton) recordSaveContinueButton.disabled = false;
         if (recordSaveLabel) recordSaveLabel.textContent = "Guardar cambios";

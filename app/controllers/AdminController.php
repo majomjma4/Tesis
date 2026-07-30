@@ -51,17 +51,22 @@ final class AdminController
                 if($id>0){
                     $current=$model->findByIdForUpdate($id);
                     if($current===null)throw new InvalidArgumentException('El material ya no está disponible.');
-                    $submittedKeywords=$this->normalizeAuditKeywords($_POST['keywords']??'');
+                    $submittedMaterialType=$model->resolveMaterialType($_POST,(string)($_POST['controlled_material_type']??'')==='1');
+                    $resolvedKeywords=$model->resolveKeywords(
+                        $_POST,
+                        (array)($current['keywords']??[]),
+                        (string)($_POST['controlled_keywords']??'')==='1'
+                    );
+                    $submittedKeywords=$this->normalizeAuditKeywords($resolvedKeywords);
                     $currentKeywords=$this->normalizeAuditKeywords((array)($current['keywords']??[]));
                     $newCategoryId=(int)($_POST['category_id']??0);
                     $newCategoryName=$model->categoryName($newCategoryId);
                     if($newCategoryName===null)throw new InvalidArgumentException('Selecciona una categoría válida.');
                     $auditableFields=[
                         'title'=>['label'=>'Título','old'=>$this->normalizeAuditText($current['title']??''),'new'=>$title],
-                        'material_type'=>['label'=>'Tipo de material','old'=>$this->normalizeAuditText($current['material_type']??''),'new'=>$this->normalizeAuditText($_POST['material_type']??'')],
+                        'material_type'=>['label'=>'Tipo de material','old'=>$this->normalizeAuditText($current['material_type']??''),'new'=>$this->normalizeAuditText($submittedMaterialType)],
                         'description'=>['label'=>'Descripción corta','old'=>$this->normalizeAuditText($current['description']??'',true),'new'=>$this->normalizeAuditText($_POST['description']??'',true)],
                         'full_description'=>['label'=>'Descripción completa','old'=>$this->normalizeAuditText($current['full_description']??'',true),'new'=>$this->normalizeAuditText($_POST['full_description']??'',true)],
-                        'publisher'=>['label'=>'Responsable','old'=>$this->normalizeAuditText($current['publisher']??''),'new'=>$this->normalizeAuditText($_POST['publisher']??'')],
                     ];
                     foreach($auditableFields as $field=>$change){
                         if($change['old']!==$change['new'])$auditChanges[]=['field'=>$field]+$change;
@@ -80,7 +85,7 @@ final class AdminController
                 );
                 return ['id'=>$saved,'no_changes'=>false];
             });
-            if($result['no_changes'])$this->json(true,'No se detectaron cambios para guardar.',['id'=>$result['id'],'no_changes'=>true]);
+            if($result['no_changes'])$this->json(true,'La información ya se encuentra actualizada.',['id'=>$result['id'],'no_changes'=>true]);
             $saved=(int)$result['id'];
             $this->json(true,$id?'Material actualizado correctamente.':'Material creado correctamente.',['id'=>$saved]);
         }

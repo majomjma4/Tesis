@@ -43,6 +43,8 @@ final class SupportMaterialController
             http_response_code(404);
         } else {
             $material['downloads'] = (new SupportMaterialDownloadModel())->getTotal($material['id'], $material['downloads']);
+            $material['information_updated_at'] = $materialModel->lastInformationUpdateAt((int) $material['id']);
+            $material['editable_keywords'] = $materialModel->normalizeExistingKeywords((array) ($material['keywords'] ?? []));
             $material['package_descriptor'] = (new SupportMaterialPackageService())->describe($material);
             $documentEvolution = $materialModel->documentEvolution((int) $material['id']);
             if ($isAdministrator) {

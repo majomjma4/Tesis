@@ -5,6 +5,11 @@ declare(strict_types=1);
 final class SupportMaterialModel
 {
     public const RESTORE_HOURS = 24;
+    public const KEYWORD_CATALOG = [
+        'Tesis','Perfil de tesis','Titulación','Investigación','Metodología','Normativa',
+        'Reglamento','Formato','Plantilla','Guía documental','Vinculación','Proyecto PIS',
+        'Prácticas preprofesionales',
+    ];
     private const PREVIEW_EXTENSIONS = ['pdf','docx','txt','png','jpg','jpeg','webp'];
 
     public function getAll(): array
@@ -107,6 +112,103 @@ final class SupportMaterialModel
         return $name === false ? null : (string) $name;
     }
 
+    public function resolveMaterialType(array $input, bool $controlled = false): string
+    {
+        if (!$controlled) {
+            return trim((string) preg_replace('/\s+/u', ' ', (string) ($input['material_type'] ?? '')));
+        }
+        $choice = trim((string) ($input['material_type_choice'] ?? ''));
+        $predefined = ['Normativa', 'Formato', 'Guía documental', 'Plantilla'];
+        if (in_array($choice, $predefined, true)) return $choice;
+        if ($choice !== 'Otros') {
+            throw new InvalidArgumentException('Selecciona un tipo de material válido.');
+        }
+        $custom = trim((string) preg_replace('/\s+/u', ' ', (string) ($input['material_type_custom'] ?? '')));
+        if ($custom === '') {
+            throw new InvalidArgumentException('Especifica el tipo de material.');
+        }
+        if (mb_strlen($custom) > 100) {
+            throw new InvalidArgumentException('El tipo de material personalizado no puede superar 100 caracteres.');
+        }
+        return $custom;
+    }
+
+    public function normalizeExistingKeywords(array $keywords): array
+    {
+        $catalog = $this->keywordCatalogMap();
+        $normalized = [];
+        $seen = [];
+        foreach ($keywords as $keyword) {
+            $display = trim((string) preg_replace('/\s+/u', ' ', (string) $keyword));
+            if ($display === '') continue;
+            $key = $this->keywordKey($display);
+            if ($key === 'perfil') $key = $this->keywordKey('Perfil de tesis');
+            $display = $catalog[$key] ?? $display;
+            $dedupeKey = $this->keywordKey($display);
+            if (isset($seen[$dedupeKey])) continue;
+            $seen[$dedupeKey] = true;
+            $normalized[] = $display;
+        }
+        return $normalized;
+    }
+
+    public function resolveKeywords(array $input, array $existing = [], bool $controlled = false): array
+    {
+        if (!$controlled) {
+            $keywords = array_map(
+                static fn (string $keyword): string => trim((string) preg_replace('/\s+/u', ' ', $keyword)),
+                preg_split('/[,;\n]+/u', (string) ($input['keywords'] ?? '')) ?: []
+            );
+            return array_values(array_unique(array_filter($keywords, static fn (string $keyword): bool => $keyword !== '')));
+        }
+        $submitted = $input['keywords_selected'] ?? [];
+        if (!is_array($submitted)) {
+            throw new InvalidArgumentException('La selección de palabras clave no es válida.');
+        }
+        $existingNormalized = $this->normalizeExistingKeywords($existing);
+        $catalog = $this->keywordCatalogMap();
+        $legacy = [];
+        foreach ($existingNormalized as $keyword) {
+            $key = $this->keywordKey($keyword);
+            if (!isset($catalog[$key])) $legacy[$key] = $keyword;
+        }
+        $resolved = [];
+        $seen = [];
+        foreach ($submitted as $keyword) {
+            $key = $this->keywordKey((string) $keyword);
+            if ($key === 'perfil') $key = $this->keywordKey('Perfil de tesis');
+            $display = $catalog[$key] ?? $legacy[$key] ?? null;
+            if ($display === null) {
+                throw new InvalidArgumentException('La selección contiene una palabra clave no permitida.');
+            }
+            $dedupeKey = $this->keywordKey($display);
+            if (isset($seen[$dedupeKey])) continue;
+            $seen[$dedupeKey] = true;
+            $resolved[] = $display;
+        }
+        if (count($resolved) > 8) {
+            throw new InvalidArgumentException('Puedes seleccionar un máximo de 8 palabras clave.');
+        }
+        return $resolved;
+    }
+
+    public function lastInformationUpdateAt(int $materialId): ?string
+    {
+        if ($materialId < 1) return null;
+        $statement = Database::connection()->prepare(
+            "SELECT MAX(created_at)
+             FROM admin_audit_log
+             WHERE entity_type='support_material' AND entity_id=:id
+               AND module='Repositorio' AND result='correct'
+               AND action IN ('support_material.updated','support_material_updated')"
+        );
+        $statement->execute(['id' => $materialId]);
+        $updatedAt = $statement->fetchColumn();
+        return $updatedAt === false || $updatedAt === null || trim((string) $updatedAt) === ''
+            ? null
+            : (string) $updatedAt;
+    }
+
     public function findFile(array $material, int $fileId): ?array
     {
         foreach ($material['files'] as $file) {
@@ -122,16 +224,15 @@ final class SupportMaterialModel
     {
         $id = (int) ($input['id'] ?? 0);
         $title = trim((string) ($input['title'] ?? ''));
-        $type = trim((string) ($input['material_type'] ?? ''));
+        $controlledType = $id > 0 && (string) ($input['controlled_material_type'] ?? '') === '1';
+        $controlledKeywords = $id > 0 && (string) ($input['controlled_keywords'] ?? '') === '1';
+        $type = $this->resolveMaterialType($input, $controlledType);
         $description = trim((string) ($input['description'] ?? ''));
         $fullDescription = trim((string) ($input['full_description'] ?? ''));
         $publisher = trim((string) ($input['publisher'] ?? ''));
         $categoryId = (int) ($input['category_id'] ?? 0);
         $publicationDate = null;
-        $keywords = array_values(array_unique(array_filter(array_map(
-            'trim',
-            preg_split('/[,;\n]+/u', (string) ($input['keywords'] ?? '')) ?: []
-        ))));
+        $keywords = [];
 
         if ($title === '' || mb_strlen($title) > 220) {
             throw new InvalidArgumentException('Ingresa un título válido de hasta 220 caracteres.');
@@ -145,10 +246,30 @@ final class SupportMaterialModel
         if ($fullDescription === '') {
             throw new InvalidArgumentException('Ingresa la descripción completa del material.');
         }
+        $database = Database::connection();
+        if ($id > 0) {
+            $storedPublisher = $database->prepare(
+                'SELECT publisher,keywords_json FROM support_materials
+                 WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL'
+            );
+            $storedPublisher->execute(['id' => $id]);
+            $storedMaterial = $storedPublisher->fetch();
+            if (!$storedMaterial) {
+                throw new InvalidArgumentException('El material ya no está disponible.');
+            }
+            $publisher = (string) $storedMaterial['publisher'];
+            $existingKeywords = json_decode((string) ($storedMaterial['keywords_json'] ?? '[]'), true);
+            $keywords = $this->resolveKeywords(
+                $input,
+                is_array($existingKeywords) ? $existingKeywords : [],
+                $controlledKeywords
+            );
+        } else {
+            $keywords = $this->resolveKeywords($input);
+        }
         if ($publisher === '' || mb_strlen($publisher) > 180) {
             throw new InvalidArgumentException('Ingresa el responsable de la publicación.');
         }
-        $database = Database::connection();
         $category = $database->prepare(
             'SELECT COUNT(*) FROM support_material_categories WHERE id=:id AND is_active=1'
         );
@@ -170,17 +291,13 @@ final class SupportMaterialModel
         ];
 
         if ($id > 0) {
-            if ($this->findById($id, true) === null) {
-                throw new InvalidArgumentException('El material ya no está disponible.');
-            }
             $payload['id'] = $id;
             $updatePayload = $payload;
-            unset($updatePayload['publication_date']);
+            unset($updatePayload['publication_date'], $updatePayload['publisher']);
             $statement = $database->prepare(
                 'UPDATE support_materials SET
                  category_id=:category_id,title=:title,material_type=:material_type,
                  description=:description,full_description=:full_description,
-                 publisher=:publisher,
                  keywords_json=:keywords_json,updated_by=:updated_by
                  WHERE id=:id'
             );
@@ -1110,5 +1227,22 @@ final class SupportMaterialModel
             7=>'julio',8=>'agosto',9=>'septiembre',10=>'octubre',11=>'noviembre',12=>'diciembre'];
         return (int) $date->format('j') . ' de ' . $months[(int) $date->format('n')]
             . ' de ' . $date->format('Y');
+    }
+
+    private function keywordCatalogMap(): array
+    {
+        $map = [];
+        foreach (self::KEYWORD_CATALOG as $keyword) $map[$this->keywordKey($keyword)] = $keyword;
+        return $map;
+    }
+
+    private function keywordKey(string $value): string
+    {
+        $normalized = mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $value)), 'UTF-8');
+        if (class_exists('Normalizer')) {
+            $decomposed = Normalizer::normalize($normalized, Normalizer::FORM_D);
+            if (is_string($decomposed)) $normalized = (string) preg_replace('/\p{Mn}+/u', '', $decomposed);
+        }
+        return $normalized;
     }
 }

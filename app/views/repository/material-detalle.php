@@ -10,6 +10,46 @@
     $mode = $requestedMode === 'edit' && !empty($isAdministrator) ? 'edit' : 'view';
     $modeQuery = $mode === 'edit' ? '&mode=edit' : '&mode=view';
     $viewUrl = $detailUrl . '&mode=view&tab=information';
+    $updatedAtValue = trim((string) ($material['information_updated_at'] ?? ''));
+    $updatedAtLabel = 'Sin actualizaciones registradas';
+    if ($updatedAtValue !== '') {
+        try {
+            $updatedAtUtc = new DateTimeImmutable($updatedAtValue, new DateTimeZone('UTC'));
+            $updatedAtLocal = $updatedAtUtc->setTimezone(new DateTimeZone(date_default_timezone_get()));
+            $shortMonths = [1 => 'ene', 2 => 'feb', 3 => 'mar', 4 => 'abr', 5 => 'may', 6 => 'jun',
+                7 => 'jul', 8 => 'ago', 9 => 'sep', 10 => 'oct', 11 => 'nov', 12 => 'dic'];
+            $updatedAtLabel = $updatedAtLocal->format('d') . ' '
+                . $shortMonths[(int) $updatedAtLocal->format('n')] . ' '
+                . $updatedAtLocal->format('Y') . ' · ' . $updatedAtLocal->format('H:i');
+        } catch (Throwable) {
+            $updatedAtLabel = 'Sin actualizaciones registradas';
+        }
+    }
+    $storedMaterialType = trim((string) ($material['material_type'] ?? $material['type'] ?? ''));
+    $materialTypeKey = mb_strtolower($storedMaterialType, 'UTF-8');
+    if (class_exists('Normalizer')) {
+        $decomposedType = Normalizer::normalize($materialTypeKey, Normalizer::FORM_D);
+        if (is_string($decomposedType)) {
+            $materialTypeKey = (string) preg_replace('/\p{Mn}+/u', '', $decomposedType);
+        }
+    }
+    $materialTypeKey = trim((string) preg_replace('/\s+/u', ' ', $materialTypeKey));
+    $materialTypeMap = [
+        'normativa' => 'Normativa',
+        'formato' => 'Formato',
+        'guía' => 'Guía documental',
+        'guía documental' => 'Guía documental',
+        'guia' => 'Guía documental',
+        'guia documental' => 'Guía documental',
+        'plantilla' => 'Plantilla',
+    ];
+    $materialTypeChoice = $materialTypeMap[$materialTypeKey] ?? 'Otros';
+    $materialTypeCustom = $materialTypeChoice === 'Otros' ? $storedMaterialType : '';
+    $selectedKeywords = array_values(array_map('strval', (array) ($material['editable_keywords'] ?? $material['keywords'] ?? [])));
+    $legacyKeywords = array_values(array_filter(
+        $selectedKeywords,
+        static fn (string $keyword): bool => !in_array($keyword, SupportMaterialModel::KEYWORD_CATALOG, true)
+    ));
 
     $materialFiles = array_values(array_filter(
         is_array($material['files'] ?? null) ? $material['files'] : [],
@@ -91,6 +131,7 @@
         'metadata' => array_values(array_filter([
             ['label' => 'Responsable', 'value' => (string) ($material['publisher'] ?? '')],
             ['label' => 'Publicación', 'value' => (string) ($material['publication_date'] ?? '')],
+            ['label' => 'Última actualización', 'value' => $updatedAtLabel],
             ['label' => 'Categoría', 'value' => (string) ($material['category_label'] ?? '')],
             ['label' => 'Periodo', 'value' => (string) ($material['pao_label'] ?? '')],
             ['key' => 'availability', 'label' => 'Disponibilidad', 'value' => $isPublished ? ($materialAvailable ? 'Disponible' : 'No disponible') : 'No aplica', 'tone' => 'secondary'],
@@ -156,6 +197,7 @@
             'method' => 'POST',
             'csrf_token' => (string) ($materialCsrfToken ?? ''),
             'cancel_url' => $viewUrl,
+            'detail_url' => $viewUrl,
             'success_url' => $viewUrl,
             'success_message' => '',
             'categories' => is_array($materialCategories ?? null) ? $materialCategories : [],
@@ -163,14 +205,18 @@
                 'id' => $materialId,
                 'title' => (string) ($material['title'] ?? ''),
                 'category_id' => (int) ($material['category_id'] ?? 0),
-                'material_type' => (string) ($material['material_type'] ?? $material['type'] ?? ''),
+                'material_type_choice' => $materialTypeChoice,
+                'material_type_custom' => $materialTypeCustom,
                 'description' => (string) ($material['description'] ?? ''),
                 'full_description' => (string) ($material['full_description'] ?? ''),
                 'publisher' => (string) ($material['publisher'] ?? ''),
                 'publication_date_label' => (string) ($material['publication_date'] ?? 'Sin publicar'),
+                'updated_at_label' => $updatedAtLabel,
                 'period' => (string) ($material['pao_label'] ?? ''),
-                'keywords' => implode(', ', array_map('strval', (array) ($material['keywords'] ?? []))),
+                'keywords_selected' => $selectedKeywords,
             ],
+            'keyword_catalog' => SupportMaterialModel::KEYWORD_CATALOG,
+            'legacy_keywords' => $legacyKeywords,
             'errors' => [],
         ],
         'endpoints' => [
