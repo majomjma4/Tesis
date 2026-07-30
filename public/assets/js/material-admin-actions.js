@@ -229,6 +229,10 @@
     };
     reason.addEventListener("click", () => reasonList.hidden ? openReasonList() : closeReasonList(true));
     reason.addEventListener("keydown", event => {
+        if (event.repeat && ["Enter"," "].includes(event.key)) {
+            event.preventDefault();
+            return;
+        }
         if (["Enter"," "].includes(event.key)) {
             event.preventDefault();
             if (reasonList.hidden) openReasonList();
@@ -288,6 +292,24 @@
             }
             event.preventDefault();
             close();
+            return;
+        }
+        if (!event.defaultPrevented && ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(event.key)) {
+            const active = document.activeElement;
+            if (active?.matches("button:not([role='combobox'])") && !active.closest('[role="listbox"]')) {
+                const controls = [...overlay.querySelectorAll(
+                    'button:not(:disabled):not([hidden]),[tabindex]:not([tabindex="-1"])'
+                )].filter(control => control.getClientRects().length > 0);
+                const index = controls.indexOf(active);
+                if (index >= 0 && controls.length > 1) {
+                    event.preventDefault();
+                    const backwards = event.key === "ArrowLeft" || event.key === "ArrowUp";
+                    const next = backwards
+                        ? (index === 0 ? controls.length - 1 : index - 1)
+                        : (index === controls.length - 1 ? 0 : index + 1);
+                    controls[next]?.focus();
+                }
+            }
             return;
         }
         if (event.key !== "Tab") return;

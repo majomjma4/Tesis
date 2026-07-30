@@ -533,6 +533,13 @@ digitalRecordMenuPanel?.addEventListener("keydown", (event) => {
     items[next]?.focus();
 });
 
+digitalRecord?.addEventListener("keydown", (event) => {
+    const menuLink = event.target.closest?.('a[role="menuitem"]');
+    if (event.key !== " " || event.repeat || !menuLink || !digitalRecord.contains(menuLink)) return;
+    event.preventDefault();
+    menuLink.click();
+});
+
 document.addEventListener("click", (event) => {
     if (digitalRecordMenu && !digitalRecordMenu.contains(event.target)) closeDigitalRecordMenu();
 });
@@ -575,7 +582,7 @@ if (recordPersistentTabs) {
             activatePersistentRecordTab(link.dataset.tabId || "information");
         });
         link.addEventListener("keydown", (event) => {
-            if (event.key === " ") {
+            if (event.key === " " && !event.repeat) {
                 event.preventDefault();
                 activatePersistentRecordTab(link.dataset.tabId || "information");
                 return;
@@ -1735,15 +1742,15 @@ function bindNeutralFileButton(button) {
         selectNeutralFile(button);
     });
     button.addEventListener("keydown", (event) => {
-        if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-        const list = button.closest("[data-file-group-list]");
-        const options = [...(list?.querySelectorAll('[data-record-file]:not(:disabled)') ?? [])];
+        if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key)) return;
+        const options = [...(neutralFileList?.querySelectorAll('[data-record-file]:not(:disabled)') ?? [])]
+            .filter((option) => !option.hidden && option.getClientRects().length > 0);
         if (!options.length) return;
         event.preventDefault();
         const index = options.indexOf(button);
         const next = event.key === "Home" ? 0
             : event.key === "End" ? options.length - 1
-                : event.key === "ArrowUp" ? Math.max(0, index - 1)
+                : ["ArrowUp", "ArrowLeft"].includes(event.key) ? Math.max(0, index - 1)
                     : Math.min(options.length - 1, index + 1);
         options[next]?.focus();
     });
@@ -4286,7 +4293,7 @@ function bindNeutralFileMenu(item) {
     };
     toggle.addEventListener("click", openMenu);
     toggle.addEventListener("keydown", (event) => {
-        if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+        if (!event.repeat && (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ")) {
             event.preventDefault();
             openMenu();
         }
@@ -4702,7 +4709,7 @@ globalFileToggle?.addEventListener("click", () => {
     else closeGlobalFileMenu(true);
 });
 globalFileToggle?.addEventListener("keydown", (event) => {
-    if (["Enter", " ", "ArrowDown"].includes(event.key)) {
+    if (!event.repeat && ["Enter", " ", "ArrowDown"].includes(event.key)) {
         event.preventDefault();
         openGlobalFileMenu();
     }
@@ -5014,3 +5021,27 @@ document.addEventListener("keydown", (event) => {
         }
     });
 })();
+
+document.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+    const active = document.activeElement;
+    const dialog = active?.closest?.('[role="dialog"],[role="alertdialog"]');
+    if (!dialog || dialog.getClientRects().length === 0) return;
+    if (active.matches("input,select,textarea,[contenteditable='true']")) return;
+    if (active.closest('[role="menu"],[role="listbox"],[role="tree"],[role="tablist"]')) return;
+
+    const controls = [...dialog.querySelectorAll(
+        'a[href],button:not(:disabled),[tabindex]:not([tabindex="-1"])'
+    )].filter((control) => !control.hidden
+        && control.getAttribute("aria-hidden") !== "true"
+        && control.getClientRects().length > 0);
+    const index = controls.indexOf(active);
+    if (index < 0 || controls.length < 2) return;
+
+    event.preventDefault();
+    const backwards = event.key === "ArrowLeft" || event.key === "ArrowUp";
+    const next = backwards
+        ? (index === 0 ? controls.length - 1 : index - 1)
+        : (index === controls.length - 1 ? 0 : index + 1);
+    controls[next]?.focus();
+});
