@@ -1310,7 +1310,7 @@ function loadNeutralViewerScript(url, isReady) {
                 console.debug("[DOCX viewer] Biblioteca cargada", { url: resolvedUrl });
                 resolve();
             } else {
-                reject(new Error("La biblioteca del visor no se inicializÃ³ correctamente."));
+                reject(new Error("La biblioteca del visor no se inicializó correctamente."));
             }
         }, { once: true });
         script.addEventListener("error", () => reject(new Error("No fue posible cargar la biblioteca local del visor.")), { once: true });
@@ -1332,7 +1332,7 @@ function ensureNeutralDocxLibraries() {
     if (neutralDocxLibrariesPromise) return neutralDocxLibrariesPromise;
     const jsZipUrl = neutralViewerDocx?.dataset.jszipScript || "";
     const docxPreviewUrl = neutralViewerDocx?.dataset.docxPreviewScript || "";
-    if (!jsZipUrl || !docxPreviewUrl) return Promise.reject(new Error("El visor DOCX local no estÃ¡ configurado."));
+    if (!jsZipUrl || !docxPreviewUrl) return Promise.reject(new Error("El visor DOCX local no está configurado."));
     neutralDocxLibrariesPromise = loadNeutralViewerScript(jsZipUrl, () => Boolean(window.JSZip))
         .then(() => loadNeutralViewerScript(docxPreviewUrl, () => typeof window.docx?.renderAsync === "function"))
         .then(() => {
@@ -1350,7 +1350,7 @@ function ensureNeutralDocxLibraries() {
 }
 
 async function renderNeutralDocxPreview(preview, requestSequence, fileId) {
-    if (!neutralViewerDocx || !preview.content_url) throw new Error("El contenido DOCX no estÃ¡ disponible.");
+    if (!neutralViewerDocx || !preview.content_url) throw new Error("El contenido DOCX no está disponible.");
     await ensureNeutralDocxLibraries();
     console.debug("[DOCX viewer] Descargando DOCX", {
         fileId,
@@ -1374,7 +1374,7 @@ async function renderNeutralDocxPreview(preview, requestSequence, fileId) {
         throw error;
     }
     const documentData = await contentResponse.arrayBuffer();
-    if (documentData.byteLength === 0) throw new Error("El endpoint protegido devolviÃ³ un DOCX sin contenido.");
+    if (documentData.byteLength === 0) throw new Error("El endpoint protegido devolvió un DOCX sin contenido.");
     console.debug("[DOCX viewer] DOCX descargado", { bytes: documentData.byteLength });
     const detachedBody = document.createElement("div");
     const detachedStyles = document.createElement("div");

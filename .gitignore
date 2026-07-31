@@ -1,4 +1,5 @@
 /storage/repository/*.zip
+/storage/backups/
 # Materiales de apoyo generados por usuarios: privados y específicos de cada
 # instalación. Las excepciones siguientes son únicamente fixtures demostrativos
 # referenciados por database/snapshot.sql.
