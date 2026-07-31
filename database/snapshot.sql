@@ -56,6 +56,38 @@ INSERT INTO `academic_periods` VALUES (2,'2026-I','I PAO 2026','2026-04-01','202
 UNLOCK TABLES;
 
 --
+-- Table structure for table `academic_period_transitions`
+--
+
+DROP TABLE IF EXISTS `academic_period_transitions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `academic_period_transitions` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `closed_period_id` smallint(5) unsigned NOT NULL,
+  `activated_period_id` smallint(5) unsigned NOT NULL,
+  `performed_by` bigint(20) unsigned NOT NULL,
+  `performed_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `reverted_by` bigint(20) unsigned DEFAULT NULL,
+  `reverted_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_period_transition_event` (`closed_period_id`,`activated_period_id`,`performed_at`),
+  KEY `idx_period_transition_latest` (`performed_at`,`id`),
+  KEY `idx_period_transition_actor` (`performed_by`,`performed_at`),
+  KEY `idx_period_transition_reverted` (`reverted_at`),
+  KEY `fk_period_transition_activated` (`activated_period_id`),
+  KEY `fk_period_transition_reverter` (`reverted_by`),
+  CONSTRAINT `fk_period_transition_activated` FOREIGN KEY (`activated_period_id`) REFERENCES `academic_periods` (`id`),
+  CONSTRAINT `fk_period_transition_closed` FOREIGN KEY (`closed_period_id`) REFERENCES `academic_periods` (`id`),
+  CONSTRAINT `fk_period_transition_performer` FOREIGN KEY (`performed_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `fk_period_transition_reverter` FOREIGN KEY (`reverted_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `chk_period_transition_distinct` CHECK (`closed_period_id` <> `activated_period_id`),
+  CONSTRAINT `chk_period_transition_reversal` CHECK (`reverted_by` is null and `reverted_at` is null or `reverted_by` is not null and `reverted_at` is not null)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `academic_subjects`
 --
 

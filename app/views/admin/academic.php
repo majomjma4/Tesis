@@ -4,6 +4,7 @@ $activePeriod = $academic['promotion']['source'] ?? null;
 $plannedPeriod = $academic['promotion']['target'] ?? null;
 $closedPeriods = array_values(array_filter($periods, static fn(array $period): bool => ($period['status'] ?? '') === 'closed'));
 $suggestedPeriod = $academic['promotion']['suggested'] ?? null;
+$reversal = $academic['reversal'] ?? null;
 $typeCount = count($academic['types'] ?? []);
 $materialTypeCount = count($academic['material_types'] ?? []);
 $keywordCount = count($academic['keywords'] ?? []);
@@ -155,6 +156,27 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
                     </button>
                 </footer>
             </article>
+        <?php endif; ?>
+
+        <?php if ($reversal): ?>
+            <aside class="aa-reversal" aria-label="Reversión del cierre académico">
+                <span class="aa-reversal-icon"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></span>
+                <div>
+                    <small>Acción temporal</small>
+                    <strong>Revertir cierre de <?= e($reversal['closed_period_name']) ?></strong>
+                    <?php if ($reversal['available']): ?>
+                        <p>Disponible hasta el <?= e($reversal['expires_label']) ?>. Solo procede si no existe actividad académica en <?= e($reversal['activated_period_name']) ?>.</p>
+                    <?php else: ?>
+                        <p><?= e($reversal['reason'] ?? 'La reversión ya no está disponible.') ?></p>
+                    <?php endif; ?>
+                </div>
+                <button type="button" class="aa-secondary" data-revert-period
+                    data-transition-id="<?= (int) $reversal['id'] ?>"
+                    data-closed-name="<?= e($reversal['closed_period_name']) ?>"
+                    <?= !$reversal['available'] ? 'disabled aria-disabled="true"' : '' ?>>
+                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Revertir cierre
+                </button>
+            </aside>
         <?php endif; ?>
 
         <?php if ($closedPeriods): ?>
@@ -345,6 +367,7 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
     id="aaConfig"
     data-save="<?= e($academicEndpoints['save']) ?>"
     data-promote="<?= e($academicEndpoints['promote']) ?>"
+    data-revert="<?= e($academicEndpoints['revert']) ?>"
     data-csrf="<?= e($academicCsrf) ?>"
     data-target-period="<?= (int) ($plannedPeriod['id'] ?? 0) ?>"
     data-close-early="<?= $activePeriodClosesEarly ? '1' : '0' ?>"

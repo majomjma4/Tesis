@@ -251,6 +251,8 @@
             confirmIcon.setAttribute('aria-hidden', 'true');
         }
         confirmCancel.textContent = 'Cancelar';
+        confirmCancel.classList.add('aa-secondary');
+        confirmCancel.classList.remove('aa-primary');
         confirmBox.hidden = false;
         syncDialogState();
         requestAnimationFrame(() => confirmAccept?.focus());
@@ -261,6 +263,8 @@
         document.querySelector('#aaConfirmText').textContent = text;
         confirmAccept.hidden = true;
         confirmCancel.textContent = 'Entendido';
+        confirmCancel.classList.add('aa-secondary');
+        confirmCancel.classList.remove('aa-primary');
         confirmBox.hidden = false;
         syncDialogState();
         requestAnimationFrame(() => confirmCancel?.focus());
@@ -285,6 +289,8 @@
         if (closurePending) closurePending.hidden = false;
         confirmAccept.hidden = true;
         confirmCancel.textContent = 'Entendido';
+        confirmCancel.classList.remove('aa-secondary');
+        confirmCancel.classList.add('aa-primary');
         confirmBox.hidden = false;
         syncDialogState();
         requestAnimationFrame(() => confirmCancel?.focus());
@@ -392,6 +398,16 @@
             closesEarly ? 'Cerrar de todas formas' : 'Cerrar período'
         );
     });
+    document.querySelector('[data-revert-period]:not(:disabled)')?.addEventListener('click', event => {
+        const button = event.currentTarget;
+        openConfirm(
+            'Revertir cierre del período',
+            'El período anterior volverá a estar activo y el período actual regresará a estado planificado. Esta acción solo está disponible durante las primeras 24 horas posteriores al cierre y únicamente si no existe actividad académica en el nuevo período.',
+            { kind: 'revert-period', transition: button.dataset.transitionId },
+            'Revertir cierre',
+            'primary'
+        );
+    });
 
     form.addEventListener('submit', async event => {
         event.preventDefault();
@@ -434,6 +450,10 @@
                 if (action.early) data.set('confirm_early_close', '1');
                 const result = await send(config.dataset.promote, data);
                 sessionStorage.setItem('academicToast', result.message || 'Período actualizado correctamente.');
+            } else if (action.kind === 'revert-period') {
+                data.set('transition_id', action.transition);
+                const result = await send(config.dataset.revert, data);
+                sessionStorage.setItem('academicToast', result.message || 'El cierre del período se revirtió correctamente.');
             } else if (action.kind === 'delete-period') {
                 data.set('entity', 'period');
                 data.set('action', 'delete');

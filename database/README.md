@@ -8,6 +8,12 @@ XAMPP y ejecutar desde la raiz del proyecto:
 powershell -ExecutionPolicy Bypass -File .\scripts\import_database.ps1
 ```
 
+En Windows no debe canalizarse un dump con `Get-Content ... | mysql.exe`:
+PowerShell puede decodificar el archivo como texto y volver a codificar su
+salida con una página de códigos distinta, sustituyendo cada byte UTF-8 no
+representable por `?`. El script oficial usa `SOURCE`, `utf8mb4` y modo binario
+para que MariaDB lea directamente los bytes del snapshot.
+
 La importacion elimina y recrea la base `tesis`. Para usar otras credenciales
 sin exponer la contrasena como texto plano:
 
@@ -27,6 +33,9 @@ Cada vez que deban conservarse nuevos registros en Git:
 powershell -ExecutionPolicy Bypass -File .\scripts\export_database.ps1
 git add database/snapshot.sql
 ```
+
+La exportación oficial usa `--result-file` y nunca pasa el SQL por la consola de
+PowerShell, evitando la misma recodificación durante la generación del dump.
 
 El snapshot puede contener correos y hashes de contrasenas. Debe guardarse en un
 repositorio privado o generarse usando solamente datos de demostracion
@@ -121,6 +130,7 @@ El comando informa registros sin archivo y archivos sin registro. No elimina,
 mueve ni modifica archivos o datos.
 # Migraciones recientes
 
+- `migrations/20260815_academic_period_transitions.sql`: registra cada cierre/promoción de PAO y permite revertir de forma auditada la transición más reciente durante 24 horas cuando el nuevo período no tiene actividad académica.
 - `migrations/20260814_academic_catalogs.sql`: centraliza en `system_settings` los tipos y palabras clave que utiliza Materiales de apoyo, sin crear entidades paralelas.
 - `migrations/20260813_project_repository_availability.sql`: separa la disponibilidad temporal de un proyecto publicado de su retiro del Repositorio.
 - `migrations/20260812_support_material_version_integrity.sql`: fija la numeración histórica por archivo lógico y agrega huellas SHA-256 para verificar archivos vigentes y versiones.

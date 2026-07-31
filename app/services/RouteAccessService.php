@@ -4,7 +4,7 @@ declare(strict_types=1);
 final class RouteAccessService
 {
     private const PUBLIC_ROUTES = ['login', 'logout', 'dev-reload'];
-    private const ADMIN_ROUTES = ['admin-users','admin-user-save','admin-user-status','admin-user-password','admin-users-import','admin-project-save','admin-project-trash','admin-academic','admin-academic-save','admin-academic-promote','admin-repository','admin-repository-publish','admin-support-material-save','admin-support-material-history','admin-support-material-history-cleanup','admin-support-material-status','admin-support-material-file','admin-notification-send','admin-reports','admin-report-export','admin-settings','admin-settings-save','admin-trash','admin-trash-user','admin-trash-restore','admin-trash-purge'];
+    private const ADMIN_ROUTES = ['admin-users','admin-user-save','admin-user-status','admin-user-password','admin-users-import','admin-project-save','admin-project-trash','admin-academic','admin-academic-save','admin-academic-promote','admin-academic-revert','admin-repository','admin-repository-publish','admin-support-material-save','admin-support-material-history','admin-support-material-history-cleanup','admin-support-material-status','admin-support-material-file','admin-notification-send','admin-reports','admin-report-export','admin-settings','admin-settings-save','admin-trash','admin-trash-user','admin-trash-restore','admin-trash-purge'];
     public function enforce(string $page): void
     {
         $config = $GLOBALS['config'] ?? [];

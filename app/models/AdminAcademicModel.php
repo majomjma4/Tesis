@@ -13,7 +13,7 @@ final class AdminAcademicModel
         'published' => 'Publicado',
     ];
 
-    public function dashboard(): array
+    public function dashboard(?int $actor = null): array
     {
         $db = Database::connection();
         // El período vigente siempre proviene de MariaDB; nunca se deduce del mes calendario.
@@ -140,6 +140,7 @@ final class AdminAcademicModel
                 'projects' => $active ? (int) $active['projects'] : 0,
                 'suggested' => $this->nextPeriod($active),
             ],
+            'reversal' => $actor ? $this->reversalAvailability($db, $actor) : null,
         ];
     }
 
@@ -227,16 +228,100 @@ final class AdminAcademicModel
 
             $db->prepare("UPDATE academic_periods SET status='closed' WHERE id=:id")->execute(['id' => $active['id']]);
             $db->prepare("UPDATE academic_periods SET status='active' WHERE id=:id")->execute(['id' => $planned['id']]);
+            $transition = $db->prepare(
+                'INSERT INTO academic_period_transitions
+                 (closed_period_id,activated_period_id,performed_by,performed_at)
+                 VALUES(:closed,:activated,:actor,UTC_TIMESTAMP())'
+            );
+            $transition->execute(['closed' => $active['id'], 'activated' => $planned['id'], 'actor' => $actor]);
+            $transitionId = (int) $db->lastInsertId();
             $this->audit($db, $actor, 'academic_period_closed', 'period', (int) $active['id'], [
                 'activated_period_id' => (int) $planned['id'],
                 'projects_preserved' => $projectCount,
+                'transition_id' => $transitionId,
             ]);
             $this->audit($db, $actor, 'academic_period_activated', 'period', (int) $planned['id'], [
                 'closed_period_id' => (int) $active['id'],
                 'manual_transition' => true,
+                'transition_id' => $transitionId,
             ]);
 
-            return ['closed' => $active['name'], 'activated' => $planned['name'], 'projects' => $projectCount];
+            return ['closed' => $active['name'], 'activated' => $planned['name'], 'projects' => $projectCount, 'transition_id' => $transitionId];
+        });
+    }
+
+    public function reverseTransition(int $transitionId, int $actor): array
+    {
+        if ($transitionId < 1) throw new InvalidArgumentException('La transición académica seleccionada no es válida.');
+
+        return Database::transaction(function (PDO $db) use ($transitionId, $actor): array {
+            $statement = $db->prepare('SELECT * FROM academic_period_transitions WHERE id=:id FOR UPDATE');
+            $statement->execute(['id' => $transitionId]);
+            $transition = $statement->fetch();
+            if (!$transition || $transition['reverted_at'] !== null) {
+                throw new InvalidArgumentException('No es posible revertir esta transición porque el estado de los períodos cambió.');
+            }
+            if ((int) $transition['performed_by'] !== $actor) {
+                throw new InvalidArgumentException('Solo el administrador que realizó el cierre puede revertirlo.');
+            }
+            $validWindow = $db->prepare('SELECT performed_at>=UTC_TIMESTAMP()-INTERVAL 24 HOUR FROM academic_period_transitions WHERE id=:id');
+            $validWindow->execute(['id' => $transitionId]);
+            if (!(bool) $validWindow->fetchColumn()) {
+                throw new InvalidArgumentException('El plazo de 24 horas para revertir el cierre ha finalizado.');
+            }
+            $latestId = (int) $db->query('SELECT id FROM academic_period_transitions ORDER BY performed_at DESC,id DESC LIMIT 1 FOR UPDATE')->fetchColumn();
+            if ($latestId !== $transitionId) {
+                throw new InvalidArgumentException('No es posible revertir esta transición porque existe una promoción posterior.');
+            }
+
+            $periods = $db->prepare(
+                'SELECT id,name,status FROM academic_periods
+                 WHERE id IN (:closed,:activated) ORDER BY id FOR UPDATE'
+            );
+            $periods->execute(['closed' => $transition['closed_period_id'], 'activated' => $transition['activated_period_id']]);
+            $periodRows = [];
+            foreach ($periods->fetchAll() as $period) $periodRows[(int) $period['id']] = $period;
+            $closed = $periodRows[(int) $transition['closed_period_id']] ?? null;
+            $activated = $periodRows[(int) $transition['activated_period_id']] ?? null;
+            if (!$closed || !$activated || $closed['status'] !== 'closed' || $activated['status'] !== 'active') {
+                throw new InvalidArgumentException('No es posible revertir esta transición porque el estado de los períodos cambió.');
+            }
+            $activeIds = $db->query("SELECT id FROM academic_periods WHERE status='active' FOR UPDATE")->fetchAll(PDO::FETCH_COLUMN);
+            if (count($activeIds) !== 1 || (int) $activeIds[0] !== (int) $activated['id']) {
+                throw new InvalidArgumentException('No es posible revertir esta transición porque el estado de los períodos cambió.');
+            }
+
+            $activity = $this->academicActivityAfter($db, (int) $activated['id'], (string) $transition['performed_at']);
+            if ($activity !== null) {
+                throw new InvalidArgumentException('No es posible revertir el cierre porque ya existe actividad académica en el período actual. ' . $activity);
+            }
+
+            $reopen = $db->prepare("UPDATE academic_periods SET status='active' WHERE id=:id AND status='closed'");
+            $reopen->execute(['id' => $closed['id']]);
+            $replan = $db->prepare("UPDATE academic_periods SET status='planned' WHERE id=:id AND status='active'");
+            $replan->execute(['id' => $activated['id']]);
+            if ($reopen->rowCount() !== 1 || $replan->rowCount() !== 1) {
+                throw new RuntimeException('No fue posible restaurar de forma íntegra los estados de los períodos.');
+            }
+            $mark = $db->prepare(
+                'UPDATE academic_period_transitions
+                 SET reverted_by=:actor,reverted_at=UTC_TIMESTAMP()
+                 WHERE id=:id AND reverted_at IS NULL'
+            );
+            $mark->execute(['actor' => $actor, 'id' => $transitionId]);
+            if ($mark->rowCount() !== 1) {
+                throw new InvalidArgumentException('Esta transición ya fue revertida.');
+            }
+            $this->audit($db, $actor, 'academic_period_closure_reverted', 'period', (int) $closed['id'], [
+                'name' => (string) $closed['name'],
+                'transition_id' => $transitionId,
+                'reopened_period_id' => (int) $closed['id'],
+                'planned_period_id' => (int) $activated['id'],
+                'planned_period_name' => (string) $activated['name'],
+                'technical_reason' => 'Reversión administrativa dentro de la ventana autorizada de 24 horas y sin actividad académica posterior.',
+            ]);
+
+            return ['reopened' => $closed['name'], 'planned' => $activated['name'], 'transition_id' => $transitionId];
         });
     }
 
@@ -398,6 +483,77 @@ final class AdminAcademicModel
         return $record;
     }
 
+    private function reversalAvailability(PDO $db, int $actor): ?array
+    {
+        $statement = $db->query(
+            "SELECT transition.*,closed_period.name closed_period_name,active_period.name activated_period_name,
+                    DATE_ADD(transition.performed_at,INTERVAL 24 HOUR) expires_at
+             FROM academic_period_transitions transition
+             JOIN academic_periods closed_period ON closed_period.id=transition.closed_period_id
+             JOIN academic_periods active_period ON active_period.id=transition.activated_period_id
+             ORDER BY transition.performed_at DESC,transition.id DESC
+             LIMIT 1"
+        );
+        $transition = $statement->fetch();
+        if (!$transition || $transition['reverted_at'] !== null || (int) $transition['performed_by'] !== $actor) return null;
+        if (strtotime((string) $transition['expires_at'] . ' UTC') < time()) return null;
+
+        $available = $transition['closed_period_id'] !== $transition['activated_period_id'];
+        $reason = null;
+        $periodState = $db->prepare(
+            "SELECT COUNT(*) FROM academic_periods
+             WHERE (id=:closed AND status='closed') OR (id=:active AND status='active')"
+        );
+        $periodState->execute(['closed' => $transition['closed_period_id'], 'active' => $transition['activated_period_id']]);
+        if ((int) $periodState->fetchColumn() !== 2) {
+            $available = false;
+            $reason = 'Reversión no disponible: el estado de los períodos cambió.';
+        } else {
+            $activity = $this->academicActivityAfter($db, (int) $transition['activated_period_id'], (string) $transition['performed_at']);
+            if ($activity !== null) {
+                $available = false;
+                $reason = 'Reversión no disponible: ya existe actividad académica en el período activo. ' . $activity;
+            }
+        }
+        $expires = (new DateTimeImmutable((string) $transition['expires_at'], new DateTimeZone('UTC')))
+            ->setTimezone(new DateTimeZone('America/Guayaquil'));
+
+        return [
+            'id' => (int) $transition['id'],
+            'closed_period_id' => (int) $transition['closed_period_id'],
+            'closed_period_name' => (string) $transition['closed_period_name'],
+            'activated_period_id' => (int) $transition['activated_period_id'],
+            'activated_period_name' => (string) $transition['activated_period_name'],
+            'available' => $available,
+            'reason' => $reason,
+            'expires_at' => (string) $transition['expires_at'],
+            'expires_label' => $expires->format('d/m/Y H:i'),
+        ];
+    }
+
+    private function academicActivityAfter(PDO $db, int $periodId, string $performedAt): ?string
+    {
+        $checks = [
+            ['SELECT 1 FROM projects p WHERE p.academic_period_id=? AND p.created_at>? LIMIT 1', 'Se encontraron proyectos creados después del cierre.', 1],
+            ["SELECT 1 FROM project_participants item JOIN projects p ON p.id=item.project_id WHERE p.academic_period_id=? AND (item.assigned_at>? OR item.removed_at>?) LIMIT 1", 'Se encontraron asignaciones de participantes posteriores al cierre.', 2],
+            ['SELECT 1 FROM project_deliveries item JOIN projects p ON p.id=item.project_id WHERE p.academic_period_id=? AND item.submitted_at>? LIMIT 1', 'Se encontraron entregas posteriores al cierre.', 1],
+            ['SELECT 1 FROM project_files item JOIN projects p ON p.id=item.project_id WHERE p.academic_period_id=? AND (item.created_at>? OR item.deleted_at>?) LIMIT 1', 'Se encontró actividad documental posterior al cierre.', 2],
+            ['SELECT 1 FROM project_observations item JOIN projects p ON p.id=item.project_id WHERE p.academic_period_id=? AND (item.created_at>? OR item.resolved_at>?) LIMIT 1', 'Se encontraron observaciones o revisiones posteriores al cierre.', 2],
+            ['SELECT 1 FROM observation_responses item JOIN project_observations observation ON observation.id=item.observation_id JOIN projects p ON p.id=observation.project_id WHERE p.academic_period_id=? AND item.created_at>? LIMIT 1', 'Se encontraron respuestas a observaciones posteriores al cierre.', 1],
+            ['SELECT 1 FROM project_comments item JOIN projects p ON p.id=item.project_id WHERE p.academic_period_id=? AND (item.created_at>? OR item.updated_at>? OR item.deleted_at>?) LIMIT 1', 'Se encontraron comentarios académicos posteriores al cierre.', 3],
+            ['SELECT 1 FROM project_stages item JOIN projects p ON p.id=item.project_id WHERE p.academic_period_id=? AND item.completed_at>? LIMIT 1', 'Se encontraron avances de etapa posteriores al cierre.', 1],
+            ['SELECT 1 FROM project_events item JOIN projects p ON p.id=item.project_id WHERE p.academic_period_id=? AND item.created_at>? LIMIT 1', 'Se encontraron eventos académicos posteriores al cierre.', 1],
+            ['SELECT 1 FROM project_audit_log item JOIN projects p ON p.id=item.project_id WHERE p.academic_period_id=? AND item.created_at>? LIMIT 1', 'Se encontraron cambios académicos posteriores al cierre.', 1],
+            ['SELECT 1 FROM projects p WHERE p.academic_period_id=? AND (p.updated_at>? OR p.published_at>?) LIMIT 1', 'Se encontraron cambios o publicaciones de proyectos posteriores al cierre.', 2],
+        ];
+        foreach ($checks as [$sql, $reason, $dateParameterCount]) {
+            $statement = $db->prepare($sql);
+            $statement->execute(array_merge([$periodId], array_fill(0, $dateParameterCount, $performedAt)));
+            if ($statement->fetchColumn() !== false) return $reason;
+        }
+        return null;
+    }
+
     private function nextPeriod(?array $period): ?array
     {
         if (!$period || !preg_match('/^(I|II) PAO (\d{4})$/', (string) $period['name'], $match)) return null;
@@ -423,6 +579,7 @@ final class AdminAcademicModel
             'academic_period_plan_deleted' => 'Eliminó la planificación de ' . $element,
             'academic_period_closed' => 'Cerró ' . $element,
             'academic_period_activated' => 'Activó ' . $element,
+            'academic_period_closure_reverted' => 'Revirtió el cierre de ' . $element,
             'academic_type_created' => 'Creó el tipo de proyecto ' . $element,
             'academic_type_updated' => 'Editó el tipo de proyecto ' . $element,
             'academic_type_activated' => 'Activó el tipo de proyecto ' . $element,

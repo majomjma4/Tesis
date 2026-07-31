@@ -97,6 +97,27 @@ CREATE TABLE academic_periods (
   CONSTRAINT chk_period_dates CHECK (ends_on >= starts_on)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE academic_period_transitions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  closed_period_id SMALLINT UNSIGNED NOT NULL,
+  activated_period_id SMALLINT UNSIGNED NOT NULL,
+  performed_by BIGINT UNSIGNED NOT NULL,
+  performed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reverted_by BIGINT UNSIGNED NULL,
+  reverted_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_period_transition_event (closed_period_id, activated_period_id, performed_at),
+  INDEX idx_period_transition_latest (performed_at, id),
+  INDEX idx_period_transition_actor (performed_by, performed_at),
+  INDEX idx_period_transition_reverted (reverted_at),
+  CONSTRAINT chk_period_transition_distinct CHECK (closed_period_id <> activated_period_id),
+  CONSTRAINT chk_period_transition_reversal CHECK ((reverted_by IS NULL AND reverted_at IS NULL) OR (reverted_by IS NOT NULL AND reverted_at IS NOT NULL)),
+  CONSTRAINT fk_period_transition_closed FOREIGN KEY (closed_period_id) REFERENCES academic_periods(id),
+  CONSTRAINT fk_period_transition_activated FOREIGN KEY (activated_period_id) REFERENCES academic_periods(id),
+  CONSTRAINT fk_period_transition_performer FOREIGN KEY (performed_by) REFERENCES users(id),
+  CONSTRAINT fk_period_transition_reverter FOREIGN KEY (reverted_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE student_profiles (
   user_id BIGINT UNSIGNED PRIMARY KEY,
   institutional_code VARCHAR(50) NOT NULL UNIQUE,

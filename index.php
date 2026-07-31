@@ -42,6 +42,7 @@ match ($page) {
     'admin-project-trash' => (new AdminController())->trashProject(),
     'admin-academic-save' => (new AdminController())->saveAcademic(),
     'admin-academic-promote' => (new AdminController())->promoteAcademicPeriod(),
+    'admin-academic-revert' => (new AdminController())->revertAcademicPeriod(),
     'admin-repository-publish' => (new AdminController())->publishProject(),
     'admin-support-material-save' => (new AdminController())->saveSupportMaterial(),
     'admin-support-material-history' => (new AdminController())->supportMaterialHistory(),
