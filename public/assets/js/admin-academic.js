@@ -13,7 +13,6 @@
     const confirmCancel = confirmBox?.querySelector('[data-cancel-confirm]');
     const toast = document.querySelector('#aaToast');
     const tooltip = document.querySelector('#aaTooltip');
-    const accordions = [...document.querySelectorAll('[data-aa-accordion]')];
     if (!modal || !confirmBox || !form || !config) return;
 
     const restoredCatalog = sessionStorage.getItem('academicOpenCatalog');
@@ -27,15 +26,15 @@
         panel.setAttribute('aria-hidden', String(!open));
         panel.inert = !open;
     };
-    accordions.forEach(accordion => {
-        setAccordionOpen(accordion, accordion.dataset.catalog === restoredCatalog);
+    const bindAccordion = (accordion, initiallyOpen = false) => {
+        setAccordionOpen(accordion, initiallyOpen);
         accordion.querySelector('[data-aa-accordion-toggle]')?.addEventListener('click', () => {
             setAccordionOpen(accordion, !accordion.classList.contains('is-open'));
         });
-    });
-    const rememberCatalog = entity => {
-        if (entity && entity !== 'period') sessionStorage.setItem('academicOpenCatalog', entity);
     };
+    document.querySelectorAll('[data-aa-accordion]').forEach(accordion => {
+        bindAccordion(accordion, accordion.dataset.catalog === restoredCatalog);
+    });
 
     let tooltipTimer = null;
     let tooltipTarget = null;
@@ -69,7 +68,7 @@
         target.setAttribute('aria-describedby', tooltip.id);
         positionTooltip(target);
     };
-    document.querySelectorAll('[data-aa-tooltip]').forEach(target => {
+    const bindTooltips = root => root.querySelectorAll('[data-aa-tooltip]').forEach(target => {
         target.addEventListener('mouseenter', () => {
             window.clearTimeout(tooltipTimer);
             tooltipTimer = window.setTimeout(() => showTooltip(target), 800);
@@ -78,6 +77,7 @@
         target.addEventListener('focus', () => showTooltip(target));
         target.addEventListener('blur', hideTooltip);
     });
+    bindTooltips(document);
 
     const layers = [modal, confirmBox];
     layers.forEach(layer => {
@@ -171,7 +171,8 @@
 
     const syncDialogState = () => document.body.classList.toggle('aa-dialog-open', layers.some(layer => !layer.hidden));
     const setValue = (name, value) => {
-        const field = form.elements.namedItem(name);
+        const field = [...form.elements].find(control => control.name === name && !control.disabled)
+            || [...form.elements].find(control => control.name === name);
         if (!field) return;
         field.value = String(value ?? '');
         field.dispatchEvent(new Event('change', { bubbles: true }));
@@ -299,10 +300,33 @@
         return result;
     };
 
+    const showToast = text => {
+        if (!toast) return;
+        toast.textContent = text;
+        toast.hidden = false;
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => { toast.hidden = true; }, 4200);
+    };
+    const refreshCatalog = async entity => {
+        const selector = `[data-aa-accordion][data-catalog="${entity}"]`;
+        const current = document.querySelector(selector);
+        if (!current) throw new Error('No fue posible actualizar el catálogo en pantalla.');
+        const scrollTop = window.scrollY;
+        const response = await fetch(window.location.href, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            cache: 'no-store',
+        });
+        if (!response.ok) throw new Error('El catálogo fue actualizado, pero no fue posible refrescar su contenido.');
+        const documentCopy = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const replacement = documentCopy.querySelector(selector);
+        if (!replacement) throw new Error('El catálogo fue actualizado, pero la respuesta no contiene su contenido.');
+        current.replaceWith(replacement);
+        bindAccordion(replacement, true);
+        bindTooltips(replacement);
+        window.scrollTo({ top: scrollTop, left: window.scrollX, behavior: 'auto' });
+    };
+
     document.querySelectorAll('[data-form="period"]').forEach(button => button.addEventListener('click', () => openModal('period')));
-    document.querySelectorAll('[data-form="type"],[data-form="material_type"],[data-form="keyword"]').forEach(button => {
-        button.addEventListener('click', () => openModal(button.dataset.form));
-    });
     document.querySelector('[data-edit-period]')?.addEventListener('click', event => {
         const button = event.currentTarget;
         openModal('period', {
@@ -319,12 +343,31 @@
             { kind: 'delete-period', id: button.dataset.id }
         );
     });
-    document.querySelectorAll('[data-catalog-edit]').forEach(button => button.addEventListener('click', () => openModal(button.dataset.entity, {
-        id: button.dataset.id,
-        name: button.dataset.name,
-    })));
     const entityLabels = { type: 'tipo de proyecto', material_type: 'tipo de material', keyword: 'palabra clave' };
-    document.querySelectorAll('[data-catalog-state]').forEach(button => button.addEventListener('click', () => {
+    document.querySelector('.aa-workspace')?.addEventListener('click', event => {
+        const button = event.target instanceof Element
+            ? event.target.closest('[data-form="type"],[data-form="material_type"],[data-form="keyword"],[data-catalog-edit],[data-catalog-state],[data-catalog-delete]')
+            : null;
+        if (!button) return;
+        if (button.matches('[data-form]')) {
+            openModal(button.dataset.form);
+            return;
+        }
+        if (button.matches('[data-catalog-edit]')) {
+            openModal(button.dataset.entity, { id: button.dataset.id, name: button.dataset.name });
+            return;
+        }
+        if (button.matches('[data-catalog-delete]')) {
+            if (button.disabled) return;
+            openConfirm(
+                `Eliminar ${entityLabels[button.dataset.entity] || 'registro'}`,
+                'Esta acción eliminará definitivamente el registro y no podrá deshacerse.',
+                { kind: 'catalog', entity: button.dataset.entity, action: 'delete', id: button.dataset.id, name: button.dataset.name },
+                'Eliminar definitivamente',
+                'danger'
+            );
+            return;
+        }
         const activate = button.dataset.action === 'activate';
         openConfirm(
             `${activate ? 'Activar' : 'Desactivar'} ${entityLabels[button.dataset.entity] || 'registro'}`,
@@ -335,16 +378,7 @@
             activate ? 'Activar' : 'Desactivar',
             activate ? 'primary' : 'warning'
         );
-    }));
-    document.querySelectorAll('[data-catalog-delete]').forEach(button => button.addEventListener('click', () => {
-        openConfirm(
-            `Eliminar ${entityLabels[button.dataset.entity] || 'registro'}`,
-            'Esta acción eliminará definitivamente el registro y no podrá deshacerse.',
-            { kind: 'catalog', entity: button.dataset.entity, action: 'delete', id: button.dataset.id, name: button.dataset.name },
-            'Eliminar definitivamente',
-            'danger'
-        );
-    }));
+    });
     document.querySelector('[data-close-period]')?.addEventListener('click', () => {
         if (!config.dataset.targetPeriod || config.dataset.targetPeriod === '0') return;
         const closesEarly = config.dataset.closeEarly === '1';
@@ -370,10 +404,16 @@
         submit.disabled = true;
         message.hidden = true;
         try {
+            const entity = form.elements.namedItem('entity')?.value || '';
             const result = await send(config.dataset.save, new FormData(form));
-            sessionStorage.setItem('academicToast', result.message || 'Información académica guardada correctamente.');
-            rememberCatalog(form.elements.namedItem('entity')?.value);
-            location.reload();
+            if (entity === 'period') {
+                sessionStorage.setItem('academicToast', result.message || 'Información académica guardada correctamente.');
+                location.reload();
+                return;
+            }
+            closeModal();
+            await refreshCatalog(entity);
+            showToast(result.message || 'Catálogo actualizado correctamente.');
         } catch (error) {
             message.textContent = error.message;
             message.hidden = false;
@@ -406,8 +446,11 @@
                 data.set('id', action.id);
                 data.set('name', action.name || '');
                 const result = await send(config.dataset.save, data);
-                sessionStorage.setItem('academicToast', result.message || 'Catálogo actualizado correctamente.');
-                rememberCatalog(action.entity);
+                closeConfirm();
+                await refreshCatalog(action.entity);
+                showToast(result.message || 'Catálogo actualizado correctamente.');
+                button.disabled = false;
+                return;
             }
             location.reload();
         } catch (error) {
