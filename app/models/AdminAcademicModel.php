@@ -13,6 +13,31 @@ final class AdminAcademicModel
              FROM academic_periods ap
              ORDER BY ap.starts_on DESC"
         )->fetchAll();
+        $projectRows = $db->query(
+            "SELECT academic_period_id,id,title
+             FROM (
+                 SELECT p.academic_period_id,p.id,p.title,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY p.academic_period_id
+                            ORDER BY p.created_at DESC,p.id DESC
+                        ) position
+                 FROM projects p
+                 WHERE p.deleted_at IS NULL
+             ) period_projects
+             WHERE position<=5
+             ORDER BY academic_period_id,position"
+        )->fetchAll();
+        $projectsByPeriod = [];
+        foreach ($projectRows as $project) {
+            $projectsByPeriod[(int) $project['academic_period_id']][] = [
+                'id' => (int) $project['id'],
+                'title' => (string) $project['title'],
+            ];
+        }
+        foreach ($periods as &$period) {
+            $period['project_preview'] = $projectsByPeriod[(int) $period['id']] ?? [];
+        }
+        unset($period);
 
         $active = null;
         $planned = null;

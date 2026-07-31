@@ -820,16 +820,32 @@
         sessionStorage.removeItem("repositoryToast");
         showToast(storedToast);
     }
-    const requestedTab = new URLSearchParams(location.search).get("tab");
-    const requestedMaterialStatus = new URLSearchParams(location.search).get("status");
+    const requestedParams = new URLSearchParams(location.search);
+    const requestedTab = requestedParams.get("tab");
+    const requestedMaterialStatus = requestedParams.get("status");
+    const requestedPeriod = requestedParams.get("period");
     const allowedMaterialStatuses = new Set(["all", "available", "unavailable", "withdrawn"]);
     if (materialStatusFilter) {
         materialStatusFilter.value = allowedMaterialStatuses.has(requestedMaterialStatus)
             ? requestedMaterialStatus
             : "all";
     }
+    if (periodFilter && requestedPeriod) {
+        if (periodFilter instanceof HTMLSelectElement) {
+            let requestedOption = [...periodFilter.options].find(
+                (option) => normalize(option.value) === normalize(requestedPeriod)
+            );
+            if (!requestedOption) {
+                requestedOption = new Option(requestedPeriod, requestedPeriod);
+                periodFilter.add(requestedOption);
+            }
+            periodFilter.value = requestedOption.value;
+        } else {
+            periodFilter.value = requestedPeriod;
+        }
+    }
     selectTab(requestedTab === "materials" ? "materials" : "projects");
-    const requestedMaterialEdit = new URLSearchParams(location.search).get("edit_material");
+    const requestedMaterialEdit = requestedParams.get("edit_material");
     if (requestedMaterialEdit) {
         const requestedMaterialCard = [...document.querySelectorAll('[data-repository-item="materials"]')].find((card) => {
             const data = card.querySelector("[data-material-json]");

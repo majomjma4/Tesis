@@ -53,12 +53,6 @@ document.addEventListener("click", (event) => {
     if (!menuLink || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     if (!window.matchMedia("(max-width: 900px)").matches) return;
 
-    if (menuLink.classList.contains("active")) {
-        event.preventDefault();
-        closeSidebar();
-        return;
-    }
-
     saveSidebarScroll();
 });
 document.addEventListener("click", (event) => {

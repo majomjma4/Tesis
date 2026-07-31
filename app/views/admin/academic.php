@@ -15,6 +15,8 @@ $activePeriodEnded = $activePeriod
 $activePeriodClosesEarly = $activePeriod
     ? new DateTimeImmutable($activePeriod['ends_on']) > $today
     : false;
+$repositoryPeriodUrl = static fn(array $period): string =>
+    route('admin-repository') . '&period=' . rawurlencode((string) $period['name']);
 $monthNames = [1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril', 5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto', 9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre'];
 $friendlyRange = static function (?string $start, ?string $end) use ($monthNames): string {
     if (!$start || !$end) return 'Fechas pendientes';
@@ -66,7 +68,15 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
                 </div>
                 <div class="aa-period-summary">
                     <span class="aa-status active"><i class="fa-solid fa-circle" aria-hidden="true"></i> Activo</span>
-                    <div><strong><?= (int) ($activePeriod['projects'] ?? 0) ?></strong><small>Proyectos del período</small></div>
+                    <div>
+                        <strong><?= (int) ($activePeriod['projects'] ?? 0) ?></strong>
+                        <small>Proyectos del período</small>
+                        <?php if ((int) ($activePeriod['projects'] ?? 0) > 0): ?>
+                            <a class="aa-active-projects-link" href="<?= e($repositoryPeriodUrl($activePeriod)) ?>">
+                                Ver proyectos <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
                 </div>
                 <footer>
                     <?php if (!$plannedPeriod): ?>
@@ -103,14 +113,34 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
 
         <?php if ($closedPeriods): ?>
             <div class="aa-history">
-                <header><div><small>Registro institucional</small><h3>Historial de períodos</h3></div><span><?= count($closedPeriods) ?></span></header>
-                <div class="aa-history-list" role="table" aria-label="Historial de períodos cerrados">
+                <header>
+                    <div><small>Registro institucional</small><h3>Historial de períodos académicos</h3></div>
+                    <span><?= count($closedPeriods) ?></span>
+                </header>
+                <div class="aa-history-list">
                     <?php foreach ($closedPeriods as $period): ?>
-                        <div class="aa-history-row" role="row">
-                            <strong role="cell"><?= e($period['name']) ?></strong>
-                            <span role="cell"><?= e($friendlyRange($period['starts_on'], $period['ends_on'])) ?></span>
-                            <span role="cell" class="aa-status closed">Cerrado</span>
-                        </div>
+                        <details class="aa-history-period">
+                            <summary>
+                                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                                <strong><?= e($period['name']) ?></strong>
+                                <span><small>Finalizado:</small> <?= e((new DateTimeImmutable($period['ends_on']))->format('d/m/Y')) ?></span>
+                                <span><?= (int) $period['projects'] ?> proyecto<?= (int) $period['projects'] === 1 ? '' : 's' ?></span>
+                            </summary>
+                            <div class="aa-history-period-content">
+                                <?php if (!empty($period['project_preview'])): ?>
+                                    <ul>
+                                        <?php foreach ($period['project_preview'] as $project): ?>
+                                            <li><a href="<?= e($repositoryPeriodUrl($period)) ?>"><?= e($project['title']) ?></a></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                    <a class="aa-history-all" href="<?= e($repositoryPeriodUrl($period)) ?>">
+                                        Ver todos los proyectos del <?= e($period['name']) ?> <span aria-hidden="true">→</span>
+                                    </a>
+                                <?php else: ?>
+                                    <p>Este período no registra proyectos académicos.</p>
+                                <?php endif; ?>
+                            </div>
+                        </details>
                     <?php endforeach; ?>
                 </div>
             </div>

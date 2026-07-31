@@ -4,8 +4,7 @@ const userInput = document.querySelector("#user");
 const passwordInput = document.querySelector("#password");
 const loginAlert = document.querySelector("#loginAlert");
 const passwordToggle = document.querySelector("#passwordToggle");
-const recentLoginUsers = document.querySelector("#recentLoginUsers");
-const loginHistoryClear = document.querySelector("#loginHistoryClear");
+const loginUserClear = document.querySelector("#loginUserClear");
 // Final de seleccion de elementos del formulario
 
 function hidePassword() {
@@ -20,12 +19,22 @@ function hidePassword() {
 hidePassword();
 window.addEventListener("pageshow", hidePassword);
 
-const loginHistoryKey = "recentLoginUsers";
-function readLoginHistory() { try { return JSON.parse(localStorage.getItem(loginHistoryKey) || "[]").slice(0, 3); } catch { return []; } }
-function renderLoginHistory() { const history=readLoginHistory(); recentLoginUsers?.replaceChildren(...history.map(value => { const option=document.createElement("option"); option.value=value; return option; })); if(loginHistoryClear)loginHistoryClear.hidden=history.length===0; }
-function rememberLoginUser() { const value=userInput?.value.trim(); if (!value) return; try { localStorage.setItem(loginHistoryKey, JSON.stringify([value, ...readLoginHistory().filter(item => item.toLocaleLowerCase("es") !== value.toLocaleLowerCase("es"))].slice(0, 3))); renderLoginHistory(); } catch {} }
-renderLoginHistory();
-loginHistoryClear?.addEventListener("click",()=>{try{localStorage.removeItem(loginHistoryKey);}catch{}renderLoginHistory();userInput?.focus();});
+function syncUserClearButton() {
+    if (loginUserClear) loginUserClear.hidden = userInput?.value === "";
+}
+
+syncUserClearButton();
+window.addEventListener("pageshow", syncUserClearButton);
+window.addEventListener("load", syncUserClearButton, { once: true });
+window.setTimeout(syncUserClearButton, 250);
+window.setTimeout(syncUserClearButton, 1000);
+
+loginUserClear?.addEventListener("click", () => {
+    if (!userInput) return;
+    userInput.value = "";
+    userInput.dispatchEvent(new Event("input", { bubbles: true }));
+    userInput.focus({ preventScroll: true });
+});
 
 // Inicio de validacion visual de campos
 function updateFieldState(input) {
@@ -36,7 +45,10 @@ function updateFieldState(input) {
 
 // Inicio de eventos de entrada
 [userInput, passwordInput].forEach((input) => {
-    input?.addEventListener("input", () => updateFieldState(input));
+    input?.addEventListener("input", () => {
+        updateFieldState(input);
+        if (input === userInput) syncUserClearButton();
+    });
     input?.addEventListener("blur", () => updateFieldState(input));
 });
 
@@ -74,6 +86,6 @@ loginForm?.addEventListener("submit", (event) => {
     const hasEmptyFields = !userInput.value.trim() || !passwordInput.value.trim();
     loginAlert?.classList.remove("show");
 
-    if (hasEmptyFields) event.preventDefault(); else rememberLoginUser();
+    if (hasEmptyFields) event.preventDefault();
 });
 // Final de envio del formulario
