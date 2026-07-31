@@ -226,6 +226,7 @@
         showProjectDialog(modal);
         form.title.focus();
     };
+    window.AdminProjectEditor = { open };
     document.querySelector('#apNew')?.addEventListener('click', () => open());
     document.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => open(JSON.parse(button.closest('article').querySelector('script').textContent))));
     const requestedProjectEdit = new URLSearchParams(location.search).get('edit');

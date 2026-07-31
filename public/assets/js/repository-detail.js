@@ -502,7 +502,7 @@ digitalRecordMenuTrigger?.addEventListener("click", () => {
     if (!digitalRecordMenuPanel) return;
     digitalRecordMenuPanel.hidden = !willOpen;
     digitalRecordMenuTrigger.setAttribute("aria-expanded", String(willOpen));
-    if (willOpen) digitalRecordMenuPanel.querySelector("button:not([disabled])")?.focus();
+    if (willOpen) digitalRecordMenuPanel.querySelector('[role="menuitem"]:not([disabled]):not([hidden])')?.focus();
 });
 digitalRecordMenuTrigger?.addEventListener("keydown", (event) => {
     if (!["ArrowDown", "ArrowUp"].includes(event.key) || !digitalRecordMenuPanel) return;
@@ -1762,8 +1762,13 @@ function initializeNeutralFiles() {
         return;
     }
     neutralFilesInitialized = true;
+    const requestedFileId = new URLSearchParams(window.location.search).get("file_id");
+    const requested = requestedFileId
+        ? neutralFileButtons.find((button) => button.dataset.fileId === requestedFileId)
+        : null;
     const presentation = neutralFileButtons.find((button) => button.dataset.filePresentation === "true");
-    if (presentation) selectNeutralFile(presentation);
+    const initialFile = requested || presentation || neutralFileButtons[0] || null;
+    if (initialFile) selectNeutralFile(initialFile);
     else if (neutralViewer) setNeutralViewerState("empty");
 }
 if (!neutralFilesPanel || !neutralFilesPanel.hidden) initializeNeutralFiles();
@@ -4818,7 +4823,7 @@ document.addEventListener("keydown", (event) => {
 // Acciones administrativas generales del material de apoyo.
 (() => {
     if (window.SupportMaterialAdminActions) {
-        const record = document.querySelector('[data-digital-record][data-entity-type="support_material"]');
+        const record = document.querySelector('[data-digital-record][data-admin-endpoint]:not([data-admin-endpoint=""])');
         const setAdministrativeUnread = (unread) => {
             document.querySelectorAll("[data-record-unread-dot],[data-record-history-unread-dot],[data-record-unread-text]")
                 .forEach(element => { element.hidden = !unread; });
@@ -4834,6 +4839,9 @@ document.addEventListener("keydown", (event) => {
                 available: record.dataset.recordAvailable === "1",
                 endpoint: record.dataset.adminEndpoint,
                 csrf: record.dataset.adminCsrf,
+                trashEndpoint: record.dataset.adminTrashEndpoint,
+                trashCsrf: record.dataset.adminTrashCsrf,
+                entity: record.dataset.entityType,
                 material: { id: record.dataset.recordId, title: document.querySelector("#digitalRecordTitle")?.textContent || "" },
                 onSuccess: result => {
                     setAdministrativeUnread(true);
@@ -4846,6 +4854,27 @@ document.addEventListener("keydown", (event) => {
                 },
             });
         }));
+
+        record?.querySelector("[data-project-history-trigger]")?.addEventListener("click", () => {
+            closeDigitalRecordMenu?.();
+            activatePersistentRecordTab("evolution");
+            window.requestAnimationFrame(() => {
+                const history = record.querySelector('[data-project-history="administrative"]');
+                if (history instanceof HTMLDetailsElement) history.open = true;
+                history?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+            });
+        });
+
+        const editorTrigger = record?.querySelector("[data-project-editor-open]");
+        editorTrigger?.addEventListener("click", () => {
+            const payload = document.querySelector("[data-project-editor-payload]");
+            if (!payload || !window.AdminProjectEditor?.open) return;
+            try {
+                window.AdminProjectEditor.open(JSON.parse(payload.textContent || "{}"));
+            } catch (error) {
+                console.error("No fue posible abrir el editor del proyecto.", error);
+            }
+        });
         return;
     }
     const record = document.querySelector('[data-digital-record][data-entity-type="support_material"]');

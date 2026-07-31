@@ -4,6 +4,8 @@ $versionGroups = is_array($digitalRecord['versions'] ?? null) ? $digitalRecord['
 $versionEndpoints = is_array($digitalRecord['version_endpoints'] ?? null) ? $digitalRecord['version_endpoints'] : [];
 $regularEndpoints = is_array($digitalRecord['endpoints'] ?? null) ? $digitalRecord['endpoints'] : [];
 $materialId = (int) ($digitalRecord['entity']['id'] ?? 0);
+$entityQueryKey = (string) ($digitalRecord['entity']['query_key'] ?? 'material_id');
+$evolutionOwner = (string) ($digitalRecord['entity']['type'] ?? '') === 'project' ? 'proyecto' : 'material';
 $previewTypes = [
     'pdf' => 'pdf', 'docx' => 'docx', 'txt' => 'text',
     'png' => 'image', 'jpg' => 'image', 'jpeg' => 'image', 'webp' => 'image',
@@ -28,10 +30,21 @@ body.dark-mode .ed-evolution-status{color:#86efac}@media(max-width:760px){.ed-ev
 .ed-version-select:hover,.ed-version-actions a:hover,.ed-version-actions button:not(:disabled):hover{transform:translateY(-1px)}
 .ed-version-actions a:hover,.ed-version-actions button:not(:disabled):hover{border-color:var(--primary);background:var(--surface-soft);color:var(--primary)}
 </style>
+<?php if ((string)($digitalRecord['entity']['type']??'')==='project' && isset($digitalRecord['project_histories'])):
+    $projectHistories=(array)$digitalRecord['project_histories'];
+    $historyDate=static fn(string $value):string=>$value!==''?date('d/m/Y H:i',strtotime($value)):'';
+?>
+<style>.ed-project-histories{display:grid;gap:14px}.ed-project-history{border:1px solid var(--line);border-radius:15px;background:var(--surface);overflow:hidden}.ed-project-history>summary{min-height:72px;padding:15px 18px;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px;cursor:pointer;list-style:none}.ed-project-history>summary::-webkit-details-marker{display:none}.ed-project-history>summary:hover,.ed-project-history>summary:focus-visible{background:var(--surface-soft);outline:none}.ed-project-history-count{min-width:30px;padding:5px 8px;border-radius:999px;background:var(--surface-soft);color:var(--muted);font-size:11px;font-weight:850;text-align:center}.ed-project-history>summary i{color:var(--muted);transition:transform .2s ease}.ed-project-history[open]>summary i{transform:rotate(180deg)}.ed-project-history-list{display:grid;gap:9px;padding:0 18px 18px}.ed-project-history-entry{padding:13px 14px;border:1px solid var(--line);border-radius:11px;background:var(--surface-soft)}.ed-project-history-entry strong{display:block;font-size:13px}.ed-project-history-entry small{display:block;margin-top:5px;color:var(--muted);font-size:11px}.ed-project-history-entry p{margin:8px 0 0;font-size:12px;line-height:1.55}.ed-project-history-empty{margin:0;padding:18px;border:1px dashed var(--line);border-radius:11px;color:var(--muted);font-size:12px;text-align:center}@media(max-width:520px){.ed-project-history>summary{grid-template-columns:minmax(0,1fr) auto;gap:8px}.ed-project-history>summary i{grid-column:2;grid-row:1}.ed-project-history-count{grid-column:2;grid-row:2}.ed-project-history-list{padding:0 12px 12px}}</style>
+<div class="ed-project-histories" data-project-histories>
+<?php foreach([['administrative','Historial administrativo',false,'Este expediente no registra cambios administrativos.'],['academic','Historial académico',true,'Este expediente no registra todavía un recorrido académico.']] as [$key,$label,$open,$empty]):$entries=(array)($projectHistories[$key]??[]); ?>
+<details class="ed-project-history" data-project-history="<?=e($key)?>"<?=$open?' open':''?>><summary><strong><?=e($label)?></strong><span class="ed-project-history-count"><?=count($entries)?></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></summary><div class="ed-project-history-list"><?php if(!$entries):?><p class="ed-project-history-empty"><?=e($empty)?></p><?php else:foreach($entries as $entry):?><article class="ed-project-history-entry"><strong><?=e((string)$entry['title'])?></strong><small><?=e((string)$entry['actor'])?> · <?=e($historyDate((string)$entry['date']))?></small><?php if(trim((string)$entry['detail'])!==''):?><p><?=e((string)$entry['detail'])?></p><?php endif;?></article><?php endforeach;endif;?></div></details>
+<?php endforeach; ?>
+</div>
+<?php else: ?>
 <div class="ed-evolution" data-document-evolution>
     <header class="ed-evolution-head">
         <h2>Evolución documental</h2>
-        <p>Consulta la secuencia de versiones generada cuando un archivo del material fue reemplazado.</p>
+        <p>Consulta la secuencia de versiones registrada para los documentos del <?= e($evolutionOwner) ?>.</p>
     </header>
     <?php if (!$versionGroups): ?>
         <div class="ed-empty"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><h2>Aún no existe evolución documental registrada</h2><p>Las versiones aparecerán cuando un archivo sea reemplazado.</p></div>
@@ -61,7 +74,7 @@ body.dark-mode .ed-evolution-status{color:#86efac}@media(max-width:760px){.ed-ev
                             $current = !empty($version['current']);
                             $available = !empty($version['available']);
                             $extension = mb_strtolower((string) ($version['extension'] ?? ''), 'UTF-8');
-                            $query = '&material_id=' . $materialId . '&file_id=' . (int) $version['file_id'];
+                            $query = '&' . rawurlencode($entityQueryKey) . '=' . $materialId . '&file_id=' . (int) $version['file_id'];
                             if ($current) {
                                 $previewUrl = (string) ($regularEndpoints['preview'] ?? '') . $query;
                                 $downloadUrl = (string) ($regularEndpoints['download'] ?? '') . $query;
@@ -120,3 +133,4 @@ body.dark-mode .ed-evolution-status{color:#86efac}@media(max-width:760px){.ed-ev
         </div>
     <?php endif; ?>
 </div>
+<?php endif; ?>

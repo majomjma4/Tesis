@@ -173,7 +173,7 @@ $formatDate = static function (?string $date): string {
                             <span><i class="fa-solid fa-globe"></i> <?= e($formatDate($project['published_at'])) ?></span>
                         </div>
                         <footer>
-                            <a class="ar-primary-action" href="<?= e(route('project-detail') . '&id=' . (int) $project['id'] . '&tab=information') ?>">
+                            <a class="ar-primary-action" href="<?= e(route('repository-detail') . '&id=' . (int) $project['id'] . '&tab=information&return=' . rawurlencode((string)($_SERVER['REQUEST_URI'] ?? route('admin-repository')))) ?>">
                                 <i class="fa-solid fa-diagram-project"></i> Abrir expediente
                             </a>
                             <button class="ar-icon-action ar-availability-action" data-project-availability data-id="<?= (int) $project['id'] ?>" data-available="<?= !empty($project['is_available']) ? '1' : '0' ?>" data-tooltip="<?= !empty($project['is_available']) ? 'Marcar como no disponible' : 'Marcar como disponible' ?>" type="button" aria-label="<?= !empty($project['is_available']) ? 'Marcar proyecto como no disponible' : 'Marcar proyecto como disponible' ?>">

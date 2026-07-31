@@ -11,19 +11,29 @@ final class ProjectModel
     /** Devuelve los expedientes visibles para el usuario indicado. */
     public function getProjectsForUser(int $userId): array
     {
-        $projects = array_filter($this->projects(), static fn (array $project): bool => in_array($userId, $project['user_ids'], true));
-        return array_values(array_map(fn (array $project): array => $this->enrichProject($project), $projects));
+        if (!Database::isEnabled()) return [];
+        $statement=Database::connection()->prepare("SELECT DISTINCT p.id,p.code,p.title,p.subtitle,p.status,p.current_stage,p.updated_at,
+            pt.code AS type_key,pt.name AS type,c.name AS career,ap.name AS period,t.full_name AS tutor
+            FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id INNER JOIN careers c ON c.id=p.career_id
+            INNER JOIN academic_periods ap ON ap.id=p.academic_period_id LEFT JOIN users t ON t.id=p.tutor_id
+            LEFT JOIN project_participants pp ON pp.project_id=p.id AND pp.status='active' AND pp.removed_at IS NULL
+            WHERE p.deleted_at IS NULL AND (p.created_by=:user OR pp.user_id=:user) ORDER BY p.updated_at DESC,p.id DESC");
+        $statement->execute(['user'=>$userId]);
+        $labels=['development'=>'En desarrollo','under_review'=>'En revisión','changes_required'=>'Requiere cambios','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el Tribunal','published'=>'Publicado'];
+        return array_map(static function(array $row)use($labels):array{
+            $status=(string)$row['status'];
+            return ['id'=>(int)$row['id'],'code'=>(string)$row['code'],'title'=>(string)$row['title'],'subtitle'=>(string)($row['subtitle']??''),
+                'status'=>$labels[$status]??$status,'status_key'=>$status,'type'=>(string)$row['type'],'type_key'=>(string)$row['type_key'],
+                'career'=>(string)$row['career'],'period'=>(string)$row['period'],'tutor'=>(string)($row['tutor']??''),'stage'=>(string)$row['current_stage'],
+                'last_activity'=>'Actualización del expediente · '.date('d/m/Y',strtotime((string)$row['updated_at'])),
+                'metric_bucket'=>in_array($status,['published','tribunal_approved'],true)?'finished':($status==='changes_required'?'changes':($status==='under_review'?'review':'active'))];
+        },$statement->fetchAll());
     }
 
     /** Busca un expediente comprobando temporalmente su pertenencia. */
     public function findProjectForUser(int $projectId, int $userId): ?array
     {
-        foreach ($this->getProjectsForUser($userId) as $project) {
-            if ($project['id'] === $projectId) {
-                return $project;
-            }
-        }
-        return null;
+        return (new ProjectRecordModel())->find($projectId,$userId,false);
     }
 
     /** Devuelve un expediente real para la consulta administrativa. */

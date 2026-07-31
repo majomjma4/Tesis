@@ -97,7 +97,19 @@
             reasons: [["duplicate","Contenido duplicado"],["outdated","Información desactualizada"],["replaced","Material reemplazado"],["incorrect","Publicación incorrecta"],["not_required","Ya no es requerido"],["other","Otro motivo"]],
         },
     };
-    const currentDefinition = () => definitions[config?.type];
+    const currentDefinition = () => {
+        const definition = definitions[config?.type];
+        if (!definition || config?.entity !== "project") return definition;
+        const adapt = value => String(value).replaceAll("material", "proyecto").replaceAll("Material", "Proyecto");
+        return {
+            ...definition,
+            title: adapt(definition.title),
+            confirmTitle: adapt(definition.confirmTitle),
+            warning: adapt(definition.warning),
+            submit: adapt(definition.submit),
+            processing: adapt(definition.processing),
+        };
+    };
     const selectedLabel = () => reasonText.textContent.trim();
     const selectedValue = () => reasonValue.value;
     const valid = () => selectedValue() && (selectedValue() !== "other" || detail.value.trim().length >= 5);
@@ -184,6 +196,8 @@
             detailRow.hidden = selectedValue() !== "other";
             detailLabel.textContent = detail.value.trim();
             materialRow.hidden = config.type !== "trash";
+            const entityLabel = materialRow.querySelector("dt");
+            if (entityLabel) entityLabel.textContent = config.entity === "project" ? "Proyecto" : "Material";
             materialLabel.textContent = config.material.title || "";
             submitLabel.textContent = currentDefinition().submit;
             back.focus();
@@ -329,13 +343,18 @@
         if (processing) return;
         processing = true; submit.disabled = true; cancel.disabled = true; back.disabled = true; closeButton.disabled = true;
         submitLabel.textContent = currentDefinition().processing; error.hidden = true;
+        const projectTrash = config.entity === "project" && config.action === "trash";
+        const endpoint = projectTrash && config.trashEndpoint ? config.trashEndpoint : config.endpoint;
         const body = new FormData();
-        body.set("_csrf", config.csrf); body.set("id", config.material.id); body.set("action", config.action);
-        body.set("reason_code", selectedValue()); body.set("reason_detail", selectedValue() === "other" ? detail.value.trim() : "");
+        body.set("_csrf", projectTrash ? config.trashCsrf : config.csrf); body.set("id", config.material.id);
+        if (!projectTrash) body.set("action", config.action);
+        const reasonDetail = selectedValue() === "other" ? detail.value.trim() : "";
+        body.set(projectTrash ? "reason" : "reason_code", projectTrash ? [selectedLabel(), reasonDetail].filter(Boolean).join(": ") : selectedValue());
+        if (!projectTrash) body.set("reason_detail", reasonDetail);
         if (config.action === "availability") body.set("is_available", config.available ? "0" : "1");
         if (config.action === "publication") body.set("status", config.type === "publish" ? "published" : "withdrawn");
         try {
-            const response = await fetch(config.endpoint, { method: "POST", body, credentials: "same-origin" });
+            const response = await fetch(endpoint, { method: "POST", body, credentials: "same-origin" });
             const result = await response.json();
             if (!response.ok || !result.success) throw new Error(result.message || "No fue posible completar la acción.");
             processing = false; close();

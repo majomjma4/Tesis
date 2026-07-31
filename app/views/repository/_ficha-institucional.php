@@ -52,8 +52,16 @@ $renderEditModal = ($digitalRecord['mode'] ?? 'view') === 'view'
     && is_array($editAction)
     && !empty($editAction['modal'])
     && !empty($digitalRecord['form']['action']);
-$activeTab = in_array((string) ($digitalRecord['active_tab'] ?? ''), ['information', 'files', 'evolution'], true)
-    ? (string) $digitalRecord['active_tab'] : 'information';
+$tabIds = array_values(array_filter(array_map(static fn (array $tab): string => (string) ($tab['id'] ?? ''), $tabs)));
+$activeTab = in_array((string) ($digitalRecord['active_tab'] ?? ''), $tabIds, true)
+    ? (string) $digitalRecord['active_tab'] : ($tabIds[0] ?? 'information');
+$tabPartials = is_array($digitalRecord['tab_partials'] ?? null) ? $digitalRecord['tab_partials'] : [];
+$renderRecordTab = static function (string $tabPanel) use (&$digitalRecord, $tabPartials): void {
+    if ($tabPanel === 'files') require __DIR__ . '/_explorador-documental.php';
+    elseif ($tabPanel === 'evolution') require __DIR__ . '/_evolucion-documental.php';
+    elseif (isset($tabPartials[$tabPanel]) && is_file((string) $tabPartials[$tabPanel])) require (string) $tabPartials[$tabPanel];
+    else require __DIR__ . '/_informacion-expediente.php';
+};
 ?>
 <style>
 .digital-record{--ed-accent:var(--primary);width:min(1180px,100%);margin:0 auto;padding:22px 0 44px;color:var(--text)}
@@ -82,10 +90,11 @@ body.dark-mode .ed-label.is-success{color:#86efac}
 .digital-record .ed-action:not([disabled]),.digital-record .ed-tab,.digital-record .ed-menu-panel button:not([disabled]){cursor:pointer}
 .digital-record .ed-menu-panel button:not([disabled]){transition:background .16s ease,color .16s ease,transform .16s ease}
 .digital-record .ed-menu-panel button:not([disabled]):hover{background:var(--surface-soft);color:var(--primary);transform:translateX(2px)}
+.ed-menu-panel a{width:100%;min-height:40px;padding:8px 10px;border:0;border-radius:9px;background:transparent;color:var(--text);display:flex;align-items:center;gap:9px;box-sizing:border-box;font:inherit;font-size:12px;line-height:1.4;text-align:left;text-decoration:none;cursor:pointer;transition:background .16s ease,color .16s ease,transform .16s ease}.ed-menu-panel a:hover{background:var(--surface-soft);color:var(--primary);transform:translateX(2px)}.ed-menu-panel a:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 28%,transparent);outline-offset:-2px;background:var(--surface-soft)}
 .digital-record .ed-tab{transition:color .16s ease,transform .16s ease}.digital-record .ed-tab:hover{transform:translateY(-1px)}
 </style>
 
-<main class="digital-record" data-digital-record data-record-id="<?= (int) ($digitalRecord['entity']['id'] ?? 0) ?>" data-entity-type="<?= e((string) ($digitalRecord['entity']['type'] ?? 'record')) ?>" data-active-tab="<?= e($activeTab) ?>" data-persistent-tabs="<?= ($digitalRecord['mode'] ?? 'view') === 'view' ? 'true' : 'false' ?>" data-admin-endpoint="<?= e((string) ($digitalRecord['admin_actions']['endpoint'] ?? '')) ?>" data-admin-csrf="<?= e((string) ($digitalRecord['admin_actions']['csrf_token'] ?? '')) ?>" data-record-status="<?= e((string) ($digitalRecord['admin_actions']['status'] ?? '')) ?>" data-record-available="<?= !empty($digitalRecord['admin_actions']['is_available']) ? '1' : '0' ?>" data-admin-redirect="<?= e((string) ($digitalRecord['admin_actions']['redirect'] ?? '')) ?>">
+<main class="digital-record" data-digital-record data-record-id="<?= (int) ($digitalRecord['entity']['id'] ?? 0) ?>" data-entity-type="<?= e((string) ($digitalRecord['entity']['type'] ?? 'record')) ?>" data-active-tab="<?= e($activeTab) ?>" data-persistent-tabs="<?= ($digitalRecord['mode'] ?? 'view') === 'view' ? 'true' : 'false' ?>" data-admin-endpoint="<?= e((string) ($digitalRecord['admin_actions']['endpoint'] ?? '')) ?>" data-admin-csrf="<?= e((string) ($digitalRecord['admin_actions']['csrf_token'] ?? '')) ?>" data-admin-trash-endpoint="<?= e((string) ($digitalRecord['admin_actions']['trash_endpoint'] ?? '')) ?>" data-admin-trash-csrf="<?= e((string) ($digitalRecord['admin_actions']['trash_csrf_token'] ?? '')) ?>" data-record-status="<?= e((string) ($digitalRecord['admin_actions']['status'] ?? '')) ?>" data-record-available="<?= !empty($digitalRecord['admin_actions']['is_available']) ? '1' : '0' ?>" data-admin-redirect="<?= e((string) ($digitalRecord['admin_actions']['redirect'] ?? '')) ?>">
     <nav class="ed-breadcrumb" aria-label="Ruta de navegación">
         <?php foreach (($digitalRecord['breadcrumbs'] ?? []) as $index => $crumb): ?>
             <?php if ($index > 0): ?><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><?php endif; ?>
@@ -94,7 +103,7 @@ body.dark-mode .ed-label.is-success{color:#86efac}
         <?php endforeach; ?>
     </nav>
     <div class="ed-back-links">
-        <a class="ed-back" href="<?= e((string) ($digitalRecord['return_url'] ?? route('repository'))) ?>"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Volver al repositorio</a>
+        <a class="ed-back" href="<?= e((string) ($digitalRecord['return_url'] ?? route('repository'))) ?>"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> <?= e((string)($digitalRecord['return_label'] ?? 'Volver al repositorio')) ?></a>
     </div>
     <article class="ed-shell" aria-labelledby="digitalRecordTitle">
         <header class="ed-header">
@@ -106,7 +115,8 @@ body.dark-mode .ed-label.is-success{color:#86efac}
                 <div class="ed-actions" aria-label="Acciones del expediente">
                     <div class="ed-primary-actions">
                     <?php foreach ($actions as $action): $enabled = !empty($action['enabled']); $iconStyle = (string) ($action['icon_style'] ?? 'fa-regular'); $isDownload = !empty($action['download']); ?>
-                        <?php if ($enabled && !empty($action['url']) && !empty($action['modal'])): ?><button class="ed-action<?= ($action['kind'] ?? '') === 'primary' ? ' is-primary' : '' ?>" type="button" data-record-edit-open data-edit-fallback-url="<?= e($action['url']) ?>"><i class="<?= e($iconStyle) ?> <?= e($action['icon']) ?>" aria-hidden="true"></i><?= e($action['label']) ?></button>
+                        <?php if ($enabled && ($action['trigger'] ?? '') === 'project-editor'): ?><button class="ed-action<?= ($action['kind'] ?? '') === 'primary' ? ' is-primary' : '' ?>" type="button" data-project-editor-open><i class="<?= e($iconStyle) ?> <?= e($action['icon']) ?>" aria-hidden="true"></i><?= e($action['label']) ?></button>
+                        <?php elseif ($enabled && !empty($action['url']) && !empty($action['modal'])): ?><button class="ed-action<?= ($action['kind'] ?? '') === 'primary' ? ' is-primary' : '' ?>" type="button" data-record-edit-open data-edit-fallback-url="<?= e($action['url']) ?>"><i class="<?= e($iconStyle) ?> <?= e($action['icon']) ?>" aria-hidden="true"></i><?= e($action['label']) ?></button>
                         <?php elseif ($enabled && !empty($action['url'])): ?><a class="ed-action<?= ($action['kind'] ?? '') === 'primary' ? ' is-primary' : '' ?>" href="<?= e($action['url']) ?>"<?= $isDownload ? ' download data-record-download' : '' ?>><i class="<?= e($iconStyle) ?> <?= e($action['icon']) ?>" aria-hidden="true"></i><?= e($action['label']) ?></a>
                         <?php else: ?><button class="ed-action<?= ($action['kind'] ?? '') === 'primary' ? ' is-primary' : '' ?>" type="button" disabled title="Disponible en una fase posterior"><i class="<?= e($iconStyle) ?> <?= e($action['icon']) ?>" aria-hidden="true"></i><?= e($action['label']) ?></button><?php endif; ?>
                     <?php endforeach; ?>
@@ -114,7 +124,7 @@ body.dark-mode .ed-label.is-success{color:#86efac}
                     <?php if ($menuActions): ?><div class="ed-menu" data-record-menu>
                         <button class="ed-action" type="button" aria-label="Más acciones" aria-haspopup="menu" aria-expanded="false" aria-controls="recordActionsMenu" data-record-menu-trigger><i class="fa-solid fa-ellipsis" aria-hidden="true"></i><span class="ed-unread-dot" data-record-unread-dot<?= empty($digitalRecord['admin_actions']['has_unread']) ? ' hidden' : '' ?> aria-hidden="true"></span><span class="ed-sr-only" data-record-unread-text<?= empty($digitalRecord['admin_actions']['has_unread']) ? ' hidden' : '' ?>>Hay actividad administrativa nueva</span></button>
                         <div class="ed-menu-panel" id="recordActionsMenu" role="menu" hidden data-record-menu-panel>
-                            <?php foreach ($menuActions as $item): ?><button type="button" role="menuitem"<?= empty($item['enabled']) ? ' disabled' : '' ?><?= !empty($item['hidden']) ? ' hidden' : '' ?> class="<?= !empty($item['danger']) ? 'is-danger ' : '' ?><?= !empty($item['separator']) ? 'is-separated' : '' ?>"<?= ($item['action'] ?? '') === 'admin-history' ? ' data-record-history-trigger' : '' ?><?= !empty($item['action']) && ($item['action'] ?? '') !== 'admin-history' ? ' data-record-admin-action="' . e($item['action']) . '"' : '' ?>><i class="fa-solid <?= e($item['icon']) ?>" aria-hidden="true"></i><span><?= e($item['label']) ?></span><?php if (($item['action'] ?? '') === 'admin-history'): ?><span class="ed-unread-dot"<?= empty($digitalRecord['admin_actions']['has_unread']) ? ' hidden' : '' ?> data-record-history-unread-dot aria-hidden="true"></span><span class="ed-sr-only"<?= empty($digitalRecord['admin_actions']['has_unread']) ? ' hidden' : '' ?> data-record-unread-text>Hay actividad administrativa nueva</span><?php endif; ?></button><?php endforeach; ?>
+                            <?php foreach ($menuActions as $item): ?><?php if (!empty($item['url']) && !empty($item['enabled'])): ?><a role="menuitem" href="<?= e((string)$item['url']) ?>"<?= !empty($item['download'])?' download':'' ?> class="<?= !empty($item['separator'])?'is-separated':'' ?>"><i class="fa-solid <?= e($item['icon']) ?>" aria-hidden="true"></i><span><?= e($item['label']) ?></span></a><?php else: ?><button type="button" role="menuitem"<?= empty($item['enabled']) ? ' disabled' : '' ?><?= !empty($item['hidden']) ? ' hidden' : '' ?> class="<?= !empty($item['danger']) ? 'is-danger ' : '' ?><?= !empty($item['separator']) ? 'is-separated' : '' ?>"<?= ($item['action'] ?? '') === 'admin-history' ? ' data-record-history-trigger' : '' ?><?= ($item['action'] ?? '') === 'project-history' ? ' data-project-history-trigger' : '' ?><?= !empty($item['action']) && !in_array(($item['action'] ?? ''),['admin-history','project-history'],true) ? ' data-record-admin-action="' . e($item['action']) . '"' : '' ?>><i class="fa-solid <?= e($item['icon']) ?>" aria-hidden="true"></i><span><?= e($item['label']) ?></span><?php if (($item['action'] ?? '') === 'admin-history'): ?><span class="ed-unread-dot"<?= empty($digitalRecord['admin_actions']['has_unread']) ? ' hidden' : '' ?> data-record-history-unread-dot aria-hidden="true"></span><span class="ed-sr-only"<?= empty($digitalRecord['admin_actions']['has_unread']) ? ' hidden' : '' ?> data-record-unread-text>Hay actividad administrativa nueva</span><?php endif; ?></button><?php endif; ?><?php endforeach; ?>
                         </div>
                     </div><?php endif; ?>
                 </div>
@@ -127,21 +137,17 @@ body.dark-mode .ed-label.is-success{color:#86efac}
             <?php foreach ($tabs as $tabItem): ?><a class="ed-tab" id="recordTab-<?= e($tabItem['id']) ?>" data-record-tab-link data-tab-id="<?= e($tabItem['id']) ?>" href="<?= e($tabItem['url']) ?>"<?= $tabItem['id'] === $activeTab ? ' aria-current="page"' : '' ?><?= ($digitalRecord['mode'] ?? 'view') === 'view' ? ' role="tab" tabindex="' . ($tabItem['id'] === $activeTab ? '0' : '-1') . '" aria-selected="' . ($tabItem['id'] === $activeTab ? 'true' : 'false') . '" aria-controls="recordTabPanel-' . e($tabItem['id']) . '"' : '' ?>><i class="fa-solid <?= e($tabItem['icon']) ?>" aria-hidden="true"></i><?= e($tabItem['label']) ?></a><?php endforeach; ?>
         </nav>
         <?php if (($digitalRecord['mode'] ?? 'view') === 'view'): ?>
-            <?php foreach (['information', 'files', 'evolution'] as $tabPanel): ?>
+            <?php foreach ($tabIds as $tabPanel): ?>
                 <section class="ed-content ed-tab-panel" id="recordTabPanel-<?= e($tabPanel) ?>" data-record-tab-panel="<?= e($tabPanel) ?>" role="tabpanel" tabindex="0" aria-labelledby="recordTab-<?= e($tabPanel) ?>"<?= $tabPanel !== $activeTab ? ' hidden' : '' ?>>
                     <?php
-                    if ($tabPanel === 'files') require __DIR__ . '/_explorador-documental.php';
-                    elseif ($tabPanel === 'evolution') require __DIR__ . '/_evolucion-documental.php';
-                    else require __DIR__ . '/_informacion-expediente.php';
+                    $renderRecordTab($tabPanel);
                     ?>
                 </section>
             <?php endforeach; ?>
         <?php else: ?>
             <section class="ed-content" aria-label="Contenido de <?= e((string) (($tabs[array_search($activeTab, array_column($tabs, 'id'), true)]['label'] ?? 'expediente'))) ?>">
                 <?php
-                if ($activeTab === 'files') require __DIR__ . '/_explorador-documental.php';
-                elseif ($activeTab === 'evolution') require __DIR__ . '/_evolucion-documental.php';
-                else require __DIR__ . '/_informacion-expediente.php';
+                $renderRecordTab($activeTab);
                 ?>
             </section>
         <?php endif; ?>

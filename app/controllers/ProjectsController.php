@@ -36,28 +36,17 @@ final class ProjectsController
     public function detail(): void
     {
         $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $legacyTabs = ['deliveries' => 'documents', 'final-documents' => 'documents', 'observations' => 'review', 'comments' => 'review', 'history' => 'activity', 'calendar' => 'activity', 'participants' => 'information', 'more' => 'information'];
-        $allowedTabs = ['summary', 'documents', 'review', 'activity', 'information'];
-        $requestedTab = strtolower(trim((string) ($_GET['tab'] ?? 'summary')));
+        $legacyTabs = ['summary'=>'information','deliveries' => 'files', 'documents'=>'files','final-documents' => 'files', 'observations' => 'information', 'comments' => 'information', 'review'=>'information', 'history' => 'information', 'calendar' => 'information', 'activity'=>'information', 'participants' => 'information', 'more' => 'information'];
+        $allowedTabs = ['information', 'files', 'evolution'];
+        $requestedTab = strtolower(trim((string) ($_GET['tab'] ?? 'information')));
         $tab = $legacyTabs[$requestedTab] ?? $requestedTab;
-        $tab = in_array($tab, $allowedTabs, true) ? $tab : 'summary';
-        $reviewView = strtolower(trim((string) ($_GET['view'] ?? ($requestedTab === 'comments' ? 'conversation' : 'observations'))));
-        $reviewView = in_array($reviewView, ['observations', 'conversation'], true) ? $reviewView : 'observations';
-        $activityView = strtolower(trim((string) ($_GET['view'] ?? ($requestedTab === 'calendar' ? 'calendar' : 'history'))));
-        $activityView = in_array($activityView, ['history', 'calendar'], true) ? $activityView : 'history';
-        $observationFilter = strtolower(trim((string) ($_GET['filter'] ?? 'pending')));
-        $observationFilter = in_array($observationFilter, ['pending', 'addressed', 'resolved', 'all'], true) ? $observationFilter : 'pending';
-        $selectedObservationId = filter_var($_GET['observation'] ?? 1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 1;
-        $model = new ProjectModel();
+        $tab = in_array($tab, $allowedTabs, true) ? $tab : 'information';
         $access = new ProjectAccessService();
-        $isAdministrator = (new AuthSessionService())->hasAdminAccess();
+        $session = new AuthSessionService();
+        $isAdministrator = $session->hasAdminAccess();
         $project = $id && $access->can('project.view')
-            ? ($isAdministrator ? $model->findProjectForAdministrator((int) $id) : $model->findProjectForUser((int) $id, $access->currentUserId()))
+            ? (new ProjectRecordModel())->find((int)$id, $access->currentUserId(), $isAdministrator)
             : null;
-        $projectEvents = [];
-        if ($project !== null) {
-            $projectEvents = array_values(array_filter((new CalendarModel())->getEvents(), static fn (array $event): bool => (int) ($event['projectId'] ?? 0) === (int) $project['id']));
-        }
 
         if ($project === null) {
             (new ErrorController())->notFound();
@@ -69,21 +58,60 @@ final class ProjectsController
             'title' => ($project['title'] ?? 'Proyecto no encontrado') . ' | Gestión Académica',
             'bodyClass' => 'project-detail-page',
             'pageStyles' => [asset('css/project-simplified.css')],
-            'pageScript' => asset('js/project-detail.js'),
+            'pageScript' => asset('js/repository-detail.js'),
             'project' => $project,
             'activeTab' => $tab,
-            'legacySection' => in_array($requestedTab, ['history', 'participants', 'calendar'], true) ? $requestedTab : null,
-            'reviewView' => $reviewView,
-            'activityView' => $activityView,
-            'observationFilter' => $observationFilter,
-            'selectedObservationId' => $selectedObservationId,
-            'tabs' => $model->getDetailTabs(),
-            'projectEvents' => $projectEvents,
-            'projectPermissions' => $access->permissions(),
             'isAdministrator' => $isAdministrator,
+            'publicContext' => false,
+            'canReview' => $isAdministrator || $access->can('delivery.review') || $access->can('observation.reply'),
+            'canDeliver' => $access->can('delivery.create'),
             'projectEditUrl' => route('projects') . '&edit=' . (int) $project['id'],
+            'detailUrl' => route('project-detail') . '&id=' . (int)$project['id'],
+            'returnUrl' => route('projects'),
+            'previewActionUrl' => route('project-file-preview'),
+            'downloadActionUrl' => route('project-file-download'),
         ]);
     }
+
+    public function filePreview(): void
+    {
+        [$project, $file, $stream] = $this->resolveFile(true);
+        $query='&project_id='.(int)$project['id'].'&file_id='.(int)$file['id'];
+        $preview=(new FilePreviewService())->prepare($this->previewFile($file,$stream),route('project-file-content').$query,route('project-file-download').$query);
+        fclose($stream); $this->json(['success'=>true,'message'=>$preview['message'],'data'=>['preview'=>$preview]]);
+    }
+
+    public function fileContent(): void
+    {
+        [, $file, $stream] = $this->resolveFile(); $data=$this->previewFile($file,$stream);
+        if (!(new FilePreviewService())->canStreamInline($data)) { fclose($stream); http_response_code(415); exit('Este formato debe descargarse para consultarlo.'); }
+        session_write_close(); $this->stream($file,$stream,'inline');
+    }
+
+    public function fileDownload(): void
+    {
+        [, $file, $stream] = $this->resolveFile(); session_write_close(); $this->stream($file,$stream,'attachment');
+    }
+
+    private function resolveFile(bool $json=false): array
+    {
+        if (session_status()!==PHP_SESSION_ACTIVE) session_start();
+        if (($_SERVER['REQUEST_METHOD']??'GET')!=='GET') { http_response_code(405); exit; }
+        $projectId=filter_var($_GET['project_id']??null,FILTER_VALIDATE_INT); $fileId=filter_var($_GET['file_id']??null,FILTER_VALIDATE_INT);
+        $access=new ProjectAccessService(); $admin=(new AuthSessionService())->hasAdminAccess();
+        $model=new ProjectRecordModel();
+        $repositoryScope=(string)($_GET['scope']??'')==='repository';
+        $project=($projectId && $access->can('project.view'))?$model->find((int)$projectId,$access->currentUserId(),$admin,$repositoryScope):null;
+        $file=($project && $fileId)?$model->findFile((int)$projectId,(int)$fileId):null;
+        if(!$project||!$file){http_response_code(404);if($json)$this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);exit('El archivo solicitado no está disponible.');}
+        try{$path=(new PrivateProjectFileService())->resolveStoredFile((int)$projectId,(string)$file['storage_name']);$stream=fopen($path,'rb');}catch(Throwable){$stream=false;}
+        if($stream===false){http_response_code(404);exit('El archivo solicitado no está disponible.');}
+        return [$project,$file,$stream];
+    }
+
+    private function previewFile(array $file,$stream):array{return ['name'=>(string)$file['original_name'],'path'=>(string)$file['original_name'],'size'=>(int)$file['size_bytes'],'stream'=>$stream];}
+    private function stream(array $file,$stream,string $disposition):never{header('Content-Type: '.(string)$file['mime_type']);header('Content-Length: '.(int)$file['size_bytes']);header("Content-Disposition: {$disposition}; filename*=UTF-8''".rawurlencode((string)$file['original_name']));header('X-Content-Type-Options: nosniff');header('Cache-Control: private, no-store, max-age=0');fpassthru($stream);fclose($stream);exit;}
+    private function json(array $payload):never{header('Content-Type: application/json; charset=UTF-8');echo json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);exit;}
 
     /** Mantiene accesible la ruta global mientras se construye el formulario definitivo. */
     public function create(): void

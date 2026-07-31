@@ -18,11 +18,12 @@ final class RepositoryController
         $favoriteModel = new FavoriteModel();
         $downloadModel = new DownloadModel();
         $userId = $this->getCurrentUserId();
+        $repositoryReturnUrl = (string) ($_SERVER['REQUEST_URI'] ?? route('repository'));
         $favoriteIds = $favoriteModel->getFavoriteIds($userId);
-        $projects = array_map(static function (array $project) use ($favoriteIds, $downloadModel): array {
+        $projects = array_map(static function (array $project) use ($favoriteIds, $downloadModel, $repositoryReturnUrl): array {
             $project['is_favorite'] = in_array($project['id'], $favoriteIds, true);
             $project['downloads'] = $downloadModel->getTotal($project['id'], $project['downloads']);
-            $project['detail_url'] = base_url('index.php?page=repository-detail&id=' . urlencode((string) $project['id']));
+            $project['detail_url'] = base_url('index.php?page=repository-detail&id=' . urlencode((string) $project['id']) . '&return=' . rawurlencode($repositoryReturnUrl));
             return $project;
         }, $repositoryModel->getPublishedProjects());
 
@@ -49,39 +50,42 @@ final class RepositoryController
     public function detail(): void
     {
         $this->ensureSession();
+        $session=new AuthSessionService();
+        $isAdministrator=$session->hasAdminAccess();
         $projectId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
-        $repositoryModel = new RepositoryModel();
-        $project = $projectId === false || $projectId === null
-            ? null
-            : $repositoryModel->getPublishedProjectDetail((int) $projectId);
-
-        if ($project === null) {
-            http_response_code(404);
-            $archiveState = null;
-        } else {
-            $favoriteModel = new FavoriteModel();
-            $project['is_favorite'] = $favoriteModel->isFavorite($this->getCurrentUserId(), $project['id']);
-            $project['downloads'] = (new DownloadModel())->getTotal($project['id'], $project['downloads']);
-            $archiveState = (new ArchiveService())->listDirectory($project['archive']['path']);
-            $project['archive'] = array_merge($project['archive'], $archiveState['meta']);
-        }
-
-        View::render('repository/detalle', [
+        $access = new ProjectAccessService();
+        $project = ($projectId !== false && $projectId !== null && $access->can('project.view'))
+            ? (new ProjectRecordModel())->find((int)$projectId, $access->currentUserId(), $isAdministrator, true) : null;
+        if ($project === null) http_response_code(404);
+        $requestedTab=strtolower(trim((string)($_GET['tab']??'information')));
+        $activeTab=in_array($requestedTab,['information','files','evolution'],true)?$requestedTab:'information';
+        $returnUrl=$this->repositoryReturnUrl((string)($_GET['return']??''));
+        View::render('projects/detail', [
             'currentPage' => 'repository',
             'title' => $project === null ? 'Proyecto no encontrado | Repositorio' : $project['title'] . ' | Repositorio',
-            'pageScript' => asset('js/repository-detail.js'),
+            'pageStyles'=>$isAdministrator?[asset('css/admin-projects.css')]:[],
+            'pageScript' => $isAdministrator?asset('js/admin-projects.js'):asset('js/repository-detail.js'),
+            'pageScripts'=>$isAdministrator?[asset('js/material-admin-actions.js'),asset('js/repository-detail.js')]:[],
             'project' => $project,
-            'repositoryUrl' => route('repository'),
-            'projectTrackingUrl' => !empty($project['source_project_id']) ? route('project-detail') . '&id=' . (int) $project['source_project_id'] . '&tab=final-documents' : null,
-            'favoriteActionUrl' => route('repository-favorite'),
-            'favoriteCsrfToken' => $this->getFavoriteCsrfToken(),
-            'archiveState' => $archiveState,
-            'filesActionUrl' => route('repository-files'),
-            'projectDownloadUrl' => base_url('index.php?page=repository-download&id=' . urlencode((string) ($project['id'] ?? 0))),
-            'fileDownloadActionUrl' => route('repository-file-download'),
-            'previewActionUrl' => route('repository-preview'),
-            'previewContentActionUrl' => route('repository-preview-content'),
+            'activeTab'=>$activeTab,'isAdministrator'=>$isAdministrator,'publicContext'=>true,'canReview'=>false,'canDeliver'=>false,
+            'projectEditUrl'=>'','detailUrl'=>route('repository-detail').'&id='.(int)($project['id']??0),
+            'returnUrl'=>$returnUrl,'previewActionUrl'=>route('project-file-preview').'&scope=repository',
+            'downloadActionUrl'=>route('project-file-download').'&scope=repository',
+            'projectAdminEndpoint'=>$isAdministrator?route('admin-repository-publish'):'',
+            'projectTrashEndpoint'=>$isAdministrator?route('admin-project-trash'):'',
+            'projectSaveEndpoint'=>$isAdministrator?route('admin-project-save'):'',
+            'projectAdminCsrf'=>$isAdministrator?$session->csrfToken('admin_repository'):'',
+            'projectTrashCsrf'=>$isAdministrator?$session->csrfToken('admin_projects'):'',
+            'projectEditorCatalogs'=>$isAdministrator?(new AdminProjectModel())->catalogs():[],
         ]);
+    }
+
+    private function repositoryReturnUrl(string $candidate): string
+    {
+        if ($candidate==='') return (new AuthSessionService())->hasAdminAccess()?route('admin-repository'):route('repository');
+        $parts=parse_url($candidate); if($parts===false||isset($parts['scheme'])||isset($parts['host'])) return route('repository');
+        parse_str((string)($parts['query']??''),$query); $page=strtolower((string)($query['page']??''));
+        return in_array($page,['repository','repositorio','admin-repository'],true)?$candidate:route('repository');
     }
 
     public function files(): void

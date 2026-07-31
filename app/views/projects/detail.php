@@ -1,63 +1,121 @@
-<div class="project-detail project-workspace-v2" data-project-workspace data-project-status="<?=e((string)($project['status_key']??''))?>">
-<?php if ($project === null): ?>
-    <section class="detail-empty detail-not-found"><span><i class="fa-regular fa-folder-open"></i></span><h1>Proyecto no encontrado</h1><p>El expediente no existe o no tienes permiso para consultarlo.</p><a href="<?= e(route('projects')) ?>">Volver a Mis proyectos</a></section>
+<?php
+if ($project === null): ?>
+    <section class="repository-detail-not-found"><i class="fa-solid fa-folder-open"></i><h1>Proyecto no encontrado</h1><p>El expediente solicitado no existe o no está disponible para tu cuenta.</p><a class="open-btn" href="<?= e($returnUrl) ?>">Volver</a></section>
 <?php else:
-    $url = static function (string $tab, array $params = []) use ($project): string {
-        return route('project-detail') . '&' . http_build_query(['id' => (int) $project['id'], 'tab' => $tab] + $params);
+    $projectId = (int) $project['id'];
+    $detailUrl = (string) $detailUrl;
+    $statusLabels = ['development'=>'En desarrollo','under_review'=>'En revisión','changes_required'=>'Requiere cambios','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el Tribunal','published'=>'Publicado'];
+    $statusLabel = $publicContext ? 'Publicado' : ($statusLabels[(string) $project['status']] ?? (string) $project['status']);
+    $isDegreeProject = in_array(mb_strtolower((string)($project['type_code'] ?? ''),'UTF-8'), ['thesis','tesis','degree','titulacion','titulación'], true)
+        || str_contains(mb_strtolower((string)($project['type_name'] ?? ''),'UTF-8'), 'titul');
+    $stageLabel = $publicContext ? 'Finalizado' : match ((string)$project['status']) {
+        'development' => 'En desarrollo',
+        'under_review', 'changes_required' => 'Revisión académica',
+        'approved' => $isDegreeProject ? 'Preparación para tribunal' : 'Por publicar',
+        'defense' => 'Defensa',
+        'tribunal_approved' => 'Por publicar',
+        'published' => 'Finalizado',
+        default => 'Etapa no definida',
     };
-    $can = static fn (string $permission): bool => in_array('*', $projectPermissions, true) || in_array($permission, $projectPermissions, true);
-    $primary = ['label' => 'Ver expediente', 'url' => $url('summary')];
-    if ($project['status_key'] === 'published' && !empty($project['repository_id'])) $primary = ['label' => 'Abrir ficha institucional', 'url' => route('repository-detail') . '&id=' . (int) $project['repository_id']];
-    elseif ($project['status_key'] === 'review' && $can('observation.address')) $primary = ['label' => 'Atender observaciones', 'url' => $url('review')];
-    elseif ($project['status_key'] === 'review' && $can('delivery.review')) $primary = ['label' => 'Revisar entrega', 'url' => $url('review')];
-    elseif ($project['status_key'] === 'defense') $primary = ['label' => 'Consultar evaluación', 'url' => $url('information')];
-    elseif ($project['status_key'] === 'tribunal_approved') $primary = ['label' => 'Preparar publicación', 'url' => $url('documents')];
-    elseif ($project['status_key'] === 'approved') $primary = ['label' => 'Preparar documentos finales', 'url' => $url('documents')];
-    elseif ($can('delivery.create')) $primary = ['label' => 'Registrar entrega', 'url' => $url('documents')];
-    $statusKey = static function (string $status): string { $value = mb_strtolower($status, 'UTF-8'); return str_contains($value, 'atendida') ? 'addressed' : (str_contains($value, 'resuelta') ? 'resolved' : 'pending'); };
-    $pendingObservations = array_values(array_filter($project['observations'], static fn (array $item): bool => $statusKey($item['status']) === 'pending'));
-    $filteredObservations = $observationFilter === 'all' ? $project['observations'] : array_values(array_filter($project['observations'], static fn (array $item): bool => $statusKey($item['status']) === $observationFilter));
-    $selectedObservation = null;
-    foreach ($filteredObservations as $item) if ((int) $item['id'] === (int) $selectedObservationId) $selectedObservation = $item;
-    $selectedObservation ??= $filteredObservations[0] ?? null;
-?>
-    <nav class="detail-breadcrumb" aria-label="Migas de pan"><a href="<?= e(route('projects')) ?>">Mis proyectos</a><i class="fa-solid fa-chevron-right"></i><span aria-current="page"><?= e($project['title']) ?></span></nav>
-
-    <header class="workspace-header">
-        <div class="workspace-heading"><div class="detail-badges"><span><?= e($project['type']) ?></span><strong><?= e($project['status']) ?></strong></div><h1><?= e($project['title']) ?></h1><div class="workspace-meta"><span><i class="fa-solid fa-chalkboard-user"></i><?= e($project['tutor'] ?: 'Tutor por asignar') ?></span><span><i class="fa-regular fa-calendar"></i><?= e($project['period']) ?></span><span><i class="fa-solid fa-users"></i><?= count($project['participants']) ?> integrantes</span></div></div>
-        <div class="workspace-header-actions"><?php if (!empty($isAdministrator)): ?><a class="workspace-main-action" href="<?= e($projectEditUrl) ?>"><i class="fa-regular fa-pen-to-square"></i> Editar proyecto</a><?php endif; ?><a class="workspace-main-action" href="<?= e($primary['url']) ?>"><?= e($primary['label']) ?> <i class="fa-solid fa-arrow-right"></i></a><div class="detail-more-menu" data-project-more-menu><button type="button" aria-label="Más acciones" aria-haspopup="menu" aria-expanded="false"><i class="fa-solid fa-ellipsis"></i></button><div role="menu" hidden><a role="menuitem" href="<?= e($url('information')) ?>">Información del proyecto</a><a role="menuitem" href="<?= e($url('activity')) ?>">Consultar actividad</a><?php if (!empty($project['repository_id'])): ?><a role="menuitem" href="<?= e(route('repository-detail')) ?>&id=<?= (int) $project['repository_id'] ?>">Ficha institucional</a><?php endif; ?></div></div></div>
-    </header>
-
-    <nav class="workspace-tabs" aria-label="Secciones del proyecto"><?php foreach ($tabs as $key => $tab): ?><a class="<?= $activeTab === $key ? 'is-active' : '' ?>" <?= $activeTab === $key ? 'aria-current="page"' : '' ?> href="<?= e($url($key)) ?>"><i class="fa-solid <?= e($tab['icon']) ?>"></i><span><?= e($tab['label']) ?></span></a><?php endforeach; ?></nav>
-
-    <main class="workspace-content">
-    <?php if ($activeTab === 'summary'): ?>
-        <div class="summary-v2">
-            <section class="summary-situation"><span>Situación actual</span><h2><?php if ($pendingObservations): ?>La <?= e($project['latest_delivery']['version'] ?? 'última entrega') ?> necesita <?= count($pendingObservations) ?> <?= count($pendingObservations) === 1 ? 'corrección' : 'correcciones' ?> antes del <?= e($project['key_dates'][2]['value'] ?? 'próximo hito') ?>.<?php else: ?>El proyecto está al día y puede continuar con la siguiente etapa académica.<?php endif; ?></h2></section>
-            <section class="summary-facts"><div><i class="fa-solid fa-file-lines"></i><span><small>Última entrega</small><strong><?= e($project['latest_delivery']['title'] ?? 'Sin entregas') ?></strong><em><?= e($project['latest_delivery']['date'] ?? 'No registrada') ?></em></span></div><div><i class="fa-regular fa-calendar"></i><span><small>Próxima fecha</small><strong><?= e($project['key_dates'][2]['value'] ?? 'Por definir') ?></strong><em><?= e($project['key_dates'][2]['label'] ?? 'Próximo hito') ?></em></span></div></section>
-            <section class="summary-recent"><header><h2>Actividad reciente</h2></header><?php if ($project['activities']): ?><ol><?php foreach (array_slice($project['activities'], 0, 3) as $activity): ?><li><i class="fa-solid fa-check"></i><strong><?= e($activity['title']) ?></strong><time><?= e($activity['date']) ?></time></li><?php endforeach; ?></ol><?php else: ?><p class="workspace-empty-inline">No existe actividad reciente.</p><?php endif; ?></section>
-        </div>
-
-    <?php elseif ($activeTab === 'documents'): ?>
-        <section class="workspace-page-heading"><div><span>Documentos</span><h2>Entregas y versiones</h2><p>Selecciona el nombre de un archivo para visualizarlo. Usa la flecha de cada fila para consultar su trazabilidad.</p></div></section>
-        <script type="application/json" id="projectDeliveriesData"><?= json_encode(array_map(static fn (array $delivery): array => ['file'=>$delivery['file'],'path'=>$delivery['preview_path'],'format'=>strtoupper(pathinfo($delivery['file'], PATHINFO_EXTENSION))], $project['deliveries']), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?></script>
-        <?php if ($project['deliveries']): ?><div class="document-rows"><?php foreach ($project['deliveries'] as $index => $delivery): ?><details class="document-row" <?= $index === 0 ? 'open' : '' ?>><summary><span class="document-version"><?= e($delivery['version']) ?></span><span class="document-name"><strong><?= e($delivery['title']) ?></strong><small><?= e($delivery['file']) ?></small></span><span class="document-author"><small><?= e($delivery['author']) ?></small><time><?= e($delivery['date']) ?></time></span><span class="workspace-status"><?= e($delivery['status']) ?></span><button type="button" disabled aria-label="Abrir <?= e($delivery['file']) ?>">Abrir</button><i class="fa-solid fa-chevron-down"></i></summary><div class="document-expanded"><p><?= e($delivery['comment']) ?></p><dl><div><dt>Etapa</dt><dd><?= e($delivery['stage']) ?></dd></div><div><dt>Tamaño</dt><dd><?= e($delivery['size']) ?></dd></div><div><dt>Revisión</dt><dd><?= e($delivery['status']) ?></dd></div><div><dt>Observaciones vinculadas</dt><dd><?= $index === 0 ? count($project['observations']) : 0 ?></dd></div></dl></div></details><?php endforeach; ?></div><?php else: ?><div class="workspace-empty"><i class="fa-solid fa-file-circle-plus"></i><h3>Aún no existen entregas</h3><p>Las versiones registradas aparecerán aquí.</p></div><?php endif; ?>
-        <?php if ($project['final_documents']): ?><section class="final-documents-v2"><header><span>Documentos finales</span><h2>Archivos para publicación</h2></header><div class="final-document-list"><?php foreach ($project['final_documents'] as $document): ?><article><i class="fa-solid <?= $document['format'] === 'ZIP' ? 'fa-file-zipper' : 'fa-file-pdf' ?>"></i><div><small><?= e($document['label']) ?></small><strong><?= e($document['file']) ?></strong></div><span><?= e($document['format']) ?></span><b><?= e($document['status']) ?></b></article><?php endforeach; ?></div></section><?php endif; ?>
-
-    <?php elseif ($activeTab === 'review'): ?>
-        <nav class="workspace-subtabs" aria-label="Vistas de revisión"><a class="<?= $reviewView === 'observations' ? 'is-active' : '' ?>" href="<?= e($url('review', ['view' => 'observations'])) ?>">Observaciones</a><a class="<?= $reviewView === 'conversation' ? 'is-active' : '' ?>" href="<?= e($url('review', ['view' => 'conversation'])) ?>">Conversación</a></nav>
-        <script type="application/json" id="projectObservationsData"><?= json_encode($project['observations'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?></script>
-        <?php if ($reviewView === 'observations'): ?><div class="review-master-detail"><aside class="observation-master"><header><h2>Observaciones</h2><nav aria-label="Filtrar observaciones"><?php foreach (['pending'=>'Pendientes','addressed'=>'Atendidas','resolved'=>'Resueltas','all'=>'Todas'] as $key=>$label): ?><a class="<?= $observationFilter === $key ? 'is-active' : '' ?>" href="<?= e($url('review', ['view'=>'observations','filter'=>$key])) ?>"><?= e($label) ?></a><?php endforeach; ?></nav></header><?php if ($project['observations'] && in_array($observationFilter, ['pending','all'], true)): ?><div class="observation-master-list"><?php foreach ($project['observations'] as $observation): ?><a class="<?= (int) $selectedObservation['id'] === (int) $observation['id'] ? 'is-selected' : '' ?>" href="<?= e($url('review', ['view'=>'observations','filter'=>$observationFilter,'observation'=>$observation['id']])) ?>"><span><?= e($observation['category']) ?></span><strong><?= e($observation['title']) ?></strong><small><?= e($observation['date']) ?></small></a><?php endforeach; ?></div><?php else: ?><p class="workspace-empty-inline">No hay observaciones en este estado.</p><?php endif; ?></aside><section class="observation-detail"><?php if ($selectedObservation && in_array($observationFilter, ['pending','all'], true)): ?><header><div><span class="workspace-status"><?= e($selectedObservation['status']) ?></span><small><?= e($selectedObservation['category']) ?></small></div><time><?= e($selectedObservation['date']) ?></time></header><h2><?= e($selectedObservation['title']) ?></h2><p><?= e($selectedObservation['text']) ?></p><dl><div><dt>Entrega</dt><dd><?= e($selectedObservation['delivery']) ?></dd></div><div><dt>Ubicación</dt><dd><?= e($selectedObservation['location']) ?></dd></div><div><dt>Autor</dt><dd><?= e($selectedObservation['author']) ?></dd></div></dl><?php if ($selectedObservation['responses']): ?><div class="observation-followup"><strong>Seguimiento</strong><?php foreach ($selectedObservation['responses'] as $response): ?><article><b><?= e($response['author']) ?></b><time><?= e($response['date']) ?></time><p><?= e($response['text']) ?></p></article><?php endforeach; ?></div><?php endif; ?><?php else: ?><div class="workspace-empty"><i class="fa-regular fa-circle-check"></i><h3>Selecciona una observación</h3></div><?php endif; ?></section></div>
-        <?php else: ?><section class="conversation-view"><header><span>Conversación general</span><h2>Mensajes del proyecto</h2><p>Este espacio es independiente de las observaciones formales.</p></header><div class="conversation-messages"><?php foreach ($project['comments'] as $comment): ?><article><b><?= e(mb_substr($comment['author'], 0, 1, 'UTF-8')) ?></b><div><header><strong><?= e($comment['author']) ?></strong><time><?= e($comment['date']) ?></time></header><p><?= e($comment['text']) ?></p></div></article><?php endforeach; ?></div><form class="conversation-composer"><label for="projectComment">Nuevo comentario</label><textarea id="projectComment" rows="3" disabled placeholder="Escribe un comentario general..."></textarea><footer><small>La publicación se habilitará al conectar persistencia.</small><button type="button" disabled>Publicar comentario</button></footer></form></section><?php endif; ?>
-
-    <?php elseif ($activeTab === 'activity'): ?>
-        <nav class="workspace-subtabs" aria-label="Vistas de actividad"><a class="<?= $activityView === 'history' ? 'is-active' : '' ?>" href="<?= e($url('activity', ['view'=>'history'])) ?>">Historial</a><a class="<?= $activityView === 'calendar' ? 'is-active' : '' ?>" href="<?= e($url('activity', ['view'=>'calendar'])) ?>">Calendario</a></nav>
-        <?php if ($activityView === 'history'): ?><section class="activity-view"><header><div><span>Historial</span><h2>Actividad del expediente</h2></div><label>Tipo <select disabled><option>Todas las actividades</option></select></label></header><ol class="activity-timeline"><?php foreach ($project['history'] as $entry): ?><li><i class="fa-solid <?= e($entry['icon']) ?>"></i><div><strong><?= e($entry['action']) ?></strong><p><?= e($entry['detail']) ?></p><?php if(!empty($entry['changes'])):?><ul class="activity-change-list"><?php foreach($entry['changes'] as $change):?><li><strong><?=e($change['field'])?></strong> <?=e($change['verb']??'cambiado')?> de “<?=e($change['from'])?>” a “<?=e($change['to'])?>”.</li><?php endforeach;?></ul><?php endif;?><small><?= e($entry['user']) ?> · <?= e($entry['role']) ?></small></div><time><?= e($entry['date']) ?></time></li><?php endforeach; ?></ol></section>
-        <?php else: ?><section class="activity-view"><header><div><span>Calendario</span><h2>Eventos del proyecto</h2></div><a class="secondary-action" href="<?= e(route('calendar')) ?>&project_id=<?= (int) $project['id'] ?>">Ver calendario completo</a></header><?php if ($projectEvents): ?><div class="project-events-v2"><?php foreach ($projectEvents as $event): ?><article><i class="fa-regular fa-calendar"></i><div><strong><?= e((string) $event['title']) ?></strong><p><?= e((string) ($event['description'] ?? '')) ?></p></div><time><?= e((string) $event['date']) ?></time></article><?php endforeach; ?></div><?php else: ?><div class="workspace-empty"><i class="fa-regular fa-calendar-xmark"></i><h3>No hay eventos vinculados</h3></div><?php endif; ?></section><?php endif; ?>
-
-    <?php else: ?>
-        <div class="information-layout"><section class="information-section"><header><i class="fa-solid fa-graduation-cap"></i><div><span>Información académica</span><h2>Datos del proyecto</h2></div></header><dl><?php foreach ($project['academic_info'] as $item): ?><div><dt><?= e($item['label']) ?></dt><dd><?= e($item['value']) ?></dd></div><?php endforeach; ?></dl></section><section class="information-section"><header><i class="fa-solid fa-users"></i><div><span>Equipo</span><h2>Participantes</h2></div></header><div class="information-team"><?php foreach ($project['participant_groups'] as $group): ?><div><h3><?= e($group['label']) ?> <small><?= count($group['members']) ?></small></h3><?php foreach ($group['members'] as $member): ?><article><b><?= e($member['initial']) ?></b><span><strong><?= e($member['name']) ?></strong><small><?= e($member['role']) ?></small></span></article><?php endforeach; ?></div><?php endforeach; ?></div></section><section class="information-section administration-section"><header><i class="fa-solid fa-shield-halved"></i><div><span>Administración</span><h2>Gestión del expediente</h2></div></header><div class="administration-list"><div><span>Publicación</span><?php if (!empty($project['repository_id'])): ?><a href="<?= e(route('repository-detail')) ?>&id=<?= (int) $project['repository_id'] ?>">Abrir repositorio</a><?php else: ?><small>No disponible en esta etapa</small><?php endif; ?></div><div><span>Configuración</span><small><?= $can('status.manage') ? 'Disponible según permisos' : 'Solo para coordinación' ?></small></div></div><?php if ($can('participant.manage')): ?><button type="button" class="secondary-action" disabled>Administrar participantes</button><?php endif; ?><?php if (in_array('*', $projectPermissions, true)): ?><aside class="risk-zone"><div><strong>Zona de riesgo</strong><p>Acciones sensibles reservadas para administración.</p></div><button type="button" disabled>Archivar expediente</button></aside><?php endif; ?></section></div>
-    <?php endif; ?>
-    </main>
-<?php endif; ?>
-</div>
+    $dateLabel = static fn (?string $value): string => $value ? date('d/m/Y', strtotime($value)) : '';
+    $roleLabels = ['student'=>'Estudiante','tutor'=>'Tutor','cotutor'=>'Cotutor','tribunal'=>'Tribunal','jury'=>'Jurado'];
+    $students = array_values(array_filter($project['participants'], static fn (array $row): bool => $row['role_code'] === 'student'));
+    $academicTeam = array_values(array_filter($project['participants'], static fn (array $row): bool => in_array($row['role_code'], ['tutor','cotutor'], true)));
+    $tribunal = array_values(array_filter($project['participants'], static fn (array $row): bool => in_array($row['role_code'], ['tribunal','jury'], true)));
+    $participantRows = static function (array $rows) use ($roleLabels, $dateLabel): array {
+        return array_map(static fn (array $row): array => [
+            'label' => ($roleLabels[$row['role_code']] ?? ucfirst((string) $row['role_code'])) . (!empty($row['is_leader']) ? ' líder' : ''),
+            'value' => (string) $row['full_name'],
+        ], $rows);
+    };
+    $previewTypes = ['pdf'=>'pdf','docx'=>'docx','txt'=>'text','png'=>'image','jpg'=>'image','jpeg'=>'image','webp'=>'image'];
+    $documents = array_map(static function (array $file) use ($projectId, $previewActionUrl, $downloadActionUrl, $previewTypes): array {
+        $extension = strtolower((string) $file['extension']);
+        $query = '&project_id=' . $projectId . '&file_id=' . (int) $file['id'];
+        return ['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'type'=>strtoupper($extension ?: 'FILE'),
+            'size'=>ArchiveService::formatBytes((int)$file['size_bytes']),'sort_order'=>(int)$file['id'],'extension'=>$extension,'available'=>true,
+            'is_presentation'=>(int)($project['presentation_file_id'] ?? 0)===(int)$file['id'],'is_package'=>false,
+            'preview_supported'=>isset($previewTypes[$extension]),'preview_type'=>$previewTypes[$extension] ?? 'unsupported',
+            'preview_url'=>$previewActionUrl.$query,'download_url'=>$downloadActionUrl.$query];
+    }, $project['files']);
+    $archives = array_values(array_filter($documents, static fn(array $file): bool => $file['extension']==='zip'));
+    $documents = array_values(array_filter($documents, static fn(array $file): bool => $file['extension']!=='zip'));
+    $versions = [];
+    foreach ($project['deliveries'] as $delivery) {
+        $deliveryFiles = array_values(array_filter($project['files'], static fn(array $file): bool => (int)($file['delivery_id'] ?? 0)===(int)$delivery['id']));
+        foreach ($deliveryFiles as $file) {
+            $extension=strtolower((string)$file['extension']);
+            $versions[] = ['name'=>(string)$delivery['title'],'versions_count'=>1,'updated_date'=>date('d/m/Y H:i',strtotime((string)$delivery['submitted_at'])),
+                'responsible'=>(string)$delivery['author_name'],'available'=>true,'versions'=>[[
+                    'file_id'=>(int)$file['id'],'id'=>(int)$delivery['id'],'number'=>(int)$delivery['version_number'],'name'=>(string)$file['original_name'],
+                    'date'=>date('d/m/Y H:i',strtotime((string)$delivery['submitted_at'])),'responsible'=>(string)$delivery['author_name'],
+                    'current'=>true,'available'=>true,'extension'=>$extension,'size'=>ArchiveService::formatBytes((int)$file['size_bytes']),
+                    'preview_supported'=>isset($previewTypes[$extension])]]];
+        }
+    }
+    $tabs = [
+        ['id'=>'information','label'=>'Información','icon'=>'fa-file-lines'],['id'=>'files','label'=>'Documentos','icon'=>'fa-folder-open'],
+        ['id'=>'evolution','label'=>'Evolución documental','icon'=>'fa-clock-rotate-left'],
+    ];
+    foreach ($tabs as &$tabItem) $tabItem['url']=$detailUrl.'&tab='.$tabItem['id']; unset($tabItem);
+    $allowedTabs=array_column($tabs,'id'); $activeTab=in_array($activeTab,$allowedTabs,true)?$activeTab:'information';
+    $importantDates=array_values(array_filter([
+        ['label'=>'Registro','value'=>$dateLabel($project['created_at']??null)],['label'=>'Aprobación','value'=>$dateLabel($project['approved_at']??null)],
+        ['label'=>'Aprobación del tribunal','value'=>$dateLabel($project['tribunal_approved_at']??null)],['label'=>'Publicación','value'=>$dateLabel($project['published_at']??null)],
+    ],static fn(array $row):bool=>$row['value']!==''));
+    $informationSections = [
+        ['id'=>'description','title'=>'Resumen del proyecto','icon'=>'fa-align-left','type'=>'prose','content'=>(string)($project['summary'] ?: $project['subtitle'] ?: 'Este expediente no registra un resumen institucional.')],
+        ['id'=>'institutional','title'=>'Información académica','icon'=>'fa-building-columns','type'=>'metadata','content'=>array_values(array_filter([
+            ['label'=>'Código','value'=>(string)$project['code']],['label'=>'Tipo de proyecto','value'=>(string)$project['type_name']],['label'=>'Carrera','value'=>(string)$project['career_name']],
+            ['label'=>'Período académico','value'=>(string)$project['period_name']],['label'=>'Estado','value'=>$statusLabel],['label'=>'Etapa académica','value'=>$stageLabel],
+            ['label'=>'Asignatura académica','value'=>trim((string)($project['subject_code']??'').' · '.(string)($project['subject_name']??''),' ·')],['label'=>'Línea de investigación','value'=>(string)($project['research_line_name']??'')],
+            ['label'=>'Fecha de registro','value'=>$dateLabel($project['created_at']??null)],['label'=>'Fecha de aprobación','value'=>$dateLabel($project['approved_at']??null)],['label'=>'Fecha de publicación','value'=>$dateLabel($project['published_at']??null)],
+        ],static fn(array $row):bool=>$row['value']!==''))],
+        ['id'=>'participants','title'=>'Participantes','icon'=>'fa-users','type'=>'metadata','content'=>array_merge($participantRows($students),$participantRows($academicTeam),$participantRows($tribunal))],
+        ['id'=>'dates','title'=>'Fechas importantes','icon'=>'fa-calendar-days','type'=>'metadata','content'=>$importantDates],
+    ];
+    $actions=[];
+    if ($isAdministrator) $actions[]=['id'=>'edit','label'=>'Editar proyecto','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
+    elseif (!$publicContext && $canDeliver) $actions[]=['id'=>'delivery','label'=>'Registrar entrega','kind'=>'primary','icon'=>'fa-upload','url'=>$detailUrl.'&tab=review','enabled'=>true];
+    if ($project['files']) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>$downloadActionUrl.'&project_id='.$projectId.'&file_id='.(int)$project['files'][0]['id'],'enabled'=>true,'download'=>true];
+    $menuActions=$isAdministrator&&$publicContext?[
+        ['label'=>$project['is_available']?'Marcar como no disponible':'Marcar como disponible','icon'=>$project['is_available']?'fa-ban':'fa-circle-check','enabled'=>true,'action'=>'availability'],
+        ['label'=>'Retirar publicación','icon'=>'fa-box-archive','enabled'=>true,'action'=>'publication'],
+        ['label'=>'Ver historial administrativo','icon'=>'fa-clock-rotate-left','enabled'=>true,'action'=>'project-history','separator'=>true],
+        ['label'=>'Enviar a Papelera','icon'=>'fa-trash-can','enabled'=>true,'action'=>'trash','danger'=>true,'separator'=>true],
+    ]:[];
+    $adminHistory=[];$academicHistory=[];
+    if($publicContext){
+        $adminLabels=['project_updated'=>'Información del proyecto actualizada','project_availability_changed'=>'Disponibilidad del proyecto actualizada','project_unpublished'=>'Publicación retirada','project_republished'=>'Publicación restaurada','project_trashed'=>'Proyecto enviado a Papelera','project_restored'=>'Proyecto restaurado','project.presentation_selected'=>'Archivo principal seleccionado','project.presentation_changed'=>'Archivo principal actualizado','project.presentation_removed'=>'Archivo principal retirado','project_file_replaced'=>'Archivo reemplazado','project_file_removed'=>'Archivo retirado'];
+        foreach($project['activity'] as $event){$action=(string)$event['action'];if(!isset($adminLabels[$action]))continue;$detail=trim((string)($event['reason']??''));$state=json_decode((string)($event['new_state']??''),true);$changes=is_array($state)?($state['_history_changes']??[]):[];if($detail===''&&is_array($changes)&&$changes)$detail=implode('; ',array_map(static fn(array $change):string=>(string)($change['field']??'Dato').' de '.(string)($change['from']??'sin asignar').' a '.(string)($change['to']??'sin asignar'),$changes));$adminHistory[]=['title'=>$adminLabels[$action],'detail'=>$detail,'actor'=>(string)($event['actor_name']?:'Administración institucional'),'date'=>(string)$event['created_at']];}
+        $academicHistory[]=['title'=>'Proyecto registrado','detail'=>'Se creó el expediente académico del proyecto.','actor'=>'Sistema académico','date'=>(string)$project['created_at']];
+        foreach($project['deliveries'] as $event)$academicHistory[]=['title'=>'Entrega realizada · versión '.(int)$event['version_number'],'detail'=>(string)($event['comment']?:$event['title']),'actor'=>(string)$event['author_name'],'date'=>(string)$event['submitted_at']];
+        foreach($project['observations'] as $event)$academicHistory[]=['title'=>'Observación académica · '.(string)$event['category'],'detail'=>(string)$event['body'],'actor'=>(string)$event['author_name'],'date'=>(string)$event['created_at']];
+        foreach($project['responses'] as $event)$academicHistory[]=['title'=>'Respuesta a observación','detail'=>(string)$event['body'],'actor'=>(string)$event['author_name'],'date'=>(string)$event['created_at']];
+        foreach($project['stages'] as $event)if($event['status']==='completed'&&!empty($event['completed_at']))$academicHistory[]=['title'=>'Etapa completada · '.(string)$event['label'],'detail'=>'La etapa académica fue completada.','actor'=>'Sistema académico','date'=>(string)$event['completed_at']];
+        foreach($project['activity'] as $event){$label=['project_approved'=>'Proyecto aprobado','project_tribunal_approved'=>'Proyecto aprobado por el tribunal','tribunal_approved'=>'Proyecto aprobado por el tribunal','project_published'=>'Proyecto publicado','delivery_submitted'=>'Entrega registrada'][(string)$event['action']]??null;if($label)$academicHistory[]=['title'=>$label,'detail'=>(string)($event['reason']??''),'actor'=>(string)($event['actor_name']?:'Sistema académico'),'date'=>(string)$event['created_at']];}
+        usort($adminHistory,static fn(array $a,array $b):int=>strcmp($b['date'],$a['date']));usort($academicHistory,static fn(array $a,array $b):int=>strcmp($b['date'],$a['date']));
+    }
+    $digitalRecord=['entity'=>['type'=>'project','id'=>$projectId,'query_key'=>'project_id'],'context'=>$publicContext?'repository':'academic','mode'=>'view','return_url'=>$returnUrl,
+        'breadcrumbs'=>[['label'=>$publicContext?'Repositorio':'Proyectos','url'=>$returnUrl],['label'=>(string)$project['code'],'url'=>null]],
+        'header'=>['title'=>(string)$project['title'],'description'=>(string)($project['subtitle']??''),'type_label'=>(string)$project['type_name'],'status_label'=>$statusLabel,'status_tone'=>$project['status']==='published'?'success':'neutral'],
+        'metadata'=>array_values(array_filter([['label'=>'Código','value'=>(string)$project['code']],['label'=>'Carrera','value'=>(string)$project['career_name']],['label'=>'Período académico','value'=>(string)$project['period_name']],['label'=>'Tutor','value'=>(string)($project['tutor_name']??'')],['label'=>'Integrantes','value'=>count($students).''],['label'=>'Registro','value'=>$dateLabel($project['created_at']??null)],['label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible']],static fn(array $row):bool=>$row['value']!=='')),
+        'actions'=>$actions,'menu_actions'=>$menuActions,'tabs'=>$tabs,'active_tab'=>$activeTab,'information_sections'=>$informationSections,
+        'documents'=>$documents,'archives'=>$archives,'versions'=>$versions,'can_manage_files'=>false,'package'=>[],
+        'global_file_actions'=>array_map(static fn(array $file):array=>['label'=>'Descargar '.$file['name'],'icon'=>'fa-download','url'=>$file['download_url'],'download'=>true],array_merge($documents,$archives)),
+        'project_histories'=>['administrative'=>$adminHistory,'academic'=>$academicHistory],
+        'endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl], 'version_endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl],
+        'admin_actions'=>['endpoint'=>(string)($projectAdminEndpoint??''),'trash_endpoint'=>(string)($projectTrashEndpoint??''),'csrf_token'=>(string)($projectAdminCsrf??''),'trash_csrf_token'=>(string)($projectTrashCsrf??''),'status'=>'published','is_available'=>!empty($project['is_available']),'redirect'=>$returnUrl],
+        'return_label'=>$publicContext?'Volver al repositorio':'Volver a proyectos'];
+    if($publicContext): ?><style>
+    .digital-record[data-entity-type="project"] .ed-information{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .digital-record[data-entity-type="project"] .ed-document-section{padding:19px}
+    .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="description"],.digital-record[data-entity-type="project"] .ed-document-section[data-information-section="institutional"]{grid-column:1/-1}
+    .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="description"]{padding:20px}
+    .digital-record[data-entity-type="project"] .ed-document-section-header{margin-bottom:13px;padding-bottom:11px}
+    .digital-record[data-entity-type="project"] .ed-prose{max-width:none;line-height:1.65}
+    @media(max-width:800px){.digital-record[data-entity-type="project"] .ed-information{grid-template-columns:1fr}.digital-record[data-entity-type="project"] .ed-document-section[data-information-section="institutional"]{grid-column:auto}}
+    </style><?php endif;
+    require __DIR__.'/../repository/_ficha-institucional.php';
+    if($publicContext&&$isAdministrator&&!empty($projectEditorCatalogs)){$projectEditorOnly=true;$catalogs=$projectEditorCatalogs;$projectCsrf=$projectTrashCsrf;$projectEndpoints=['save'=>$projectSaveEndpoint,'trash'=>$projectTrashEndpoint];$projectEditorPayload=array_merge($project,['presentation_files'=>array_values(array_map(static fn(array $file):array=>['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'extension'=>(string)$file['extension'],'format'=>strtoupper((string)$file['extension']),'icon'=>'fa-regular fa-file','size'=>ArchiveService::formatBytes((int)$file['size_bytes'])],$project['files']))]);require __DIR__.'/../admin/projects.php';}
+endif;
