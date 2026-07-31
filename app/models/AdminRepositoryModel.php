@@ -48,7 +48,17 @@ final class AdminRepositoryModel
     public function listing(string $filter = '', array $pagination = []): array
     {
         $eligible = "((pt.code='thesis' AND p.status='tribunal_approved') OR (pt.code<>'thesis' AND p.status='approved'))";
-        $where = "p.deleted_at IS NULL AND p.status IN ('approved','defense','tribunal_approved','published')";
+        $where = "p.deleted_at IS NULL
+            AND EXISTS (
+                SELECT 1
+                FROM project_participants student_participant
+                JOIN student_profiles student_profile
+                  ON student_profile.user_id=student_participant.user_id
+                WHERE student_participant.project_id=p.id
+                  AND student_participant.role_code='student'
+                  AND student_participant.status='active'
+            )
+            AND p.status IN ('approved','defense','tribunal_approved','published')";
         $params = [];
 
         if ($filter === '' || $filter === 'published') {
@@ -120,29 +130,67 @@ final class AdminRepositoryModel
     {
         $database = Database::connection();
         $eligible = "((pt.code='thesis' AND p.status='tribunal_approved') OR (pt.code<>'thesis' AND p.status='approved'))";
+        $pendingRows = $database->query(
+            "SELECT p.academic_period_id,COUNT(DISTINCT p.id) total
+            FROM projects p
+            JOIN project_types pt ON pt.id=p.project_type_id
+            WHERE p.deleted_at IS NULL
+              AND p.status='approved'
+              AND EXISTS(
+                  SELECT 1
+                  FROM project_participants pp
+                  JOIN student_profiles sp ON sp.user_id=pp.user_id
+                  WHERE pp.project_id=p.id
+                    AND pp.role_code='student'
+                    AND pp.status='active'
+              )
+            GROUP BY p.academic_period_id"
+        )->fetchAll();
+        $pendingByPeriod = [];
+        foreach ($pendingRows as $row) {
+            $pendingByPeriod[(int) $row['academic_period_id']] = (int) $row['total'];
+        }
 
         return [
+            'pending' => array_sum($pendingByPeriod),
+            'pending_by_period' => $pendingByPeriod,
             'eligible' => (int) $database->query(
-                "SELECT COUNT(*) FROM projects p
+                "SELECT COUNT(DISTINCT p.id) FROM projects p
                 JOIN project_types pt ON pt.id=p.project_type_id
                 WHERE p.deleted_at IS NULL AND $eligible
+                AND EXISTS(
+                    SELECT 1 FROM project_participants pp
+                    JOIN student_profiles sp ON sp.user_id=pp.user_id
+                    WHERE pp.project_id=p.id AND pp.role_code='student' AND pp.status='active'
+                )
                 AND EXISTS(
                     SELECT 1 FROM project_files f
                     WHERE f.project_id=p.id AND f.deleted_at IS NULL
                 )"
             )->fetchColumn(),
             'published' => (int) $database->query(
-                "SELECT COUNT(*) FROM projects
-                WHERE deleted_at IS NULL AND status='published'
+                "SELECT COUNT(DISTINCT p.id) FROM projects p
+                JOIN project_types pt ON pt.id=p.project_type_id
+                WHERE p.deleted_at IS NULL AND p.status='published'
+                AND EXISTS(
+                    SELECT 1 FROM project_participants pp
+                    JOIN student_profiles sp ON sp.user_id=pp.user_id
+                    WHERE pp.project_id=p.id AND pp.role_code='student' AND pp.status='active'
+                )
                 AND EXISTS(
                     SELECT 1 FROM project_files f
-                    WHERE f.project_id=projects.id AND f.deleted_at IS NULL
+                    WHERE f.project_id=p.id AND f.deleted_at IS NULL
                 )"
             )->fetchColumn(),
             'incomplete' => (int) $database->query(
-                "SELECT COUNT(*) FROM projects p
+                "SELECT COUNT(DISTINCT p.id) FROM projects p
                 JOIN project_types pt ON pt.id=p.project_type_id
                 WHERE p.deleted_at IS NULL AND $eligible
+                AND EXISTS(
+                    SELECT 1 FROM project_participants pp
+                    JOIN student_profiles sp ON sp.user_id=pp.user_id
+                    WHERE pp.project_id=p.id AND pp.role_code='student' AND pp.status='active'
+                )
                 AND NOT EXISTS(
                     SELECT 1 FROM project_files f
                     WHERE f.project_id=p.id AND f.deleted_at IS NULL
@@ -160,11 +208,10 @@ final class AdminRepositoryModel
                 WHERE is_active=1 ORDER BY name"
             )->fetchAll(),
             'periods' => $database->query(
-                "SELECT DISTINCT ap.id,ap.name,ap.starts_on
-                FROM academic_periods ap
-                JOIN projects p ON p.academic_period_id=ap.id
-                WHERE p.deleted_at IS NULL AND p.status='published'
-                ORDER BY ap.starts_on DESC"
+                "SELECT id,name,status,starts_on
+                FROM academic_periods
+                WHERE status IN ('active','closed')
+                ORDER BY (status='active') DESC,starts_on DESC"
             )->fetchAll(),
         ];
     }

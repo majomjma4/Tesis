@@ -121,6 +121,7 @@ El comando informa registros sin archivo y archivos sin registro. No elimina,
 mueve ni modifica archivos o datos.
 # Migraciones recientes
 
+- `migrations/20260814_academic_catalogs.sql`: centraliza en `system_settings` los tipos y palabras clave que utiliza Materiales de apoyo, sin crear entidades paralelas.
 - `migrations/20260813_project_repository_availability.sql`: separa la disponibilidad temporal de un proyecto publicado de su retiro del Repositorio.
 - `migrations/20260812_support_material_version_integrity.sql`: fija la numeración histórica por archivo lógico y agrega huellas SHA-256 para verificar archivos vigentes y versiones.
 - `migrations/20260810_support_material_admin_actions.sql`: agrega disponibilidad, primera publicación y baja lógica recuperable para materiales de apoyo.

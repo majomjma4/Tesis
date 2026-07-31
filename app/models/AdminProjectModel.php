@@ -6,21 +6,7 @@ final class AdminProjectModel
     private const STATUS_LABELS=['development'=>'En desarrollo','under_review'=>'En revisión','changes_required'=>'Requiere cambios','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el Tribunal','published'=>'Publicado'];
     public function listing(array $f,array $pagination=[]):array
     {
-        $w=['p.deleted_at IS NULL'];
-        $x=[];
-        if($f['search']!==''){
-            $w[]='(p.title LIKE :q_title OR p.code LIKE :q_code OR u.full_name LIKE :q_tutor)';
-            $term='%'.$f['search'].'%';
-            $x['q_title']=$term;
-            $x['q_code']=$term;
-            $x['q_tutor']=$term;
-        }
-        if(in_array($f['status'],self::STATUSES,true)){$w[]='p.status=:s';$x['s']=$f['status'];}
-        if(($f['group']??'')==='finished')$w[]="p.status IN ('approved','defense','tribunal_approved','published')";
-        if(($f['attention']??'')==='observations')$w[]="EXISTS(SELECT 1 FROM project_observations po WHERE po.project_id=p.id AND po.status='pending')";
-        if($f['type_id']>0){$w[]='p.project_type_id=:t';$x['t']=$f['type_id'];}
-        if($f['period_id']>0){$w[]='p.academic_period_id=:a';$x['a']=$f['period_id'];}
-        $from=" FROM projects p JOIN project_types pt ON pt.id=p.project_type_id JOIN careers c ON c.id=p.career_id JOIN academic_periods ap ON ap.id=p.academic_period_id LEFT JOIN users u ON u.id=p.tutor_id WHERE ".implode(' AND ',$w);
+        [$from,$x]=$this->filteredQuery($f);
         $sql="SELECT p.id,p.code,p.title,p.subtitle,p.status,p.project_type_id,p.career_id,p.academic_period_id,p.tutor_id,p.presentation_file_id,p.updated_at,pt.name type_name,c.name career_name,ap.name period_name,u.full_name tutor_name,(SELECT COUNT(*) FROM project_participants pp WHERE pp.project_id=p.id AND pp.status='active') participant_count".$from.' ORDER BY p.updated_at DESC';
         $result=PaginationService::run(Database::connection(),'SELECT COUNT(*)'.$from,$sql,$x,$pagination?:PaginationService::request());
         $files=Database::connection()->prepare(
@@ -52,8 +38,48 @@ final class AdminProjectModel
         unset($item);
         return $result;
     }
-    public function summary():array{$r=Database::connection()->query("SELECT COUNT(*) total,SUM(status='development') development,SUM(status IN ('under_review','changes_required')) review,SUM(status='approved') approved,SUM(status IN ('defense','tribunal_approved')) defense FROM projects WHERE deleted_at IS NULL")->fetch()?:[];return array_map('intval',$r);}
-    public function catalogs():array{$d=Database::connection();return ['types'=>$d->query('SELECT id,code,name FROM project_types WHERE is_active=1 ORDER BY name')->fetchAll(),'careers'=>$d->query('SELECT id,name FROM careers WHERE is_active=1 ORDER BY name')->fetchAll(),'periods'=>$d->query("SELECT id,name FROM academic_periods WHERE status IN ('active','planned') ORDER BY (status='active') DESC, starts_on DESC")->fetchAll(),'teachers'=>$d->query("SELECT u.id,u.full_name FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.status='active' AND tp.can_tutor=1 ORDER BY u.full_name")->fetchAll()];}
+    public function summary(array $filters=[]):array
+    {
+        [$from,$params]=$this->filteredQuery($filters);
+        $statement=Database::connection()->prepare("SELECT COUNT(*) total,SUM(p.status='development') development,SUM(p.status IN ('under_review','changes_required')) review,SUM(p.status='approved') approved,SUM(p.status IN ('defense','tribunal_approved')) defense".$from);
+        $statement->execute($params);
+        return array_map('intval',$statement->fetch()?:[]);
+    }
+    public function catalogs():array{$d=Database::connection();return ['types'=>$d->query('SELECT id,code,name FROM project_types WHERE is_active=1 ORDER BY name')->fetchAll(),'careers'=>$d->query('SELECT id,name FROM careers WHERE is_active=1 ORDER BY name')->fetchAll(),'periods'=>$d->query("SELECT id,name,status,starts_on FROM academic_periods WHERE status IN ('active','closed') ORDER BY (status='active') DESC, starts_on DESC")->fetchAll(),'teachers'=>$d->query("SELECT u.id,u.full_name FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.status='active' AND tp.can_tutor=1 ORDER BY u.full_name")->fetchAll()];}
+    private function filteredQuery(array $filters):array
+    {
+        $where=[
+            'p.deleted_at IS NULL',
+            "EXISTS (
+                SELECT 1
+                FROM project_participants student_participant
+                JOIN student_profiles student_profile
+                  ON student_profile.user_id=student_participant.user_id
+                WHERE student_participant.project_id=p.id
+                  AND student_participant.role_code='student'
+                  AND student_participant.status='active'
+            )",
+        ];
+        $params=[];
+        $search=(string)($filters['search']??'');
+        if($search!==''){
+            $where[]='(p.title LIKE :q_title OR p.code LIKE :q_code OR u.full_name LIKE :q_tutor)';
+            $term='%'.$search.'%';
+            $params['q_title']=$term;
+            $params['q_code']=$term;
+            $params['q_tutor']=$term;
+        }
+        $status=(string)($filters['status']??'');
+        if(in_array($status,self::STATUSES,true)){$where[]='p.status=:s';$params['s']=$status;}
+        if(($filters['group']??'')==='finished')$where[]="p.status IN ('approved','defense','tribunal_approved','published')";
+        if(($filters['attention']??'')==='observations')$where[]="EXISTS(SELECT 1 FROM project_observations po WHERE po.project_id=p.id AND po.status='pending')";
+        $typeId=(int)($filters['type_id']??0);
+        if($typeId>0){$where[]='p.project_type_id=:t';$params['t']=$typeId;}
+        $periodId=(int)($filters['period_id']??0);
+        if($periodId>0){$where[]='p.academic_period_id=:a';$params['a']=$periodId;}
+        $from=" FROM projects p JOIN project_types pt ON pt.id=p.project_type_id JOIN careers c ON c.id=p.career_id JOIN academic_periods ap ON ap.id=p.academic_period_id LEFT JOIN users u ON u.id=p.tutor_id WHERE ".implode(' AND ',$where);
+        return [$from,$params];
+    }
     public function save(array $v,int $id,int $actor):int
     {
         $this->validate($v);

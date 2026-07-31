@@ -6,10 +6,9 @@ final class SupportMaterialModel
 {
     public const RESTORE_HOURS = 24;
     private const MAX_CLASSIFICATION_TAGS = 4;
-    public const KEYWORD_CATALOG = [
-        'Tesis','Perfil de tesis','Titulación','Investigación','Metodología','Normativa',
-        'Reglamento','Formato','Plantilla','Guía documental','Vinculación','Proyecto PIS',
-        'Prácticas preprofesionales',
+    private const CATALOG_SETTINGS = [
+        'material_type' => 'support_material_types',
+        'keyword' => 'support_material_keywords',
     ];
     private const PREVIEW_EXTENSIONS = ['pdf','docx','txt','png','jpg','jpeg','webp'];
 
@@ -79,6 +78,153 @@ final class SupportMaterialModel
         )->fetchAll();
     }
 
+    public function materialTypeCatalog(bool $activeOnly = true): array
+    {
+        return array_column($this->catalogEntries('material_type', $activeOnly), 'name');
+    }
+
+    public function keywordCatalog(bool $activeOnly = true): array
+    {
+        return array_column($this->catalogEntries('keyword', $activeOnly), 'name');
+    }
+
+    public function catalogEntries(string $kind, bool $activeOnly = false, ?PDO $db = null): array
+    {
+        $key = self::CATALOG_SETTINGS[$kind] ?? null;
+        if (!$key) throw new InvalidArgumentException('El catálogo de materiales seleccionado no es válido.');
+        $connection = $db ?? Database::connection();
+        $statement = $connection->prepare('SELECT setting_value FROM system_settings WHERE setting_key=:key');
+        $statement->execute(['key' => $key]);
+        $decoded = json_decode((string) ($statement->fetchColumn() ?: '[]'), true);
+        if (!is_array($decoded)) return [];
+        $entries = [];
+        foreach ($decoded as $entry) {
+            if (!is_array($entry) || (int) ($entry['id'] ?? 0) < 1) continue;
+            $name = $this->compactCatalogText((string) ($entry['name'] ?? ''));
+            if ($name === '') continue;
+            $active = !empty($entry['is_active']);
+            if ($activeOnly && !$active) continue;
+            $entries[] = [
+                'id' => (int) $entry['id'],
+                'name' => $name,
+                'is_active' => $active ? 1 : 0,
+                'aliases' => array_values(array_unique(array_filter(array_map(
+                    fn (mixed $alias): string => $this->compactCatalogText((string) $alias),
+                    (array) ($entry['aliases'] ?? [])
+                )))),
+            ];
+        }
+        return $entries;
+    }
+
+    public function administrativeCatalog(string $kind, ?PDO $db = null): array
+    {
+        $connection = $db ?? Database::connection();
+        $entries = $this->catalogEntries($kind, false, $connection);
+        $materials = $connection->query(
+            'SELECT material_type,keywords_json FROM support_materials
+             WHERE deleted_at IS NULL AND purged_at IS NULL'
+        )->fetchAll();
+        foreach ($entries as &$entry) {
+            $accepted = array_fill_keys(array_map(
+                fn (string $name): string => $this->keywordKey($name),
+                array_merge([$entry['name']], $entry['aliases'])
+            ), true);
+            $associated = 0;
+            foreach ($materials as $material) {
+                if ($kind === 'material_type') {
+                    if (isset($accepted[$this->keywordKey((string) $material['material_type'])])) $associated++;
+                    continue;
+                }
+                $keywords = json_decode((string) ($material['keywords_json'] ?? '[]'), true);
+                if (!is_array($keywords)) continue;
+                foreach ($keywords as $keyword) {
+                    if (!isset($accepted[$this->keywordKey((string) $keyword)])) continue;
+                    $associated++;
+                    break;
+                }
+            }
+            $entry['materials'] = $associated;
+        }
+        unset($entry);
+        usort($entries, static function (array $left, array $right): int {
+            $activeOrder = (int) $right['is_active'] <=> (int) $left['is_active'];
+            return $activeOrder !== 0 ? $activeOrder : strnatcasecmp((string) $left['name'], (string) $right['name']);
+        });
+        return $entries;
+    }
+
+    public function mutateCatalog(PDO $db, string $kind, array $values, int $actor): array
+    {
+        $settingKey = self::CATALOG_SETTINGS[$kind] ?? null;
+        if (!$settingKey) throw new InvalidArgumentException('El catálogo de materiales seleccionado no es válido.');
+        $id = (int) ($values['id'] ?? 0);
+        $action = (string) ($values['action'] ?? 'save');
+        $statement = $db->prepare('SELECT setting_value FROM system_settings WHERE setting_key=:key FOR UPDATE');
+        $statement->execute(['key' => $settingKey]);
+        $stored = json_decode((string) ($statement->fetchColumn() ?: '[]'), true);
+        $entries = is_array($stored) ? array_values(array_filter($stored, 'is_array')) : [];
+        $index = null;
+        foreach ($entries as $position => $entry) if ((int) ($entry['id'] ?? 0) === $id) $index = $position;
+        if ($action !== 'save' && $index === null) throw new InvalidArgumentException('El registro seleccionado ya no está disponible.');
+        $before = $index === null ? null : $entries[$index];
+        $resultName = (string) ($before['name'] ?? '');
+
+        if ($action === 'delete') {
+            $catalog = $this->administrativeCatalog($kind, $db);
+            $selected = array_values(array_filter($catalog, static fn (array $entry): bool => (int) $entry['id'] === $id))[0] ?? null;
+            if (!$selected) throw new InvalidArgumentException('El registro seleccionado ya no está disponible.');
+            if ((int) $selected['materials'] > 0) {
+                throw new InvalidArgumentException('No puede eliminarse porque tiene elementos asociados.');
+            }
+            array_splice($entries, $index, 1);
+        } elseif (in_array($action, ['activate', 'deactivate'], true)) {
+            $entries[$index]['is_active'] = $action === 'activate';
+        } else {
+            $name = $this->compactCatalogText((string) ($values['name'] ?? ''));
+            $maximum = $kind === 'material_type' ? 100 : 120;
+            if (mb_strlen($name) < 2 || mb_strlen($name) > $maximum) {
+                throw new InvalidArgumentException($kind === 'material_type'
+                    ? 'Ingresa un tipo de material válido.'
+                    : 'Ingresa una palabra clave válida.');
+            }
+            $normalized = $this->keywordKey($name);
+            foreach ($entries as $position => $entry) {
+                if ($position === $index) continue;
+                $names = array_merge([(string) ($entry['name'] ?? '')], (array) ($entry['aliases'] ?? []));
+                foreach ($names as $candidate) {
+                    if ($this->keywordKey((string) $candidate) === $normalized) {
+                        throw new InvalidArgumentException('Ya existe un registro equivalente en este catálogo.');
+                    }
+                }
+            }
+            if ($index === null) {
+                $id = 1 + max([0, ...array_map(static fn (array $entry): int => (int) ($entry['id'] ?? 0), $entries)]);
+                $entries[] = ['id' => $id, 'name' => $name, 'is_active' => true, 'aliases' => []];
+            } else {
+                $oldName = $this->compactCatalogText((string) ($entries[$index]['name'] ?? ''));
+                $aliases = (array) ($entries[$index]['aliases'] ?? []);
+                if ($oldName !== '' && $this->keywordKey($oldName) !== $normalized) $aliases[] = $oldName;
+                $entries[$index]['name'] = $name;
+                $entries[$index]['aliases'] = array_values(array_unique($aliases));
+            }
+            $resultName = $name;
+        }
+        $update = $db->prepare(
+            'UPDATE system_settings SET setting_value=:value,updated_by=:actor WHERE setting_key=:key'
+        );
+        $update->execute([
+            'value' => json_encode(array_values($entries), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'actor' => $actor,
+            'key' => $settingKey,
+        ]);
+        return [
+            'id' => $id,
+            'name' => $resultName,
+            'previous' => $before,
+        ];
+    }
+
     public function findById(int $materialId, bool $includeWithdrawn = false): ?array
     {
         if ($materialId < 1) return null;
@@ -119,7 +265,7 @@ final class SupportMaterialModel
             return trim((string) preg_replace('/\s+/u', ' ', (string) ($input['material_type'] ?? '')));
         }
         $choice = trim((string) ($input['material_type_choice'] ?? ''));
-        $predefined = ['Normativa', 'Formato', 'Guía documental', 'Plantilla'];
+        $predefined = $this->materialTypeCatalog();
         if (in_array($choice, $predefined, true)) return $choice;
         if ($choice !== 'Otros') {
             throw new InvalidArgumentException('Selecciona un tipo de material válido.');
@@ -1289,8 +1435,16 @@ final class SupportMaterialModel
     private function keywordCatalogMap(): array
     {
         $map = [];
-        foreach (self::KEYWORD_CATALOG as $keyword) $map[$this->keywordKey($keyword)] = $keyword;
+        foreach ($this->catalogEntries('keyword', true) as $entry) {
+            $map[$this->keywordKey($entry['name'])] = $entry['name'];
+            foreach ($entry['aliases'] as $alias) $map[$this->keywordKey($alias)] = $entry['name'];
+        }
         return $map;
+    }
+
+    private function compactCatalogText(string $value): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', trim($value)));
     }
 
     private function keywordKey(string $value): string

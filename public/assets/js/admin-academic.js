@@ -7,7 +7,77 @@
     const datePicker = form?.querySelector('[data-date-picker]');
     const dateHeading = datePicker?.querySelector('[data-date-heading]');
     const dateDays = datePicker?.querySelector('[data-date-days]');
+    const closurePending = confirmBox?.querySelector('[data-closure-pending]');
+    const closurePendingList = confirmBox?.querySelector('[data-closure-pending-list]');
+    const confirmAccept = confirmBox?.querySelector('[data-accept-confirm]');
+    const confirmCancel = confirmBox?.querySelector('[data-cancel-confirm]');
+    const toast = document.querySelector('#aaToast');
+    const tooltip = document.querySelector('#aaTooltip');
+    const accordions = [...document.querySelectorAll('[data-aa-accordion]')];
     if (!modal || !confirmBox || !form || !config) return;
+
+    const restoredCatalog = sessionStorage.getItem('academicOpenCatalog');
+    sessionStorage.removeItem('academicOpenCatalog');
+    const setAccordionOpen = (accordion, open) => {
+        const toggle = accordion.querySelector('[data-aa-accordion-toggle]');
+        const panel = accordion.querySelector('[data-aa-accordion-panel]');
+        if (!toggle || !panel) return;
+        accordion.classList.toggle('is-open', open);
+        toggle.setAttribute('aria-expanded', String(open));
+        panel.setAttribute('aria-hidden', String(!open));
+        panel.inert = !open;
+    };
+    accordions.forEach(accordion => {
+        setAccordionOpen(accordion, accordion.dataset.catalog === restoredCatalog);
+        accordion.querySelector('[data-aa-accordion-toggle]')?.addEventListener('click', () => {
+            setAccordionOpen(accordion, !accordion.classList.contains('is-open'));
+        });
+    });
+    const rememberCatalog = entity => {
+        if (entity && entity !== 'period') sessionStorage.setItem('academicOpenCatalog', entity);
+    };
+
+    let tooltipTimer = null;
+    let tooltipTarget = null;
+    const hideTooltip = () => {
+        window.clearTimeout(tooltipTimer);
+        tooltipTimer = null;
+        if (tooltipTarget) tooltipTarget.removeAttribute('aria-describedby');
+        tooltipTarget = null;
+        if (tooltip) tooltip.hidden = true;
+    };
+    const positionTooltip = target => {
+        if (!tooltip || tooltip.hidden) return;
+        const rect = target.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+        const top = rect.top - tooltipRect.height - 8 >= 8
+            ? rect.top - tooltipRect.height - 8
+            : rect.bottom + 8;
+        const left = Math.min(
+            Math.max(8, rect.left + (rect.width - tooltipRect.width) / 2),
+            window.innerWidth - tooltipRect.width - 8
+        );
+        tooltip.style.top = `${top}px`;
+        tooltip.style.left = `${left}px`;
+    };
+    const showTooltip = target => {
+        if (!tooltip || !target.dataset.aaTooltip) return;
+        hideTooltip();
+        tooltipTarget = target;
+        tooltip.textContent = target.dataset.aaTooltip;
+        tooltip.hidden = false;
+        target.setAttribute('aria-describedby', tooltip.id);
+        positionTooltip(target);
+    };
+    document.querySelectorAll('[data-aa-tooltip]').forEach(target => {
+        target.addEventListener('mouseenter', () => {
+            window.clearTimeout(tooltipTimer);
+            tooltipTimer = window.setTimeout(() => showTooltip(target), 800);
+        });
+        target.addEventListener('mouseleave', hideTooltip);
+        target.addEventListener('focus', () => showTooltip(target));
+        target.addEventListener('blur', hideTooltip);
+    });
 
     const layers = [modal, confirmBox];
     layers.forEach(layer => {
@@ -108,8 +178,13 @@
         syncDateField(name);
     };
     const showFields = entity => {
-        form.querySelector('[data-fields="period"]').hidden = entity !== 'period';
-        form.querySelector('[data-fields="type"]').hidden = entity !== 'type';
+        form.querySelectorAll('[data-fields]').forEach(section => {
+            const active = section.dataset.fields === entity;
+            section.hidden = !active;
+            section.querySelectorAll('input, select, textarea, button').forEach(control => {
+                control.disabled = !active;
+            });
+        });
     };
     const closeModal = () => {
         closeDatePicker();
@@ -138,8 +213,14 @@
             setValue('ends_on', values.end || '');
             document.querySelector('#aaSubmit').textContent = 'Guardar planificación';
         } else {
-            document.querySelector('#aaTitle').textContent = values.id ? 'Editar tipo de proyecto' : 'Agregar tipo de proyecto';
-            document.querySelector('#aaModalEyebrow').textContent = 'Catálogo de proyectos';
+            const labels = {
+                type: ['tipo de proyecto', 'Catálogo de proyectos'],
+                material_type: ['tipo de material', 'Materiales de apoyo'],
+                keyword: ['palabra clave', 'Materiales de apoyo'],
+            };
+            const [label, eyebrow] = labels[entity] || labels.type;
+            document.querySelector('#aaTitle').textContent = `${values.id ? 'Editar' : 'Agregar'} ${label}`;
+            document.querySelector('#aaModalEyebrow').textContent = eyebrow;
             setValue('name', values.name || '');
             document.querySelector('#aaSubmit').textContent = 'Guardar';
         }
@@ -147,26 +228,81 @@
         syncDialogState();
         requestAnimationFrame(() => form.querySelector('[data-fields]:not([hidden]) input, [data-fields]:not([hidden]) select')?.focus());
     };
-    const openConfirm = (title, text, action, confirmLabel = 'Confirmar') => {
+    const openConfirm = (title, text, action, confirmLabel = 'Confirmar', variant = 'warning') => {
         pendingAction = action;
         document.querySelector('#aaConfirmTitle').textContent = title;
         const confirmText = document.querySelector('#aaConfirmText');
         confirmText.textContent = text;
         confirmText.style.whiteSpace = 'pre-line';
-        confirmBox.querySelector('[data-accept-confirm]').textContent = confirmLabel;
+        if (closurePending) closurePending.hidden = true;
+        if (closurePendingList) closurePendingList.replaceChildren();
+        confirmAccept.hidden = false;
+        confirmAccept.textContent = confirmLabel;
+        confirmAccept.classList.toggle('aa-primary', variant === 'primary');
+        confirmAccept.classList.toggle('aa-danger', variant === 'danger');
+        confirmAccept.classList.toggle('aa-warning', variant === 'warning');
+        confirmBox.dataset.variant = variant;
+        const confirmIcon = confirmBox.querySelector(':scope > div > span > i');
+        if (confirmIcon) {
+            confirmIcon.className = variant === 'primary'
+                ? 'fa-solid fa-circle-check'
+                : (variant === 'danger' ? 'fa-regular fa-trash-can' : 'fa-solid fa-triangle-exclamation');
+            confirmIcon.setAttribute('aria-hidden', 'true');
+        }
+        confirmCancel.textContent = 'Cancelar';
         confirmBox.hidden = false;
         syncDialogState();
-        requestAnimationFrame(() => confirmBox.querySelector('[data-accept-confirm]')?.focus());
+        requestAnimationFrame(() => confirmAccept?.focus());
+    };
+    const showConfirmError = text => {
+        pendingAction = null;
+        document.querySelector('#aaConfirmTitle').textContent = 'No fue posible completar la acción';
+        document.querySelector('#aaConfirmText').textContent = text;
+        confirmAccept.hidden = true;
+        confirmCancel.textContent = 'Entendido';
+        confirmBox.hidden = false;
+        syncDialogState();
+        requestAnimationFrame(() => confirmCancel?.focus());
+    };
+    const showClosurePending = projects => {
+        pendingAction = null;
+        document.querySelector('#aaConfirmTitle').textContent = 'No es posible cerrar el período académico';
+        const confirmText = document.querySelector('#aaConfirmText');
+        confirmText.textContent = 'Todavía existen proyectos que no han finalizado su proceso académico.\n\nTodos los proyectos del período deben encontrarse en estado “Publicado” antes de cerrar el período.';
+        confirmText.style.whiteSpace = 'pre-line';
+        closurePendingList?.replaceChildren(...projects.map(project => {
+            const item = document.createElement('li');
+            const code = document.createElement('strong');
+            const title = document.createElement('span');
+            const status = document.createElement('small');
+            code.textContent = project.code || 'Sin código';
+            title.textContent = project.title || 'Proyecto sin título';
+            status.textContent = `Estado: ${project.status_label || project.status || 'Sin estado'}`;
+            item.append(code, title, status);
+            return item;
+        }));
+        if (closurePending) closurePending.hidden = false;
+        confirmAccept.hidden = true;
+        confirmCancel.textContent = 'Entendido';
+        confirmBox.hidden = false;
+        syncDialogState();
+        requestAnimationFrame(() => confirmCancel?.focus());
     };
     const send = async (url, data) => {
         const response = await fetch(url, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: data });
         const result = await response.json().catch(() => ({ success: false, message: 'La respuesta del servidor no es válida.' }));
-        if (!response.ok || !result.success) throw new Error(result.message || 'No fue posible completar la acción.');
+        if (!response.ok || !result.success) {
+            const error = new Error(result.message || 'No fue posible completar la acción.');
+            error.data = result.data || {};
+            throw error;
+        }
         return result;
     };
 
     document.querySelectorAll('[data-form="period"]').forEach(button => button.addEventListener('click', () => openModal('period')));
-    document.querySelector('[data-form="type"]')?.addEventListener('click', () => openModal('type'));
+    document.querySelectorAll('[data-form="type"],[data-form="material_type"],[data-form="keyword"]').forEach(button => {
+        button.addEventListener('click', () => openModal(button.dataset.form));
+    });
     document.querySelector('[data-edit-period]')?.addEventListener('click', event => {
         const button = event.currentTarget;
         openModal('period', {
@@ -183,15 +319,30 @@
             { kind: 'delete-period', id: button.dataset.id }
         );
     });
-    document.querySelectorAll('[data-edit-type]').forEach(button => button.addEventListener('click', () => openModal('type', {
+    document.querySelectorAll('[data-catalog-edit]').forEach(button => button.addEventListener('click', () => openModal(button.dataset.entity, {
         id: button.dataset.id,
         name: button.dataset.name,
     })));
-    document.querySelectorAll('[data-deactivate-type]').forEach(button => button.addEventListener('click', () => {
+    const entityLabels = { type: 'tipo de proyecto', material_type: 'tipo de material', keyword: 'palabra clave' };
+    document.querySelectorAll('[data-catalog-state]').forEach(button => button.addEventListener('click', () => {
+        const activate = button.dataset.action === 'activate';
         openConfirm(
-            'Desactivar tipo de proyecto',
-            `“${button.dataset.name}” dejará de estar disponible para proyectos nuevos. Los proyectos existentes conservarán este tipo.`,
-            { kind: 'deactivate', id: button.dataset.id }
+            `${activate ? 'Activar' : 'Desactivar'} ${entityLabels[button.dataset.entity] || 'registro'}`,
+            activate
+                ? 'Este registro volverá a estar disponible para nuevas selecciones.'
+                : 'Este registro dejará de estar disponible para nuevas selecciones, pero continuará apareciendo en los registros históricos que ya lo utilizan.',
+            { kind: 'catalog', entity: button.dataset.entity, action: button.dataset.action, id: button.dataset.id, name: button.dataset.name },
+            activate ? 'Activar' : 'Desactivar',
+            activate ? 'primary' : 'warning'
+        );
+    }));
+    document.querySelectorAll('[data-catalog-delete]').forEach(button => button.addEventListener('click', () => {
+        openConfirm(
+            `Eliminar ${entityLabels[button.dataset.entity] || 'registro'}`,
+            'Esta acción eliminará definitivamente el registro y no podrá deshacerse.',
+            { kind: 'catalog', entity: button.dataset.entity, action: 'delete', id: button.dataset.id, name: button.dataset.name },
+            'Eliminar definitivamente',
+            'danger'
         );
     }));
     document.querySelector('[data-close-period]')?.addEventListener('click', () => {
@@ -219,7 +370,9 @@
         submit.disabled = true;
         message.hidden = true;
         try {
-            await send(config.dataset.save, new FormData(form));
+            const result = await send(config.dataset.save, new FormData(form));
+            sessionStorage.setItem('academicToast', result.message || 'Información académica guardada correctamente.');
+            rememberCatalog(form.elements.namedItem('entity')?.value);
             location.reload();
         } catch (error) {
             message.textContent = error.message;
@@ -239,22 +392,31 @@
             if (action.kind === 'close-period') {
                 data.set('target_period_id', action.target);
                 if (action.early) data.set('confirm_early_close', '1');
-                await send(config.dataset.promote, data);
+                const result = await send(config.dataset.promote, data);
+                sessionStorage.setItem('academicToast', result.message || 'Período actualizado correctamente.');
             } else if (action.kind === 'delete-period') {
                 data.set('entity', 'period');
                 data.set('action', 'delete');
                 data.set('id', action.id);
-                await send(config.dataset.save, data);
-            } else {
-                data.set('entity', 'type');
-                data.set('action', 'deactivate');
+                const result = await send(config.dataset.save, data);
+                sessionStorage.setItem('academicToast', result.message || 'Planificación eliminada correctamente.');
+            } else if (action.kind === 'catalog') {
+                data.set('entity', action.entity);
+                data.set('action', action.action);
                 data.set('id', action.id);
-                await send(config.dataset.save, data);
+                data.set('name', action.name || '');
+                const result = await send(config.dataset.save, data);
+                sessionStorage.setItem('academicToast', result.message || 'Catálogo actualizado correctamente.');
+                rememberCatalog(action.entity);
             }
             location.reload();
         } catch (error) {
-            closeConfirm();
-            alert(error.message);
+            if (action.kind === 'close-period' && error.data?.reason === 'unfinished_projects') {
+                showClosurePending(Array.isArray(error.data.pending_projects) ? error.data.pending_projects : []);
+            } else {
+                closeConfirm();
+                showConfirmError(error.message);
+            }
             button.disabled = false;
         }
     });
@@ -289,7 +451,11 @@
         if (!datePicker || datePicker.hidden || datePicker.contains(event.target) || event.target.closest('[data-open-date], [data-date-display]')) return;
         closeDatePicker();
     });
-    window.addEventListener('resize', positionDatePicker);
+    window.addEventListener('resize', () => {
+        positionDatePicker();
+        if (tooltipTarget) positionTooltip(tooltipTarget);
+    });
+    window.addEventListener('scroll', hideTooltip, true);
     document.addEventListener('keydown', event => {
         if (event.key !== 'Escape') return;
         if (datePicker && !datePicker.hidden) closeDatePicker();
@@ -297,4 +463,11 @@
         else if (!modal.hidden) closeModal();
     });
     syncDialogState();
+    const savedToast = sessionStorage.getItem('academicToast');
+    if (savedToast && toast) {
+        sessionStorage.removeItem('academicToast');
+        toast.textContent = savedToast;
+        toast.hidden = false;
+        window.setTimeout(() => { toast.hidden = true; }, 4200);
+    }
 })();

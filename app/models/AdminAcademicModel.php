@@ -3,13 +3,59 @@ declare(strict_types=1);
 
 final class AdminAcademicModel
 {
+    private const PROJECT_STATUS_LABELS = [
+        'development' => 'En desarrollo',
+        'under_review' => 'En revisión',
+        'changes_required' => 'Requiere cambios',
+        'approved' => 'Aprobado',
+        'defense' => 'En tribunal',
+        'tribunal_approved' => 'Aprobado por el Tribunal',
+        'published' => 'Publicado',
+    ];
+
     public function dashboard(): array
     {
         $db = Database::connection();
         // El período vigente siempre proviene de MariaDB; nunca se deduce del mes calendario.
         $periods = $db->query(
             "SELECT ap.*,
-                    (SELECT COUNT(*) FROM projects p WHERE p.academic_period_id=ap.id AND p.deleted_at IS NULL) projects
+                    (
+                        SELECT COUNT(DISTINCT p.id)
+                        FROM projects p
+                        WHERE p.academic_period_id=ap.id
+                          AND p.deleted_at IS NULL
+                          AND EXISTS (
+                              SELECT 1
+                              FROM project_types pt
+                              JOIN project_participants pp
+                                ON pp.project_id=p.id
+                               AND pp.role_code='student'
+                               AND pp.status='active'
+                              JOIN student_profiles sp ON sp.user_id=pp.user_id
+                              WHERE pt.id=p.project_type_id
+                          )
+                    ) academic_projects,
+                    (
+                        SELECT COUNT(DISTINCT p.id)
+                        FROM projects p
+                        WHERE p.academic_period_id=ap.id
+                          AND p.deleted_at IS NULL
+                          AND p.status='published'
+                          AND EXISTS (
+                              SELECT 1 FROM project_files pf
+                              WHERE pf.project_id=p.id AND pf.deleted_at IS NULL
+                          )
+                          AND EXISTS (
+                              SELECT 1
+                              FROM project_types pt
+                              JOIN project_participants pp
+                                ON pp.project_id=p.id
+                               AND pp.role_code='student'
+                               AND pp.status='active'
+                              JOIN student_profiles sp ON sp.user_id=pp.user_id
+                              WHERE pt.id=p.project_type_id
+                          )
+                    ) published_projects
              FROM academic_periods ap
              ORDER BY ap.starts_on DESC"
         )->fetchAll();
@@ -23,6 +69,21 @@ final class AdminAcademicModel
                         ) position
                  FROM projects p
                  WHERE p.deleted_at IS NULL
+                   AND p.status='published'
+                   AND EXISTS (
+                       SELECT 1 FROM project_files pf
+                       WHERE pf.project_id=p.id AND pf.deleted_at IS NULL
+                   )
+                   AND EXISTS (
+                       SELECT 1
+                       FROM project_types pt
+                       JOIN project_participants pp
+                         ON pp.project_id=p.id
+                        AND pp.role_code='student'
+                        AND pp.status='active'
+                       JOIN student_profiles sp ON sp.user_id=pp.user_id
+                       WHERE pt.id=p.project_type_id
+                   )
              ) period_projects
              WHERE position<=5
              ORDER BY academic_period_id,position"
@@ -35,6 +96,9 @@ final class AdminAcademicModel
             ];
         }
         foreach ($periods as &$period) {
+            $period['projects'] = $period['status'] === 'closed'
+                ? (int) $period['published_projects']
+                : (int) $period['academic_projects'];
             $period['project_preview'] = $projectsByPeriod[(int) $period['id']] ?? [];
         }
         unset($period);
@@ -50,10 +114,26 @@ final class AdminAcademicModel
             'periods' => $periods,
             'types' => $db->query(
                 "SELECT pt.*,
-                        (SELECT COUNT(*) FROM projects p WHERE p.project_type_id=pt.id) projects
+                        (
+                            SELECT COUNT(DISTINCT p.id)
+                            FROM projects p
+                            WHERE p.project_type_id=pt.id
+                              AND p.deleted_at IS NULL
+                              AND EXISTS (
+                                  SELECT 1
+                                  FROM project_participants pp
+                                  JOIN student_profiles sp ON sp.user_id=pp.user_id
+                                  WHERE pp.project_id=p.id
+                                    AND pp.role_code='student'
+                                    AND pp.status='active'
+                              )
+                        ) projects
+                        ,(SELECT COUNT(*) FROM projects reference_project WHERE reference_project.project_type_id=pt.id) references_count
                  FROM project_types pt
                  ORDER BY pt.is_active DESC, pt.name"
             )->fetchAll(),
+            'material_types' => (new SupportMaterialModel())->administrativeCatalog('material_type', $db),
+            'keywords' => (new SupportMaterialModel())->administrativeCatalog('keyword', $db),
             'promotion' => [
                 'source' => $active,
                 'target' => $planned,
@@ -65,7 +145,7 @@ final class AdminAcademicModel
 
     public function save(string $entity, array $values, int $actor): void
     {
-        if (!in_array($entity, ['period', 'type'], true)) {
+        if (!in_array($entity, ['period', 'type', 'material_type', 'keyword'], true)) {
             throw new InvalidArgumentException('La opción académica seleccionada no es válida.');
         }
 
@@ -74,7 +154,11 @@ final class AdminAcademicModel
                 $this->savePeriod($db, $values, $actor);
                 return;
             }
-            $this->saveType($db, $values, $actor);
+            if ($entity === 'type') {
+                $this->saveType($db, $values, $actor);
+                return;
+            }
+            $this->saveMaterialCatalog($db, $entity, $values, $actor);
         });
     }
 
@@ -99,9 +183,47 @@ final class AdminAcademicModel
                 throw new InvalidArgumentException('El período planificado no corresponde al siguiente período académico.');
             }
 
-            $projects = $db->prepare("SELECT COUNT(*) FROM projects WHERE academic_period_id=:id AND deleted_at IS NULL");
+            $projects = $db->prepare(
+                "SELECT DISTINCT p.id,p.code,p.title,p.status
+                 FROM projects p
+                 WHERE p.academic_period_id=:id
+                   AND p.deleted_at IS NULL
+                   AND EXISTS (
+                       SELECT 1
+                       FROM project_types pt
+                       JOIN project_participants pp
+                         ON pp.project_id=p.id
+                        AND pp.role_code='student'
+                        AND pp.status='active'
+                       JOIN student_profiles sp ON sp.user_id=pp.user_id
+                       WHERE pt.id=p.project_type_id
+                   )
+                 ORDER BY p.status,p.code"
+            );
             $projects->execute(['id' => $active['id']]);
-            $projectCount = (int) $projects->fetchColumn();
+            $periodProjects = $projects->fetchAll();
+            $projectCount = count($periodProjects);
+            $pendingProjects = array_values(array_map(
+                static fn(array $project): array => [
+                    'id' => (int) $project['id'],
+                    'code' => (string) $project['code'],
+                    'title' => (string) $project['title'],
+                    'status' => (string) $project['status'],
+                    'status_label' => self::PROJECT_STATUS_LABELS[(string) $project['status']] ?? (string) $project['status'],
+                ],
+                array_filter(
+                    $periodProjects,
+                    static fn(array $project): bool => (string) $project['status'] !== 'published'
+                )
+            ));
+            if ($pendingProjects !== []) {
+                return [
+                    'blocked' => true,
+                    'reason' => 'unfinished_projects',
+                    'pending_projects' => $pendingProjects,
+                    'projects' => $projectCount,
+                ];
+            }
 
             $db->prepare("UPDATE academic_periods SET status='closed' WHERE id=:id")->execute(['id' => $active['id']]);
             $db->prepare("UPDATE academic_periods SET status='active' WHERE id=:id")->execute(['id' => $planned['id']]);
@@ -210,6 +332,16 @@ final class AdminAcademicModel
     {
         $id = (int) ($values['id'] ?? 0);
         $action = (string) ($values['action'] ?? 'save');
+        $current = $this->catalogRecord($db, 'project_types', $id, 'El tipo de proyecto no es válido.');
+        if ($action !== 'save' && !$current) throw new InvalidArgumentException('El tipo de proyecto no es válido.');
+        if ($action === 'delete') {
+            $count = $db->prepare('SELECT COUNT(*) FROM projects WHERE project_type_id=:id');
+            $count->execute(['id' => $id]);
+            if ((int) $count->fetchColumn() > 0) throw new InvalidArgumentException('No se puede eliminar un tipo de proyecto que tiene proyectos asociados.');
+            $db->prepare('DELETE FROM project_types WHERE id=:id')->execute(['id' => $id]);
+            $this->audit($db, $actor, 'academic_type_deleted', 'type', $id, ['name' => (string) $current['name']]);
+            return;
+        }
         if (in_array($action, ['activate', 'deactivate'], true)) {
             if ($id < 1) throw new InvalidArgumentException('El tipo de proyecto no es válido.');
             $active = $action === 'activate' ? 1 : 0;
@@ -240,6 +372,32 @@ final class AdminAcademicModel
         $this->audit($db, $actor, $created ? 'academic_type_created' : 'academic_type_updated', 'type', $id, ['name' => $name]);
     }
 
+    private function saveMaterialCatalog(PDO $db, string $entity, array $values, int $actor): void
+    {
+        $action = (string) ($values['action'] ?? 'save');
+        $created = (int) ($values['id'] ?? 0) < 1;
+        $result = (new SupportMaterialModel())->mutateCatalog($db, $entity, $values, $actor);
+        $prefix = $entity === 'material_type' ? 'academic_material_type_' : 'academic_keyword_';
+        $event = $action === 'save' ? ($created ? 'created' : 'updated') : $action . 'd';
+        if ($action === 'activate') $event = 'activated';
+        if ($action === 'deactivate') $event = 'deactivated';
+        $this->audit($db, $actor, $prefix . $event, $entity, (int) $result['id'], [
+            'catalog_id' => (int) $result['id'],
+            'name' => (string) $result['name'],
+            'previous' => $result['previous'],
+        ]);
+    }
+
+    private function catalogRecord(PDO $db, string $table, int $id, string $message): ?array
+    {
+        if ($id < 1) return null;
+        $statement = $db->prepare("SELECT * FROM $table WHERE id=:id FOR UPDATE");
+        $statement->execute(['id' => $id]);
+        $record = $statement->fetch();
+        if (!$record) throw new InvalidArgumentException($message);
+        return $record;
+    }
+
     private function nextPeriod(?array $period): ?array
     {
         if (!$period || !preg_match('/^(I|II) PAO (\d{4})$/', (string) $period['name'], $match)) return null;
@@ -252,7 +410,8 @@ final class AdminAcademicModel
     {
         $element = (string) ($details['name'] ?? '');
         if ($element === '' && $id) {
-            $table = $type === 'period' ? 'academic_periods' : 'project_types';
+            $tables = ['period' => 'academic_periods', 'type' => 'project_types'];
+            $table = $tables[$type] ?? 'project_types';
             $statement = $db->prepare("SELECT name FROM $table WHERE id=:id");
             $statement->execute(['id' => $id]);
             $element = (string) ($statement->fetchColumn() ?: ($type === 'period' ? 'Período académico' : 'Tipo de proyecto'));
@@ -268,6 +427,17 @@ final class AdminAcademicModel
             'academic_type_updated' => 'Editó el tipo de proyecto ' . $element,
             'academic_type_activated' => 'Activó el tipo de proyecto ' . $element,
             'academic_type_deactivated' => 'Desactivó el tipo de proyecto ' . $element,
+            'academic_type_deleted' => 'Eliminó el tipo de proyecto ' . $element,
+            'academic_material_type_created' => 'Creó el tipo de material ' . $element,
+            'academic_material_type_updated' => 'Editó el tipo de material ' . $element,
+            'academic_material_type_activated' => 'Activó el tipo de material ' . $element,
+            'academic_material_type_deactivated' => 'Desactivó el tipo de material ' . $element,
+            'academic_material_type_deleted' => 'Eliminó el tipo de material ' . $element,
+            'academic_keyword_created' => 'Creó la palabra clave ' . $element,
+            'academic_keyword_updated' => 'Editó la palabra clave ' . $element,
+            'academic_keyword_activated' => 'Activó la palabra clave ' . $element,
+            'academic_keyword_deactivated' => 'Desactivó la palabra clave ' . $element,
+            'academic_keyword_deleted' => 'Eliminó la palabra clave ' . $element,
         ];
         (new AdminActivityService($db))->record($actor,$action,$labels[$action]??$action,'Gestión académica',$type,$id,$element,'correct',$details);
     }

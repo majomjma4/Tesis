@@ -26,6 +26,10 @@
         }
     }
     $storedMaterialType = trim((string) ($material['material_type'] ?? $material['type'] ?? ''));
+    $catalogModel = new SupportMaterialModel();
+    $materialTypeEntries = $catalogModel->catalogEntries('material_type', true);
+    $materialTypeCatalog = array_column($materialTypeEntries, 'name');
+    $keywordCatalog = $catalogModel->keywordCatalog();
     $materialTypeKey = mb_strtolower($storedMaterialType, 'UTF-8');
     if (class_exists('Normalizer')) {
         $decomposedType = Normalizer::normalize($materialTypeKey, Normalizer::FORM_D);
@@ -34,21 +38,23 @@
         }
     }
     $materialTypeKey = trim((string) preg_replace('/\s+/u', ' ', $materialTypeKey));
-    $materialTypeMap = [
-        'normativa' => 'Normativa',
-        'formato' => 'Formato',
-        'guía' => 'Guía documental',
-        'guía documental' => 'Guía documental',
-        'guia' => 'Guía documental',
-        'guia documental' => 'Guía documental',
-        'plantilla' => 'Plantilla',
-    ];
+    $materialTypeMap = [];
+    foreach ($materialTypeEntries as $entry) {
+        foreach (array_merge([$entry['name']], $entry['aliases']) as $catalogType) {
+            $key = mb_strtolower($catalogType, 'UTF-8');
+            if (class_exists('Normalizer')) {
+                $decomposed = Normalizer::normalize($key, Normalizer::FORM_D);
+                if (is_string($decomposed)) $key = (string) preg_replace('/\p{Mn}+/u', '', $decomposed);
+            }
+            $materialTypeMap[trim((string) preg_replace('/\s+/u', ' ', $key))] = $entry['name'];
+        }
+    }
     $materialTypeChoice = $materialTypeMap[$materialTypeKey] ?? 'Otros';
     $materialTypeCustom = $materialTypeChoice === 'Otros' ? $storedMaterialType : '';
     $selectedKeywords = array_values(array_map('strval', (array) ($material['editable_keywords'] ?? $material['keywords'] ?? [])));
     $legacyKeywords = array_values(array_filter(
         $selectedKeywords,
-        static fn (string $keyword): bool => !in_array($keyword, SupportMaterialModel::KEYWORD_CATALOG, true)
+        static fn (string $keyword): bool => !in_array($keyword, $keywordCatalog, true)
     ));
 
     $materialFiles = array_values(array_filter(
@@ -235,7 +241,8 @@
                 'period' => (string) ($material['pao_label'] ?? ''),
                 'keywords_selected' => $selectedKeywords,
             ],
-            'keyword_catalog' => SupportMaterialModel::KEYWORD_CATALOG,
+            'material_type_catalog' => $materialTypeCatalog,
+            'keyword_catalog' => $keywordCatalog,
             'legacy_keywords' => $legacyKeywords,
             'errors' => [],
         ],

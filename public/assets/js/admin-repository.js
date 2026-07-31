@@ -7,6 +7,14 @@
     const clearSearch = document.querySelector("#arClearSearch");
     const typeFilter = document.querySelector("#arTypeFilter");
     const periodFilter = document.querySelector("#arPeriodFilter");
+    const pendingPublicationCard = document.querySelector("[data-pending-publication-card]");
+    const pendingPublicationCount = pendingPublicationCard?.querySelector("[data-pending-publication-count]");
+    const pendingByPeriodData = document.querySelector("#arPendingByPeriod");
+    const pendingByPeriod = (() => {
+        try { return JSON.parse(pendingByPeriodData?.textContent || "{}"); }
+        catch { return {}; }
+    })();
+    const globalPendingPublications = Number(pendingPublicationCount?.textContent || 0);
     const categoryFilter = document.querySelector("#arCategoryFilter");
     const materialStatusFilter = document.querySelector("#arMaterialStatusFilter");
     const clearMaterialFilters = document.querySelector("#arClearMaterialFilters");
@@ -78,6 +86,36 @@
         .replace(/\s+/g, " ")
         .toLowerCase()
         .trim();
+
+    const syncPendingPublicationCard = () => {
+        if (!pendingPublicationCard || !pendingPublicationCount) return;
+        const periodId = periodFilter instanceof HTMLSelectElement
+            ? Number(periodFilter.selectedOptions[0]?.dataset.periodId || 0)
+            : Number(periodFilter?.dataset.periodId || 0);
+        const total = periodId > 0
+            ? Number(pendingByPeriod[String(periodId)] || 0)
+            : globalPendingPublications;
+        pendingPublicationCount.textContent = String(total);
+        pendingPublicationCard.classList.toggle("is-clickable", total > 0);
+        if (total > 0) {
+            const target = new URL(pendingPublicationCard.dataset.baseUrl, window.location.href);
+            target.searchParams.set("status", "approved");
+            if (periodId > 0) target.searchParams.set("period_id", String(periodId));
+            else target.searchParams.delete("period_id");
+            pendingPublicationCard.href = target.toString();
+            pendingPublicationCard.removeAttribute("aria-disabled");
+            pendingPublicationCard.removeAttribute("tabindex");
+            pendingPublicationCard.setAttribute(
+                "aria-label",
+                `Ver ${total} ${total === 1 ? "proyecto aprobado pendiente" : "proyectos aprobados pendientes"} de publicación`
+            );
+        } else {
+            pendingPublicationCard.removeAttribute("href");
+            pendingPublicationCard.setAttribute("aria-disabled", "true");
+            pendingPublicationCard.setAttribute("tabindex", "-1");
+            pendingPublicationCard.setAttribute("aria-label", "No hay proyectos pendientes de publicación");
+        }
+    };
 
     const dismissToast = (key) => {
         const entry = toastRegistry.get(key);
@@ -728,6 +766,7 @@
             clearMaterialFilters.hidden = !hasActiveMaterialFilters;
         }
         renderPagination(matches.length, size, state, controls);
+        syncPendingPublicationCard();
     }
 
     const selectTab = (tab) => {
@@ -750,8 +789,18 @@
         button.addEventListener("click", () => selectTab(button.dataset.repositoryTab));
     });
     search?.addEventListener("input", () => updateResults(true));
-    [typeFilter, periodFilter, categoryFilter].forEach((control) => {
+    [typeFilter, categoryFilter].forEach((control) => {
         control?.addEventListener("change", () => updateResults(true));
+    });
+    periodFilter?.addEventListener("change", () => {
+        const url = new URL(window.location.href);
+        const selectedPeriod = periodFilter instanceof HTMLSelectElement
+            ? periodFilter.selectedOptions[0]?.textContent.trim() || ""
+            : "";
+        if (periodFilter.value && selectedPeriod) url.searchParams.set("period", selectedPeriod);
+        else url.searchParams.delete("period");
+        window.history.pushState({}, "", url);
+        updateResults(true);
     });
     materialStatusFilter?.addEventListener("change", () => {
         const url = new URL(window.location.href);
@@ -832,18 +881,24 @@
     }
     if (periodFilter && requestedPeriod) {
         if (periodFilter instanceof HTMLSelectElement) {
-            let requestedOption = [...periodFilter.options].find(
+            const requestedOption = [...periodFilter.options].find(
                 (option) => normalize(option.value) === normalize(requestedPeriod)
+                    || normalize(option.textContent) === normalize(requestedPeriod)
             );
-            if (!requestedOption) {
-                requestedOption = new Option(requestedPeriod, requestedPeriod);
-                periodFilter.add(requestedOption);
-            }
-            periodFilter.value = requestedOption.value;
-        } else {
-            periodFilter.value = requestedPeriod;
+            if (requestedOption) periodFilter.value = requestedOption.value;
         }
     }
+    window.addEventListener("popstate", () => {
+        const period = new URLSearchParams(location.search).get("period") || "";
+        if (periodFilter instanceof HTMLSelectElement) {
+            const option = [...periodFilter.options].find(
+                (candidate) => normalize(candidate.value) === normalize(period)
+                    || normalize(candidate.textContent) === normalize(period)
+            );
+            periodFilter.value = option?.value || "";
+        }
+        updateResults(true);
+    });
     selectTab(requestedTab === "materials" ? "materials" : "projects");
     const requestedMaterialEdit = requestedParams.get("edit_material");
     if (requestedMaterialEdit) {

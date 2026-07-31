@@ -45,10 +45,11 @@ $formatDate = static function (?string $date): string {
             <span class="ar-stat-icon"><i class="fa-solid fa-file-lines"></i></span>
             <div><strong><?= count($catalogSupportMaterials) ?></strong><span>Materiales de apoyo</span></div>
         </article>
-        <article class="ar-stat ar-stat-pending">
+        <a class="ar-stat ar-stat-pending" data-pending-publication-card data-base-url="<?= e(route('projects')) ?>" aria-disabled="true" tabindex="-1" aria-label="No hay proyectos pendientes de publicación">
             <span class="ar-stat-icon"><i class="fa-regular fa-clock"></i></span>
-            <div><strong><?= (int) $repositorySummary['eligible'] + (int) $repositorySummary['incomplete'] ?></strong><span>Pendientes de publicación</span></div>
-        </article>
+            <div><strong data-pending-publication-count><?= (int) ($repositorySummary['pending'] ?? 0) ?></strong><span>Pendientes de publicación</span></div>
+        </a>
+        <script id="arPendingByPeriod" type="application/json"><?= json_encode($repositorySummary['pending_by_period'] ?? [], JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
     </section>
 
     <section class="ar-catalog">
@@ -65,50 +66,56 @@ $formatDate = static function (?string $date): string {
             </button>
         </nav>
 
-        <div class="ar-tools">
-            <label class="ar-search">
+        <div class="ar-tools admin-filter-bar">
+            <label class="ar-search admin-filter-search admin-filter-item-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input id="arSearch" type="search" placeholder="Buscar en el repositorio..." autocomplete="off">
                 <button id="arClearSearch" type="button" aria-label="Limpiar búsqueda" hidden>
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </label>
-            <label class="ar-filter-control" data-filter-for="projects">
+            <label class="ar-filter-control admin-filter-control" data-filter-for="projects">
                 <span>Tipo</span>
                 <select id="arTypeFilter">
-                    <option value="">Todos los tipos</option>
+                    <option value="">Todos</option>
                     <?php foreach ($repositoryCatalogs['types'] as $type): ?>
                         <option value="<?= e(mb_strtolower($type['name'], 'UTF-8')) ?>"><?= e($type['name']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
-            <?php if (count($repositoryCatalogs['periods']) === 1): ?>
-                <div class="ar-filter-control ar-fixed-filter" data-filter-for="projects">
+            <?php if (count($repositoryCatalogs['periods']) === 0): ?>
+                <div class="ar-filter-control ar-fixed-filter admin-filter-control admin-filter-fixed" data-filter-for="projects">
+                    <span>Período académico</span>
+                    <div><i class="fa-regular fa-calendar"></i><strong>Sin períodos disponibles</strong></div>
+                    <input id="arPeriodFilter" type="hidden" value="" data-fixed-filter data-period-id="">
+                </div>
+            <?php elseif (count($repositoryCatalogs['periods']) === 1): ?>
+                <div class="ar-filter-control ar-fixed-filter admin-filter-control admin-filter-fixed" data-filter-for="projects">
                     <span>Período académico</span>
                     <div><i class="fa-regular fa-calendar"></i><strong><?= e($repositoryCatalogs['periods'][0]['name']) ?></strong></div>
-                    <input id="arPeriodFilter" type="hidden" value="<?= e(mb_strtolower($repositoryCatalogs['periods'][0]['name'], 'UTF-8')) ?>" data-fixed-filter>
+                    <input id="arPeriodFilter" type="hidden" value="<?= e(mb_strtolower($repositoryCatalogs['periods'][0]['name'], 'UTF-8')) ?>" data-fixed-filter data-period-id="<?= (int) $repositoryCatalogs['periods'][0]['id'] ?>">
                 </div>
             <?php else: ?>
-                <label class="ar-filter-control" data-filter-for="projects">
+                <label class="ar-filter-control admin-filter-control" data-filter-for="projects">
                     <span>Período académico</span>
                     <select id="arPeriodFilter">
-                        <option value="">Todos los períodos</option>
+                        <option value="">Todos</option>
                         <?php foreach ($repositoryCatalogs['periods'] as $period): ?>
-                            <option value="<?= e(mb_strtolower($period['name'], 'UTF-8')) ?>"><?= e($period['name']) ?></option>
+                            <option value="<?= e(mb_strtolower($period['name'], 'UTF-8')) ?>" data-period-id="<?= (int) $period['id'] ?>"><?= e($period['name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </label>
             <?php endif; ?>
-            <label class="ar-filter-control" data-filter-for="materials" hidden>
+            <label class="ar-filter-control admin-filter-control" data-filter-for="materials" hidden>
                 <span>Categoría</span>
                 <select id="arCategoryFilter">
-                    <option value="">Todas las categorías</option>
+                    <option value="">Todos</option>
                     <?php foreach ($functionalMaterialCategories as $category): ?>
                         <option value="<?= e($category['slug']) ?>"><?= e($category['name']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
-            <label class="ar-filter-control" data-filter-for="materials" hidden>
+            <label class="ar-filter-control admin-filter-control" data-filter-for="materials" hidden>
                 <span>Estado</span>
                 <select id="arMaterialStatusFilter">
                     <option value="all">Todos</option>

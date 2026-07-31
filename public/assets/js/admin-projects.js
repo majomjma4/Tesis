@@ -16,6 +16,15 @@
     dialogLayers.forEach(layer => { layer.hidden = true; });
     dialogLayers.forEach(layer => document.body.append(layer));
     const syncProjectDialogs = () => document.body.classList.toggle('project-dialog-open', dialogLayers.some(layer => !layer.hidden));
+    const showProjectDialog = layer => {
+        if (!layer) return;
+        dialogLayers.forEach(candidate => {
+            candidate.hidden = candidate !== layer;
+        });
+        document.body.append(layer);
+        layer.hidden = false;
+        syncProjectDialogs();
+    };
     new MutationObserver(syncProjectDialogs).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
     syncProjectDialogs();
     let pendingSaveData = null;
@@ -127,6 +136,7 @@
     if (typeSelect?.options[0]) typeSelect.options[0].text = 'Seleccionar tipo';
     if (tutorSelect?.options[0]) tutorSelect.options[0].text = 'Seleccionar tutor';
     if (statusSelect && !statusSelect.querySelector('option[value=""]')) statusSelect.add(new Option('Seleccionar estado', ''), 0);
+    const thesisOnlyStatuses = [...(statusSelect?.options || [])].filter(option => ['defense', 'tribunal_approved'].includes(option.value));
     if (careerSelect) {
         [...careerSelect.options].forEach(option => { if (!option.value || !option.textContent.includes('Desarrollo de Software')) option.remove(); });
         selectFirstAvailable(careerSelect);
@@ -150,6 +160,19 @@
         if (careerField) careerField.querySelector('strong').textContent = 'Desarrollo de Software';
         if (periodField) periodField.querySelector('strong').textContent = periodSelect.selectedOptions[0]?.textContent.trim() || 'Sin período activo';
     };
+    const syncProjectStatusOptions = () => {
+        const selectedType = typeSelect?.options[typeSelect.selectedIndex];
+        const isThesis = /titulación|tesis/i.test(selectedType?.textContent || '');
+        thesisOnlyStatuses.forEach(option => {
+            option.disabled = !isThesis;
+            option.hidden = !isThesis;
+        });
+        if (!isThesis && ['defense', 'tribunal_approved'].includes(statusSelect?.value)) {
+            statusSelect.value = 'approved';
+        }
+        statusSelect?.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    typeSelect?.addEventListener('change', syncProjectStatusOptions);
     const setProjectDefaults = () => {
         selectFirstAvailable(careerSelect);
         selectFirstAvailable(periodSelect);
@@ -166,11 +189,21 @@
     };
     const open = project => {
         activeProject = project || null;
-        document.body.append(modal);
+        pendingSaveData = null;
+        document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         form.reset();
+        thesisOnlyStatuses.forEach(option => {
+            option.disabled = false;
+            option.hidden = false;
+        });
+        const formMessage = document.querySelector('#apMessage');
+        formMessage.hidden = true;
+        formMessage.textContent = '';
+        form.querySelector('[type="submit"]').disabled = false;
         for (const [key, value] of Object.entries(project || {})) if (form.elements[key]) form.elements[key].value = value ?? '';
         if (!project) setProjectDefaults();
-        else [careerSelect, periodSelect, typeSelect, tutorSelect, statusSelect].forEach(select => select?.dispatchEvent(new Event('change', { bubbles: true })));
+        else [careerSelect, periodSelect, typeSelect, tutorSelect].forEach(select => select?.dispatchEvent(new Event('change', { bubbles: true })));
+        syncProjectStatusOptions();
         syncFixedFields();
         document.querySelector('#apTitle').textContent = project ? 'Editar proyecto' : 'Nuevo proyecto';
         if (editWarning) editWarning.hidden = !project;
@@ -190,7 +223,7 @@
             if (manageParticipants) manageParticipants.href = projectUrl('information');
             if (manageFiles) manageFiles.href = projectUrl('documents');
         }
-        modal.hidden = false;
+        showProjectDialog(modal);
         form.title.focus();
     };
     document.querySelector('#apNew')?.addEventListener('click', () => open());
@@ -211,7 +244,13 @@
         const submit = form.querySelector('[type="submit"]');
         submit.disabled = true;
         try { await request(cfg.dataset.save, data); location.reload(); }
-        catch (error) { const message = document.querySelector('#apMessage'); message.textContent = error.message; message.className = 'ap-message error'; message.hidden = false; }
+        catch (error) {
+            const message = document.querySelector('#apMessage');
+            message.textContent = error.message;
+            message.className = 'ap-message error';
+            message.hidden = false;
+            if (modal.hidden) showProjectDialog(modal);
+        }
         finally { submit.disabled = false; }
     };
     const openPresentationDialog = data => {
@@ -245,7 +284,7 @@
             if (!button.getAttribute('aria-label')) button.textContent = 'Omitir';
         });
         presentationDialog.querySelector('[data-confirm-presentation]').textContent = 'Continuar';
-        presentationDialog.hidden = false;
+        showProjectDialog(presentationDialog);
         (presentationOptions.querySelector('input:checked') || presentationDialog.querySelector('[data-cancel-presentation]'))?.focus();
     };
     form?.addEventListener('submit', event => {
@@ -256,10 +295,14 @@
         if (publishingFirstTime) { openPresentationDialog(data); return; }
         if (!form.elements.id.value) { saveProject(data); return; }
         pendingSaveData = data;
-        saveConfirm.hidden = false;
+        showProjectDialog(saveConfirm);
         saveConfirm.querySelector('[data-confirm-save]')?.focus();
     });
-    saveConfirm?.querySelector('[data-cancel-save]')?.addEventListener('click', () => { saveConfirm.hidden = true; pendingSaveData = null; form.querySelector('[type="submit"]')?.focus(); });
+    saveConfirm?.querySelector('[data-cancel-save]')?.addEventListener('click', () => {
+        pendingSaveData = null;
+        showProjectDialog(modal);
+        form.querySelector('[type="submit"]')?.focus();
+    });
     saveConfirm?.querySelector('[data-confirm-save]')?.addEventListener('click', () => {
         if (!pendingSaveData) return;
         const data = pendingSaveData; pendingSaveData = null; saveConfirm.hidden = true; saveProject(data);
@@ -285,12 +328,11 @@
     presentationDialog?.addEventListener('click', event => { if (event.target === presentationDialog) cancelPresentation(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape' && !presentationDialog?.hidden) cancelPresentation(); });
     document.querySelectorAll('[data-trash]').forEach(button => button.addEventListener('click', () => {
-        document.body.append(trash);
         trashForm.reset();
         trashQuickReason?.dispatchEvent(new Event('change', { bubbles: true }));
         syncTrashReasonField();
         trashForm.id.value = JSON.parse(button.closest('article').querySelector('script').textContent).id;
-        trash.hidden = false;
+        showProjectDialog(trash);
     }));
     document.querySelectorAll('[data-close-trash]').forEach(button => button.addEventListener('click', () => trash.hidden = true));
     trash?.addEventListener('click', event => { if (event.target === trash) trash.hidden = true; });
@@ -382,13 +424,17 @@
         });
         if (clear) clear.hidden = !search.value;
         if (noResults) noResults.hidden = visible !== 0 || !query;
-        if (serverQuery && fold(search.value).trim() !== fold(serverQuery).trim()) {
+        if (fold(search.value).trim() !== fold(serverQuery).trim()) {
             clearTimeout(refreshTimer);
             refreshTimer = setTimeout(() => filters.requestSubmit(), 450);
         }
     };
     const typeFilter = filters.querySelector('select[name="type_id"]');
     const statusFilter = filters.querySelector('select[name="status"]');
+    const periodFilter = filters.querySelector('select[name="period_id"]');
+    filters.addEventListener('submit', () => {
+        if (periodFilter && !periodFilter.value) periodFilter.disabled = true;
+    });
     const thesisOnlyFilters = [...(statusFilter?.options || [])].filter(option => ['defense', 'tribunal_approved'].includes(option.value));
     const syncFilterWorkflow = () => {
         if (!typeFilter || !thesisOnlyFilters.length) return;
@@ -400,36 +446,16 @@
     };
     typeFilter?.addEventListener('change', () => { syncFilterWorkflow(); filters.requestSubmit(); });
     statusFilter?.addEventListener('change', () => filters.requestSubmit());
+    periodFilter?.addEventListener('change', () => filters.requestSubmit());
     search.addEventListener('input', apply);
     clear?.addEventListener('click', () => {
         search.value = '';
         apply();
         search.focus();
-        if (serverQuery) filters.requestSubmit();
+        if (fold(serverQuery).trim() !== '') filters.requestSubmit();
     });
     syncFilterWorkflow();
     apply();
-})();
-
-(() => {
-    const form = document.querySelector('#apForm');
-    if (!form) return;
-    const type = form.elements.project_type_id;
-    const status = form.elements.status;
-    const thesisOnlyStatuses = [...status.options].filter(option => ['defense', 'tribunal_approved'].includes(option.value));
-    if (!type || !thesisOnlyStatuses.length) return;
-    const syncWorkflow = () => {
-        const selectedType = type.options[type.selectedIndex];
-        const isThesis = /titulación|tesis/i.test(selectedType?.textContent || '');
-        thesisOnlyStatuses.forEach(option => { option.disabled = !isThesis; option.hidden = !isThesis; });
-        if (!isThesis && ['defense', 'tribunal_approved'].includes(status.value)) {
-            status.value = 'approved';
-            status.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-    };
-    type.addEventListener('change', syncWorkflow);
-    document.querySelectorAll('#apNew,[data-edit]').forEach(button => button.addEventListener('click', () => setTimeout(syncWorkflow)));
-    syncWorkflow();
 })();
 
 (() => {
