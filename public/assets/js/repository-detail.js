@@ -962,6 +962,31 @@ function resetNeutralViewer() {
     }
 }
 
+function clearNeutralFileSelection() {
+    document.querySelectorAll("[data-zip-entry-file].is-selected").forEach((item) => {
+        item.classList.remove("is-selected");
+        item.setAttribute("aria-selected", "false");
+    });
+    neutralFileButtons.forEach((button) => {
+        button.classList.remove("is-selected");
+        button.setAttribute("aria-pressed", "false");
+    });
+    neutralSelectedFileId = "";
+    neutralPreviewSequence += 1;
+    neutralPreviewRequest?.abort();
+    neutralPreviewRequest = null;
+    resetNeutralViewer();
+    if (neutralViewerName) neutralViewerName.textContent = "Archivo";
+    if (neutralViewerMeta) neutralViewerMeta.textContent = "";
+    if (neutralViewer) neutralViewer.dataset.previewType = "";
+    if (neutralViewerDocxNote) neutralViewerDocxNote.hidden = true;
+    if (neutralViewerDocxTopScroll) neutralViewerDocxTopScroll.hidden = true;
+    neutralViewerBody?.classList.remove("is-docx-content");
+    setNeutralZoomControlsVisibility(false);
+    syncNeutralViewerDownload(null);
+    setNeutralViewerState("empty");
+}
+
 function setNeutralViewerState(state, message = "", retryButton = null) {
     if (!neutralViewerState || !neutralViewer) return;
     if (state === "missing") syncNeutralViewerDownload(null);
@@ -1860,17 +1885,10 @@ function initializeNeutralFiles() {
         return;
     }
     neutralFilesInitialized = true;
-    const requestedFileId = new URLSearchParams(window.location.search).get("file_id");
-    const requested = requestedFileId
-        ? neutralFileButtons.find((button) => button.dataset.fileId === requestedFileId)
-        : null;
-    const presentation = neutralFileButtons.find((button) => button.dataset.filePresentation === "true");
-    const initialFile = requested || presentation || neutralFileButtons[0] || null;
-    if (initialFile) selectNeutralFile(initialFile);
-    else if (neutralViewer) {
-        syncNeutralViewerDownload(null);
-        setNeutralViewerState("empty");
-    }
+    const presentation = neutralFileButtons.find((button) => button.dataset.filePresentation === "true"
+        && button.dataset.fileAvailable === "true" && !button.disabled);
+    if (presentation) selectNeutralFile(presentation);
+    else if (neutralViewer) clearNeutralFileSelection();
 }
 if (!neutralFilesPanel || !neutralFilesPanel.hidden) initializeNeutralFiles();
 digitalRecord?.addEventListener("digitalrecord:tabchange", (event) => {
@@ -3404,22 +3422,7 @@ function syncPresentationFile(targetButton) {
     if (targetButton) {
         selectNeutralFile(targetButton);
     } else {
-        const current = neutralFileButtons.find((button) => button.getAttribute("aria-pressed") === "true" && button.isConnected)
-            || neutralFileButtons.find((button) => button.dataset.filePresentation === "true" && button.isConnected)
-            || neutralFileButtons.find((button) => button.isConnected)
-            || null;
-        if (current) {
-            selectNeutralFile(current);
-            return;
-        }
-        neutralSelectedFileId = "";
-        neutralPreviewSequence += 1;
-        neutralPreviewRequest?.abort();
-        neutralPreviewRequest = null;
-        resetNeutralViewer();
-        if (neutralViewerName) neutralViewerName.textContent = "Archivo";
-        if (neutralViewerMeta) neutralViewerMeta.textContent = "";
-        setNeutralViewerState("empty");
+        clearNeutralFileSelection();
     }
 }
 
@@ -3621,13 +3624,8 @@ async function submitRecordUpload(event) {
             closeRecordUpload(true);
         }
         if (added.length) {
-            const hadActiveFiles = neutralFileButtons.length > 0;
             appendNeutralAddedFiles(added);
             updateNeutralPackage(payload.package);
-            if (!hadActiveFiles) {
-                const firstAdded = neutralFileButtons.find((button) => String(button.dataset.fileId) === String(added[0]?.id));
-                if (firstAdded) selectNeutralFile(firstAdded);
-            }
         }
         if (failedCount > 0 || addedCount === 0) {
             [...added.map((file) => `${file.name} — agregado`), ...failed.map((file) => `${file.name} — ${file.message}`)].forEach((message) => {
@@ -4440,7 +4438,6 @@ function confirmPermanentFileDeletion() {
 }
 
 function insertRestoredFile(file) {
-    const hadActiveFiles = neutralFileButtons.length > 0;
     appendNeutralAddedFiles([file]);
     const button = neutralFileButtons.find((candidate) => String(candidate.dataset.fileId) === String(file.id));
     const item = button?.closest("[data-record-file-item]");
@@ -4456,7 +4453,6 @@ function insertRestoredFile(file) {
     if (next) list.insertBefore(item, next);
     const tree = list?.querySelector(`[data-zip-tree][data-zip-file-id="${String(file.id)}"]`);
     if (tree) item.after(tree);
-    if (!hadActiveFiles) selectNeutralFile(button);
 }
 
 async function submitFileRestore() {
@@ -4819,14 +4815,6 @@ function removeNeutralFileItems(items, packageData) {
     if (!removedButtons.length) return;
     const removedSet = new Set(removedButtons);
     const selectedButton = removedButtons.find((button) => button.getAttribute("aria-pressed") === "true") || null;
-    let fallback = null;
-    if (selectedButton) {
-        const selectedIndex = neutralFileButtons.indexOf(selectedButton);
-        fallback = neutralFileButtons.find((button) => !removedSet.has(button) && button.dataset.filePresentation === "true")
-            || neutralFileButtons.slice(selectedIndex + 1).find((button) => !removedSet.has(button))
-            || neutralFileButtons.slice(0, selectedIndex).reverse().find((button) => !removedSet.has(button))
-            || null;
-    }
     neutralFileButtons = neutralFileButtons.filter((candidate) => !removedSet.has(candidate));
     const groups = new Set();
     items.forEach((item) => {
@@ -4844,19 +4832,7 @@ function removeNeutralFileItems(items, packageData) {
     syncNeutralFilesEmptyState();
     updateNeutralPackage(packageData);
     if (!selectedButton) return;
-    neutralPreviewSequence += 1;
-    neutralPreviewRequest?.abort();
-    neutralPreviewRequest = null;
-    resetNeutralViewer();
-    if (fallback?.isConnected) {
-        selectNeutralFile(fallback);
-    } else {
-        neutralSelectedFileId = "";
-        if (neutralViewerName) neutralViewerName.textContent = "Archivo";
-        if (neutralViewerMeta) neutralViewerMeta.textContent = "";
-        syncNeutralViewerDownload(null);
-        setNeutralViewerState("empty");
-    }
+    clearNeutralFileSelection();
 }
 
 async function submitFileRemoval() {
