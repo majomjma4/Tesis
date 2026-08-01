@@ -544,7 +544,7 @@ final class AdminController
                     $fileId=Database::transaction(function(PDO $database)use($model,$materialId,$stored,$actor):int{
                         if($model->findByIdForUpdate($materialId)===null)throw new InvalidArgumentException('El material ya no está disponible.');
                         if($model->hasActiveFileEquivalent($materialId,(string)$stored['original_name'],(int)$stored['size_bytes'])){
-                            throw new InvalidArgumentException('Ya existe un archivo activo con el mismo nombre y tamaño.');
+                            throw new InvalidArgumentException('Ya existe un archivo activo con el mismo nombre y tamaño. Utiliza Reemplazar archivo para actualizarlo.');
                         }
                         $id=$model->addFile($materialId,$stored,$actor);
                         (new AdminActivityService($database))->record(

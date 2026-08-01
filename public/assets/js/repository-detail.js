@@ -3008,6 +3008,7 @@ if (recordUploadDialog && recordUploadDialog.parentElement !== document.body) do
 const recordUploadForm = recordUploadDialog?.querySelector("[data-record-file-upload-form]");
 const recordUploadInput = recordUploadDialog?.querySelector("[data-upload-input]");
 const recordUploadPickerTrigger = recordUploadDialog?.querySelector("[data-upload-picker-trigger]");
+const recordUploadDropzone = recordUploadDialog?.querySelector("[data-upload-dropzone]");
 const recordUploadList = recordUploadDialog?.querySelector("[data-upload-file-list]");
 const recordUploadStatus = recordUploadDialog?.querySelector("[data-upload-status]");
 const recordUploadResults = recordUploadDialog?.querySelector("[data-upload-results]");
@@ -3022,6 +3023,7 @@ let recordUploadState = "idle";
 let recordUploadReturnFocus = null;
 let recordUploadBackgroundState = [];
 let recordUploadCloseTimer = null;
+let recordUploadDragDepth = 0;
 const recordUploadPickerState = { active: false, cleanup: null, fallbackTimer: null };
 const recordToastRegistry = new Map();
 const recordToastDurations = { success: 3800, info: 4000, warning: 5000, error: 5600 };
@@ -3034,6 +3036,11 @@ function releaseRecordUploadPicker() {
         window.clearTimeout(recordUploadPickerState.fallbackTimer);
         recordUploadPickerState.fallbackTimer = null;
     }
+}
+
+function resetRecordUploadDragState() {
+    recordUploadDragDepth = 0;
+    recordUploadDropzone?.classList.remove("dragover");
 }
 
 function openRecordUploadPicker() {
@@ -3187,6 +3194,7 @@ function openRecordUpload() {
         ? globalFileToggle
         : document.activeElement;
     recordUploadEntries = [];
+    resetRecordUploadDragState();
     if (recordUploadInput) recordUploadInput.value = "";
     recordUploadResults?.replaceChildren();
     renderRecordUploadEntries();
@@ -3210,6 +3218,7 @@ function resetRecordUploadDialog() {
         recordUploadCloseTimer = null;
     }
     recordUploadEntries = [];
+    resetRecordUploadDragState();
     if (recordUploadInput) recordUploadInput.value = "";
     recordUploadList?.replaceChildren();
     recordUploadResults?.replaceChildren();
@@ -3628,7 +3637,7 @@ async function submitRecordUpload(event) {
             updateNeutralPackage(payload.package);
         }
         if (failedCount > 0 || addedCount === 0) {
-            [...added.map((file) => `${file.name} — agregado`), ...failed.map((file) => `${file.name} — ${file.message}`)].forEach((message) => {
+            added.map((file) => `${file.name} — agregado`).forEach((message) => {
                 const item = document.createElement("li");
                 item.textContent = message;
                 recordUploadResults?.append(item);
@@ -3656,6 +3665,30 @@ recordUploadInput?.addEventListener("change", () => {
     validateRecordUploadFiles([...recordUploadInput.files]);
 });
 recordUploadInput?.addEventListener("cancel", releaseRecordUploadPicker);
+recordUploadDropzone?.addEventListener("dragenter", (event) => {
+    if (recordUploadState === "uploading") return;
+    event.preventDefault();
+    recordUploadDragDepth += 1;
+    recordUploadDropzone.classList.add("dragover");
+});
+recordUploadDropzone?.addEventListener("dragover", (event) => {
+    if (recordUploadState === "uploading") return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    recordUploadDropzone.classList.add("dragover");
+});
+recordUploadDropzone?.addEventListener("dragleave", (event) => {
+    event.preventDefault();
+    recordUploadDragDepth = Math.max(0, recordUploadDragDepth - 1);
+    if (recordUploadDragDepth === 0) recordUploadDropzone.classList.remove("dragover");
+});
+recordUploadDropzone?.addEventListener("drop", (event) => {
+    event.preventDefault();
+    resetRecordUploadDragState();
+    if (recordUploadState === "uploading") return;
+    const files = [...(event.dataTransfer?.files || [])];
+    if (files.length) validateRecordUploadFiles(files);
+});
 recordUploadForm?.addEventListener("submit", submitRecordUpload);
 recordUploadCancel?.addEventListener("click", () => closeRecordUpload(true));
 recordUploadClose?.addEventListener("click", () => closeRecordUpload(true));
@@ -4395,7 +4428,10 @@ async function inspectFileRestore(fileId) {
         console.error("Inspección de restauración:", error);
         const message = error instanceof Error ? error.message : "No fue posible validar el archivo.";
         showRecordUploadToast(message, "error", {
-            freshAttempt: message === "Este archivo ya se encuentra disponible dentro del material."
+            freshAttempt: [
+                "Este archivo ya se encuentra disponible dentro del material.",
+                "Este archivo ya se encuentra disponible dentro del proyecto."
+            ].includes(message)
         });
         await refreshRestorableFiles().catch(() => {});
     } finally {

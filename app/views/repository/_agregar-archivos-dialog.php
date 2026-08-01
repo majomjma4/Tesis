@@ -20,12 +20,13 @@ $extensions = is_array($limits['extensions'] ?? null) ? $limits['extensions'] : 
                 <input type="hidden" name="_csrf" value="<?= e((string) ($upload['csrf_token'] ?? '')) ?>">
                 <input type="hidden" name="material_id" value="<?= (int) ($digitalRecord['entity']['id'] ?? 0) ?>">
                 <input type="hidden" name="action" value="add">
-                <div class="ed-upload-picker">
-                    <strong>Seleccionar uno o varios archivos</strong>
-                    <span>Los archivos válidos se agregarán como documentos normales; el archivo de presentación solo cambia cuando lo indiques desde su menú.</span>
-                    <button class="ed-upload-picker-trigger" type="button" data-upload-picker-trigger>Elegir archivos</button>
-                    <input type="file" multiple data-upload-input accept="<?= e('.' . implode(',.', $extensions)) ?>" hidden>
-                </div>
+                <button class="ed-upload-picker file-drag-zone" type="button" data-upload-picker-trigger data-upload-dropzone>
+                    <i class="fa-solid fa-file-arrow-up upload-icon" aria-hidden="true"></i>
+                    <strong>Arrastra tus archivos aquí</strong>
+                    <span>o haz clic para seleccionarlos</span>
+                    <small>Los archivos válidos se agregarán como documentos normales; el archivo de presentación solo cambia cuando lo indiques desde su menú.</small>
+                </button>
+                <input type="file" multiple data-upload-input accept="<?= e('.' . implode(',.', $extensions)) ?>" hidden>
                 <p class="ed-dialog-info-note">
                     <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
                     <span><?= !empty($recordIsProject) ? 'Los archivos pasarán a formar parte del expediente académico. Se registrarán el responsable y la fecha de carga; la acción quedará en el historial administrativo, podrá reflejarse en reportes institucionales y notificará a los autores activos. Posteriormente podrán reemplazarse, retirarse o marcarse como archivo de presentación según las políticas institucionales.' : 'Los archivos agregados quedarán registrados en el historial del expediente y podrán reflejarse en los reportes administrativos.' ?></span>

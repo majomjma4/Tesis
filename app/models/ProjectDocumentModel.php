@@ -20,6 +20,16 @@ final class ProjectDocumentModel
     {
         $q=$this->db->prepare("SELECT * FROM project_files WHERE project_id=:project AND id=:file AND deleted_at IS NULL AND purged_at IS NULL".($lock?' FOR UPDATE':''));$q->execute(['project'=>$projectId,'file'=>$fileId]);$row=$q->fetch();if(!$row)throw new InvalidArgumentException('El archivo ya no está disponible.');return $row;
     }
+    public function activeFileConflict(int $projectId,string $originalName,int $sizeBytes,string $checksum):?array
+    {
+        $q=$this->db->prepare("SELECT id,original_name,size_bytes,checksum_sha256,
+            CASE WHEN original_name=:name_match AND size_bytes=:size_match THEN 'name_size' ELSE 'checksum' END conflict_type
+            FROM project_files
+            WHERE project_id=:project AND deleted_at IS NULL AND purged_at IS NULL
+              AND ((original_name=:name_lookup AND size_bytes=:size_lookup) OR checksum_sha256=:checksum)
+            ORDER BY (original_name=:name_order AND size_bytes=:size_order) DESC,id LIMIT 1");
+        $q->execute(['name_match'=>$originalName,'size_match'=>$sizeBytes,'project'=>$projectId,'name_lookup'=>$originalName,'size_lookup'=>$sizeBytes,'checksum'=>$checksum,'name_order'=>$originalName,'size_order'=>$sizeBytes]);$row=$q->fetch();return $row?:null;
+    }
     public function add(int $projectId,array $stored,int $actor):array
     {
         $q=$this->db->prepare("INSERT INTO project_files(project_id,delivery_id,category,original_name,storage_name,storage_path,mime_type,extension,size_bytes,checksum_sha256,sort_order,uploaded_by) SELECT :project,NULL,'repository',:name,:storage,:path,:mime,:extension,:size,:checksum,COALESCE(MAX(sort_order),0)+1,:actor FROM project_files WHERE project_id=:project2");
@@ -52,19 +62,20 @@ final class ProjectDocumentModel
     public function restorable(int $projectId):array
     {
         $q=$this->db->prepare("SELECT f.*,u.full_name deleted_by_name,TIMESTAMPDIFF(SECOND,UTC_TIMESTAMP(),DATE_ADD(f.deleted_at,INTERVAL 24 HOUR)) remaining_seconds FROM project_files f LEFT JOIN users u ON u.id=f.deleted_by WHERE f.project_id=:id AND f.deleted_at IS NOT NULL AND f.purged_at IS NULL AND f.deleted_at>=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 24 HOUR) ORDER BY f.deleted_at DESC");$q->execute(['id'=>$projectId]);
-        return array_map(function(array $f):array{$seconds=max(0,(int)$f['remaining_seconds']);return ['id'=>(int)$f['id'],'name'=>$f['original_name'],'extension'=>$f['extension'],'size'=>ArchiveService::formatBytes((int)$f['size_bytes']),'size_bytes'=>(int)$f['size_bytes'],'deleted_at'=>$f['deleted_at'],'deleted_at_label'=>date('d/m/Y H:i',strtotime($f['deleted_at'])),'deleted_by_name'=>$f['deleted_by_name']?:'Administración','remaining_seconds'=>$seconds,'remaining_label'=>floor($seconds/3600).' h '.floor(($seconds%3600)/60).' min'];},$q->fetchAll());
+        $storage=new ProjectDocumentFileService();$files=[];foreach($q->fetchAll() as $f){$seconds=max(0,(int)$f['remaining_seconds']);if($seconds<1)continue;try{$storage->resolveStoredFile($projectId,(string)$f['storage_name']);}catch(Throwable){continue;}$files[]=['id'=>(int)$f['id'],'name'=>$f['original_name'],'extension'=>$f['extension'],'size'=>ArchiveService::formatBytes((int)$f['size_bytes']),'size_bytes'=>(int)$f['size_bytes'],'deleted_at'=>$f['deleted_at'],'deleted_at_label'=>date('d/m/Y H:i',strtotime($f['deleted_at'])),'deleted_by_name'=>$f['deleted_by_name']?:'Administración','remaining_seconds'=>$seconds,'remaining_label'=>floor($seconds/3600).' h '.floor(($seconds%3600)/60).' min'];}return $files;
     }
     public function inspectRestore(int $projectId,int $fileId):array
     {
         $q=$this->db->prepare("SELECT * FROM project_files WHERE project_id=:project AND id=:file AND deleted_at IS NOT NULL AND purged_at IS NULL AND deleted_at>=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 24 HOUR) FOR UPDATE");$q->execute(['project'=>$projectId,'file'=>$fileId]);$f=$q->fetch();if(!$f)throw new InvalidArgumentException('El plazo de recuperación de este archivo finalizó.');
-        $name=$f['original_name'];$c=$this->db->prepare('SELECT id FROM project_files WHERE project_id=:project AND deleted_at IS NULL AND purged_at IS NULL AND original_name=:name AND id<>:id');$c->execute(['project'=>$projectId,'name'=>$name,'id'=>$fileId]);$conflict=(bool)$c->fetchColumn();
-        if($conflict){$ext=pathinfo($name,PATHINFO_EXTENSION);$stem=pathinfo($name,PATHINFO_FILENAME);$name=$stem.' (restaurado)'.($ext!==''?'.'.$ext:'');}
-        return ['file_id'=>$fileId,'original_name'=>$f['original_name'],'final_name'=>$name,'conflict'=>$conflict,'conflicting_name'=>$conflict?$f['original_name']:''];
+        $storage=new ProjectDocumentFileService();try{$retiredPath=$storage->resolveStoredFile($projectId,(string)$f['storage_name']);}catch(Throwable){throw new InvalidArgumentException('El archivo físico ya no está disponible y no puede restaurarse.');}
+        $active=$this->db->prepare('SELECT id,original_name,storage_name FROM project_files WHERE project_id=:project AND deleted_at IS NULL AND purged_at IS NULL AND id<>:id FOR UPDATE');$active->execute(['project'=>$projectId,'id'=>$fileId]);$activeFiles=$active->fetchAll();$normalized=$this->normalizeRestoreName((string)$f['original_name']);$sameName=current(array_filter($activeFiles,fn(array $candidate):bool=>$this->normalizeRestoreName((string)$candidate['original_name'])===$normalized))?:null;$conflict=false;$finalName=(string)$f['original_name'];
+        if($sameName!==null){try{$activePath=$storage->resolveStoredFile($projectId,(string)$sameName['storage_name']);}catch(Throwable){throw new RuntimeException('No fue posible verificar la integridad del archivo activo.');}$retiredHash=hash_file('sha256',$retiredPath);$activeHash=hash_file('sha256',$activePath);if(!is_string($retiredHash)||!is_string($activeHash))throw new RuntimeException('No fue posible verificar la integridad de los archivos.');if(hash_equals($retiredHash,$activeHash))throw new InvalidArgumentException('Este archivo ya se encuentra disponible dentro del proyecto.');$conflict=true;$finalName=$this->suggestRestoredName((string)$f['original_name'],$activeFiles);}
+        return ['file_id'=>$fileId,'original_name'=>(string)$f['original_name'],'final_name'=>$finalName,'conflict'=>$conflict,'conflicting_name'=>$sameName===null?null:(string)$sameName['original_name']];
     }
     public function restore(int $projectId,int $fileId,int $actor,string $name):array
     {
-        $inspection=$this->inspectRestore($projectId,$fileId);$final=trim($name)!==''?trim($name):$inspection['final_name'];
-        $q=$this->db->prepare('UPDATE project_files SET original_name=:name,deleted_at=NULL,deleted_by=NULL WHERE project_id=:project AND id=:file');$q->execute(['name'=>$final,'project'=>$projectId,'file'=>$fileId]);$f=$this->findActiveFile($projectId,$fileId);return $f+['final_name'=>$final,'conflict'=>$inspection['conflict']];
+        $inspection=$this->inspectRestore($projectId,$fileId);if($name===''||$this->normalizeRestoreName($name)!==$this->normalizeRestoreName((string)$inspection['final_name']))throw new InvalidArgumentException('El conflicto cambió. Revisa nuevamente el nombre propuesto.');$final=(string)$inspection['final_name'];
+        $q=$this->db->prepare('UPDATE project_files SET original_name=:name,deleted_at=NULL,deleted_by=NULL WHERE project_id=:project AND id=:file AND deleted_at IS NOT NULL');$q->execute(['name'=>$final,'project'=>$projectId,'file'=>$fileId]);if($q->rowCount()!==1)throw new InvalidArgumentException('El archivo ya fue restaurado.');$f=$this->findActiveFile($projectId,$fileId);return $f+['final_name'=>$final,'conflict'=>$inspection['conflict'],'restored_original_name'=>$inspection['original_name']];
     }
     public function purge(int $projectId,array $ids,int $actor):array
     {
@@ -75,5 +86,12 @@ final class ProjectDocumentModel
     public function versions(int $projectId):array
     {
         $q=$this->db->prepare('SELECT v.*,u.full_name responsible FROM project_file_versions v LEFT JOIN users u ON u.id=v.replaced_by WHERE v.project_id=:id ORDER BY v.replaced_at DESC,v.id DESC');$q->execute(['id'=>$projectId]);return $q->fetchAll();
+    }
+    private function normalizeRestoreName(string $name):string{return mb_strtolower(trim($name),'UTF-8');}
+    private function suggestRestoredName(string $originalName,array $activeFiles):string
+    {
+        $extension=pathinfo($originalName,PATHINFO_EXTENSION);$base=pathinfo($originalName,PATHINFO_FILENAME);$activeNames=array_fill_keys(array_map(fn(array $file):string=>$this->normalizeRestoreName((string)$file['original_name']),$activeFiles),true);
+        for($number=1;$number<10000;$number++){$suffix=$number===1?' (restaurado)':' (restaurado '.$number.')';$candidate=$base.$suffix.($extension===''?'':'.'.$extension);if(!isset($activeNames[$this->normalizeRestoreName($candidate)]))return $candidate;}
+        throw new RuntimeException('No fue posible generar un nombre disponible para la restauración.');
     }
 }
