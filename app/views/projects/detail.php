@@ -28,6 +28,12 @@ if ($project === null): ?>
             'value' => (string) $row['full_name'],
         ], $rows);
     };
+    $authorMetadata = null;
+    if (count($students) === 1) {
+        $authorMetadata = ['key'=>'author','label'=>'Autor','value'=>(string)$students[0]['full_name'],'icon'=>'fa-user-graduate'];
+    } elseif (count($students) > 1) {
+        $authorMetadata = ['key'=>'author','label'=>'Autores','value'=>count($students).' integrantes','icon'=>'fa-users'];
+    }
     $previewTypes = ['pdf'=>'pdf','docx'=>'docx','txt'=>'text','png'=>'image','jpg'=>'image','jpeg'=>'image','webp'=>'image'];
     $documents = array_map(static function (array $file) use ($projectId, $previewActionUrl, $downloadActionUrl, $previewTypes): array {
         $extension = strtolower((string) $file['extension']);
@@ -64,7 +70,7 @@ if ($project === null): ?>
         ['label'=>'Aprobación del tribunal','value'=>$dateLabel($project['tribunal_approved_at']??null)],['label'=>'Publicación','value'=>$dateLabel($project['published_at']??null)],
     ],static fn(array $row):bool=>$row['value']!==''));
     $informationSections = [
-        ['id'=>'description','title'=>'Resumen del proyecto','icon'=>'fa-align-left','type'=>'prose','content'=>(string)($project['summary'] ?: $project['subtitle'] ?: 'Este expediente no registra un resumen institucional.')],
+        ['id'=>'description','title'=>'Descripción','icon'=>'fa-align-left','type'=>'prose','content'=>(string)($project['summary'] ?: $project['subtitle'] ?: 'Este expediente no registra un resumen institucional.')],
         ['id'=>'institutional','title'=>'Información académica','icon'=>'fa-building-columns','type'=>'metadata','content'=>array_values(array_filter([
             ['label'=>'Código','value'=>(string)$project['code']],['label'=>'Tipo de proyecto','value'=>(string)$project['type_name']],['label'=>'Carrera','value'=>(string)$project['career_name']],
             ['label'=>'Período académico','value'=>(string)$project['period_name']],['label'=>'Estado','value'=>$statusLabel],['label'=>'Etapa académica','value'=>$stageLabel],
@@ -98,8 +104,16 @@ if ($project === null): ?>
     }
     $digitalRecord=['entity'=>['type'=>'project','id'=>$projectId,'query_key'=>'project_id'],'context'=>$publicContext?'repository':'academic','mode'=>'view','return_url'=>$returnUrl,
         'breadcrumbs'=>[['label'=>$publicContext?'Repositorio':'Proyectos','url'=>$returnUrl],['label'=>(string)$project['code'],'url'=>null]],
-        'header'=>['title'=>(string)$project['title'],'description'=>(string)($project['subtitle']??''),'type_label'=>(string)$project['type_name'],'status_label'=>$statusLabel,'status_tone'=>$project['status']==='published'?'success':'neutral'],
-        'metadata'=>array_values(array_filter([['label'=>'Código','value'=>(string)$project['code']],['label'=>'Carrera','value'=>(string)$project['career_name']],['label'=>'Período académico','value'=>(string)$project['period_name']],['label'=>'Tutor','value'=>(string)($project['tutor_name']??'')],['label'=>'Integrantes','value'=>count($students).''],['label'=>'Registro','value'=>$dateLabel($project['created_at']??null)],['label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible']],static fn(array $row):bool=>$row['value']!=='')),
+        'header'=>['title'=>(string)$project['title'],'description'=>(string)($project['subtitle']??''),'type_label'=>(string)$project['type_name'],'type_icon'=>$publicContext?'fa-folder-tree':null,'status_label'=>$statusLabel,'status_tone'=>$project['status']==='published'?'success':'neutral'],
+        'metadata'=>array_values(array_filter($publicContext?[
+            ['key'=>'period','label'=>'Período académico','value'=>(string)$project['period_name'],'icon'=>'fa-calendar-days'],
+            ['key'=>'tutor','label'=>'Tutor','value'=>(string)($project['tutor_name']??''),'icon'=>'fa-chalkboard-user'],
+            $authorMetadata,
+            ['key'=>'registration','label'=>'Registro','value'=>$dateLabel($project['created_at']??null),'icon'=>'fa-calendar-plus'],
+            ['key'=>'availability','label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible','icon'=>$project['is_available']?'fa-circle-check':'fa-circle-minus'],
+        ]:[
+            ['label'=>'Código','value'=>(string)$project['code']],['label'=>'Carrera','value'=>(string)$project['career_name']],['label'=>'Período académico','value'=>(string)$project['period_name']],['label'=>'Tutor','value'=>(string)($project['tutor_name']??'')],['label'=>'Integrantes','value'=>count($students).''],['label'=>'Registro','value'=>$dateLabel($project['created_at']??null)],['label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible']
+        ],static fn(?array $row):bool=>$row!==null&&$row['value']!=='')),
         'actions'=>$actions,'menu_actions'=>$menuActions,'tabs'=>$tabs,'active_tab'=>$activeTab,'information_sections'=>$informationSections,
         'documents'=>$documents,'archives'=>$archives,'versions'=>$versions,'can_manage_files'=>false,'package'=>[],
         'global_file_actions'=>array_map(static fn(array $file):array=>['label'=>'Descargar '.$file['name'],'icon'=>'fa-download','url'=>$file['download_url'],'download'=>true],array_merge($documents,$archives)),
