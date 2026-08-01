@@ -115,6 +115,24 @@ final class AdminController
         }
     }
 
+    public function projectHistory(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') $this->json(false, 'Método no permitido.', [], 405);
+        $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
+        $offset = filter_var($_GET['offset'] ?? 0, FILTER_VALIDATE_INT);
+        if ($id === false || $id === null || (int) $id < 1) $this->json(false, 'El proyecto solicitado no es válido.', [], 422);
+        $exists = Database::connection()->prepare('SELECT 1 FROM projects WHERE id=:id');
+        $exists->execute(['id' => (int) $id]);
+        if (!$exists->fetchColumn()) $this->json(false, 'El proyecto solicitado no existe.', [], 404);
+        try {
+            $history = (new ProjectAuditHistoryModel())->forProject((int) $id, 20, $offset === false ? 0 : (int) $offset);
+            $this->json(true, 'Historial administrativo cargado.', $history);
+        } catch (Throwable $error) {
+            error_log('Project administrative history: ' . $error->getMessage());
+            $this->json(false, 'No fue posible cargar el historial administrativo.', [], 500);
+        }
+    }
+
     public function cleanupSupportMaterialHistory():void
     {
         $this->requirePost();$session=new AuthSessionService();

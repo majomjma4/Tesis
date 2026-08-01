@@ -65,7 +65,7 @@ if ($project === null): ?>
     }
     $tabs = [
         ['id'=>'information','label'=>'Información','icon'=>'fa-file-lines'],['id'=>'files','label'=>'Documentos','icon'=>'fa-folder-open'],
-        ['id'=>'evolution','label'=>'Evolución documental','icon'=>'fa-clock-rotate-left'],
+        ['id'=>'evolution','label'=>'Historial','icon'=>'fa-clock-rotate-left'],
     ];
     foreach ($tabs as &$tabItem) $tabItem['url']=$detailUrl.'&tab='.$tabItem['id']; unset($tabItem);
     $allowedTabs=array_column($tabs,'id'); $activeTab=in_array($activeTab,$allowedTabs,true)?$activeTab:'information';
@@ -126,21 +126,9 @@ if ($project === null): ?>
     $menuActions=$isAdministrator&&$publicContext?[
         ['label'=>$project['is_available']?'Marcar como no disponible':'Marcar como disponible','icon'=>$project['is_available']?'fa-ban':'fa-circle-check','enabled'=>true,'action'=>'availability'],
         ['label'=>'Retirar publicación','icon'=>'fa-box-archive','enabled'=>true,'action'=>'publication'],
-        ['label'=>'Ver historial administrativo','icon'=>'fa-clock-rotate-left','enabled'=>true,'action'=>'project-history','separator'=>true],
+        ['label'=>'Ver historial administrativo','icon'=>'fa-clock-rotate-left','enabled'=>true,'action'=>'admin-history','separator'=>true],
         ['label'=>'Enviar a Papelera','icon'=>'fa-trash-can','enabled'=>true,'action'=>'trash','danger'=>true,'separator'=>true],
     ]:[];
-    $adminHistory=[];$academicHistory=[];
-    if($publicContext){
-        $adminLabels=['project_updated'=>'Información del proyecto actualizada','project_availability_changed'=>'Disponibilidad del proyecto actualizada','project_unpublished'=>'Publicación retirada','project_republished'=>'Publicación restaurada','project_trashed'=>'Proyecto enviado a Papelera','project_restored'=>'Proyecto restaurado','project.presentation_selected'=>'Archivo principal seleccionado','project.presentation.changed'=>'Archivo principal actualizado','project.presentation_changed'=>'Archivo principal actualizado','project.presentation_removed'=>'Archivo principal retirado','project.file_added'=>'Archivo agregado','project.file_replaced'=>'Archivo reemplazado','project.file_removed'=>'Archivo retirado','project.file_restored'=>'Archivo restaurado','project.file_purged'=>'Archivo eliminado definitivamente','project_file_replaced'=>'Archivo reemplazado','project_file_removed'=>'Archivo retirado'];
-        foreach($project['activity'] as $event){$action=(string)$event['action'];if(!isset($adminLabels[$action]))continue;$detail=trim((string)($event['reason']??''));$state=json_decode((string)($event['new_state']??''),true);$changes=is_array($state)?($state['_history_changes']??[]):[];if($detail===''&&is_array($changes)&&$changes)$detail=implode('; ',array_map(static fn(array $change):string=>(string)($change['field']??'Dato').' de '.(string)($change['from']??'sin asignar').' a '.(string)($change['to']??'sin asignar'),$changes));$adminHistory[]=['title'=>$adminLabels[$action],'detail'=>$detail,'actor'=>(string)($event['actor_name']?:'Administración institucional'),'date'=>(string)$event['created_at']];}
-        $academicHistory[]=['title'=>'Proyecto registrado','detail'=>'Se creó el expediente académico del proyecto.','actor'=>'Sistema académico','date'=>(string)$project['created_at']];
-        foreach($project['deliveries'] as $event)$academicHistory[]=['title'=>'Entrega realizada · versión '.(int)$event['version_number'],'detail'=>(string)($event['comment']?:$event['title']),'actor'=>(string)$event['author_name'],'date'=>(string)$event['submitted_at']];
-        foreach($project['observations'] as $event)$academicHistory[]=['title'=>'Observación académica · '.(string)$event['category'],'detail'=>(string)$event['body'],'actor'=>(string)$event['author_name'],'date'=>(string)$event['created_at']];
-        foreach($project['responses'] as $event)$academicHistory[]=['title'=>'Respuesta a observación','detail'=>(string)$event['body'],'actor'=>(string)$event['author_name'],'date'=>(string)$event['created_at']];
-        foreach($project['stages'] as $event)if($event['status']==='completed'&&!empty($event['completed_at']))$academicHistory[]=['title'=>'Etapa completada · '.(string)$event['label'],'detail'=>'La etapa académica fue completada.','actor'=>'Sistema académico','date'=>(string)$event['completed_at']];
-        foreach($project['activity'] as $event){$label=['project_approved'=>'Proyecto aprobado','project_tribunal_approved'=>'Proyecto aprobado por el tribunal','tribunal_approved'=>'Proyecto aprobado por el tribunal','project_published'=>'Proyecto publicado','delivery_submitted'=>'Entrega registrada'][(string)$event['action']]??null;if($label)$academicHistory[]=['title'=>$label,'detail'=>(string)($event['reason']??''),'actor'=>(string)($event['actor_name']?:'Sistema académico'),'date'=>(string)$event['created_at']];}
-        usort($adminHistory,static fn(array $a,array $b):int=>strcmp($b['date'],$a['date']));usort($academicHistory,static fn(array $a,array $b):int=>strcmp($b['date'],$a['date']));
-    }
     $digitalRecord=['entity'=>['type'=>'project','id'=>$projectId,'query_key'=>'project_id'],'context'=>$publicContext?'repository':'academic','mode'=>'view','return_url'=>$returnUrl,
         'breadcrumbs'=>[['label'=>$publicContext?'Repositorio':'Proyectos','url'=>$returnUrl],['label'=>(string)$project['code'],'url'=>null]],
         'header'=>['title'=>(string)$project['title'],'description'=>(string)($project['subtitle']??''),'type_label'=>(string)$project['type_name'],'type_icon'=>$publicContext?'fa-folder-tree':null,'status_label'=>$statusLabel,'status_tone'=>$project['status']==='published'?'success':'neutral'],
@@ -160,9 +148,14 @@ if ($project === null): ?>
         'file_upload'=>!empty($projectDocuments)?['endpoint'=>(string)$projectDocuments['endpoint'],'csrf_token'=>(string)$projectDocuments['csrf'],'limits'=>(array)$projectDocuments['limits']]:[],
         'package'=>(array)($projectDocuments['package']??[]),
         'global_file_actions'=>[],
-        'project_histories'=>['administrative'=>$adminHistory,'academic'=>$academicHistory],
-        'endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl], 'version_endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl],
-        'admin_actions'=>['endpoint'=>(string)($projectAdminEndpoint??''),'trash_endpoint'=>(string)($projectTrashEndpoint??''),'csrf_token'=>(string)($projectAdminCsrf??''),'trash_csrf_token'=>(string)($projectTrashCsrf??''),'status'=>'published','is_available'=>!empty($project['is_available']),'redirect'=>$returnUrl],
+        'project_histories'=>[
+            'academic'=>(array)($project['academic_history']??[]),
+            'academic_total'=>(int)($project['academic_history_total']??count((array)($project['academic_history']??[]))),
+            'academic_endpoint'=>(string)($academicHistoryEndpoint??''),
+            'modifications'=>(array)($project['post_publication_modifications']??[]),
+        ],
+        'endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl,'admin_history'=>(string)($projectHistoryEndpoint??'')], 'version_endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl],
+         'admin_actions'=>['endpoint'=>(string)($projectAdminEndpoint??''),'trash_endpoint'=>(string)($projectTrashEndpoint??''),'csrf_token'=>(string)($projectAdminCsrf??''),'trash_csrf_token'=>(string)($projectTrashCsrf??''),'status'=>'published','is_available'=>!empty($project['is_available']),'redirect'=>$returnUrl],
         'return_label'=>$publicContext?'Volver al repositorio':'Volver a proyectos'];
     if($publicContext): ?><style>
     .digital-record[data-entity-type="project"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:14px;align-items:start}

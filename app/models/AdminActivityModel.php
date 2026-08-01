@@ -8,6 +8,12 @@ final class AdminActivityModel
     {
         $limit = max(1, min(20, $limit));
         $offset = max(0, $offset);
+        $count = Database::connection()->prepare(
+            'SELECT COUNT(*) FROM admin_audit_log
+             WHERE entity_type=:entity_type AND entity_id=:entity_id AND result="correct"'
+        );
+        $count->execute(['entity_type' => $entityType, 'entity_id' => $entityId]);
+        $total = (int) $count->fetchColumn();
         $statement = Database::connection()->prepare(
             'SELECT audit.id,audit.actor_user_id,audit.action,audit.action_label,
                     audit.element_label,audit.result,audit.details,audit.created_at,
@@ -39,7 +45,9 @@ final class AdminActivityModel
             'items' => array_map([$this, 'normalize'], $rows),
             'has_more' => $hasMore,
             'next_offset' => $offset + count($rows),
-            'incomplete_count' => $this->countIncompleteSupportMaterialEvents($entityId),
+            'total_count' => $total,
+            // La consulta paginada no inspecciona ni depura registros históricos fuera de la página solicitada.
+            'incomplete_count' => 0,
             'max_audit_id' => $snapshotMaxAuditId,
         ];
     }
@@ -207,7 +215,7 @@ final class AdminActivityModel
     {
         $details = $this->relevantPresentationDetails($action, $details);
         $labels = [
-            'name'=>'Archivo','original_name'=>'Archivo retirado','final_name'=>'Nombre final restaurado',
+            'name'=>'Nombre','original_name'=>'Archivo retirado','final_name'=>'Nombre final restaurado',
             'file_name'=>'Archivo','old_file_name'=>'Archivo anterior','new_file_name'=>'Archivo nuevo',
             'extension'=>'Tipo','mime_type'=>'Tipo MIME','size'=>'Tamaño','size_bytes'=>'Tamaño','reason'=>'Motivo',
             'reason_detail'=>'Detalle','previous_status'=>'Estado anterior','new_status'=>'Estado nuevo',
@@ -328,6 +336,7 @@ final class AdminActivityModel
             'old_file_name'=>'Archivo anterior','new_file_name'=>'Archivo nuevo',
             'presentation_previous'=>'Presentación anterior','presentation_new'=>'Presentación nueva',
             'mime_type'=>'Tipo MIME','size'=>'Tamaño','size_bytes'=>'Tamaño','actor'=>'Realizado por',
+            'name'=>'Nombre','old_value'=>'Valor anterior','new_value'=>'Valor nuevo',
         ];
         if(isset($labels[$field]))return $labels[$field];
         if($fallback!==''&&!preg_match('/^[a-z0-9_.-]+$/i',$fallback))return $fallback;

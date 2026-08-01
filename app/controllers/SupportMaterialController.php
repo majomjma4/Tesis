@@ -38,6 +38,7 @@ final class SupportMaterialController
         $materialCategories = [];
         $restorableFiles = [];
         $documentEvolution = [];
+        $documentEvolutionEvents = [];
         $hasUnreadAdministrativeActivity = false;
         if ($material === null) {
             http_response_code(404);
@@ -68,7 +69,19 @@ final class SupportMaterialController
                     }
                 }
             }
-            $documentEvolution = $materialModel->documentEvolution((int) $material['id']);
+            $documentEvolutionTotal = $materialModel->documentEvolutionEventCount((int) $material['id']);
+            $documentEvolutionEvents = $materialModel->documentEvolutionEvents((int) $material['id'], 16, 0);
+            $documentEvolutionEvents = array_slice($documentEvolutionEvents, 0, 15);
+            $evolutionFileIds = array_values(array_unique(array_filter(array_map(
+                static fn (array $event): int => (string) ($event['type'] ?? '') === 'file-replaced' ? (int) ($event['file_id'] ?? 0) : 0,
+                $documentEvolutionEvents
+            ))));
+            $documentEvolution = $evolutionFileIds
+                ? $materialModel->documentEvolution((int) $material['id'], $evolutionFileIds)
+                : [];
+            $initialGroups=[];foreach($documentEvolution as $group)$initialGroups[(int)$group['file_id']]=$this->evolutionGroupUrls((int)$material['id'],$group);
+            $documentEvolution=array_values($initialGroups);
+            foreach($documentEvolutionEvents as &$event){$event['preview_url']='';$event['download_url']='';if(($event['file_state']??'')==='available'&&(int)($event['file_id']??0)>0){$query='&material_id='.(int)$material['id'].'&file_id='.(int)$event['file_id'];$event['download_url']=route('support-material-download').$query;if(in_array((string)($event['extension']??''),['pdf','docx','txt','png','jpg','jpeg','webp'],true))$event['preview_url']=route('support-material-preview').$query;}}unset($event);
             if ($isAdministrator) {
                 $materialCategories = $materialModel->categories();
                 $restorableFiles = $materialModel->restorableFiles((int) $material['id']);
@@ -105,12 +118,75 @@ final class SupportMaterialController
             'materialFileLimits' => $isAdministrator ? (new SupportMaterialFileService())->limits() : [],
             'restorableFiles' => $restorableFiles,
             'documentEvolution' => $documentEvolution,
+            'documentEvolutionEvents' => $documentEvolutionEvents,
+            'documentEvolutionTotal' => $documentEvolutionTotal ?? 0,
             'hasUnreadAdministrativeActivity' => $hasUnreadAdministrativeActivity,
             'versionPreviewActionUrl' => route('support-material-version-preview'),
             'versionDownloadActionUrl' => route('support-material-version-download'),
         ]);
     }
     // Final de presentación de materiales
+
+    public function evolutionEvents(): void
+    {
+        $this->ensureSession();
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') $this->sendJson(false, 'Método no permitido.');
+        $materialId = filter_var($_GET['material_id'] ?? null, FILTER_VALIDATE_INT);
+        $offset = max(0, (int) ($_GET['offset'] ?? 0));
+        $administrator = (new AuthSessionService())->hasAdminAccess();
+        $model = new SupportMaterialModel();
+        $material = $materialId ? $model->findById((int) $materialId, $administrator) : null;
+        if (!$material) { http_response_code(404); $this->sendJson(false, 'El material solicitado no está disponible.'); }
+        $events = $model->documentEvolutionEvents((int) $materialId, 16, $offset);
+        $hasMore = count($events) > 15;
+        $events = array_slice($events, 0, 15);
+        $fileIds = array_values(array_unique(array_filter(array_map(
+            static fn (array $event): int => (string) ($event['type'] ?? '') === 'file-replaced' ? (int) ($event['file_id'] ?? 0) : 0,
+            $events
+        ))));
+        $groups = $fileIds ? $model->documentEvolution((int) $materialId, $fileIds) : [];
+        $groupByFile = [];
+        foreach ($groups as $group) {
+            $auditIds=array_values(array_filter(array_map(static fn(array $version):int=>(int)($version['replacement_audit_id']??0),(array)$group['versions'])));
+            $groupByFile[(int)$group['file_id']]=['latest_audit_id'=>$auditIds?max($auditIds):0,'group'=>$this->evolutionGroupUrls((int)$materialId,$group)];
+        }
+        foreach ($events as &$event) {
+            $candidate=$groupByFile[(int)($event['file_id']??0)]??null;
+            $event['version_group']=$candidate&&($candidate['latest_audit_id']===0||$candidate['latest_audit_id']===(int)$event['id'])?$candidate['group']:null;
+            $event['preview_url'] = '';
+            $event['download_url'] = '';
+            if (($event['file_state'] ?? '') === 'available' && (int) ($event['file_id'] ?? 0) > 0) {
+                $query = '&material_id=' . (int) $materialId . '&file_id=' . (int) $event['file_id'];
+                $event['download_url'] = route('support-material-download') . $query;
+                if (in_array((string) ($event['extension'] ?? ''), ['pdf','docx','txt','png','jpg','jpeg','webp'], true)) {
+                    $event['preview_url'] = route('support-material-preview') . $query;
+                }
+            }
+        }
+        unset($event);
+        $total = $model->documentEvolutionEventCount((int) $materialId);
+        $this->sendJson(true, 'Evolución documental cargada.', [
+            'events' => $events, 'total' => $total, 'loaded' => count($events),
+            'has_more' => $hasMore, 'next_offset' => $offset + count($events),
+        ]);
+    }
+
+    private function evolutionGroupUrls(int $materialId, array $group): array
+    {
+        foreach ($group['versions'] as &$version) {
+            $version['preview_url'] = '';
+            $version['download_url'] = '';
+            if (($version['state'] ?? '') !== 'available') continue;
+            $query = '&material_id=' . $materialId . '&file_id=' . (int) $version['file_id'];
+            if (empty($version['current'])) $query .= '&version_id=' . (int) $version['id'];
+            $version['download_url'] = (empty($version['current']) ? route('support-material-version-download') : route('support-material-download')) . $query;
+            if (!empty($version['preview_supported'])) {
+                $version['preview_url'] = (empty($version['current']) ? route('support-material-version-preview') : route('support-material-preview')) . $query;
+            }
+        }
+        unset($version);
+        return $group;
+    }
 
     // Inicio de vistas previas seguras
     // Clasifica el archivo y transmite en línea únicamente los formatos autorizados.

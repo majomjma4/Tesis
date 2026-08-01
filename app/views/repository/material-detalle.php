@@ -214,6 +214,9 @@
             'browsable' => false,
         ],
         'versions' => is_array($documentEvolution ?? null) ? $documentEvolution : [],
+        'document_evolution_events' => is_array($documentEvolutionEvents ?? null) ? $documentEvolutionEvents : [],
+        'document_evolution_total' => (int) ($documentEvolutionTotal ?? 0),
+        'document_evolution_endpoint' => route('support-material-evolution-events') . '&material_id=' . $materialId,
         'version_endpoints' => [
             'preview' => (string) ($versionPreviewActionUrl ?? ''),
             'download' => (string) ($versionDownloadActionUrl ?? ''),

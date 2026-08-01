@@ -52,6 +52,9 @@ final class ProjectsController
             (new ErrorController())->notFound();
             return;
         }
+        $academicPage = (new ProjectRecordModel())->academicHistoryPage((int) $project['id']);
+        $project['academic_history'] = $academicPage['events'];
+        $project['academic_history_total'] = $academicPage['total'];
 
         $descriptionService = new ProjectDescriptionService();
         $isStudentParticipant = !$isAdministrator && in_array('student', $access->currentRoles(), true)
@@ -83,7 +86,20 @@ final class ProjectsController
             'descriptionCsrf' => $session->csrfToken('project_description'),
             'descriptionSaveEndpoint' => route('project-description-save'),
             'lifecycleDescription' => $descriptionService->effectiveDescription((string) $project['type_code'], $project['summary'] ?? null),
+            'academicHistoryEndpoint' => route('project-academic-history-events') . '&project_id=' . (int) $project['id'],
         ]);
+    }
+
+    public function academicHistoryEvents(): void
+    {
+        $projectId=filter_var($_GET['project_id']??null,FILTER_VALIDATE_INT);$offset=max(0,(int)($_GET['offset']??0));
+        $session=new AuthSessionService();$access=new ProjectAccessService();$administrator=$session->hasAdminAccess();
+        if(!$projectId||!$access->can('project.view')){$this->json(['success'=>false,'message'=>'El proyecto solicitado no está disponible.','data'=>[]]);}
+        $db=Database::connection();$allowed=$db->prepare("SELECT 1 FROM projects p WHERE p.id=:id AND p.deleted_at IS NULL".($administrator?'':" AND ((p.status='published' AND p.is_available=1) OR p.created_by=:viewer OR EXISTS(SELECT 1 FROM project_participants pp WHERE pp.project_id=p.id AND pp.user_id=:viewer2 AND pp.status='active'))"));
+        $params=['id'=>(int)$projectId];if(!$administrator){$params['viewer']=$access->currentUserId();$params['viewer2']=$access->currentUserId();}$allowed->execute($params);
+        if(!$allowed->fetchColumn()){http_response_code(404);$this->json(['success'=>false,'message'=>'El proyecto solicitado no está disponible.','data'=>[]]);}
+        $page=(new ProjectRecordModel())->academicHistoryPage((int)$projectId,$offset,15);
+        $this->json(['success'=>true,'message'=>'Historial académico cargado.','data'=>$page]);
     }
 
     public function saveDescription(): void

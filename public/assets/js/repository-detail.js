@@ -541,8 +541,61 @@ digitalRecord?.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("click", (event) => {
+    const timelineMore = event.target.closest("[data-timeline-more]");
+    if (timelineMore instanceof HTMLButtonElement) {
+        loadMoreTimeline(timelineMore);
+        return;
+    }
     if (digitalRecordMenu && !digitalRecordMenu.contains(event.target)) closeDigitalRecordMenu();
 });
+
+function timelineElement(tag, className = "", text = "") {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (text) element.textContent = text;
+    return element;
+}
+
+function timelineDate(value) {
+    const date = new Date(String(value || "").replace(" ", "T") + (String(value || "").includes("Z") ? "" : "Z"));
+    return Number.isNaN(date.getTime()) ? String(value || "") : new Intl.DateTimeFormat("es-EC", { dateStyle: "short", timeStyle: "short" }).format(date);
+}
+
+function renderAcademicTimelineEvent(item) {
+    const icons = { registration:"fa-file-circle-plus",delivery:"fa-cloud-arrow-up",observation:"fa-comment-dots",status:"fa-arrow-right-arrow-left",tribunal:"fa-user-group","tribunal-approval":"fa-award",publication:"fa-building-columns" };
+    const li = timelineElement("li", "ed-academic-event"); li.dataset.eventType = item.type || "status";
+    const marker = timelineElement("span", "ed-academic-marker"); marker.setAttribute("aria-hidden", "true"); marker.innerHTML = `<i class="fa-solid ${icons[item.type] || "fa-circle"}"></i>`;
+    const article = timelineElement("article", "ed-academic-content");
+    const row = timelineElement("div", "ed-academic-title-row"); row.append(timelineElement("h3", "", item.title || "Evento académico"), timelineElement("time", "ed-academic-date", timelineDate(item.date)));
+    article.append(row);
+    if (item.actor) { const actor=timelineElement("p","ed-academic-actor",item.actor); actor.prepend(Object.assign(timelineElement("i","fa-regular fa-user"),{ariaHidden:"true"})); article.append(actor); }
+    if (item.detail) article.append(timelineElement("p", "ed-academic-description", item.detail));
+    if (Array.isArray(item.meta) && item.meta.length) { const list=timelineElement("ul","ed-academic-meta"); item.meta.forEach(value=>list.append(timelineElement("li","",String(value)))); article.append(list); }
+    li.append(marker, article); return li;
+}
+
+function documentStateLabel(state) { return state === "available" ? "Disponible" : (state === "deleted" ? "Eliminado" : "No disponible"); }
+
+function renderDocumentTimelineEvent(item) {
+    const icons={"file-added":"fa-file-circle-plus","file-replaced":"fa-file-pen","file-removed":"fa-file-circle-minus","file-restored":"fa-trash-arrow-up","presentation-changed":"fa-star","presentation-removed":"fa-star-half-stroke"};
+    const major=Boolean(item.version_group)||["file-replaced","presentation-changed","presentation-removed"].includes(item.type);
+    const li=timelineElement("li",`ed-document-event ${major?"is-major":"is-compact"}`);li.dataset.documentEvent=item.type||"file-added";
+    const marker=timelineElement("span","ed-document-marker");marker.setAttribute("aria-hidden","true");marker.innerHTML=`<i class="fa-solid ${icons[item.type]||"fa-file-lines"}"></i>`;
+    const content=timelineElement("div","ed-document-event-content");const head=timelineElement("div","ed-document-event-head");const copy=timelineElement("div");copy.append(timelineElement("h3","",item.title||"Cambio documental"));if(item.responsible)copy.append(timelineElement("p","",item.responsible));head.append(copy,timelineElement("time","",timelineDate(item.date)));content.append(head);
+    if(item.file_name&&!item.version_group){const file=timelineElement("div","ed-document-event-file");let name;if(item.file_state==="available"&&item.preview_url){name=timelineElement("button","",item.file_name);name.type="button";name.dataset.evolutionPreview="";Object.assign(name.dataset,{fileId:`event:${item.id}`,fileName:item.file_name,fileType:String(item.extension||"FILE").toUpperCase(),fileSize:item.size||"",fileExtension:item.extension||"",versionCurrent:"true",previewType:item.extension||"unsupported",previewSupported:"true",previewUrl:item.preview_url,downloadUrl:item.download_url||""});}else if(item.file_state==="available"&&item.download_url){name=timelineElement("a","",item.file_name);name.href=item.download_url;name.setAttribute("download","");}else{name=timelineElement("span","",item.file_name);}file.append(name,timelineElement("span",`ed-version-badge ${item.file_state==="available"?"is-available":""}`,documentStateLabel(item.file_state)));content.append(file);}
+    if(item.version_group)content.append(renderVersionGroup(item.version_group));li.append(marker,content);return li;
+}
+
+function renderVersionGroup(group) {
+    const details=timelineElement("details","ed-evolution-group");const summary=timelineElement("summary");const copy=timelineElement("span","ed-evolution-group-copy");copy.append(timelineElement("strong","",group.name||"Archivo"),timelineElement("span","ed-evolution-group-meta",`${group.versions_count||0} versiones`));summary.append(copy,timelineElement("i","fa-solid fa-chevron-down ed-evolution-chevron"));details.append(summary);const versions=timelineElement("div","ed-version-timeline");
+    (group.versions||[]).forEach(version=>{const article=timelineElement("article",`ed-version-entry ${version.current?"is-current":""}`);const main=timelineElement("div","ed-version-select");main.append(timelineElement("span","ed-version-number",`Versión ${version.number}`));const info=timelineElement("span","ed-version-main");info.append(timelineElement("strong","",version.name||"Archivo"),timelineElement("span","ed-version-meta",`${timelineDate(version.created_at)} · ${version.responsible||"Responsable no disponible"} · ${String(version.extension||"FILE").toUpperCase()} · ${version.size||""}`));const badges=timelineElement("span","ed-version-badges");if(version.current)badges.append(timelineElement("span","ed-version-badge is-current","Versión actual"));badges.append(timelineElement("span",`ed-version-badge ${version.state==="available"?"is-available":""}`,documentStateLabel(version.state)));main.append(info,badges);article.append(main);if(version.state==="available"&&(version.preview_url||version.download_url)){const actions=timelineElement("div","ed-version-actions");if(version.preview_url){const preview=timelineElement("button","","Vista previa");preview.type="button";preview.dataset.evolutionPreview="";Object.assign(preview.dataset,{fileId:`version:${version.file_id}:${version.current?"current":version.id}`,fileName:version.name||"Archivo",fileType:String(version.extension||"FILE").toUpperCase(),fileSize:version.size||"",fileExtension:version.extension||"",versionCurrent:String(Boolean(version.current)),previewType:version.extension||"unsupported",previewSupported:"true",previewUrl:version.preview_url,downloadUrl:version.download_url||""});actions.append(preview);}if(version.download_url){const download=timelineElement("a","","Descargar");download.href=version.download_url;download.setAttribute("download","");actions.append(download);}article.append(actions);}versions.append(article);});details.append(versions);return details;
+}
+
+async function loadMoreTimeline(button) {
+    if (button.disabled) return; const wrap=button.closest(".ed-timeline-more");const timeline=wrap?.previousElementSibling;if(!(timeline instanceof HTMLOListElement))return;
+    const label=button.querySelector("span")||button;button.disabled=true;label.textContent="Cargando…";
+    try{const endpoint=new URL(timeline.dataset.historyEndpoint||"",window.location.href);endpoint.searchParams.set("offset",timeline.dataset.historyOffset||"0");const response=await fetch(endpoint,{headers:{Accept:"application/json"}});const result=await response.json();if(!response.ok||!result.success)throw new Error(result.message||"No fue posible cargar más eventos.");const items=Array.isArray(result.data?.events)?result.data.events:[];const existing=new Set([...timeline.children].map(child=>child.dataset.eventId).filter(Boolean));items.forEach(item=>{const key=String(item.key||item.id||"");if(key&&existing.has(key))return;const node=timeline.dataset.progressiveTimeline==="academic"?renderAcademicTimelineEvent(item):renderDocumentTimelineEvent(item);if(key)node.dataset.eventId=key;timeline.append(node);existing.add(key);});timeline.dataset.historyOffset=String(result.data?.next_offset??Number(timeline.dataset.historyOffset||0)+items.length);const total=Number(result.data?.total||timeline.dataset.historyTotal||0);const shown=Number(timeline.dataset.historyOffset||0);const progress=wrap.querySelector("[data-timeline-progress]");if(progress)progress.textContent=`Mostrando ${Math.min(shown,total)} de ${total} ${total===1?"evento":"eventos"}`;if(!result.data?.has_more)wrap.remove();else label.textContent="Ver más";}catch(error){label.textContent="No fue posible cargar. Reintentar";}finally{button.disabled=false;}
+}
 
 const recordPersistentTabs = digitalRecord?.dataset.persistentTabs === "true";
 const recordTabLinks = [...(digitalRecord?.querySelectorAll("[data-record-tab-link]") ?? [])];
@@ -1725,6 +1778,30 @@ documentEvolution?.addEventListener("click", (event) => {
     detail.hidden = !willOpen;
 });
 
+document.addEventListener("click", (event) => {
+    const historyToggle = event.target.closest("[data-history-toggle]");
+    if (historyToggle instanceof HTMLButtonElement) {
+        const controlledId = historyToggle.getAttribute("aria-controls") || "";
+        const controlled = controlledId ? document.getElementById(controlledId) : null;
+        if (!(controlled instanceof HTMLElement)) return;
+        const expanded = historyToggle.getAttribute("aria-expanded") === "true";
+        historyToggle.setAttribute("aria-expanded", String(!expanded));
+        historyToggle.setAttribute("aria-label", `${expanded ? "Mostrar" : "Plegar"} Historial académico`);
+        controlled.hidden = expanded;
+        return;
+    }
+    const historyJump = event.target.closest("[data-history-jump]");
+    if (!(historyJump instanceof HTMLAnchorElement)) return;
+    const target = document.getElementById(historyJump.dataset.historyJump || "");
+    if (!(target instanceof HTMLElement)) return;
+    event.preventDefault();
+    target.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+    });
+    window.history.replaceState(null, "", `#${target.id}`);
+});
+
 function bindNeutralFileButton(button) {
     if (!(button instanceof HTMLElement) || button.dataset.fileBound === "true") return;
     button.dataset.fileBound = "true";
@@ -2530,6 +2607,7 @@ const recordHistoryLoadingState = recordHistoryOverlay?.querySelector("[data-rec
 const recordHistoryEmptyState = recordHistoryOverlay?.querySelector("[data-record-history-empty]");
 const recordHistoryErrorState = recordHistoryOverlay?.querySelector("[data-record-history-error]");
 const recordHistoryNotice = recordHistoryOverlay?.querySelector("[data-record-history-notice]");
+const recordHistoryProgress = recordHistoryOverlay?.querySelector("[data-record-history-progress]");
 const recordHistoryList = recordHistoryOverlay?.querySelector("[data-record-history-list]");
 const recordHistoryFooter = recordHistoryOverlay?.querySelector("[data-record-history-footer]");
 const recordHistoryMore = recordHistoryOverlay?.querySelector("[data-record-history-more]");
@@ -2548,6 +2626,8 @@ let recordHistoryLoaded = false;
 let recordHistoryLoading = false;
 let recordHistoryHasMore = false;
 let recordHistoryIncompleteTotal = 0;
+let recordHistoryTotal = 0;
+const recordHistoryRenderedIds = new Set();
 let recordHistoryCleanupLoading = false;
 
 function historyTextValue(value, field) {
@@ -2677,6 +2757,9 @@ async function loadRecordHistory(reset = false) {
     const initialLoad = reset || recordHistoryOffset === 0;
     if (reset) {
         recordHistoryOffset = 0;
+        recordHistoryTotal = 0;
+        recordHistoryRenderedIds.clear();
+        if (recordHistoryProgress) recordHistoryProgress.hidden = true;
         recordHistoryHasMore = false;
         recordHistoryList?.replaceChildren();
     }
@@ -2694,16 +2777,29 @@ async function loadRecordHistory(reset = false) {
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.message);
         const items = Array.isArray(result.data?.items) ? result.data.items : [];
+        const newItems = items.filter((item) => {
+            const id = Number(item?.id || 0);
+            if (id > 0 && recordHistoryRenderedIds.has(id)) return false;
+            if (id > 0) recordHistoryRenderedIds.add(id);
+            return true;
+        });
         if (initialLoad) recordHistoryList?.replaceChildren();
         const nextOffset = Number(result.data?.next_offset || recordHistoryOffset + items.length);
+        recordHistoryTotal = Math.max(0, Number(result.data?.total_count || 0));
         recordHistoryHasMore = Boolean(result.data?.has_more);
         recordHistoryIncompleteTotal = Math.max(0, Number(result.data?.incomplete_count || 0));
         if (recordHistoryIncompleteCount) {
             recordHistoryIncompleteCount.textContent = `${recordHistoryIncompleteTotal} ${recordHistoryIncompleteTotal === 1 ? "registro antiguo sin detalle" : "registros antiguos sin detalle"}`;
         }
         setHistoryState(nextOffset > 0 ? "loaded" : "empty");
-        items.forEach((item) => recordHistoryList?.append(renderHistoryItem(item)));
+        newItems.forEach((item) => recordHistoryList?.append(renderHistoryItem(item)));
         recordHistoryOffset = nextOffset;
+        if (recordHistoryProgress) {
+            const shown = recordHistoryRenderedIds.size || nextOffset;
+            const noun = recordHistoryTotal === 1 ? "registro" : "registros";
+            recordHistoryProgress.textContent = `Mostrando ${Math.min(shown, recordHistoryTotal)} de ${recordHistoryTotal} ${noun}`;
+            recordHistoryProgress.hidden = recordHistoryTotal < 1;
+        }
         recordHistoryLoaded = true;
         if (initialLoad) {
             document.querySelectorAll("[data-record-unread-dot],[data-record-history-unread-dot],[data-record-unread-text]").forEach(element => { element.hidden = true; });
@@ -4985,16 +5081,6 @@ document.addEventListener("keydown", (event) => {
                 },
             });
         }));
-
-        record?.querySelector("[data-project-history-trigger]")?.addEventListener("click", () => {
-            closeDigitalRecordMenu?.();
-            activatePersistentRecordTab("evolution");
-            window.requestAnimationFrame(() => {
-                const history = record.querySelector('[data-project-history="administrative"]');
-                if (history instanceof HTMLDetailsElement) history.open = true;
-                history?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-            });
-        });
 
         const editorTrigger = record?.querySelector("[data-project-editor-open]");
         editorTrigger?.addEventListener("click", () => {

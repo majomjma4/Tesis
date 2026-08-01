@@ -57,6 +57,7 @@ final class RepositoryController
         $project = ($projectId !== false && $projectId !== null && $access->can('project.view'))
             ? (new ProjectRecordModel())->find((int)$projectId, $access->currentUserId(), $isAdministrator, true) : null;
         if ($project === null) http_response_code(404);
+        if($project!==null){$academicPage=(new ProjectRecordModel())->academicHistoryPage((int)$project['id']);$project['academic_history']=$academicPage['events'];$project['academic_history_total']=$academicPage['total'];}
         $requestedTab=strtolower(trim((string)($_GET['tab']??'information')));
         $activeTab=in_array($requestedTab,['information','files','evolution'],true)?$requestedTab:'information';
         $returnUrl=$this->repositoryReturnUrl((string)($_GET['return']??''));
@@ -78,12 +79,14 @@ final class RepositoryController
             'returnUrl'=>$returnUrl,'previewActionUrl'=>route('project-file-preview').'&scope=repository',
             'downloadActionUrl'=>route('project-file-download').'&scope=repository',
             'projectAdminEndpoint'=>$isAdministrator?route('admin-repository-publish'):'',
+            'projectHistoryEndpoint'=>$isAdministrator?route('admin-project-history').'&id='.(int)($project['id']??0):'',
             'projectTrashEndpoint'=>$isAdministrator?route('admin-project-trash'):'',
             'projectSaveEndpoint'=>$isAdministrator?route('admin-project-save'):'',
             'projectAdminCsrf'=>$isAdministrator?$session->csrfToken('admin_repository'):'',
             'projectTrashCsrf'=>$isAdministrator?$session->csrfToken('admin_projects'):'',
             'projectEditorCatalogs'=>$isAdministrator?(new AdminProjectModel())->catalogs():[],
             'projectDocuments'=>$projectDocuments,
+            'academicHistoryEndpoint'=>route('project-academic-history-events').'&project_id='.(int)($project['id']??0),
         ]);
     }
 

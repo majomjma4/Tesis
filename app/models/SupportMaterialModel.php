@@ -895,9 +895,11 @@ final class SupportMaterialModel
         return $inspection;
     }
 
-    public function documentEvolution(int $materialId): array
+    public function documentEvolution(int $materialId, array $fileIds = []): array
     {
         if ($materialId < 1) return [];
+        $fileIds = array_values(array_unique(array_filter(array_map('intval', $fileIds), static fn (int $id): bool => $id > 0)));
+        $fileFilter = $fileIds ? ' AND file.id IN (' . implode(',', array_fill(0, count($fileIds), '?')) . ')' : '';
         $statement = Database::connection()->prepare(
             'SELECT file.id file_id,file.material_id,file.original_name current_name,
                     file.relative_path current_path,file.extension current_extension,
@@ -913,10 +915,10 @@ final class SupportMaterialModel
                ON version.file_id=file.id AND version.material_id=file.material_id
              LEFT JOIN users creator ON creator.id=file.created_by
              LEFT JOIN users replacer ON replacer.id=version.replaced_by
-             WHERE file.material_id=:material_id
+             WHERE file.material_id=?' . $fileFilter . '
              ORDER BY file.sort_order,file.id,version.version_number'
         );
-        $statement->execute(['material_id' => $materialId]);
+        $statement->execute([$materialId, ...$fileIds]);
         $rows = $statement->fetchAll();
         if (!$rows) return [];
 
@@ -926,10 +928,12 @@ final class SupportMaterialModel
              FROM admin_audit_log
              audit LEFT JOIN users actor ON actor.id=audit.actor_user_id
              WHERE audit.action='support_material.file_replaced'
-               AND audit.entity_type='support_material' AND audit.entity_id=:material_id
+               AND audit.entity_type='support_material' AND audit.entity_id=?" . ($fileIds
+                   ? " AND CAST(JSON_UNQUOTE(JSON_EXTRACT(audit.details,'$.file_id')) AS UNSIGNED) IN (" . implode(',', array_fill(0, count($fileIds), '?')) . ')'
+                   : '') . "
              ORDER BY audit.created_at,audit.id"
         );
-        $auditStatement->execute(['material_id' => $materialId]);
+        $auditStatement->execute([$materialId, ...$fileIds]);
         $audits = [];
         foreach ($auditStatement->fetchAll() as $audit) {
             $details = json_decode((string) ($audit['details'] ?? ''), true);
@@ -971,6 +975,7 @@ final class SupportMaterialModel
                     'date' => $this->evolutionDate($createdAt),
                     'responsible' => $createdBy,
                     'available' => $available,
+                    'state' => $available ? 'available' : 'deleted',
                     'preview_supported' => $available && $this->isPreviewCompatible([
                         'original_name' => $row['version_name'],
                         'extension' => $row['version_extension'],
@@ -986,6 +991,8 @@ final class SupportMaterialModel
             )) + 1;
             $currentAvailable = $last['deleted_at'] === null && $last['purged_at'] === null
                 && $this->storedSupportFileAvailable((string) $last['current_path']);
+            $currentState = $last['purged_at'] !== null || !$this->storedSupportFileAvailable((string) $last['current_path'])
+                ? 'deleted' : ($last['deleted_at'] !== null ? 'unavailable' : 'available');
             $versions[] = [
                 'id' => null,
                 'file_id' => $fileId,
@@ -1005,6 +1012,7 @@ final class SupportMaterialModel
                     ?: ($audits[$fileId . ':' . (int) $last['version_id']]['actor_name'] ?? '')
                     ?: 'Responsable no disponible'),
                 'available' => $currentAvailable,
+                'state' => $currentState,
                 'preview_supported' => $currentAvailable && $this->isPreviewCompatible([
                     'original_name' => $last['current_name'],
                     'extension' => $last['current_extension'],
@@ -1027,6 +1035,102 @@ final class SupportMaterialModel
             ];
         }
         return $groups;
+    }
+
+    /** Cambios estrictamente documentales; excluye consultas y actividad administrativa no documental. */
+    public function documentEvolutionEvents(int $materialId, int $limit = 0, int $offset = 0): array
+    {
+        if ($materialId < 1) return [];
+        $actions = [
+            'support_material.file_added', 'support_material.file_replaced',
+            'support_material.file_removed', 'support_material.file_restored',
+        ];
+        $placeholders = implode(',', array_fill(0, count($actions), '?'));
+        $limit = max(0, min(16, $limit));
+        $offset = max(0, $offset);
+        $pagination = $limit > 0 ? ' LIMIT ' . $limit . ' OFFSET ' . $offset : '';
+        $statement = Database::connection()->prepare(
+            "SELECT audit.id,audit.action,audit.action_label,audit.element_label,audit.details,audit.created_at,
+                    actor.full_name actor_name
+             FROM admin_audit_log audit
+             LEFT JOIN users actor ON actor.id=audit.actor_user_id
+             WHERE audit.entity_type='support_material' AND audit.entity_id=?
+               AND audit.result='correct' AND audit.action IN ({$placeholders})
+             ORDER BY audit.created_at ASC,audit.id ASC" . $pagination
+        );
+        $statement->execute([$materialId, ...$actions]);
+        $events = [];
+        foreach ($statement->fetchAll() as $row) {
+            $details = json_decode((string) ($row['details'] ?? ''), true);
+            $details = is_array($details) ? $details : [];
+            $action = (string) $row['action'];
+            $type = match ($action) {
+                'support_material.file_added' => 'file-added',
+                'support_material.file_replaced' => 'file-replaced',
+                'support_material.file_removed' => 'file-removed',
+                'support_material.file_restored' => 'file-restored',
+                'support_material.presentation_removed' => 'presentation-removed',
+                default => 'presentation-changed',
+            };
+            $title = match ($type) {
+                'file-added' => 'Archivo agregado', 'file-replaced' => 'Archivo reemplazado · nueva versión',
+                'file-removed' => 'Archivo retirado', 'file-restored' => 'Archivo restaurado',
+                'presentation-removed' => 'Archivo de presentación quitado',
+                default => 'Archivo de presentación cambiado',
+            };
+            $fileName = match ($type) {
+                'file-replaced' => (string) ($details['new_file']['original_name'] ?? $details['new_file']['name'] ?? $row['element_label'] ?? ''),
+                'file-restored' => (string) ($details['final_name'] ?? $details['original_name'] ?? $row['element_label'] ?? ''),
+                'presentation-changed' => (string) ($details['new_name'] ?? $row['element_label'] ?? ''),
+                'presentation-removed' => (string) ($details['previous_name'] ?? $row['element_label'] ?? ''),
+                default => (string) ($details['name'] ?? $details['original_name'] ?? $details['file_name'] ?? $row['element_label'] ?? ''),
+            };
+            $events[] = [
+                'id' => (int) $row['id'], 'type' => $type, 'title' => $title,
+                'date' => (string) $row['created_at'],
+                'responsible' => trim((string) ($row['actor_name'] ?? '')) ?: 'Responsable no disponible',
+                'file_id' => (int) ($details['file_id'] ?? 0),
+                'version_id' => (int) ($details['version_id'] ?? 0),
+                'file_name' => trim($fileName),
+                'previous_name' => trim((string) ($details['previous_name'] ?? $details['previous_file']['original_name'] ?? '')),
+                'new_name' => trim((string) ($details['new_name'] ?? $details['new_file']['original_name'] ?? '')),
+            ];
+        }
+        $fileIds = array_values(array_unique(array_filter(array_column($events, 'file_id'))));
+        if ($fileIds) {
+            $files = Database::connection()->prepare(
+                'SELECT id,original_name,relative_path,extension,mime_type,size_bytes,deleted_at,purged_at
+                 FROM support_material_files WHERE material_id=? AND id IN (' . implode(',', array_fill(0, count($fileIds), '?')) . ')'
+            );
+            $files->execute([$materialId, ...$fileIds]);
+            $byId = [];
+            foreach ($files->fetchAll() as $file) $byId[(int) $file['id']] = $file;
+            foreach ($events as &$event) {
+                $file = $byId[(int) ($event['file_id'] ?? 0)] ?? null;
+                if (!$file) continue;
+                $physical = $this->storedSupportFileAvailable((string) $file['relative_path']);
+                $event['file_name'] = $event['file_name'] ?: (string) $file['original_name'];
+                $event['extension'] = $this->resolveFileExtension($file);
+                $event['size'] = ArchiveService::formatBytes((int) $file['size_bytes']);
+                $event['file_state'] = !empty($file['purged_at']) || !$physical
+                    ? 'deleted' : (!empty($file['deleted_at']) ? 'unavailable' : 'available');
+            }
+            unset($event);
+        }
+        return $events;
+    }
+
+    public function documentEvolutionEventCount(int $materialId): int
+    {
+        if ($materialId < 1) return 0;
+        $statement = Database::connection()->prepare(
+            "SELECT COUNT(*) FROM admin_audit_log
+             WHERE entity_type='support_material' AND entity_id=:material_id AND result='correct'
+               AND action IN ('support_material.file_added','support_material.file_replaced',
+                   'support_material.file_removed','support_material.file_restored')"
+        );
+        $statement->execute(['material_id' => $materialId]);
+        return (int) $statement->fetchColumn();
     }
 
     public function findHistoricalVersion(int $materialId, int $fileId, int $versionId): ?array

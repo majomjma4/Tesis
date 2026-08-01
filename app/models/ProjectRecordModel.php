@@ -5,6 +5,32 @@ declare(strict_types=1);
 /** Datos reales y normalizados para el expediente digital de un proyecto. */
 final class ProjectRecordModel
 {
+    public function academicHistoryPage(int $projectId, int $offset = 0, int $limit = 15): array
+    {
+        $offset = max(0, $offset); $limit = max(1, min(15, $limit));
+        $window = $offset + $limit + 1;
+        $db = Database::connection();
+        $base = $db->prepare('SELECT p.id,p.created_by,p.created_at,p.status,p.published_at,pt.code type_code FROM projects p JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id=:id AND p.deleted_at IS NULL');
+        $base->execute(['id' => $projectId]);
+        $project = $base->fetch();
+        if (!$project) return ['events'=>[],'total'=>0,'loaded'=>0,'has_more'=>false,'next_offset'=>$offset];
+        $project['participants'] = $this->rows($db, "SELECT pp.user_id,pp.role_code,pp.assigned_at,u.full_name FROM project_participants pp JOIN users u ON u.id=pp.user_id WHERE pp.project_id=:id AND pp.status='active' AND pp.removed_at IS NULL ORDER BY pp.assigned_at,pp.user_id", $projectId);
+        $project['deliveries'] = $this->windowRows($db, "SELECT pd.*,u.full_name author_name FROM project_deliveries pd JOIN users u ON u.id=pd.submitted_by WHERE pd.project_id=:id AND pd.version_number>1 ORDER BY pd.submitted_at,pd.id LIMIT {$window}", $projectId);
+        $project['observations'] = $this->windowRows($db, "SELECT po.*,u.full_name author_name,pd.version_number FROM project_observations po JOIN users u ON u.id=po.author_id LEFT JOIN project_deliveries pd ON pd.id=po.delivery_id WHERE po.project_id=:id ORDER BY po.created_at,po.id LIMIT {$window}", $projectId);
+        $activitySql = "SELECT pal.id,pal.action,pal.previous_state,pal.new_state,pal.created_at,u.full_name actor_name FROM project_audit_log pal LEFT JOIN users u ON u.id=pal.user_id WHERE pal.project_id=:id AND pal.action IN ('project_updated','project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished') ORDER BY pal.created_at,pal.id";
+        $project['activity'] = $this->windowRows($db, $activitySql . " LIMIT {$window}", $projectId);
+        $events = $this->academicHistory($project);
+
+        $deliveryTotal = $this->scalar($db, 'SELECT COUNT(*) FROM project_deliveries WHERE project_id=:id AND version_number>1', $projectId);
+        $observationTotal = $this->scalar($db, 'SELECT COUNT(*) FROM project_observations WHERE project_id=:id', $projectId);
+        $allActivity = $this->windowRows($db, $activitySql, $projectId);
+        $countProject = $project; $countProject['deliveries']=[]; $countProject['observations']=[]; $countProject['activity']=$allActivity;
+        $baseAcademicTotal = count($this->academicHistory($countProject));
+        $total = $baseAcademicTotal + $deliveryTotal + $observationTotal;
+        $page = array_slice($events, $offset, $limit);
+        return ['events'=>$page,'total'=>$total,'loaded'=>count($page),'has_more'=>$offset+count($page)<$total,'next_offset'=>$offset+count($page)];
+    }
+
     public function find(int $projectId, ?int $userId, bool $administrator, bool $publishedOnly = false): ?array
     {
         $db = Database::connection();
@@ -67,14 +93,15 @@ final class ProjectRecordModel
             WHERE pf.project_id=:id AND pf.deleted_at IS NULL AND pf.purged_at IS NULL ORDER BY pf.sort_order,pf.created_at DESC,pf.id DESC", $projectId);
         $project['deliveries'] = $this->rows($db, "SELECT pd.*,u.full_name AS author_name,ps.label AS stage_label
             FROM project_deliveries pd INNER JOIN users u ON u.id=pd.submitted_by LEFT JOIN project_stages ps ON ps.id=pd.stage_id
-            WHERE pd.project_id=:id ORDER BY pd.version_number DESC,pd.submitted_at DESC", $projectId);
+            WHERE pd.project_id=:id ORDER BY pd.submitted_at ASC,pd.id ASC", $projectId);
         $project['observations'] = $this->rows($db, "SELECT po.*,u.full_name AS author_name,pd.version_number
             FROM project_observations po INNER JOIN users u ON u.id=po.author_id LEFT JOIN project_deliveries pd ON pd.id=po.delivery_id
-            WHERE po.project_id=:id ORDER BY po.created_at DESC,po.id DESC", $projectId);
+            WHERE po.project_id=:id ORDER BY po.created_at ASC,po.id ASC", $projectId);
         $project['responses'] = $this->rows($db, "SELECT response.*,u.full_name AS author_name,po.project_id FROM observation_responses response INNER JOIN project_observations po ON po.id=response.observation_id INNER JOIN users u ON u.id=response.author_id WHERE po.project_id=:id ORDER BY response.created_at DESC,response.id DESC", $projectId);
         $project['comments'] = $this->rows($db, "SELECT pc.*,u.full_name AS author_name FROM project_comments pc INNER JOIN users u ON u.id=pc.author_id WHERE pc.project_id=:id AND pc.deleted_at IS NULL ORDER BY pc.created_at DESC", $projectId);
         $project['stages'] = $this->rows($db, "SELECT stage_code,label,status,completed_at FROM project_stages WHERE project_id=:id ORDER BY position", $projectId);
-        $project['activity'] = $this->rows($db, "SELECT pal.id,pal.action,pal.entity_type,pal.entity_id,pal.previous_state,pal.new_state,pal.reason,pal.created_at,u.full_name AS actor_name FROM project_audit_log pal LEFT JOIN users u ON u.id=pal.user_id WHERE pal.project_id=:id ORDER BY pal.created_at DESC,pal.id DESC", $projectId);
+        $project['activity'] = $this->rows($db, "SELECT pal.id,pal.action,pal.entity_type,pal.entity_id,pal.previous_state,pal.new_state,pal.reason,pal.created_at,u.full_name AS actor_name FROM project_audit_log pal LEFT JOIN users u ON u.id=pal.user_id WHERE pal.project_id=:id ORDER BY pal.created_at ASC,pal.id ASC", $projectId);
+        $project['post_publication_modifications'] = $this->postPublicationModifications($project);
         $project['tribunal_approved_at'] = null;
         foreach ($project['activity'] as $audit) if (in_array((string)$audit['action'],['project_tribunal_approved','tribunal_approved'],true)) { $project['tribunal_approved_at']=$audit['created_at']; break; }
         $approvalStatus = (string) $project['type_code'] === 'thesis' ? 'tribunal_approved' : 'approved';
@@ -100,6 +127,225 @@ final class ProjectRecordModel
         $statement = $db->prepare($sql);
         $statement->execute(['id' => $projectId]);
         return $statement->fetchAll();
+    }
+
+    private function windowRows(PDO $db, string $sql, int $projectId): array
+    {
+        return $this->rows($db, $sql, $projectId);
+    }
+
+    private function scalar(PDO $db, string $sql, int $projectId): int
+    {
+        $statement=$db->prepare($sql);$statement->execute(['id'=>$projectId]);return (int)$statement->fetchColumn();
+    }
+
+    /** Reconstruye la historia académica con datos existentes, sin mezclar la auditoría administrativa. */
+    private function academicHistory(array $project): array
+    {
+        $registrationActor = 'Sistema académico';
+        foreach ((array) $project['participants'] as $participant) {
+            if ((int) $participant['user_id'] === (int) $project['created_by']) {
+                $registrationActor = (string) $participant['full_name'];
+                break;
+            }
+        }
+        $events = [[
+            'key' => 'registration', 'type' => 'registration', 'title' => 'Proyecto registrado',
+            'detail' => 'Se registró el proyecto junto con su primera entrega documental.',
+            'actor' => $registrationActor, 'date' => (string) $project['created_at'],
+        ]];
+
+        foreach ((array) $project['deliveries'] as $delivery) {
+            if ((int) $delivery['version_number'] <= 1) continue;
+            $events[] = [
+                'key' => 'delivery:' . (int) $delivery['id'], 'type' => 'delivery', 'title' => 'Nueva entrega registrada',
+                'detail' => trim((string) ($delivery['comment'] ?: $delivery['title'])),
+                'actor' => (string) $delivery['author_name'], 'date' => (string) $delivery['submitted_at'],
+                'meta' => ['Entrega ' . (int) $delivery['version_number']],
+            ];
+        }
+        foreach ((array) $project['observations'] as $observation) {
+            $events[] = [
+                'key' => 'observation:' . (int) $observation['id'], 'type' => 'observation', 'title' => 'Observaciones registradas',
+                'detail' => 'Existen observaciones académicas disponibles para consulta.',
+                'actor' => (string) $observation['author_name'], 'date' => (string) $observation['created_at'],
+                'meta' => array_values(array_filter([
+                    !empty($observation['version_number']) ? 'Entrega ' . (int) $observation['version_number'] : null,
+                    $this->observationStatusLabel((string) ($observation['status'] ?? '')),
+                ])),
+                'reference' => ['type' => 'observation', 'id' => (int) $observation['id']],
+            ];
+        }
+
+        if ((string) $project['type_code'] === 'thesis') {
+            $tribunal = array_values(array_filter((array) $project['participants'], static fn (array $participant): bool =>
+                in_array((string) $participant['role_code'], ['tribunal', 'jury'], true)
+            ));
+            if ($tribunal) {
+                $assignedAt = max(array_map(static fn (array $member): string => (string) $member['assigned_at'], $tribunal));
+                $events[] = [
+                    'key' => 'tribunal-assigned', 'type' => 'tribunal', 'title' => 'Tribunal asignado',
+                    'detail' => 'Se completó la asignación del tribunal del proyecto.',
+                    'actor' => 'Sistema académico', 'date' => $assignedAt,
+                ];
+            }
+        }
+
+        $statusLabels = [
+            'development' => 'En desarrollo', 'under_review' => 'En revisión',
+            'changes_required' => 'Requiere cambios', 'approved' => 'Aprobado',
+            'defense' => 'En tribunal', 'tribunal_approved' => 'Aprobado por el Tribunal',
+            'published' => 'Publicado',
+        ];
+        $seenTransitions = [];
+        $publicationRecorded = false;
+        foreach ((array) $project['activity'] as $audit) {
+            $action = (string) $audit['action'];
+            if (in_array($action, ['project_unpublished', 'project_republished'], true)) continue;
+            if ($publicationRecorded) continue;
+            [$from, $to] = $this->statusChange($audit, $statusLabels);
+            if ($from === null || $to === null || $from === $to) continue;
+            if ($to === 'published' && $publicationRecorded) continue;
+            $transitionKey = $from . '>' . $to . '@' . (string) $audit['created_at'];
+            if (isset($seenTransitions[$transitionKey])) continue;
+            $seenTransitions[$transitionKey] = true;
+            if ($to === 'published') {
+                $type = 'publication';
+                $title = 'Proyecto publicado';
+                $detail = 'El expediente pasó a formar parte del Repositorio institucional.';
+                $publicationRecorded = true;
+            } elseif ($to === 'tribunal_approved' && (string) $project['type_code'] === 'thesis') {
+                $type = 'tribunal-approval';
+                $title = 'Proyecto aprobado por tribunal';
+                $detail = '';
+            } else {
+                $type = 'status';
+                $title = 'Cambio de estado';
+                $detail = ($statusLabels[$from] ?? $from) . "\n↓\n" . ($statusLabels[$to] ?? $to);
+            }
+            $events[] = [
+                'key' => 'status:' . (int) $audit['id'], 'type' => $type, 'title' => $title, 'detail' => $detail,
+                'actor' => (string) ($audit['actor_name'] ?: 'Sistema académico'), 'date' => (string) $audit['created_at'],
+            ];
+        }
+        if (!$publicationRecorded && (string) $project['status'] === 'published' && !empty($project['published_at'])) {
+            $events[] = [
+                'key' => 'publication:legacy', 'type' => 'publication', 'title' => 'Proyecto publicado',
+                'detail' => 'El expediente pasó a formar parte del Repositorio institucional.',
+                'actor' => 'Sistema académico', 'date' => (string) $project['published_at'],
+            ];
+        }
+
+        usort($events, static function (array $left, array $right): int {
+            $dateOrder = strcmp((string) $left['date'], (string) $right['date']);
+            if ($dateOrder !== 0) return $dateOrder;
+            if ($left['key'] === 'registration') return -1;
+            if ($right['key'] === 'registration') return 1;
+            return strcmp((string) $left['key'], (string) $right['key']);
+        });
+        return $events;
+    }
+
+    private function observationStatusLabel(string $status): ?string
+    {
+        return match ($status) {
+            'pending' => 'Pendientes', 'addressed' => 'Atendidas', 'resolved' => 'Resueltas',
+            default => null,
+        };
+    }
+
+    private function statusChange(array $audit, array $labels): array
+    {
+        $previous = json_decode((string) ($audit['previous_state'] ?? ''), true);
+        $next = json_decode((string) ($audit['new_state'] ?? ''), true);
+        $labelKeys = array_flip($labels);
+        $from = is_array($previous) ? ($previous['status'] ?? ($labelKeys[$previous['Estado'] ?? ''] ?? null)) : null;
+        $to = is_array($next) ? ($next['status'] ?? ($labelKeys[$next['Estado'] ?? ''] ?? null)) : null;
+        if ($from !== null && $to !== null) return [(string) $from, (string) $to];
+        foreach ((array) (is_array($next) ? ($next['_history_changes'] ?? []) : []) as $change) {
+            if (($change['field'] ?? '') !== 'Estado') continue;
+            return [$labelKeys[$change['from'] ?? ''] ?? null, $labelKeys[$change['to'] ?? ''] ?? null];
+        }
+        return [null, null];
+    }
+
+    /** Solo modificaciones administrativas posteriores a la publicación; un bloque vacío no se renderiza. */
+    private function postPublicationModifications(array $project): array
+    {
+        $publicationDate = null;
+        $publicationId = null;
+        foreach ((array) $project['activity'] as $audit) {
+            if (in_array((string) $audit['action'], ['project_published', 'project_republished'], true)) {
+                $publicationDate = (string) $audit['created_at'];
+                $publicationId = (int) $audit['id'];
+                break;
+            }
+        }
+        $publicationDate ??= !empty($project['published_at']) ? (string) $project['published_at'] : null;
+        if ($publicationDate === null) return [];
+
+        $labels = [
+            'project_updated' => 'Información del proyecto actualizada',
+            'project_description_updated' => 'Descripción del proyecto actualizada',
+            'project_participants_updated' => 'Participantes del proyecto actualizados',
+            'project_authors_updated' => 'Autores del proyecto actualizados',
+            'project_keywords_updated' => 'Etiquetas del proyecto actualizadas',
+            'project.presentation_selected' => 'Archivo principal seleccionado',
+            'project.presentation_changed' => 'Archivo principal actualizado',
+            'project.presentation_removed' => 'Archivo principal retirado',
+            'project.file_added' => 'Archivo agregado', 'project.file_replaced' => 'Archivo reemplazado',
+            'project.file_removed' => 'Archivo retirado', 'project.file_restored' => 'Archivo restaurado',
+            'project.file_purged' => 'Archivo eliminado definitivamente',
+            'project_file_replaced' => 'Archivo reemplazado', 'project_file_removed' => 'Archivo retirado',
+        ];
+        $events = [];
+        foreach ((array) $project['activity'] as $audit) {
+            $action = (string) $audit['action'];
+            $dateOrder = strcmp((string) $audit['created_at'], $publicationDate);
+            $isLater = $dateOrder > 0 || ($dateOrder === 0 && $publicationId !== null && (int) $audit['id'] > $publicationId);
+            if (!isset($labels[$action]) || !$isLater || !$this->isExceptionalModification($audit)) continue;
+            $events[] = [
+                'key' => 'modification:' . (int) $audit['id'], 'title' => $labels[$action],
+                'detail' => $this->administrativeChangeDetail($audit),
+                'actor' => (string) ($audit['actor_name'] ?: 'Administración institucional'),
+                'date' => (string) $audit['created_at'],
+            ];
+        }
+        return $events;
+    }
+
+    private function isExceptionalModification(array $audit): bool
+    {
+        if ((string) $audit['action'] !== 'project_updated') return true;
+        $previous = json_decode((string) ($audit['previous_state'] ?? ''), true);
+        $next = json_decode((string) ($audit['new_state'] ?? ''), true);
+        if (!is_array($next)) return false;
+        $history = (array) ($next['_history_changes'] ?? []);
+        if ($history !== []) {
+            return count(array_filter($history, static fn (array $change): bool =>
+                !in_array((string) ($change['field'] ?? ''), ['Estado', 'Disponibilidad'], true)
+            )) > 0;
+        }
+        if (!is_array($previous)) return false;
+        foreach (array_unique([...array_keys($previous), ...array_keys($next)]) as $field) {
+            if (in_array($field, ['id', 'status', 'is_available', '_history_changes', 'published_at'], true)) continue;
+            if (($previous[$field] ?? null) !== ($next[$field] ?? null)) return true;
+        }
+        return false;
+    }
+
+    private function administrativeChangeDetail(array $audit): string
+    {
+        $next = json_decode((string) ($audit['new_state'] ?? ''), true);
+        $changes = is_array($next) ? (array) ($next['_history_changes'] ?? []) : [];
+        $lines = array_values(array_filter(array_map(static function (array $change): string {
+            $field = trim((string) ($change['field'] ?? 'Dato'));
+            $from = trim((string) ($change['from'] ?? 'Sin asignar'));
+            $to = trim((string) ($change['to'] ?? 'Sin asignar'));
+            return $from !== $to ? $field . ': ' . $from . ' → ' . $to : '';
+        }, $changes)));
+        if ($lines !== []) return implode("\n", $lines);
+        return trim((string) ($audit['reason'] ?? ''));
     }
 
     private function statusTransitionDate(array $activity, string $targetStatus): ?string
