@@ -90,7 +90,7 @@ final class AdminProjectModel
             $typeCode=(string)$type->fetchColumn();
             if($typeCode==='')throw new InvalidArgumentException('El tipo de proyecto ya no está disponible.');
             if($id){
-                $q=$d->prepare('SELECT id,code,title,subtitle,status,project_type_id,career_id,academic_period_id,tutor_id,presentation_file_id,created_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE');
+                $q=$d->prepare('SELECT id,code,title,subtitle,summary,status,project_type_id,career_id,academic_period_id,tutor_id,presentation_file_id,created_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE');
                 $q->execute(['id'=>$id]);$before=$q->fetch();
                 if(!$before)throw new InvalidArgumentException('El proyecto ya no existe.');
                 if($v['status']==='published'){
@@ -126,20 +126,34 @@ final class AdminProjectModel
                     if($old!==$value)$changed[$field]=[$old,$value];
                 }
                 if(!$changed)throw new InvalidArgumentException('No se detectaron cambios en el proyecto.');
+                $publishing=$v['status']==='published'&&(string)$before['status']!=='published';
+                $summary=(string)($before['summary']??'');$descriptionChanged=false;$descriptionOrigin='existing';
+                if($publishing){
+                    $requiredStatus=$typeCode==='thesis'?'tribunal_approved':'approved';
+                    if((string)$before['status']!==$requiredStatus)throw new InvalidArgumentException('El proyecto ya no se encuentra en un estado válido para publicación.');
+                    if(trim($summary)===''){
+                        $summary=(new ProjectDescriptionService($d))->normalizePublicationDescription((string)($v['public_description']??''));
+                        $descriptionOrigin=in_array((string)($v['description_origin']??''),['introduction','institutional','unavailable'],true)?(string)$v['description_origin']:'administrator';
+                        $descriptionChanged=true;
+                    }
+                }
                 $code=$before['code'];
                 if((int)$before['project_type_id']!==$v['project_type_id']){
                     $code=(new ProjectCodeService())->next($d,$v['project_type_id'],$typeCode,(int)date('Y',strtotime($before['created_at'])));
                     if($code!==(string)$before['code'])$changed['code']=[(string)$before['code'],$code];
                 }
-                $q=$d->prepare('UPDATE projects SET code=:code,title=:title,subtitle=:subtitle,project_type_id=:type,career_id=:career,academic_period_id=:period,tutor_id=:tutor,status=:status WHERE id=:id');
-                $q->execute(['code'=>$code,'title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'type'=>$v['project_type_id'],'career'=>$v['career_id'],'period'=>$v['academic_period_id'],'tutor'=>$tutor,'status'=>$v['status'],'id'=>$id]);
+                $q=$d->prepare('UPDATE projects SET code=:code,title=:title,subtitle=:subtitle,summary=:summary,project_type_id=:type,career_id=:career,academic_period_id=:period,tutor_id=:tutor,status=:status,published_at=CASE WHEN :publishing=1 THEN CURRENT_TIMESTAMP ELSE published_at END,is_available=CASE WHEN :publishing_available=1 THEN 1 ELSE is_available END WHERE id=:id');
+                $q->execute(['code'=>$code,'title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'summary'=>$summary?:null,'type'=>$v['project_type_id'],'career'=>$v['career_id'],'period'=>$v['academic_period_id'],'tutor'=>$tutor,'status'=>$v['status'],'publishing'=>$publishing?1:0,'publishing_available'=>$publishing?1:0,'id'=>$id]);
+                if($descriptionChanged)(new ProjectAuditService($d))->record($id,$actor,'project_description_updated','project',$id,['summary'=>null],['summary'=>$summary,'origin'=>$descriptionOrigin,'edited_by_administrator'=>true]);
                 [$previous,$next,$history]=$this->describeChanges($d,$changed);
                 $next['_history_changes']=$history;
-                (new ProjectAuditService($d))->record($id,$actor,'project_updated','project',$id,$previous,$next);
+                $auditId=(new ProjectAuditService($d))->record($id,$actor,'project_updated','project',$id,$previous,$next);
                 if(isset($changed['status'])){
+                    (new ProjectDescriptionService($d))->registerStatusReminder($id,$auditId);
                     $from=self::STATUS_LABELS[(string)$changed['status'][0]]??(string)$changed['status'][0];
                     $to=self::STATUS_LABELS[(string)$changed['status'][1]]??(string)$changed['status'][1];
                     (new AdminActivityService($d))->record($actor,'project_status_changed','Cambió el estado de “'.$v['title'].'” de '.$from.' a '.$to,'Proyectos','project',$id,$v['title'],'correct',['from'=>$changed['status'][0],'to'=>$changed['status'][1]]);
+                    if($publishing)(new ProjectAuditService($d))->record($id,$actor,'project_published','project',$id,['status'=>$changed['status'][0]],['status'=>'published','description_origin'=>$descriptionChanged?$descriptionOrigin:'existing']);
                 }
                 return $id;
             }

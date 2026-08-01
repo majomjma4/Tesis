@@ -8,11 +8,14 @@
     const presentationDialog = document.querySelector('#apPresentation');
     const presentationOptions = presentationDialog?.querySelector('[data-presentation-options]');
     const presentationError = presentationDialog?.querySelector('[data-presentation-error]');
+    const descriptionDialog = document.querySelector('#apPublicDescription');
+    const descriptionField = descriptionDialog?.querySelector('[data-public-description-field]');
+    const descriptionError = descriptionDialog?.querySelector('[data-public-description-error]');
     const editWarning = form?.querySelector('[data-edit-warning]');
     const advancedOptions = form?.querySelector('[data-advanced-options]');
     const manageParticipants = form?.querySelector('[data-manage-participants]');
     const manageFiles = form?.querySelector('[data-manage-files]');
-    const dialogLayers = [modal, trash, saveConfirm, presentationDialog].filter(Boolean);
+    const dialogLayers = [modal, trash, saveConfirm, presentationDialog, descriptionDialog].filter(Boolean);
     dialogLayers.forEach(layer => { layer.hidden = true; });
     dialogLayers.forEach(layer => document.body.append(layer));
     const syncProjectDialogs = () => document.body.classList.toggle('project-dialog-open', dialogLayers.some(layer => !layer.hidden));
@@ -288,12 +291,43 @@
         showProjectDialog(presentationDialog);
         (presentationOptions.querySelector('input:checked') || presentationDialog.querySelector('[data-cancel-presentation]'))?.focus();
     };
-    form?.addEventListener('submit', event => {
+    const continuePublication = data => {
+        data.set('publication_intent', '1');
+        openPresentationDialog(data);
+    };
+    const preparePublicDescription = async data => {
+        const probe = new FormData();
+        probe.set('_csrf', data.get('_csrf'));
+        probe.set('id', data.get('id'));
+        probe.set('action', 'prepare_public_description');
+        const result = await request(cfg.dataset.save, probe);
+        if (!result.data.required) { continuePublication(data); return; }
+        pendingSaveData = data;
+        descriptionField.value = result.data.proposal || '';
+        descriptionDialog.querySelector('[data-public-description-copy]').textContent = result.data.message;
+        descriptionDialog.querySelector('[data-public-description-origin]').textContent = result.data.origin === 'institutional' ? 'Origen: texto institucional' : 'Origen: requiere redacción manual';
+        descriptionDialog.querySelector('[data-public-description-count]').textContent = String(descriptionField.value.length);
+        descriptionError.hidden = true;
+        descriptionDialog.dataset.origin = result.data.origin || 'unavailable';
+        showProjectDialog(descriptionDialog);
+        descriptionField.focus();
+    };
+    form?.addEventListener('submit', async event => {
         event.preventDefault();
         const data = new FormData(form);
         ['career_id', 'academic_period_id', 'project_type_id', 'tutor_id', 'status'].forEach(name => data.set(name, form.elements[name].value));
         const publishingFirstTime = data.get('status') === 'published' && activeProject?.status !== 'published';
-        if (publishingFirstTime) { openPresentationDialog(data); return; }
+        if (publishingFirstTime) {
+            try { await preparePublicDescription(data); }
+            catch (error) {
+                const message = document.querySelector('#apMessage');
+                message.textContent = error.message;
+                message.className = 'ap-message error';
+                message.hidden = false;
+                showProjectDialog(modal);
+            }
+            return;
+        }
         if (!form.elements.id.value) { saveProject(data); return; }
         pendingSaveData = data;
         showProjectDialog(saveConfirm);
@@ -328,6 +362,33 @@
     });
     presentationDialog?.addEventListener('click', event => { if (event.target === presentationDialog) cancelPresentation(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape' && !presentationDialog?.hidden) cancelPresentation(); });
+    descriptionField?.addEventListener('input', () => {
+        descriptionDialog.querySelector('[data-public-description-count]').textContent = String(descriptionField.value.length);
+        descriptionError.hidden = true;
+    });
+    const cancelDescription = () => {
+        pendingSaveData = null;
+        showProjectDialog(modal);
+        form.querySelector('[type="submit"]')?.focus();
+    };
+    descriptionDialog?.querySelectorAll('[data-cancel-public-description]').forEach(button => button.addEventListener('click', cancelDescription));
+    descriptionDialog?.querySelector('[data-confirm-public-description]')?.addEventListener('click', () => {
+        const value = descriptionField.value.replace(/\s+/g, ' ').trim();
+        if (value.length < 30) {
+            descriptionError.textContent = value ? 'La descripción es demasiado breve para presentar el proyecto.' : 'Escribe una descripción antes de publicar.';
+            descriptionError.hidden = false;
+            descriptionField.focus();
+            return;
+        }
+        if (!pendingSaveData) return;
+        const data = pendingSaveData;
+        pendingSaveData = null;
+        data.set('public_description', value);
+        data.set('description_origin', descriptionDialog.dataset.origin || 'administrator');
+        continuePublication(data);
+    });
+    descriptionDialog?.addEventListener('click', event => { if (event.target === descriptionDialog) cancelDescription(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !descriptionDialog?.hidden) cancelDescription(); });
     document.querySelectorAll('[data-trash]').forEach(button => button.addEventListener('click', () => {
         trashForm.reset();
         trashQuickReason?.dispatchEvent(new Event('change', { bubbles: true }));

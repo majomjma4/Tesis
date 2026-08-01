@@ -21,6 +21,7 @@ body.project-dialog-open{overflow:hidden!important}
 .ap-modal footer button{cursor:pointer}
 .ap-modal textarea{box-sizing:border-box;width:100%;max-width:100%;resize:vertical}
 .ap-modal .custom-select[hidden]{display:none!important}
+.ap-public-description-dialog label{margin-top:18px}.ap-public-description-dialog textarea{min-height:150px;line-height:1.55}.ap-public-description-meta{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:.75rem}.ap-public-description-dialog [data-confirm-public-description]{border:0;background:var(--blue);color:#fff;font-weight:800}
 .ap-modal label:has(select[name="career_id"]) .custom-select,.ap-modal label:has(select[name="academic_period_id"]) .custom-select{display:none!important}
 .ap-fixed-field{box-sizing:border-box;min-height:62px;padding:10px 12px;border:1px solid rgba(37,99,235,.18);border-radius:12px;background:rgba(37,99,235,.055);color:var(--text);display:grid;grid-template-columns:38px minmax(0,1fr);align-items:center;gap:11px}.ap-fixed-field>i{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:rgba(37,99,235,.12);color:var(--blue)}.ap-fixed-field>span{display:block;min-width:0}.ap-fixed-field small,.ap-fixed-field strong{display:block}.ap-fixed-field small{margin-bottom:3px;color:var(--muted);font-size:.72rem;font-weight:750}.ap-fixed-field strong{overflow:hidden;color:var(--text);font-size:.88rem;font-weight:800;text-overflow:ellipsis;white-space:nowrap}
 .ap-modal label[hidden],.ap-quick-hint[hidden]{display:none!important}
