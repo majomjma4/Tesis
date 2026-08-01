@@ -132,6 +132,8 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
 .ed-files-global-menu>a:hover,.ed-files-global-menu>button:not(:disabled):hover,.ed-file-menu>a:hover,.ed-file-menu>button:not(:disabled):hover{transform:translateX(2px)}
 .ed-files-global-menu .ed-package-size{flex:0 0 auto;margin-left:auto;padding-left:10px;color:var(--muted);font-size:11px;font-weight:800;white-space:nowrap}
 </style>
+<style>.ed-viewer-download[hidden]{display:none!important}</style>
+<style>.ed-upload-picker-trigger{width:100%;min-height:42px;margin-top:12px;padding:0 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text);font:inherit;font-size:11px;font-weight:750;cursor:pointer}.ed-upload-picker-trigger:hover{border-color:var(--primary);color:var(--primary)}.ed-upload-picker-trigger:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 28%,transparent);outline-offset:2px}</style>
 <div class="ed-files-layout" data-record-files>
     <section class="ed-files-panel" aria-labelledby="recordFilesTitle">
         <header class="ed-files-heading">
@@ -171,7 +173,7 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
                         <button class="ed-document-row<?= $selected ? ' is-selected' : '' ?><?= $available ? '' : ' is-unavailable' ?>" type="button"<?= $available ? '' : ' disabled' ?>
                             data-record-file data-file-id="<?= (int) $document['id'] ?>"
                             data-file-name="<?= e($document['name']) ?>" data-file-type="<?= e($fileVisual['label']) ?>"
-                            data-file-size="<?= e($document['size']) ?>" data-file-extension="<?= e($document['extension']) ?>"
+                            data-file-size="<?= e($document['size']) ?>" data-file-extension="<?= e($document['extension']) ?>" data-file-mime="<?= e((string) ($document['mime_type'] ?? '')) ?>"
                             data-file-sort-order="<?= (int) ($document['sort_order'] ?? $documentIndex) ?>"
                             data-file-presentation="<?= !empty($document['is_presentation']) ? 'true' : 'false' ?>"
                             data-file-package="<?= !empty($document['is_package']) ? 'true' : 'false' ?>"

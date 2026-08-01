@@ -11,7 +11,7 @@ final class SupportMaterialPackageService
         $analysis = $stored === null ? null : $this->analyzeStoredPackage($stored, $files);
         $size = array_sum(array_map(static fn (array $file): int => (int) ($file['size_bytes'] ?? 0), $files));
         return [
-            'available' => count($files) > 1
+            'available' => count($files) > 0
                 && $this->allFilesAvailable($files)
                 && (!empty($analysis['exact']) || $this->canCreatePackage()),
             'file_count' => count($files),

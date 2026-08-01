@@ -89,6 +89,7 @@
             'size' => (string) ($file['size'] ?? 'Tamaño no disponible'),
             'sort_order' => (int) ($file['sort_order'] ?? $fileId),
             'extension' => $extension,
+            'mime_type' => (string) ($file['mime_type'] ?? ''),
             'available' => $available,
             'physical_available' => $physicalAvailable,
             'material_available' => $materialAvailable,
@@ -114,10 +115,7 @@
 
     $publicationState = (string) ($material['status_key'] ?? 'published');
     $isPublished = $publicationState === 'published';
-    $presentationFile = $material['presentation_file'] ?? null;
-    $downloadUrl = is_array($presentationFile) && !empty($presentationFile['id'])
-        ? $downloadActionUrl . '&material_id=' . $materialId . '&file_id=' . (int) $presentationFile['id']
-        : null;
+    $downloadUrl = $packageDownloadUrl !== '' ? $packageDownloadUrl : null;
     $administratorView = !empty($isAdministrator);
     $classificationLabels = array_values(array_filter(
         array_map('strval', (array) ($material['keywords'] ?? [])),
@@ -156,7 +154,7 @@
         ], static fn (array $item): bool => $item['value'] !== '')),
         'actions' => $mode === 'edit' ? [] : array_values(array_filter([
             $administratorView ? ['id' => 'edit', 'label' => 'Editar', 'kind' => 'primary', 'icon' => 'fa-pen-to-square', 'url' => $materialEditUrl ?: null, 'enabled' => $materialEditUrl !== '', 'modal' => true] : null,
-            ['id' => 'download', 'label' => 'Descargar', 'kind' => 'secondary', 'icon' => 'fa-download', 'icon_style' => 'fa-solid', 'url' => $downloadUrl, 'enabled' => $downloadUrl !== null, 'download' => true],
+            $downloadUrl !== null ? ['id' => 'download', 'label' => 'Descargar', 'kind' => 'secondary', 'icon' => 'fa-download', 'icon_style' => 'fa-solid', 'url' => $downloadUrl, 'enabled' => true, 'download' => true] : null,
         ])),
         'menu_actions' => $administratorView && $mode === 'view' ? [
             ['label' => $materialAvailable ? 'Marcar como no disponible' : 'Marcar como disponible', 'icon' => $materialAvailable ? 'fa-ban' : 'fa-circle-check', 'enabled' => true, 'hidden' => !$isPublished, 'danger' => false, 'action' => 'availability'],
@@ -181,10 +179,10 @@
         'information_sections' => [
             ['id' => 'description', 'title' => 'Descripción', 'icon' => 'fa-align-left', 'type' => 'prose', 'content' => (string) ($material['full_description'] ?? $material['description'] ?? '')],
             ['id' => 'institutional', 'title' => 'Ficha del material', 'icon' => 'fa-building-columns', 'type' => 'metadata', 'content' => array_values(array_filter([
-                ['key' => 'document-type', 'label' => 'Tipo documental', 'value' => (string) ($material['type'] ?? '')],
-                ['key' => 'category', 'label' => 'Categoría', 'value' => (string) ($material['category_label'] ?? '')],
-                ['key' => 'responsible', 'label' => 'Responsable', 'value' => (string) ($material['publisher'] ?? '')],
-                ['key' => 'files', 'label' => 'Archivos registrados', 'value' => $registeredFileCount . ($registeredFileCount === 1 ? ' archivo' : ' archivos')],
+                ['key' => 'document-type', 'icon' => 'fa-file-lines', 'label' => 'Tipo documental', 'value' => (string) ($material['type'] ?? '')],
+                ['key' => 'category', 'icon' => 'fa-folder-tree', 'label' => 'Categoría', 'value' => (string) ($material['category_label'] ?? '')],
+                ['key' => 'responsible', 'icon' => 'fa-user-tie', 'label' => 'Responsable', 'value' => (string) ($material['publisher'] ?? '')],
+                ['key' => 'files', 'icon' => 'fa-folder-open', 'label' => 'Archivos registrados', 'value' => $registeredFileCount . ($registeredFileCount === 1 ? ' archivo' : ' archivos')],
             ], static fn (array $item): bool => $item['value'] !== ''))],
             ['id' => 'keywords', 'title' => 'Clasificación', 'icon' => 'fa-tags', 'type' => 'tags', 'content' => $classificationLabels],
             ...($relatedResources !== [] ? [[

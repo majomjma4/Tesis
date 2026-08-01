@@ -11,7 +11,7 @@
                 <span class="sr-only" data-viewer-zoom-status aria-live="polite"></span>
             </div>
             <button class="ed-viewer-expand" type="button" data-viewer-expand aria-label="Expandir visor"><i class="fa-solid fa-expand" aria-hidden="true"></i><span>Expandir visor</span></button>
-            <a class="ed-viewer-download" data-record-download data-viewer-download download href="<?= e((string) ($selectedDocument['download_url'] ?? '')) ?>" aria-label="Descargar <?= e((string) ($selectedDocument['name'] ?? 'archivo')) ?>"><i class="fa-solid fa-download" aria-hidden="true"></i><span data-viewer-download-label>Descargar archivo</span></a>
+            <a class="ed-viewer-download" data-record-download data-viewer-download download href="<?= e((string) ($selectedDocument['download_url'] ?? '')) ?>" aria-label="Descargar <?= e((string) ($selectedDocument['name'] ?? 'archivo')) ?>"<?= empty($selectedDocument['download_url']) ? ' hidden' : '' ?>><i class="fa-solid fa-download" aria-hidden="true"></i><span data-viewer-download-label>Descargar archivo</span></a>
         </div>
     </header>
     <div class="ed-viewer-body" data-viewer-body aria-live="polite">
@@ -52,7 +52,7 @@
                     <button type="button" data-viewer-zoom-in aria-label="Acercar documento" disabled><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
                     <span class="sr-only" data-viewer-zoom-status aria-live="polite"></span>
                 </div>
-                <a class="ed-viewer-download" data-record-download data-expanded-viewer-download download href="" aria-label="Descargar archivo"><i class="fa-solid fa-download" aria-hidden="true"></i><span data-expanded-download-label>Descargar archivo</span></a>
+                <a class="ed-viewer-download" data-record-download data-expanded-viewer-download download href="" aria-label="Descargar archivo" hidden><i class="fa-solid fa-download" aria-hidden="true"></i><span data-expanded-download-label>Descargar archivo</span></a>
                 <button class="ed-viewer-expanded-close" type="button" data-expanded-viewer-close aria-label="Cerrar visor ampliado"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
             </div>
         </header>

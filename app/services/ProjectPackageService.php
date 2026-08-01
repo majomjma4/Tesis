@@ -5,7 +5,7 @@ final class ProjectPackageService
     public function describe(int $projectId,array $files):array
     {
         $files=array_values(array_filter($files,fn(array $f):bool=>empty($f['deleted_at'])&&empty($f['purged_at'])));$size=array_sum(array_map(fn(array $f):int=>(int)$f['size_bytes'],$files));
-        return ['available'=>count($files)>1,'file_count'=>count($files),'size_bytes'=>$size,'size'=>ArchiveService::formatBytes($size),'source'=>'generated','download_url'=>route('project-package-download').'&project_id='.$projectId];
+        return ['available'=>count($files)>0,'file_count'=>count($files),'size_bytes'=>$size,'size'=>ArchiveService::formatBytes($size),'source'=>'generated','download_url'=>route('project-package-download').'&project_id='.$projectId];
     }
     public function prepare(int $projectId,array $files):array
     {

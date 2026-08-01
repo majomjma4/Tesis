@@ -964,6 +964,7 @@ function resetNeutralViewer() {
 
 function setNeutralViewerState(state, message = "", retryButton = null) {
     if (!neutralViewerState || !neutralViewer) return;
+    if (state === "missing") syncNeutralViewerDownload(null);
     if (state !== "loading" && neutralResourceTimer !== null) {
         window.clearTimeout(neutralResourceTimer);
         neutralResourceTimer = null;
@@ -1004,7 +1005,7 @@ function setNeutralViewerState(state, message = "", retryButton = null) {
                 tag.textContent = "Paquete del material";
                 wrapper.insertBefore(tag, copy);
             }
-            if (state === "unsupported") {
+            if (state === "unsupported" && selected.dataset.downloadUrl) {
                 const download = document.createElement("a");
                 const downloadIcon = document.createElement("i");
                 const downloadText = document.createElement("span");
@@ -1015,7 +1016,7 @@ function setNeutralViewerState(state, message = "", retryButton = null) {
                 download.setAttribute("aria-label", `Descargar ${selected.dataset.fileName || "archivo"}`);
                 downloadIcon.className = "fa-solid fa-download";
                 downloadIcon.setAttribute("aria-hidden", "true");
-                downloadText.textContent = downloadLabelFor(selected.dataset.fileExtension || "");
+                downloadText.textContent = downloadLabelFor(selected.dataset.fileExtension || "", selected.dataset.fileMime || "");
                 download.append(downloadIcon, downloadText);
                 wrapper.append(download);
             }
@@ -1119,12 +1120,7 @@ function selectNeutralZipEntry(zipButton, entryButton) {
     neutralZoomPercent = previewType === "docx" ? 100 : (neutralZoomByFile.get(neutralSelectedFileId) ?? 100);
     if (neutralViewerName) neutralViewerName.textContent = entryButton.dataset.fileName || "Archivo";
     if (neutralViewerMeta) neutralViewerMeta.textContent = [entryButton.dataset.fileType, entryButton.dataset.fileSize, "Contenido de ZIP"].filter(Boolean).join(" · ");
-    if (neutralViewerDownload) {
-        neutralViewerDownload.href = entryButton.dataset.downloadUrl || "";
-        neutralViewerDownload.setAttribute("download", entryButton.dataset.fileName || "archivo");
-        neutralViewerDownload.setAttribute("aria-label", `Descargar ${entryButton.dataset.fileName || "archivo"}`);
-    }
-    if (neutralViewerDownloadLabel) neutralViewerDownloadLabel.textContent = downloadLabelFor(entryButton.dataset.fileExtension || "");
+    syncNeutralViewerDownload(entryButton);
     loadNeutralPreview(entryButton);
 }
 
@@ -1209,6 +1205,7 @@ function renderNeutralZipTreeItems(zipButton, container, entries, depth) {
         button.dataset.fileType = String(entry.type || "Archivo");
         button.dataset.fileSize = String(entry.size || "");
         button.dataset.fileExtension = String(entry.extension || "");
+        button.dataset.fileMime = String(entry.mime_type || entry.mime || "");
         button.dataset.previewType = neutralZipPreviewType(entry.extension);
         button.dataset.previewSupported = String(button.dataset.previewType !== "unsupported");
         button.dataset.previewUrl = neutralZipUrl(zipButton.dataset.zipEntryPreviewUrl || "", path);
@@ -1242,18 +1239,53 @@ async function toggleNeutralZipTree(zipButton) {
     }
 }
 
-function downloadLabelFor(extension) {
-    const normalized = String(extension).toLowerCase();
-    if (["jpg", "jpeg", "png", "webp"].includes(normalized)) return "Descargar imagen";
+function downloadLabelFor(extension, mimeType = "") {
+    const normalized = String(extension).trim().replace(/^\./, "").toLowerCase();
+    const mime = String(mimeType).trim().toLowerCase();
+    if (["jpg", "jpeg", "png", "webp", "gif"].includes(normalized) || mime.startsWith("image/")) {
+        return "Descargar imagen";
+    }
     const labels = {
-        pdf: "Descargar PDF",
-        docx: "Descargar DOCX",
-        txt: "Descargar TXT",
-        xlsx: "Descargar XLSX",
-        pptx: "Descargar PPTX",
-        zip: "Descargar ZIP",
+        pdf: "PDF", doc: "DOC", docx: "DOCX", xls: "XLS", xlsx: "XLSX",
+        ppt: "PPT", pptx: "PPTX", txt: "TXT", csv: "CSV", zip: "ZIP",
+        rtf: "RTF", odt: "ODT", ods: "ODS", odp: "ODP", json: "JSON",
+        xml: "XML", svg: "SVG", rar: "RAR", "7z": "7Z", tar: "TAR", gz: "GZ",
     };
-    return labels[normalized] || "Descargar archivo";
+    if (labels[normalized]) return `Descargar ${labels[normalized]}`;
+    const mimeLabels = {
+        "application/pdf": "PDF", "application/msword": "DOC",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "DOCX",
+        "application/vnd.ms-excel": "XLS",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "XLSX",
+        "application/vnd.ms-powerpoint": "PPT",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": "PPTX",
+        "text/plain": "TXT", "text/csv": "CSV", "application/zip": "ZIP",
+    };
+    return mimeLabels[mime] ? `Descargar ${mimeLabels[mime]}` : "Descargar archivo";
+}
+
+function syncNeutralViewerDownload(source) {
+    const downloadUrl = String(source?.dataset.downloadUrl || "").trim();
+    const downloadable = Boolean(source) && source.dataset.fileAvailable !== "false" && downloadUrl !== "";
+    const fileName = String(source?.dataset.fileName || "archivo");
+    const label = downloadLabelFor(source?.dataset.fileExtension || "", source?.dataset.fileMime || "");
+    [
+        [neutralViewerDownload, neutralViewerDownloadLabel],
+        [neutralExpandedDownload, neutralExpandedDownloadLabel],
+    ].forEach(([link, labelElement]) => {
+        if (!(link instanceof HTMLAnchorElement)) return;
+        link.hidden = !downloadable;
+        link.removeAttribute("aria-disabled");
+        if (!downloadable) {
+            link.removeAttribute("href");
+            link.removeAttribute("download");
+            return;
+        }
+        link.href = downloadUrl;
+        link.setAttribute("download", fileName);
+        link.setAttribute("aria-label", `Descargar ${fileName}`);
+        if (labelElement) labelElement.textContent = label;
+    });
 }
 
 function createNeutralPreviewRetry(button) {
@@ -1711,14 +1743,7 @@ function selectNeutralFile(button) {
         ];
         neutralViewerMeta.textContent = [button.dataset.fileType ?? "Archivo", button.dataset.fileSize ?? "Tamaño no disponible", ...labels].filter(Boolean).join(" · ");
     }
-    if (neutralViewerDownload) {
-        neutralViewerDownload.href = button.dataset.downloadUrl ?? "";
-        neutralViewerDownload.setAttribute("download", button.dataset.fileName ?? "archivo");
-        neutralViewerDownload.setAttribute("aria-label", `Descargar ${button.dataset.fileName ?? "archivo"}`);
-    }
-    if (neutralViewerDownloadLabel) {
-        neutralViewerDownloadLabel.textContent = downloadLabelFor(button.dataset.fileExtension ?? "");
-    }
+    syncNeutralViewerDownload(button);
     loadNeutralPreview(button);
 }
 
@@ -1750,14 +1775,7 @@ function selectEvolutionVersion(button) {
             button.dataset.versionCurrent === "true" ? "Versión actual" : "Versión histórica",
         ].filter(Boolean).join(" · ");
     }
-    if (neutralViewerDownload) {
-        neutralViewerDownload.href = button.dataset.downloadUrl ?? "";
-        neutralViewerDownload.setAttribute("download", button.dataset.fileName ?? "version");
-        neutralViewerDownload.setAttribute("aria-label", `Descargar ${button.dataset.fileName ?? "la versión"}`);
-    }
-    if (neutralViewerDownloadLabel) {
-        neutralViewerDownloadLabel.textContent = downloadLabelFor(button.dataset.fileExtension ?? "");
-    }
+    syncNeutralViewerDownload(button);
     activatePersistentRecordTab("files");
     window.requestAnimationFrame(() => loadNeutralPreview(button));
 }
@@ -1849,7 +1867,10 @@ function initializeNeutralFiles() {
     const presentation = neutralFileButtons.find((button) => button.dataset.filePresentation === "true");
     const initialFile = requested || presentation || neutralFileButtons[0] || null;
     if (initialFile) selectNeutralFile(initialFile);
-    else if (neutralViewer) setNeutralViewerState("empty");
+    else if (neutralViewer) {
+        syncNeutralViewerDownload(null);
+        setNeutralViewerState("empty");
+    }
 }
 if (!neutralFilesPanel || !neutralFilesPanel.hidden) initializeNeutralFiles();
 digitalRecord?.addEventListener("digitalrecord:tabchange", (event) => {
@@ -2968,6 +2989,7 @@ const recordUploadDialog = document.querySelector("[data-record-file-upload-dial
 if (recordUploadDialog && recordUploadDialog.parentElement !== document.body) document.body.append(recordUploadDialog);
 const recordUploadForm = recordUploadDialog?.querySelector("[data-record-file-upload-form]");
 const recordUploadInput = recordUploadDialog?.querySelector("[data-upload-input]");
+const recordUploadPickerTrigger = recordUploadDialog?.querySelector("[data-upload-picker-trigger]");
 const recordUploadList = recordUploadDialog?.querySelector("[data-upload-file-list]");
 const recordUploadStatus = recordUploadDialog?.querySelector("[data-upload-status]");
 const recordUploadResults = recordUploadDialog?.querySelector("[data-upload-results]");
@@ -2982,8 +3004,46 @@ let recordUploadState = "idle";
 let recordUploadReturnFocus = null;
 let recordUploadBackgroundState = [];
 let recordUploadCloseTimer = null;
+const recordUploadPickerState = { active: false, cleanup: null, fallbackTimer: null };
 const recordToastRegistry = new Map();
 const recordToastDurations = { success: 3800, info: 4000, warning: 5000, error: 5600 };
+
+function releaseRecordUploadPicker() {
+    recordUploadPickerState.active = false;
+    recordUploadPickerState.cleanup?.();
+    recordUploadPickerState.cleanup = null;
+    if (recordUploadPickerState.fallbackTimer !== null) {
+        window.clearTimeout(recordUploadPickerState.fallbackTimer);
+        recordUploadPickerState.fallbackTimer = null;
+    }
+}
+
+function openRecordUploadPicker() {
+    if (!(recordUploadInput instanceof HTMLInputElement)
+        || !recordUploadDialog || recordUploadDialog.hidden
+        || recordUploadInput.disabled || recordUploadPickerState.active) return;
+
+    recordUploadPickerState.active = true;
+    let pageWasHidden = false;
+    const releaseAfterReturn = releaseRecordUploadPicker;
+    const handleVisibility = () => {
+        if (document.visibilityState === "hidden") pageWasHidden = true;
+        else if (pageWasHidden) releaseAfterReturn();
+    };
+    window.addEventListener("focus", releaseAfterReturn, { once: true, capture: true });
+    document.addEventListener("visibilitychange", handleVisibility);
+    recordUploadPickerState.cleanup = () => {
+        window.removeEventListener("focus", releaseAfterReturn, true);
+        document.removeEventListener("visibilitychange", handleVisibility);
+    };
+    try {
+        recordUploadInput.click();
+        recordUploadPickerState.fallbackTimer = window.setTimeout(releaseRecordUploadPicker, 60000);
+    } catch (error) {
+        releaseRecordUploadPicker();
+        throw error;
+    }
+}
 
 function reflowRecordToasts(mutator) {
     if (!recordToastStack) return;
@@ -3123,7 +3183,7 @@ function openRecordUpload() {
     document.documentElement.classList.add("record-upload-open");
     document.body.classList.add("record-upload-open");
     recordUploadDialog.hidden = false;
-    window.requestAnimationFrame(() => recordUploadInput?.focus());
+    window.requestAnimationFrame(() => recordUploadPickerTrigger?.focus());
 }
 
 function resetRecordUploadDialog() {
@@ -3140,6 +3200,7 @@ function resetRecordUploadDialog() {
 
 function closeRecordUpload(reset = false) {
     if (!recordUploadDialog || recordUploadDialog.hidden || recordUploadState === "uploading") return;
+    releaseRecordUploadPicker();
     recordUploadDialog.hidden = true;
     recordUploadBackgroundState.forEach(({ element, inert, ariaHidden }) => {
         element.inert = inert;
@@ -3374,10 +3435,10 @@ function appendNeutralAddedFiles(files) {
         button.setAttribute("aria-pressed", "false");
         Object.assign(button.dataset, {
             recordFile: "", fileId: String(file.id), fileName: file.name, fileType: visual.label,
-            fileSize: file.size_label, fileExtension: visual.extension,
+            fileSize: file.size_label, fileExtension: visual.extension, fileMime: file.mime_type || file.mime || "",
             fileSortOrder: String(file.sort_order ?? Number.MAX_SAFE_INTEGER),
             filePresentation: "false",
-            filePackage: "false", previewSupported: String(Boolean(file.preview_supported)),
+            filePackage: "false", fileAvailable: "true", previewSupported: String(Boolean(file.preview_supported)),
             previewType: file.preview_type || "unsupported", previewUrl: file.preview_url || "",
             zipUrl: file.zip_url || "",
             zipEntryPreviewUrl: file.zip_entry_preview_url || "",
@@ -3592,11 +3653,20 @@ async function submitRecordUpload(event) {
 }
 
 recordUploadOpen?.addEventListener("click", openRecordUpload);
-recordUploadInput?.addEventListener("change", () => validateRecordUploadFiles([...recordUploadInput.files]));
+recordUploadInput?.addEventListener("change", () => {
+    releaseRecordUploadPicker();
+    validateRecordUploadFiles([...recordUploadInput.files]);
+});
+recordUploadInput?.addEventListener("cancel", releaseRecordUploadPicker);
 recordUploadForm?.addEventListener("submit", submitRecordUpload);
 recordUploadCancel?.addEventListener("click", () => closeRecordUpload(true));
 recordUploadClose?.addEventListener("click", () => closeRecordUpload(true));
 recordUploadDialog?.addEventListener("click", (event) => {
+    const pickerTrigger = event.target.closest("[data-upload-picker-trigger]");
+    if (pickerTrigger && recordUploadDialog.contains(pickerTrigger)) {
+        openRecordUploadPicker();
+        return;
+    }
     if (event.target === recordUploadDialog) closeRecordUpload();
 });
 document.addEventListener("keydown", (event) => {
@@ -4037,6 +4107,8 @@ function applyFileReplacement(file, targetButton = fileReplaceTarget) {
         fileType: visual.label,
         fileSize: file.size_label,
         fileExtension: visual.extension,
+        fileMime: file.mime_type || file.mime || "",
+        fileAvailable: "true",
         previewSupported: String(Boolean(file.preview_supported)),
         previewType: file.preview_type || "unsupported",
         previewUrl: file.preview_url || "",
@@ -4782,6 +4854,7 @@ function removeNeutralFileItems(items, packageData) {
         neutralSelectedFileId = "";
         if (neutralViewerName) neutralViewerName.textContent = "Archivo";
         if (neutralViewerMeta) neutralViewerMeta.textContent = "";
+        syncNeutralViewerDownload(null);
         setNeutralViewerState("empty");
     }
 }

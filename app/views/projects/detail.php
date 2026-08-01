@@ -38,7 +38,7 @@ if ($project === null): ?>
     $documents = array_map(static function (array $file) use ($projectId, $previewActionUrl, $downloadActionUrl, $previewTypes): array {
         $extension = strtolower((string) $file['extension']);
         $query = '&project_id=' . $projectId . '&file_id=' . (int) $file['id'];
-        return ['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'type'=>strtoupper($extension ?: 'FILE'),
+        return ['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'type'=>strtoupper($extension ?: 'FILE'),'mime_type'=>(string)($file['mime_type']??''),
             'size'=>ArchiveService::formatBytes((int)$file['size_bytes']),'sort_order'=>(int)($file['sort_order']??$file['id']),'extension'=>$extension,'available'=>true,
             'is_presentation'=>(int)($project['presentation_file_id'] ?? 0)===(int)$file['id'],'is_package'=>false,
             'preview_supported'=>isset($previewTypes[$extension]),'preview_type'=>$previewTypes[$extension] ?? 'unsupported',
@@ -46,6 +46,7 @@ if ($project === null): ?>
     }, $project['files']);
     $archives = array_values(array_filter($documents, static fn(array $file): bool => $file['extension']==='zip'));
     $documents = array_values(array_filter($documents, static fn(array $file): bool => $file['extension']!=='zip'));
+    $headerPackage = (new ProjectPackageService())->describe($projectId, (array) $project['files']);
     $versions = [];
     foreach ($project['deliveries'] as $delivery) {
         $deliveryFiles = array_values(array_filter($project['files'], static fn(array $file): bool => (int)($file['delivery_id'] ?? 0)===(int)$delivery['id']));
@@ -122,7 +123,7 @@ if ($project === null): ?>
     $actions=[];
     if ($isAdministrator) $actions[]=['id'=>'edit','label'=>'Editar proyecto','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
     elseif (!$publicContext && $canDeliver) $actions[]=['id'=>'delivery','label'=>'Registrar entrega','kind'=>'primary','icon'=>'fa-upload','url'=>$detailUrl.'&tab=review','enabled'=>true];
-    if ($project['files']) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>$downloadActionUrl.'&project_id='.$projectId.'&file_id='.(int)$project['files'][0]['id'],'enabled'=>true,'download'=>true];
+    if (!empty($headerPackage['available'])) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'].($publicContext?'&scope=repository':''),'enabled'=>true,'download'=>true];
     $menuActions=$isAdministrator&&$publicContext?[
         ['label'=>$project['is_available']?'Marcar como no disponible':'Marcar como disponible','icon'=>$project['is_available']?'fa-ban':'fa-circle-check','enabled'=>true,'action'=>'availability'],
         ['label'=>'Retirar publicación','icon'=>'fa-box-archive','enabled'=>true,'action'=>'publication'],
