@@ -359,6 +359,7 @@ final class AdminController
                     'restorable_count'=>count($remaining),
                     'package'=>[
                         'available'=>(bool)$package['available'],'file_count'=>(int)$package['file_count'],
+                        'size_bytes'=>(int)($package['size_bytes']??0),'size'=>(string)($package['size']??''),
                         'source'=>(string)$package['source'],
                         'download_url'=>!empty($package['available'])?route('support-material-package-download').'&material_id='.$materialId:'',
                     ],
@@ -438,6 +439,7 @@ final class AdminController
                     'version_id'=>$replacement['version_id'],
                     'package'=>[
                         'available'=>(bool)$package['available'],'file_count'=>(int)$package['file_count'],
+                        'size_bytes'=>(int)($package['size_bytes']??0),'size'=>(string)($package['size']??''),
                         'source'=>(string)$package['source'],
                         'download_url'=>!empty($package['available'])?route('support-material-package-download').'&material_id='.$materialId:'',
                     ],
@@ -489,6 +491,7 @@ final class AdminController
                 $message=$removedCount===1?'Archivo retirado correctamente.':$removedCount.' archivos retirados correctamente.';
                 $packageDescriptor=[
                     'available'=>(bool)$package['available'],'file_count'=>(int)$package['file_count'],
+                    'size_bytes'=>(int)($package['size_bytes']??0),'size'=>(string)($package['size']??''),
                     'source'=>(string)$package['source'],
                     'download_url'=>!empty($package['available'])?route('support-material-package-download').'&material_id='.$materialId:'',
                 ];
@@ -565,7 +568,8 @@ final class AdminController
             $requested=count($uploads);$addedCount=count($added);$failedCount=count($failed);
             $material=$model->findById($materialId,true);$package=$material?(new SupportMaterialPackageService())->describe($material):['available'=>false,'file_count'=>0,'source'=>'generated'];
             $data=['summary'=>['requested'=>$requested,'added'=>$addedCount,'failed'=>$failedCount],'added'=>$added,'failed'=>$failed,'package'=>[
-                'available'=>(bool)$package['available'],'file_count'=>(int)$package['file_count'],'source'=>(string)$package['source'],
+                'available'=>(bool)$package['available'],'file_count'=>(int)$package['file_count'],
+                'size_bytes'=>(int)($package['size_bytes']??0),'size'=>(string)($package['size']??''),'source'=>(string)$package['source'],
                 'download_url'=>!empty($package['available'])?route('support-material-package-download').'&material_id='.$materialId:'',
             ]];
             if($addedCount===0)$this->json(false,'No se pudo agregar ningún archivo.',$data,422);

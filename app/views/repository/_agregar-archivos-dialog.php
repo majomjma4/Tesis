@@ -27,7 +27,7 @@ $extensions = is_array($limits['extensions'] ?? null) ? $limits['extensions'] : 
                 </label>
                 <p class="ed-dialog-info-note">
                     <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-                    <span>Los archivos agregados quedarán registrados en el historial del expediente y podrán reflejarse en los reportes administrativos.</span>
+                    <span><?= !empty($recordIsProject) ? 'Los archivos pasarán a formar parte del expediente académico. Se registrarán el responsable y la fecha de carga; la acción quedará en el historial administrativo, podrá reflejarse en reportes institucionales y notificará a los autores activos. Posteriormente podrán reemplazarse, retirarse o marcarse como archivo de presentación según las políticas institucionales.' : 'Los archivos agregados quedarán registrados en el historial del expediente y podrán reflejarse en los reportes administrativos.' ?></span>
                 </p>
                 <div class="ed-upload-list" data-upload-file-list></div>
                 <p class="ed-upload-status" data-upload-status role="status" aria-live="polite"></p>

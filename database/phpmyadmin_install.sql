@@ -226,6 +226,27 @@ CREATE TABLE project_code_sequences (
   CONSTRAINT fk_code_sequence_type FOREIGN KEY (project_type_id) REFERENCES project_types(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE keywords (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  normalized_name VARCHAR(120) NOT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_keywords_normalized_name (normalized_name),
+  INDEX idx_keywords_active_name (is_active, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_keywords (
+  project_id BIGINT UNSIGNED NOT NULL,
+  keyword_id BIGINT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (project_id, keyword_id),
+  INDEX idx_project_keywords_keyword (keyword_id),
+  CONSTRAINT fk_project_keywords_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_project_keywords_keyword FOREIGN KEY (keyword_id) REFERENCES keywords(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE project_participants (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   project_id BIGINT UNSIGNED NOT NULL,
@@ -282,13 +303,43 @@ CREATE TABLE project_files (
   extension VARCHAR(12) NOT NULL,
   size_bytes BIGINT UNSIGNED NOT NULL,
   checksum_sha256 CHAR(64) NOT NULL,
+  sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   uploaded_by BIGINT UNSIGNED NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted_at DATETIME NULL,
+  deleted_by BIGINT UNSIGNED NULL,
+  purged_at DATETIME NULL,
+  purged_by BIGINT UNSIGNED NULL,
   INDEX idx_files_project (project_id, category),
+  INDEX idx_project_file_restore_window (project_id, deleted_at, purged_at),
   CONSTRAINT fk_files_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_files_delivery FOREIGN KEY (delivery_id) REFERENCES project_deliveries(id),
-  CONSTRAINT fk_files_user FOREIGN KEY (uploaded_by) REFERENCES users(id)
+  CONSTRAINT fk_files_user FOREIGN KEY (uploaded_by) REFERENCES users(id),
+  CONSTRAINT fk_project_file_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id),
+  CONSTRAINT fk_project_file_purged_by FOREIGN KEY (purged_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_file_versions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  file_id BIGINT UNSIGNED NOT NULL,
+  project_id BIGINT UNSIGNED NOT NULL,
+  version_number INT UNSIGNED NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  storage_name VARCHAR(190) NOT NULL,
+  storage_path VARCHAR(500) NOT NULL,
+  extension VARCHAR(12) NOT NULL,
+  mime_type VARCHAR(120) NOT NULL,
+  size_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  checksum_sha256 CHAR(64) NOT NULL,
+  replaced_by BIGINT UNSIGNED NULL,
+  replaced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  replacement_reason VARCHAR(500) NULL,
+  UNIQUE KEY uq_project_file_version_number(file_id, version_number),
+  INDEX idx_project_file_version_project(project_id, replaced_at),
+  CONSTRAINT fk_project_file_version_file FOREIGN KEY(file_id) REFERENCES project_files(id) ON DELETE CASCADE,
+  CONSTRAINT fk_project_file_version_project FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_project_file_version_actor FOREIGN KEY(replaced_by) REFERENCES users(id),
+  CONSTRAINT chk_project_file_version_positive CHECK(version_number > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE project_observations (

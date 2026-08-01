@@ -1,5 +1,5 @@
 <?php $fileEndpoint = (string) ($digitalRecord['file_upload']['endpoint'] ?? ''); ?>
-<div class="ed-file-remove-overlay" data-file-remove-dialog hidden>
+<div class="ed-file-remove-overlay" data-file-remove-dialog<?= !empty($recordIsProject) ? ' data-file-remove-delay="3"' : '' ?> hidden>
     <section class="ed-file-remove-dialog" role="dialog" aria-modal="true" aria-labelledby="fileRemoveTitle" aria-describedby="fileRemoveDescription">
         <header>
             <div><h2 id="fileRemoveTitle" data-file-remove-title>Retirar archivo</h2><p id="fileRemoveDescription" data-file-remove-description>El archivo dejará de estar disponible en el Expediente Digital, pero permanecerá almacenado y podrá restaurarse posteriormente.</p></div>
@@ -14,13 +14,13 @@
             <p class="ed-file-remove-warning" data-file-remove-presentation-warning hidden></p>
             <p class="ed-dialog-info-note" data-file-remove-history-note>
                 <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-                <span>El retiro de este archivo quedará registrado en el historial del expediente y podrá reflejarse en los reportes administrativos.</span>
+                <span><?= !empty($recordIsProject) ? 'El archivo podrá recuperarse durante 24 horas. El retiro quedará registrado en el historial y los autores activos recibirán una notificación.' : 'El retiro de este archivo quedará registrado en el historial del expediente y podrá reflejarse en los reportes administrativos.' ?></span>
             </p>
             <p class="ed-file-remove-error" data-file-remove-error role="alert" hidden></p>
         </div>
         <footer>
             <button type="button" class="ed-file-remove-cancel" data-file-remove-cancel>Cancelar</button>
-            <button type="button" class="ed-file-remove-confirm" data-file-remove-confirm>Retirar archivo</button>
+            <button type="button" class="ed-file-remove-confirm" data-file-remove-confirm aria-live="polite">Retirar archivo</button>
         </footer>
         <div data-file-remove-config data-endpoint="<?= e($fileEndpoint) ?>" data-csrf="<?= e((string) ($digitalRecord['file_upload']['csrf_token'] ?? '')) ?>" data-material-id="<?= (int) ($digitalRecord['entity']['id'] ?? 0) ?>" hidden></div>
     </section>

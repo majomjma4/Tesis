@@ -48,6 +48,7 @@ final class SupportMaterialController
             $packageService = new SupportMaterialPackageService();
             $material['package_descriptor'] = $packageService->describe($material);
             if (!empty($material['package_descriptor']['available'])) {
+                $preparedPackage = null;
                 try {
                     $preparedPackage = $packageService->prepare($material);
                     $material['package_descriptor']['size_bytes'] = (int) ($preparedPackage['size_bytes']
@@ -60,6 +61,11 @@ final class SupportMaterialController
                 } catch (Throwable $exception) {
                     error_log('Support material package prewarm: ' . $exception->getMessage());
                     $material['package_descriptor']['available'] = false;
+                } finally {
+                    if (is_array($preparedPackage) && !empty($preparedPackage['temporary'])
+                        && is_file((string) ($preparedPackage['path'] ?? ''))) {
+                        @unlink((string) $preparedPackage['path']);
+                    }
                 }
             }
             $documentEvolution = $materialModel->documentEvolution((int) $material['id']);
@@ -335,7 +341,7 @@ final class SupportMaterialController
         } catch (Throwable $exception) {
             error_log('Support material package: ' . $exception->getMessage());
             http_response_code(422);
-            $this->renderError('No fue posible preparar el paquete completo.');
+            $this->renderError('No fue posible generar el paquete completo porque uno o más archivos no están disponibles. No se descargó un paquete incompleto.');
         }
     }
     // Final de vistas previas seguras

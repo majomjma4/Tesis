@@ -136,10 +136,11 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
     <section class="ed-files-panel" aria-labelledby="recordFilesTitle">
         <header class="ed-files-heading">
             <div><h2 id="recordFilesTitle">Archivos del <?= e($recordFileOwner) ?></h2><p data-record-file-count><?= count($selectableFiles) ?> <?= count($selectableFiles) === 1 ? 'archivo registrado' : 'archivos registrados' ?></p></div>
-            <?php if (!empty($package['available']) || $canManageFiles || $globalFileActions): ?><div class="ed-files-global-actions" data-file-global-actions>
+            <?php $showPackageDownload = !empty($package['available']) && (int)($package['file_count'] ?? 0) >= 2; ?>
+            <?php if ($showPackageDownload || $canManageFiles || $globalFileActions): ?><div class="ed-files-global-actions" data-file-global-actions>
                 <button class="ed-files-global-toggle" type="button" data-file-global-toggle aria-label="Acciones de archivos del <?= e($recordFileOwner) ?>" aria-haspopup="menu" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
                 <div class="ed-files-global-menu" data-file-global-menu role="menu" hidden>
-                    <?php if (!empty($package['available'])): ?>
+                    <?php if ($showPackageDownload): ?>
                         <a data-record-package-download data-record-download download role="menuitem" href="<?= e((string) $package['download_url']) ?>"><i class="fa-solid fa-box-archive" aria-hidden="true"></i><span>Descargar paquete completo<small><?= (int) $package['file_count'] ?> archivos</small></span><?php if (!empty($package['size'])): ?><strong class="ed-package-size"><?= e((string) $package['size']) ?></strong><?php endif; ?></a>
                     <?php endif; ?>
                     <?php foreach ($globalFileActions as $fileAction): ?><a role="menuitem" href="<?= e((string)$fileAction['url']) ?>"<?= !empty($fileAction['download'])?' download data-record-download':'' ?>><i class="fa-solid <?= e((string)($fileAction['icon']??'fa-download')) ?>" aria-hidden="true"></i><span><?= e((string)$fileAction['label']) ?></span></a><?php endforeach; ?>

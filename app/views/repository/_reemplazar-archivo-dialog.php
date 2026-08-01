@@ -14,7 +14,7 @@ $replaceExtensions = is_array($replaceLimits['extensions'] ?? null) ? $replaceLi
         <header>
             <div>
                 <h2 id="fileReplaceTitle">Reemplazar archivo</h2>
-                <p id="fileReplaceDescription">El archivo actual dejará de estar disponible para uso normal y permanecerá registrado en el historial de auditoría, conservando la trazabilidad del reemplazo.</p>
+                <p id="fileReplaceDescription"><?= !empty($recordIsProject) ? 'El documento activo del expediente será sustituido. La versión anterior permanecerá almacenada en el historial documental y el reemplazo conservará toda su trazabilidad.' : 'El archivo actual dejará de estar disponible para uso normal y permanecerá registrado en el historial de auditoría, conservando la trazabilidad del reemplazo.' ?></p>
             </div>
             <button type="button" data-file-replace-close aria-label="Cerrar confirmación">
                 <i class="fa-solid fa-xmark" aria-hidden="true"></i>
@@ -27,6 +27,7 @@ $replaceExtensions = is_array($replaceLimits['extensions'] ?? null) ? $replaceLi
                 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
                 <div><span>Archivo nuevo</span><strong data-file-replace-new></strong><small data-file-replace-meta></small></div>
             </div>
+            <?php if (!empty($recordIsProject)): ?><p class="ed-dialog-info-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>La acción quedará registrada en la auditoría y el historial administrativo. Los autores activos del proyecto recibirán una notificación automática.</span></p><?php endif; ?>
             <p class="ed-file-remove-error" data-file-replace-error role="alert" hidden></p>
         </div>
         <footer>

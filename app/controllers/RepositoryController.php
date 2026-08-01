@@ -60,6 +60,12 @@ final class RepositoryController
         $requestedTab=strtolower(trim((string)($_GET['tab']??'information')));
         $activeTab=in_array($requestedTab,['information','files','evolution'],true)?$requestedTab:'information';
         $returnUrl=$this->repositoryReturnUrl((string)($_GET['return']??''));
+        $projectDocuments=null;
+        if($project!==null&&$isAdministrator){
+            $documentModel=new ProjectDocumentModel();
+            $documentFiles=$documentModel->activeFiles((int)$project['id']);
+            $projectDocuments=['restorable'=>$documentModel->restorable((int)$project['id']),'versions'=>$documentModel->versions((int)$project['id']),'package'=>(new ProjectPackageService())->describe((int)$project['id'],$documentFiles),'limits'=>(new ProjectDocumentFileService())->limits(),'endpoint'=>route('admin-project-file'),'csrf'=>$session->csrfToken('admin_repository')];
+        }
         View::render('projects/detail', [
             'currentPage' => 'repository',
             'title' => $project === null ? 'Proyecto no encontrado | Repositorio' : $project['title'] . ' | Repositorio',
@@ -77,6 +83,7 @@ final class RepositoryController
             'projectAdminCsrf'=>$isAdministrator?$session->csrfToken('admin_repository'):'',
             'projectTrashCsrf'=>$isAdministrator?$session->csrfToken('admin_projects'):'',
             'projectEditorCatalogs'=>$isAdministrator?(new AdminProjectModel())->catalogs():[],
+            'projectDocuments'=>$projectDocuments,
         ]);
     }
 

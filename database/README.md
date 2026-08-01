@@ -1,5 +1,7 @@
 # Respaldo transportable de la base de datos
 
+La migración `20260817_project_document_management.sql` amplía de forma idempotente el contrato documental de proyectos con orden, retiro/restauración durante 24 horas, purga trazable y versiones conservadas por reemplazo. `projects.presentation_file_id` permanece como fuente única del archivo de presentación.
+
 `snapshot.sql` contiene la estructura y los registros actuales de la base
 `tesis`. Por eso, despues de un `git clone` solo hace falta iniciar MariaDB en
 XAMPP y ejecutar desde la raiz del proyecto:
@@ -130,6 +132,7 @@ El comando informa registros sin archivo y archivos sin registro. No elimina,
 mueve ni modifica archivos o datos.
 # Migraciones recientes
 
+- `migrations/20260816_project_keywords.sql`: crea el catálogo UTF-8 de palabras clave de proyectos y su relación muchos a muchos, sin insertar etiquetas ni modificar proyectos existentes.
 - `migrations/20260815_academic_period_transitions.sql`: registra cada cierre/promoción de PAO y permite revertir de forma auditada la transición más reciente durante 24 horas cuando el nuevo período no tiene actividad académica.
 - `migrations/20260814_academic_catalogs.sql`: centraliza en `system_settings` los tipos y palabras clave que utiliza Materiales de apoyo, sin crear entidades paralelas.
 - `migrations/20260813_project_repository_availability.sql`: separa la disponibilidad temporal de un proyecto publicado de su retiro del Repositorio.

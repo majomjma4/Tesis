@@ -53,12 +53,21 @@ final class ProjectsController
             return;
         }
 
+        $descriptionService = new ProjectDescriptionService();
+        $isStudentParticipant = !$isAdministrator && in_array('student', $access->currentRoles(), true)
+            && count(array_filter($project['participants'], static fn (array $participant): bool =>
+                (int) $participant['user_id'] === $access->currentUserId() && (string) $participant['role_code'] === 'student')) > 0;
+        $descriptionReminder = $isStudentParticipant
+            ? $descriptionService->consumePendingReminder((int) $project['id'], $access->currentUserId())
+            : null;
+
         View::render('projects/detail', [
             'currentPage' => 'projects',
             'title' => ($project['title'] ?? 'Proyecto no encontrado') . ' | Gestión Académica',
             'bodyClass' => 'project-detail-page',
-            'pageStyles' => [asset('css/project-simplified.css')],
+            'pageStyles' => [asset('css/project-simplified.css'), asset('css/project-description.css')],
             'pageScript' => asset('js/repository-detail.js'),
+            'pageScripts' => $descriptionReminder ? [asset('js/project-description.js')] : [],
             'project' => $project,
             'activeTab' => $tab,
             'isAdministrator' => $isAdministrator,
@@ -70,22 +79,53 @@ final class ProjectsController
             'returnUrl' => route('projects'),
             'previewActionUrl' => route('project-file-preview'),
             'downloadActionUrl' => route('project-file-download'),
+            'descriptionReminder' => $descriptionReminder,
+            'descriptionCsrf' => $session->csrfToken('project_description'),
+            'descriptionSaveEndpoint' => route('project-description-save'),
+            'lifecycleDescription' => $descriptionService->effectiveDescription((string) $project['type_code'], $project['summary'] ?? null),
         ]);
+    }
+
+    public function saveDescription(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $this->json(['success' => false, 'message' => 'Método no permitido.', 'data' => []]);
+        }
+        $session = new AuthSessionService();
+        if (!$session->validateCsrf('project_description', (string) ($_POST['_csrf'] ?? ''))) {
+            http_response_code(403);
+            $this->json(['success' => false, 'message' => 'La sesión del formulario venció.', 'data' => []]);
+        }
+        try {
+            (new ProjectDescriptionService())->saveForStudent((int) ($_POST['project_id'] ?? 0), (int) $session->userId(), (string) ($_POST['description'] ?? ''));
+            $this->json(['success' => true, 'message' => 'Descripción guardada correctamente.', 'data' => []]);
+        } catch (InvalidArgumentException $exception) {
+            http_response_code(422);
+            $this->json(['success' => false, 'message' => $exception->getMessage(), 'data' => []]);
+        } catch (Throwable $exception) {
+            error_log('Project description: ' . $exception->getMessage());
+            http_response_code(500);
+            $this->json(['success' => false, 'message' => 'No fue posible guardar la descripción.', 'data' => []]);
+        }
     }
 
     public function filePreview(): void
     {
         [$project, $file, $stream] = $this->resolveFile(true);
         $query='&project_id='.(int)$project['id'].'&file_id='.(int)$file['id'];
-        $preview=(new FilePreviewService())->prepare($this->previewFile($file,$stream),route('project-file-content').$query,route('project-file-download').$query);
-        fclose($stream); $this->json(['success'=>true,'message'=>$preview['message'],'data'=>['preview'=>$preview]]);
+        $scope=(string)($_GET['scope']??'')==='repository'?'&scope=repository':'';
+        $version=!empty($file['checksum_sha256'])?'&v='.rawurlencode(substr((string)$file['checksum_sha256'],0,16)):'';
+        $preview=(new FilePreviewService())->prepare($this->previewFile($file,$stream),route('project-file-content').$query.$scope.$version,route('project-file-download').$query.$scope);
+        fclose($stream);header('Cache-Control: private, no-store, max-age=0');$this->json(['success'=>true,'message'=>$preview['message'],'data'=>['preview'=>$preview]]);
     }
 
     public function fileContent(): void
     {
         [, $file, $stream] = $this->resolveFile(); $data=$this->previewFile($file,$stream);
-        if (!(new FilePreviewService())->canStreamInline($data)) { fclose($stream); http_response_code(415); exit('Este formato debe descargarse para consultarlo.'); }
-        session_write_close(); $this->stream($file,$stream,'inline');
+        $service=new FilePreviewService();$prepared=$service->prepare($data,'','');
+        if (!$service->canStreamInline($data)) { fclose($stream); http_response_code(415); exit('Este formato debe descargarse para consultarlo.'); }
+        session_write_close(); $this->stream($file,$stream,'inline',(string)$prepared['mime']);
     }
 
     public function fileDownload(): void
@@ -104,13 +144,13 @@ final class ProjectsController
         $project=($projectId && $access->can('project.view'))?$model->find((int)$projectId,$access->currentUserId(),$admin,$repositoryScope):null;
         $file=($project && $fileId)?$model->findFile((int)$projectId,(int)$fileId):null;
         if(!$project||!$file){http_response_code(404);if($json)$this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);exit('El archivo solicitado no está disponible.');}
-        try{$path=(new PrivateProjectFileService())->resolveStoredFile((int)$projectId,(string)$file['storage_name']);$stream=fopen($path,'rb');}catch(Throwable){$stream=false;}
+        try{$fileStorage=$admin||$repositoryScope?new ProjectDocumentFileService():new PrivateProjectFileService();$path=$fileStorage->resolveStoredFile((int)$projectId,(string)$file['storage_name']);$stream=fopen($path,'rb');}catch(Throwable){$stream=false;}
         if($stream===false){http_response_code(404);exit('El archivo solicitado no está disponible.');}
         return [$project,$file,$stream];
     }
 
     private function previewFile(array $file,$stream):array{return ['name'=>(string)$file['original_name'],'path'=>(string)$file['original_name'],'size'=>(int)$file['size_bytes'],'stream'=>$stream];}
-    private function stream(array $file,$stream,string $disposition):never{header('Content-Type: '.(string)$file['mime_type']);header('Content-Length: '.(int)$file['size_bytes']);header("Content-Disposition: {$disposition}; filename*=UTF-8''".rawurlencode((string)$file['original_name']));header('X-Content-Type-Options: nosniff');header('Cache-Control: private, no-store, max-age=0');fpassthru($stream);fclose($stream);exit;}
+    private function stream(array $file,$stream,string $disposition,?string $verifiedMime=null):never{$stat=fstat($stream);$size=is_array($stat)?(int)($stat['size']??$file['size_bytes']):(int)$file['size_bytes'];header('Content-Type: '.($verifiedMime?:((string)$file['mime_type'])));header('Content-Length: '.$size);header("Content-Disposition: {$disposition}; filename*=UTF-8''".rawurlencode((string)$file['original_name']));header('X-Content-Type-Options: nosniff');if($disposition==='inline')header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");header('Cache-Control: private, no-store, max-age=0');fpassthru($stream);fclose($stream);exit;}
     private function json(array $payload):never{header('Content-Type: application/json; charset=UTF-8');echo json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);exit;}
 
     /** Mantiene accesible la ruta global mientras se construye el formulario definitivo. */

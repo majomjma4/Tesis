@@ -9,11 +9,14 @@ final class SupportMaterialPackageService
         $files = array_values(array_filter((array) ($material['files'] ?? []), static fn (array $file): bool => empty($file['package'])));
         $stored = is_array($material['package'] ?? null) ? $material['package'] : null;
         $analysis = $stored === null ? null : $this->analyzeStoredPackage($stored, $files);
+        $size = array_sum(array_map(static fn (array $file): int => (int) ($file['size_bytes'] ?? 0), $files));
         return [
             'available' => count($files) > 1
                 && $this->allFilesAvailable($files)
                 && (!empty($analysis['exact']) || $this->canCreatePackage()),
             'file_count' => count($files),
+            'size_bytes' => $size,
+            'size' => ArchiveService::formatBytes($size),
             'source' => !empty($analysis['exact']) ? 'stored' : 'generated',
             'browsable' => false,
             'stored_outdated' => $stored !== null && empty($analysis['exact']),
@@ -27,22 +30,11 @@ final class SupportMaterialPackageService
         if (!$description['available']) {
             throw new InvalidArgumentException('Este material no requiere un paquete completo.');
         }
-        $stored = is_array($material['package'] ?? null) ? $material['package'] : null;
-        $storedPath = $stored === null ? null : $this->resolveStoredPath((string) ($stored['path'] ?? ''));
-        if ($description['source'] === 'stored' && $storedPath !== null) {
-            return [
-                'path' => $storedPath,
-                'temporary' => false,
-                'file_count' => $description['file_count'],
-                'source' => 'stored',
-                'size_bytes' => (int) filesize($storedPath),
-            ];
-        }
         $regularFiles = array_values(array_filter(
             (array) ($material['files'] ?? []),
             static fn (array $file): bool => empty($file['package'])
         ));
-        return $this->generate($regularFiles, (int) ($material['id'] ?? 0));
+        return $this->generateVerified($regularFiles, (int) ($material['id'] ?? 0));
     }
 
     private function analyzeStoredPackage(array $stored, array $files): array
@@ -96,6 +88,17 @@ final class SupportMaterialPackageService
             if ($this->resolveStoredPath((string) ($file['path'] ?? '')) === null) return false;
         }
         return true;
+    }
+
+    private function generateVerified(array $files,int $materialId):array
+    {
+        $integrity=new ArchivePackageIntegrityService();
+        $entries=$integrity->validateSources($files,fn(array $file):?string=>$this->resolveStoredPath((string)($file['path']??'')));
+        $directory=sys_get_temp_dir().DIRECTORY_SEPARATOR.'tesis-support-material-packages';
+        if(!is_dir($directory)&&!mkdir($directory,0775,true)&&!is_dir($directory))throw new RuntimeException('No fue posible preparar el paquete.');
+        $path=$directory.DIRECTORY_SEPARATOR.'material-'.$materialId.'-'.bin2hex(random_bytes(12)).'.zip';
+        $integrity->build($path,$entries);
+        return ['path'=>$path,'temporary'=>true,'file_count'=>count($entries),'source'=>'generated','size_bytes'=>(int)filesize($path)];
     }
 
     private function generate(array $files, int $materialId): array

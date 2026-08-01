@@ -307,6 +307,13 @@ final class AdminActivityModel
             'support_material.presentation_selected' => 'Seleccionó el archivo de presentación',
             'support_material.presentation_changed' => 'Cambió el archivo de presentación',
             'support_material.presentation_removed' => 'Quitó el archivo de presentación',
+            'project.file_added' => 'Agregó un archivo al proyecto',
+            'project.file_removed' => 'Retiró un archivo del proyecto',
+            'project.file_replaced' => 'Reemplazó un archivo del proyecto',
+            'project.file_restored' => 'Restauró un archivo del proyecto',
+            'project.file_purged' => 'Eliminó definitivamente un archivo del proyecto',
+            'project.presentation_changed' => 'Cambió el archivo de presentación del proyecto',
+            'project.presentation_removed' => 'Quitó el archivo de presentación del proyecto',
             default => $fallback !== '' ? $fallback : 'Se actualizó el material',
         };
     }

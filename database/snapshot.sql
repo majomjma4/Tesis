@@ -524,17 +524,26 @@ CREATE TABLE `project_files` (
   `extension` varchar(12) NOT NULL,
   `size_bytes` bigint(20) unsigned NOT NULL,
   `checksum_sha256` char(64) NOT NULL,
+  `sort_order` smallint(5) unsigned NOT NULL DEFAULT 0,
   `uploaded_by` bigint(20) unsigned NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `deleted_at` datetime DEFAULT NULL,
+  `deleted_by` bigint(20) unsigned DEFAULT NULL,
+  `purged_at` datetime DEFAULT NULL,
+  `purged_by` bigint(20) unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `storage_name` (`storage_name`),
   KEY `idx_files_project` (`project_id`,`category`),
   KEY `fk_files_delivery` (`delivery_id`),
   KEY `fk_files_user` (`uploaded_by`),
+  KEY `idx_project_file_restore_window` (`project_id`,`deleted_at`,`purged_at`),
+  KEY `fk_project_file_deleted_by` (`deleted_by`),
+  KEY `fk_project_file_purged_by` (`purged_by`),
   CONSTRAINT `fk_files_delivery` FOREIGN KEY (`delivery_id`) REFERENCES `project_deliveries` (`id`),
   CONSTRAINT `fk_files_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_files_user` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`)
+  CONSTRAINT `fk_files_user` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `fk_project_file_deleted_by` FOREIGN KEY (`deleted_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `fk_project_file_purged_by` FOREIGN KEY (`purged_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -544,8 +553,93 @@ CREATE TABLE `project_files` (
 
 LOCK TABLES `project_files` WRITE;
 /*!40000 ALTER TABLE `project_files` DISABLE KEYS */;
-INSERT INTO `project_files` VALUES (14,22,4,'delivery','Informe_avance_v1.pdf','674e5fb94b148d8e2adddeec94ccb53dba3bcdae965be1697f826b50bfab6ec5.pdf','storage/private/projects/22/674e5fb94b148d8e2adddeec94ccb53dba3bcdae965be1697f826b50bfab6ec5.pdf','application/pdf','pdf',673,'4c7f6e0bbd226d162aad3b04d39ec6f7fbc5ce461708964b1798684b25a3d7ee',24,'2026-07-19 21:16:28',NULL),(15,22,4,'annex','Anexos_investigacion.zip','7764654b1cd99ebbf7c4ec33a86c7969f316b5cee5b4ff18ca8a9549a70e689e.zip','storage/private/projects/22/7764654b1cd99ebbf7c4ec33a86c7969f316b5cee5b4ff18ca8a9549a70e689e.zip','application/zip','zip',522,'dd3a324409a2b947d92fdceb8adf7e7ac277d4e0dcb723d3455be6769291efe9',24,'2026-07-19 21:16:28',NULL),(16,25,NULL,'final','Informe_final_vinculacion.docx','fdfe028a320d8a1fe44bc7fef86eab8a9e53952bdc182794864a0955961e66ce.docx','storage/private/projects/25/fdfe028a320d8a1fe44bc7fef86eab8a9e53952bdc182794864a0955961e66ce.docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document','docx',1335,'b9d389ee48614041ffa2b9b84759f00a55511fdb7b01e601faae8e9b3878798b',22,'2026-07-19 21:16:28',NULL),(17,26,NULL,'final','Trabajo_titulacion_final.pdf','ee19c560ba20ac4c33055303f83c0cdd39b1f453de6a8a7249ae4b282487a192.pdf','storage/private/projects/26/ee19c560ba20ac4c33055303f83c0cdd39b1f453de6a8a7249ae4b282487a192.pdf','application/pdf','pdf',680,'840a88ca3f4b780bf9f940ea09d76da8ddb1cf0f9bf8bf9ebabffaba056efdb4',24,'2026-07-19 21:16:28',NULL),(18,27,NULL,'final','Informe_proyecto_publicado.pdf','8e479ac38f49cf400966e9b37f0e2069be031c964ba942fff7667e332322c55e.pdf','storage/private/projects/27/8e479ac38f49cf400966e9b37f0e2069be031c964ba942fff7667e332322c55e.pdf','application/pdf','pdf',682,'82e9afdd04b82b3c0eae120f5feb6a9a1bf73806b086f078f942dc282d31ece2',21,'2026-07-19 21:16:28',NULL),(19,27,NULL,'source','Codigo_fuente_demostrativo.zip','d77af8cffbd61371dd0981b387ebb4929638b63347d17ef0d1244fe0144ecb26.zip','storage/private/projects/27/d77af8cffbd61371dd0981b387ebb4929638b63347d17ef0d1244fe0144ecb26.zip','application/zip','zip',528,'7c06f4a68a6a8a06876b5aad658f87b99279d5622edbd64e268bbff7e5fa4545',21,'2026-07-19 21:16:28',NULL);
+INSERT INTO `project_files` (`id`,`project_id`,`delivery_id`,`category`,`original_name`,`storage_name`,`storage_path`,`mime_type`,`extension`,`size_bytes`,`checksum_sha256`,`uploaded_by`,`created_at`,`deleted_at`) VALUES (14,22,4,'delivery','Informe_avance_v1.pdf','674e5fb94b148d8e2adddeec94ccb53dba3bcdae965be1697f826b50bfab6ec5.pdf','storage/private/projects/22/674e5fb94b148d8e2adddeec94ccb53dba3bcdae965be1697f826b50bfab6ec5.pdf','application/pdf','pdf',673,'4c7f6e0bbd226d162aad3b04d39ec6f7fbc5ce461708964b1798684b25a3d7ee',24,'2026-07-19 21:16:28',NULL),(15,22,4,'annex','Anexos_investigacion.zip','7764654b1cd99ebbf7c4ec33a86c7969f316b5cee5b4ff18ca8a9549a70e689e.zip','storage/private/projects/22/7764654b1cd99ebbf7c4ec33a86c7969f316b5cee5b4ff18ca8a9549a70e689e.zip','application/zip','zip',522,'dd3a324409a2b947d92fdceb8adf7e7ac277d4e0dcb723d3455be6769291efe9',24,'2026-07-19 21:16:28',NULL),(16,25,NULL,'final','Informe_final_vinculacion.docx','fdfe028a320d8a1fe44bc7fef86eab8a9e53952bdc182794864a0955961e66ce.docx','storage/private/projects/25/fdfe028a320d8a1fe44bc7fef86eab8a9e53952bdc182794864a0955961e66ce.docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document','docx',1335,'b9d389ee48614041ffa2b9b84759f00a55511fdb7b01e601faae8e9b3878798b',22,'2026-07-19 21:16:28',NULL),(17,26,NULL,'final','Trabajo_titulacion_final.pdf','ee19c560ba20ac4c33055303f83c0cdd39b1f453de6a8a7249ae4b282487a192.pdf','storage/private/projects/26/ee19c560ba20ac4c33055303f83c0cdd39b1f453de6a8a7249ae4b282487a192.pdf','application/pdf','pdf',680,'840a88ca3f4b780bf9f940ea09d76da8ddb1cf0f9bf8bf9ebabffaba056efdb4',24,'2026-07-19 21:16:28',NULL),(18,27,NULL,'final','Informe_proyecto_publicado.pdf','8e479ac38f49cf400966e9b37f0e2069be031c964ba942fff7667e332322c55e.pdf','storage/private/projects/27/8e479ac38f49cf400966e9b37f0e2069be031c964ba942fff7667e332322c55e.pdf','application/pdf','pdf',682,'82e9afdd04b82b3c0eae120f5feb6a9a1bf73806b086f078f942dc282d31ece2',21,'2026-07-19 21:16:28',NULL),(19,27,NULL,'source','Codigo_fuente_demostrativo.zip','d77af8cffbd61371dd0981b387ebb4929638b63347d17ef0d1244fe0144ecb26.zip','storage/private/projects/27/d77af8cffbd61371dd0981b387ebb4929638b63347d17ef0d1244fe0144ecb26.zip','application/zip','zip',528,'7c06f4a68a6a8a06876b5aad658f87b99279d5622edbd64e268bbff7e5fa4545',21,'2026-07-19 21:16:28',NULL);
 /*!40000 ALTER TABLE `project_files` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `project_file_versions`
+--
+DROP TABLE IF EXISTS `project_file_versions`;
+CREATE TABLE `project_file_versions` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `file_id` bigint(20) unsigned NOT NULL,
+  `project_id` bigint(20) unsigned NOT NULL,
+  `version_number` int(10) unsigned NOT NULL,
+  `original_name` varchar(255) NOT NULL,
+  `storage_name` varchar(190) NOT NULL,
+  `storage_path` varchar(500) NOT NULL,
+  `extension` varchar(12) NOT NULL,
+  `mime_type` varchar(120) NOT NULL,
+  `size_bytes` bigint(20) unsigned NOT NULL DEFAULT 0,
+  `checksum_sha256` char(64) NOT NULL,
+  `replaced_by` bigint(20) unsigned DEFAULT NULL,
+  `replaced_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `replacement_reason` varchar(500) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_project_file_version_number` (`file_id`,`version_number`),
+  KEY `idx_project_file_version_project` (`project_id`,`replaced_at`),
+  KEY `fk_project_file_version_actor` (`replaced_by`),
+  CONSTRAINT `fk_project_file_version_file` FOREIGN KEY (`file_id`) REFERENCES `project_files` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_project_file_version_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_project_file_version_actor` FOREIGN KEY (`replaced_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `chk_project_file_version_positive` CHECK (`version_number` > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `keywords`
+--
+
+DROP TABLE IF EXISTS `keywords`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `keywords` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(120) NOT NULL,
+  `normalized_name` varchar(120) NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_keywords_normalized_name` (`normalized_name`),
+  KEY `idx_keywords_active_name` (`is_active`,`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `keywords`
+--
+
+LOCK TABLES `keywords` WRITE;
+/*!40000 ALTER TABLE `keywords` DISABLE KEYS */;
+/*!40000 ALTER TABLE `keywords` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `project_keywords`
+--
+
+DROP TABLE IF EXISTS `project_keywords`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `project_keywords` (
+  `project_id` bigint(20) unsigned NOT NULL,
+  `keyword_id` bigint(20) unsigned NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`project_id`,`keyword_id`),
+  KEY `idx_project_keywords_keyword` (`keyword_id`),
+  CONSTRAINT `fk_project_keywords_keyword` FOREIGN KEY (`keyword_id`) REFERENCES `keywords` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_project_keywords_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `project_keywords`
+--
+
+LOCK TABLES `project_keywords` WRITE;
+/*!40000 ALTER TABLE `project_keywords` DISABLE KEYS */;
+/*!40000 ALTER TABLE `project_keywords` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
