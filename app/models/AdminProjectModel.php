@@ -3,6 +3,7 @@ declare(strict_types=1);
 final class AdminProjectModel
 {
     private const STATUSES=['development','under_review','changes_required','approved','defense','tribunal_approved','published'];
+    private const PROJECT_KEYWORD_EXCLUSIONS=['reglamento','normativa','plantilla','formato','guía documental','manual','tutorial'];
     private const STATUS_LABELS=['development'=>'En desarrollo','under_review'=>'En revisión','changes_required'=>'Requiere cambios','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el Tribunal','published'=>'Publicado'];
     public function listing(array $f,array $pagination=[]):array
     {
@@ -16,6 +17,20 @@ final class AdminProjectModel
              ORDER BY id"
         );
         $keywordModel=new ProjectKeywordModel();
+        $tutoringByProject=[];
+        $projectIds=array_values(array_filter(array_map('intval',array_column($result['items'],'id'))));
+        if($projectIds){
+            $placeholders=implode(',',array_fill(0,count($projectIds),'?'));
+            $tutoring=Database::connection()->prepare("SELECT pp.project_id,pp.user_id,pp.role_code,u.username,u.full_name,u.email,1 is_teacher
+                FROM project_participants pp
+                INNER JOIN users u ON u.id=pp.user_id
+                INNER JOIN teacher_profiles tp ON tp.user_id=u.id
+                WHERE pp.project_id IN ($placeholders) AND pp.status='active' AND pp.removed_at IS NULL
+                  AND LOWER(pp.role_code) IN ('tutor','co_tutor','cotutor','co-tutor','tribunal','jury')
+                ORDER BY pp.project_id,pp.assigned_at,pp.user_id");
+            $tutoring->execute($projectIds);
+            foreach($tutoring->fetchAll() as $participant)$tutoringByProject[(int)$participant['project_id']][]=$participant;
+        }
         foreach($result['items'] as &$item){
             $files->execute(['project_id'=>$item['id']]);
             $item['presentation_files']=array_map(static function(array $file):array{
@@ -36,6 +51,7 @@ final class AdminProjectModel
             },$files->fetchAll());
             $item['presentation_file_id']=(int)($item['presentation_file_id']??0);
             $item['keywords']=$keywordModel->forProject((int)$item['id']);
+            $item['participants']=$tutoringByProject[(int)$item['id']]??[];
         }
         unset($item);
         return $result;
@@ -47,7 +63,14 @@ final class AdminProjectModel
         $statement->execute($params);
         return array_map('intval',$statement->fetch()?:[]);
     }
-    public function catalogs():array{$d=Database::connection();return ['types'=>$d->query('SELECT id,code,name FROM project_types WHERE is_active=1 ORDER BY name')->fetchAll(),'careers'=>$d->query('SELECT id,name FROM careers WHERE is_active=1 ORDER BY name')->fetchAll(),'periods'=>$d->query("SELECT id,name,status,starts_on FROM academic_periods WHERE status IN ('active','closed') ORDER BY (status='active') DESC, starts_on DESC")->fetchAll(),'teachers'=>$d->query("SELECT u.id,u.full_name FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.status='active' AND tp.can_tutor=1 ORDER BY u.full_name")->fetchAll(),'keywords'=>(new SupportMaterialModel())->keywordCatalog()];}
+    public function catalogs():array{$d=Database::connection();return ['types'=>$d->query('SELECT id,code,name FROM project_types WHERE is_active=1 ORDER BY name')->fetchAll(),'careers'=>$d->query('SELECT id,name FROM careers WHERE is_active=1 ORDER BY name')->fetchAll(),'periods'=>$d->query("SELECT id,name,status,starts_on FROM academic_periods WHERE status IN ('active','closed') ORDER BY (status='active') DESC, starts_on DESC")->fetchAll(),'teachers'=>$d->query("SELECT u.id,u.username,u.full_name,u.email FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.status='active' AND tp.can_tutor=1 ORDER BY u.full_name")->fetchAll(),'keywords'=>$this->projectKeywordCatalog()];}
+    private function projectKeywordCatalog():array
+    {
+        return array_values(array_filter(
+            (new SupportMaterialModel())->keywordCatalog(),
+            static fn(string $keyword):bool=>!in_array(mb_strtolower(trim($keyword),'UTF-8'),self::PROJECT_KEYWORD_EXCLUSIONS,true)
+        ));
+    }
     private function filteredQuery(array $filters):array
     {
         $where=[
@@ -87,6 +110,7 @@ final class AdminProjectModel
         $this->validate($v);
         return Database::transaction(function(PDO $d)use($v,$id,$actor):int{
             $tutor=$v['tutor_id']?:null;
+            $tutoringChange=['changed'=>false];
             $type=$d->prepare('SELECT code FROM project_types WHERE id=:id AND is_active=1');
             $type->execute(['id'=>$v['project_type_id']]);
             $typeCode=(string)$type->fetchColumn();
@@ -95,6 +119,10 @@ final class AdminProjectModel
                 $q=$d->prepare('SELECT id,code,title,subtitle,summary,status,project_type_id,career_id,academic_period_id,tutor_id,presentation_file_id,approved_at,created_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE');
                 $q->execute(['id'=>$id]);$before=$q->fetch();
                 if(!$before)throw new InvalidArgumentException('El proyecto ya no existe.');
+                if(!empty($v['tutoring_managed'])){
+                    $tutoringChange=(new ProjectTutoringService())->sync($d,$id,(array)($v['tutoring_user_ids']??[]),(int)($v['tutoring_primary_id']??0),$before['tutor_id']===null?null:(int)$before['tutor_id']);
+                    $tutor=(int)$tutoringChange['after_primary'];
+                }
                 if($v['status']==='published'){
                     $requestedPresentation=(int)($v['presentation_file_id']??0);
                     if($requestedPresentation>0){
@@ -128,7 +156,7 @@ final class AdminProjectModel
                     if($old!==$value)$changed[$field]=[$old,$value];
                 }
                 $keywordChange=(new ProjectKeywordModel())->syncDifferential($d,$id,(array)($v['keywords']??[]),(new SupportMaterialModel())->keywordCatalog());
-                if(!$changed&&!$keywordChange['changed'])throw new InvalidArgumentException('No se detectaron cambios en el proyecto.');
+                if(!$changed&&!$keywordChange['changed']&&!$tutoringChange['changed'])throw new InvalidArgumentException('No se detectaron cambios en el proyecto.');
                 $publishing=$v['status']==='published'&&(string)$before['status']!=='published';
                 $summary=(string)($v['summary']??'');$descriptionChanged=false;$descriptionOrigin='existing';
                 if($publishing){
@@ -151,10 +179,20 @@ final class AdminProjectModel
                     && empty($before['approved_at']);
                 if($changed){$q=$d->prepare('UPDATE projects SET code=:code,title=:title,subtitle=:subtitle,summary=:summary,project_type_id=:type,career_id=:career,academic_period_id=:period,tutor_id=:tutor,status=:status,approved_at=CASE WHEN :record_completion=1 AND approved_at IS NULL THEN CURRENT_TIMESTAMP ELSE approved_at END,published_at=CASE WHEN :publishing=1 THEN CURRENT_TIMESTAMP ELSE published_at END,is_available=CASE WHEN :publishing_available=1 THEN 1 ELSE is_available END WHERE id=:id');
                 $q->execute(['code'=>$code,'title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'summary'=>$summary?:null,'type'=>$v['project_type_id'],'career'=>$v['career_id'],'period'=>$v['academic_period_id'],'tutor'=>$tutor,'status'=>$v['status'],'record_completion'=>$recordAcademicCompletion?1:0,'publishing'=>$publishing?1:0,'publishing_available'=>$publishing?1:0,'id'=>$id]);}
-                elseif($keywordChange['changed']){$d->prepare('UPDATE projects SET updated_at=CURRENT_TIMESTAMP WHERE id=:id')->execute(['id'=>$id]);}
+                elseif($keywordChange['changed']||$tutoringChange['changed']){$d->prepare('UPDATE projects SET updated_at=CURRENT_TIMESTAMP WHERE id=:id')->execute(['id'=>$id]);}
                 if($descriptionChanged)(new ProjectAuditService($d))->record($id,$actor,'project_description_updated','project',$id,['summary'=>null],['summary'=>$summary,'origin'=>$descriptionOrigin,'edited_by_administrator'=>true]);
-                [$previous,$next,$history]=$this->describeChanges($d,$changed);
+                $describedChanges=$changed;
+                if($tutoringChange['changed'])unset($describedChanges['tutor_id']);
+                [$previous,$next,$history]=$this->describeChanges($d,$describedChanges);
                 if($keywordChange['changed']){$beforeKeywords=$keywordChange['before']?implode(', ',$keywordChange['before']):'Sin etiquetas';$afterKeywords=$keywordChange['after']?implode(', ',$keywordChange['after']):'Sin etiquetas';$previous['Etiquetas']=$beforeKeywords;$next['Etiquetas']=$afterKeywords;$history[]=['field'=>'Etiquetas','verb'=>'cambiadas','from'=>$beforeKeywords,'to'=>$afterKeywords];}
+                if($tutoringChange['changed']){
+                    $beforeTutoring=implode(', ',array_column($tutoringChange['before'],'name'));
+                    $afterTutoring=implode(', ',array_column($tutoringChange['after'],'name'));
+                    $previous['Tutoría']=$beforeTutoring;
+                    $next['Tutoría']=$afterTutoring;
+                    $next['_tutoring']=['added'=>$tutoringChange['added'],'removed'=>$tutoringChange['removed'],'previous_reference'=>$tutoringChange['before_primary'],'new_reference'=>$tutoringChange['after_primary']];
+                    $history[]=['field'=>'Tutoría','verb'=>'actualizada','from'=>$beforeTutoring,'to'=>$afterTutoring];
+                }
                 $next['_history_changes']=$history;
                 $auditId=(new ProjectAuditService($d))->record($id,$actor,'project_updated','project',$id,$previous,$next);
                 if(isset($changed['status'])){

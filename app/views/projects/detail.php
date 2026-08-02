@@ -72,7 +72,7 @@ if ($project === null): ?>
         ['id'=>'institutional','title'=>'Información académica','icon'=>'fa-building-columns','type'=>'metadata','content'=>array_values(array_filter([
             ['label'=>'Código','value'=>(string)$project['code']],['label'=>'Tipo de proyecto','value'=>(string)$project['type_name']],['label'=>'Carrera','value'=>(string)$project['career_name']],
             ['label'=>'Período académico','value'=>(string)$project['period_name']],['label'=>'Estado','value'=>$statusLabel],['label'=>'Etapa académica','value'=>$stageLabel],
-            ['label'=>'Asignatura académica','value'=>trim((string)($project['subject_code']??'').' · '.(string)($project['subject_name']??''),' ·')],['label'=>'Línea de investigación','value'=>(string)($project['research_line_name']??'')],
+            ['label'=>'Línea de investigación','value'=>(string)($project['research_line_name']??'')],
             ['label'=>'Fecha de registro','value'=>$dateLabel($project['created_at']??null)],['label'=>'Fecha de aprobación','value'=>$dateLabel($project['approved_at']??null)],['label'=>'Fecha de publicación','value'=>$dateLabel($project['published_at']??null)],
         ],static fn(array $row):bool=>$row['value']!==''))],
         ['id'=>'participants','title'=>'Participantes','icon'=>'fa-users','type'=>'metadata','content'=>array_merge($participantRows($students),$participantRows($academicTeam),$participantRows($tribunal))],
@@ -102,7 +102,7 @@ if ($project === null): ?>
             ['id'=>'description','title'=>'Descripción del proyecto','icon'=>'fa-align-left','type'=>'prose','content'=>$publishedDescription!==''?$publishedDescription:'Este proyecto aún no cuenta con una descripción pública.'],
             ['id'=>'institutional','title'=>'Información académica','icon'=>'fa-building-columns','type'=>'metadata','content'=>array_values(array_filter([
                 ['key'=>'code','icon'=>'fa-hashtag','label'=>'Código','value'=>(string)$project['code']],['key'=>'type','icon'=>'fa-folder-tree','label'=>'Tipo de proyecto','value'=>(string)$project['type_name']],['key'=>'career','icon'=>'fa-graduation-cap','label'=>'Carrera','value'=>(string)$project['career_name']],
-                ['key'=>'subject','icon'=>'fa-book-open','label'=>'Asignatura académica','value'=>trim((string)($project['subject_code']??'').' · '.(string)($project['subject_name']??''),' ·')],['key'=>'period','icon'=>'fa-calendar-days','label'=>'Período académico','value'=>(string)$project['period_name']],
+                ['key'=>'period','icon'=>'fa-calendar-days','label'=>'Período académico','value'=>(string)$project['period_name']],
                 ['key'=>'research','icon'=>'fa-microscope','label'=>'Línea de investigación','value'=>(string)($project['research_line_name']??'')],['key'=>'status','icon'=>'fa-circle-check','label'=>'Estado','value'=>'Publicado'],['key'=>'stage','icon'=>'fa-flag-checkered','label'=>'Etapa académica','value'=>$stageLabel],
                 ['key'=>'completion','icon'=>'fa-calendar-check','label'=>'Fecha de finalización','value'=>$dateLabel($project['academic_completed_at']??null)],['key'=>'publication','icon'=>'fa-building-columns','label'=>'Fecha de publicación','value'=>$dateLabel($project['repository_published_at']??null)],
             ],static fn(array $row):bool=>$row['value']!==''))],

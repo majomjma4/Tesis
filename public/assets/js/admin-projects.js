@@ -25,6 +25,11 @@
     const keywordSummary = form?.querySelector('[data-project-keyword-summary]');
     const keywordLimit = form?.querySelector('[data-project-keyword-limit]');
     const keywordChips = form?.querySelector('[data-project-keyword-chips]');
+    const tutoring = form?.querySelector('[data-project-tutoring]');
+    const tutoringList = form?.querySelector('[data-tutoring-list]');
+    const tutoringEditor = form?.querySelector('[data-tutoring-editor]');
+    const tutoringAdd = form?.querySelector('[data-tutoring-add]');
+    const tutoringNote = form?.querySelector('[data-tutoring-note]');
     const dialogLayers = [modal, trash, saveConfirm, presentationDialog, descriptionDialog].filter(Boolean);
     dialogLayers.forEach(layer => { layer.hidden = true; });
     dialogLayers.forEach(layer => document.body.append(layer));
@@ -43,9 +48,28 @@
     let pendingSaveData = null;
     let activeProject = null;
     let initialFormState = '';
+    let initialTutoringState = '';
     let projectIsSaving = false;
+    let temporaryTutors = [];
+    let initialPrimaryTutorId = '';
+    let tutoringEditorAbort = null;
+    const tutoringState = () => JSON.stringify(temporaryTutors.map(tutor => [String(tutor.user_id), tutor.is_primary ? 'principal' : 'additional'])
+        .sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1])));
     const selectedKeywordState = () => [...(keywordOptions?.querySelectorAll('input:checked') || [])].map(input => input.value.normalize('NFC')).sort((a, b) => a.localeCompare(b, 'es'));
-    const editableState = () => JSON.stringify([...['title', 'subtitle', 'tutor_id'].map(name => form?.elements[name]?.value ?? ''), form?.querySelector('[data-project-summary]')?.value ?? '', selectedKeywordState()]);
+    const normalizeComparableText = value => String(value ?? '')
+        .normalize('NFC')
+        .replace(/\r\n?/g, '\n')
+        .split('\n')
+        .map(line => line.trim().replace(/[^\S\n]+/gu, ' '))
+        .join('\n')
+        .trim();
+    const editableState = () => JSON.stringify([
+        normalizeComparableText(form?.elements.title?.value),
+        form?.elements.subtitle?.value ?? '',
+        tutoringState(),
+        normalizeComparableText(form?.querySelector('[data-project-summary]')?.value),
+        selectedKeywordState(),
+    ]);
     const syncChangeState = () => {
         const dirty = Boolean(initialFormState) && editableState() !== initialFormState;
         if (changeState) changeState.hidden = !dirty;
@@ -161,7 +185,6 @@
     const periodSelect = form?.elements.academic_period_id;
     const tutorSelect = form?.elements.tutor_id;
     const statusSelect = form?.elements.status;
-    if (tutorSelect?.options[0]) tutorSelect.options[0].text = 'Seleccionar tutor';
     if (statusSelect && !statusSelect.querySelector('option[value=""]')) statusSelect.add(new Option('Seleccionar estado', ''), 0);
     const thesisOnlyStatuses = [...(statusSelect?.options || [])].filter(option => ['defense', 'tribunal_approved'].includes(option.value));
     if (careerSelect) {
@@ -209,21 +232,181 @@
         if (!response.ok || !result.success) throw new Error(result.message);
         return result;
     };
+    const tutoringCatalog = (() => {
+        try { return JSON.parse(form?.querySelector('[data-tutoring-catalog]')?.textContent || '[]'); }
+        catch { return []; }
+    })();
+    const tutoringRoles = new Set(['tutor', 'co_tutor', 'cotutor', 'co-tutor']);
+    const tutorInitials = person => String(person?.full_name || person?.username || '?').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
+    const normalizeTutor = (person, primary = false) => ({
+        user_id: String(person?.user_id ?? person?.id ?? ''),
+        username: String(person?.username || ''),
+        full_name: String(person?.full_name || person?.name || ''),
+        email: String(person?.email || ''),
+        is_primary: primary,
+    });
+    const loadTutoring = project => {
+        const principalId = String(project?.tutor_id ?? project?.tutor_user_id ?? '');
+        initialPrimaryTutorId = principalId;
+        const candidates = (Array.isArray(project?.participants) ? project.participants : [])
+            .filter(person => tutoringRoles.has(String(person?.role_code || '').toLowerCase()) && person?.is_teacher !== false && Number(person?.is_teacher ?? 1) !== 0);
+        if (principalId && !candidates.some(person => String(person?.user_id) === principalId)) {
+            candidates.unshift({ user_id: principalId, username: project?.tutor_username, full_name: project?.tutor_name, email: project?.tutor_email });
+        }
+        const seen = new Set();
+        temporaryTutors = candidates.map(person => normalizeTutor(person, String(person?.user_id) === principalId)).filter(person => {
+            if (!person.user_id || seen.has(person.user_id)) return false;
+            seen.add(person.user_id);
+            return true;
+        });
+        renderTutoring();
+    };
+    const closeTutoringEditor = () => {
+        tutoringEditorAbort?.abort();
+        tutoringEditorAbort = null;
+        if (tutoringEditor) { tutoringEditor.hidden = true; tutoringEditor.replaceChildren(); }
+    };
+    const announceTutoring = message => {
+        if (!tutoringNote) return;
+        tutoringNote.textContent = message;
+        tutoringNote.hidden = !message;
+    };
+    const openTutoringEditor = (mode, targetId = '') => {
+        if (!tutoringEditor) return;
+        closeTutoringEditor();
+        const excluded = new Set(temporaryTutors.filter(tutor => mode === 'replace' ? tutor.user_id !== targetId : true).map(tutor => tutor.user_id));
+        const available = tutoringCatalog.map(person => normalizeTutor(person)).filter(person => person.user_id && !excluded.has(person.user_id));
+        const copy = document.createElement('p');
+        copy.textContent = mode === 'add'
+            ? 'Se añadirá un nuevo docente a la Tutoría del proyecto.'
+            : 'El docente seleccionado sustituirá al tutor actual. Este cambio todavía no se aplicará hasta guardar.';
+        const picker = document.createElement('div'); picker.className = 'ap-tutor-picker';
+        const trigger = document.createElement('button'); trigger.type = 'button'; trigger.className = 'ap-tutor-picker-trigger';
+        const panelId = `apTutorPicker${mode}${targetId || 'New'}`;
+        trigger.setAttribute('aria-haspopup', 'listbox'); trigger.setAttribute('aria-expanded', 'false'); trigger.setAttribute('aria-controls', panelId);
+        trigger.innerHTML = '<span>Selecciona un docente</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>';
+        const panel = document.createElement('div'); panel.id = panelId; panel.className = 'ap-tutor-picker-options'; panel.setAttribute('role', 'listbox'); panel.hidden = true;
+        let selectedId = '';
+        const optionButtons = available.map(person => {
+            const option = document.createElement('button'); option.type = 'button'; option.setAttribute('role', 'option'); option.setAttribute('aria-selected', 'false'); option.dataset.value = person.user_id;
+            const label = document.createElement('span');
+            const name = document.createElement('strong'); name.textContent = person.full_name || 'Docente registrado'; label.append(name);
+            if (person.username) { const username = document.createElement('small'); username.textContent = `@${person.username}`; label.append(username); }
+            const check = document.createElement('i'); check.className = 'fa-solid fa-check'; check.setAttribute('aria-hidden', 'true'); option.append(label, check); panel.append(option); return option;
+        });
+        const actions = document.createElement('div'); actions.className = 'ap-tutoring-editor-actions';
+        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancelar';
+        const apply = document.createElement('button'); apply.type = 'button'; apply.textContent = mode === 'add' ? 'Añadir temporalmente' : 'Reemplazar'; apply.disabled = true;
+        const closePicker = (restoreFocus = false) => { panel.hidden = true; picker.classList.remove('is-open'); trigger.setAttribute('aria-expanded', 'false'); if (restoreFocus) trigger.focus(); };
+        const openPicker = () => { if (!available.length) return; panel.hidden = false; picker.classList.add('is-open'); trigger.setAttribute('aria-expanded', 'true'); (optionButtons.find(option => option.dataset.value === selectedId) || optionButtons[0])?.focus(); };
+        const choose = option => {
+            selectedId = option.dataset.value || '';
+            optionButtons.forEach(item => item.setAttribute('aria-selected', String(item === option)));
+            trigger.querySelector('span').textContent = option.querySelector('strong')?.textContent || 'Docente seleccionado';
+            apply.disabled = !selectedId; closePicker(true);
+        };
+        trigger.addEventListener('click', () => panel.hidden ? openPicker() : closePicker());
+        trigger.addEventListener('keydown', event => { if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) { event.preventDefault(); openPicker(); } else if (event.key === 'Escape') closePicker(); });
+        optionButtons.forEach((option, index) => {
+            option.addEventListener('click', () => choose(option));
+            option.addEventListener('keydown', event => {
+                if (event.key === 'Escape') { event.preventDefault(); closePicker(true); return; }
+                if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(option); return; }
+                if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+                event.preventDefault();
+                const next = event.key === 'Home' ? 0 : event.key === 'End' ? optionButtons.length - 1 : event.key === 'ArrowUp' ? Math.max(0, index - 1) : Math.min(optionButtons.length - 1, index + 1);
+                optionButtons[next]?.focus();
+            });
+        });
+        tutoringEditorAbort = new AbortController();
+        document.addEventListener('click', event => { if (!picker.contains(event.target)) closePicker(); }, { signal: tutoringEditorAbort.signal });
+        cancel.addEventListener('click', closeTutoringEditor);
+        apply.addEventListener('click', () => {
+            const selected = available.find(person => person.user_id === selectedId);
+            if (!selected) return;
+            if (mode === 'add') {
+                const restoresInitialPrimary = selected.user_id === initialPrimaryTutorId;
+                if (restoresInitialPrimary) temporaryTutors = temporaryTutors.map(tutor => ({ ...tutor, is_primary: false }));
+                temporaryTutors.push({ ...selected, is_primary: temporaryTutors.length === 0 || restoresInitialPrimary });
+            } else {
+                const index = temporaryTutors.findIndex(person => person.user_id === targetId);
+                if (index >= 0) temporaryTutors[index] = { ...selected, is_primary: temporaryTutors[index].is_primary };
+            }
+            closeTutoringEditor(); renderTutoring(); syncChangeState();
+        });
+        picker.append(trigger, panel); actions.append(cancel, apply);
+        tutoringEditor.replaceChildren(copy, picker, actions);
+        tutoringEditor.hidden = false;
+        trigger.focus();
+    };
+    function renderTutoring() {
+        if (!tutoringList) return;
+        tutoringList.replaceChildren();
+        temporaryTutors.forEach(person => {
+            const row = document.createElement('article'); row.className = 'ap-tutor-person';
+            const identity = document.createElement(person.email ? 'button' : 'div'); identity.className = 'ap-tutor-identity';
+            if (person.email) identity.type = 'button';
+            const avatar = document.createElement('span'); avatar.className = 'ap-tribunal-avatar'; avatar.textContent = tutorInitials(person); avatar.setAttribute('aria-hidden', 'true');
+            const copy = document.createElement('span');
+            if (person.username) { const username = document.createElement('small'); username.textContent = `@${person.username}`; copy.append(username); }
+            const name = document.createElement('strong'); name.textContent = person.full_name || 'Docente registrado';
+            const badge = document.createElement('em'); badge.textContent = 'Tutor';
+            copy.append(name, badge); identity.append(avatar, copy);
+            if (person.email) {
+                const contactId = `apTutorContact${person.user_id}`; identity.setAttribute('aria-expanded', 'false'); identity.setAttribute('aria-controls', contactId); identity.setAttribute('aria-label', `Mostrar correo de ${person.full_name}`);
+                const chevron = document.createElement('i'); chevron.className = 'fa-solid fa-chevron-down'; chevron.setAttribute('aria-hidden', 'true'); identity.append(chevron);
+                const contact = document.createElement('a'); contact.id = contactId; contact.className = 'ap-tutor-contact'; contact.href = `mailto:${person.email}`; contact.textContent = person.email; contact.hidden = true;
+                identity.addEventListener('click', () => { contact.hidden = !contact.hidden; identity.setAttribute('aria-expanded', String(!contact.hidden)); });
+                row.append(identity, contact);
+            } else row.append(identity);
+            const actions = document.createElement('div'); actions.className = 'ap-tutor-actions';
+            const replace = document.createElement('button'); replace.type = 'button'; replace.className = 'ap-tutor-action'; replace.dataset.tooltip = 'Reemplazar tutor'; replace.setAttribute('aria-label', 'Reemplazar tutor'); replace.innerHTML = '<i class="fa-solid fa-rotate" aria-hidden="true"></i>'; replace.addEventListener('click', event => { event.stopPropagation(); openTutoringEditor('replace', person.user_id); }); actions.append(replace);
+            const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'ap-tutor-action is-destructive'; remove.disabled = temporaryTutors.length <= 1; remove.setAttribute('aria-disabled', String(remove.disabled));
+            const removeHelp = remove.disabled ? 'El proyecto debe conservar al menos un tutor.' : 'Retirar tutor'; remove.dataset.tooltip = removeHelp; remove.setAttribute('aria-label', removeHelp); remove.title = removeHelp; remove.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
+            remove.addEventListener('click', event => {
+                event.stopPropagation();
+                temporaryTutors = temporaryTutors.filter(tutor => tutor.user_id !== person.user_id);
+                if (person.is_primary && temporaryTutors.length) temporaryTutors[0].is_primary = true;
+                announceTutoring('El docente dejará de formar parte de la Tutoría. El proyecto debe conservar al menos un tutor.');
+                closeTutoringEditor(); renderTutoring(); syncChangeState();
+            });
+            actions.append(remove);
+            row.append(actions); tutoringList.append(row);
+        });
+        if (!temporaryTutors.length) {
+            const empty = document.createElement('p'); empty.className = 'ap-tutoring-empty'; empty.textContent = 'El proyecto debe conservar al menos un tutor.'; tutoringList.append(empty);
+        }
+    }
+    tutoringAdd?.addEventListener('click', () => openTutoringEditor('add'));
     const renderTribunal = project => {
-        const section = form?.querySelector('[data-project-tribunal]');
-        const content = form?.querySelector('[data-project-tribunal-content]');
-        if (!section || !content) return;
-        const isDegreeProject = String(project?.type_code || project?.project_type_code || '').toLowerCase() === 'thesis';
-        section.hidden = !isDegreeProject;
-        content.replaceChildren();
-        if (!isDegreeProject) return;
+        form?.querySelector('[data-project-tribunal]')?.remove();
+        const academicGrid = form?.querySelector('[data-project-academic-grid]');
+        if (!academicGrid) return;
+        const typeCode = String(project?.type_code || project?.project_type_code || project?.type_key || '').toLowerCase();
+        const typeName = String(project?.type_name || project?.type || '').trim();
+        const isDegreeProject = typeCode === 'thesis' || (typeCode === '' && /titulación|trabajo de titulación/i.test(typeName));
+        if (!isDegreeProject || !Array.isArray(project?.participants)) return;
+        const section = document.createElement('div');
+        section.className = 'ap-readonly ap-tribunal';
+        section.dataset.projectTribunal = '';
+        const sectionIcon = document.createElement('i');
+        sectionIcon.className = 'fa-solid fa-scale-balanced';
+        sectionIcon.setAttribute('aria-hidden', 'true');
+        const sectionBody = document.createElement('span');
+        const sectionTitle = document.createElement('small');
+        sectionTitle.textContent = 'Tribunal';
+        const content = document.createElement('div');
+        content.className = 'ap-tribunal-content';
+        sectionBody.append(sectionTitle, content);
+        section.append(sectionIcon, sectionBody);
+        academicGrid.append(section);
         const members = (Array.isArray(project?.participants) ? project.participants : []).filter(person =>
             ['tribunal', 'jury'].includes(String(person?.role_code || '').toLowerCase()) && Boolean(Number(person?.is_teacher))
         );
         if (!members.length) {
             const empty = document.createElement('p');
             empty.className = 'ap-tribunal-empty';
-            empty.innerHTML = '<i class="fa-solid fa-user-group" aria-hidden="true"></i><span>El proyecto aún no tiene un tribunal asignado.</span>';
+            empty.textContent = 'El proyecto aún no tiene un tribunal asignado.';
             content.append(empty);
             return;
         }
@@ -236,26 +419,9 @@
             const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'U';
             const row = document.createElement('article');
             row.className = 'ap-tribunal-person';
-            const main = document.createElement(email ? 'button' : 'div');
+            const main = document.createElement('div');
             main.className = 'ap-tribunal-person-main';
-            if (email) {
-                const contactId = `ap-tribunal-contact-${project.id}-${person.user_id || index}`;
-                main.type = 'button';
-                main.setAttribute('aria-expanded', 'false');
-                main.setAttribute('aria-controls', contactId);
-                main.dataset.tribunalContactToggle = '';
-                const contact = document.createElement('div');
-                contact.className = 'ap-tribunal-contact';
-                contact.id = contactId;
-                contact.hidden = true;
-                const contactLabel = document.createElement('small');
-                contactLabel.textContent = 'Correo institucional';
-                const contactLink = document.createElement('a');
-                contactLink.href = `mailto:${email}`;
-                contactLink.textContent = email;
-                contact.append(contactLabel, contactLink);
-                row.append(main, contact);
-            } else row.append(main);
+            row.append(main);
             const avatar = document.createElement('span');
             avatar.className = 'ap-tribunal-avatar';
             avatar.setAttribute('aria-hidden', 'true');
@@ -276,15 +442,16 @@
                 identity.append(secondary);
             }
             const role = document.createElement('small');
-            role.textContent = 'Miembro del tribunal';
+            const payloadRole = String(person.tribunal_role_label || person.role_label || person.role_name || person.position || person.role || '').trim();
+            role.textContent = payloadRole && !['tribunal', 'jury'].includes(payloadRole.toLowerCase()) ? payloadRole : 'Miembro del tribunal';
             identity.append(role);
-            main.append(avatar, identity);
             if (email) {
-                const chevron = document.createElement('i');
-                chevron.className = 'fa-solid fa-chevron-down';
-                chevron.setAttribute('aria-hidden', 'true');
-                main.append(chevron);
+                const contact = document.createElement('span');
+                contact.className = 'ap-tribunal-email';
+                contact.textContent = email;
+                identity.append(contact);
             }
+            main.append(avatar, identity);
             list.append(row);
         });
         content.append(list);
@@ -395,14 +562,6 @@
             closeKeywordSelector(true);
         }
     });
-    form?.addEventListener('click', event => {
-        const trigger = event.target.closest('[data-tribunal-contact-toggle]');
-        if (!trigger || !form.contains(trigger)) return;
-        const panel = document.getElementById(trigger.getAttribute('aria-controls'));
-        const expanded = trigger.getAttribute('aria-expanded') === 'true';
-        trigger.setAttribute('aria-expanded', String(!expanded));
-        if (panel) panel.hidden = expanded;
-    });
     const open = project => {
         activeProject = project || null;
         pendingSaveData = null;
@@ -447,6 +606,8 @@
             tags.replaceChildren(...(values.length ? values.map(tag => Object.assign(document.createElement('span'), { textContent: typeof tag === 'string' ? tag : tag.name })) : [Object.assign(document.createElement('span'), { textContent: 'Sin etiquetas registradas' })]));
         }
         loadKeywordSelector(project);
+        loadTutoring(project);
+        initialTutoringState = tutoringState();
         renderTribunal(project);
         if (editWarning) editWarning.hidden = !project;
         if (advancedOptions) {
@@ -483,15 +644,30 @@
         });
         requestedCard?.querySelector('[data-edit]')?.click();
     }
-    document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => modal.hidden = true));
-    modal?.addEventListener('click', event => { if (event.target === modal) modal.hidden = true; });
+    const resetTutoringPanels = () => {
+        closeTutoringEditor();
+        tutoring?.querySelectorAll('.ap-tutor-contact').forEach(contact => { contact.hidden = true; });
+        tutoring?.querySelectorAll('.ap-tutor-identity[aria-expanded]').forEach(identity => identity.setAttribute('aria-expanded', 'false'));
+        if (tutoringNote) { tutoringNote.hidden = true; tutoringNote.textContent = ''; }
+    };
+    const closeEditor = () => {
+        closeKeywordSelector();
+        resetTutoringPanels();
+        modal.hidden = true;
+    };
+    document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', closeEditor));
+    modal?.addEventListener('click', event => { if (event.target === modal) closeEditor(); });
+    document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || event.defaultPrevented || modal?.hidden || !saveConfirm?.hidden) return;
+        closeEditor();
+    });
     const saveProject = async data => {
         projectIsSaving = true;
         syncChangeState();
         try {
             await request(cfg.dataset.save, data);
             saveConfirm.hidden = true;
-            modal.hidden = true;
+            closeEditor();
             const destination = new URL(location.href);
             destination.searchParams.delete('edit');
             location.replace(destination.toString());
@@ -567,7 +743,13 @@
         event.preventDefault();
         if (!syncChangeState()) return;
         const data = new FormData(form);
+        const primaryTutor = temporaryTutors.find(tutor => tutor.is_primary) || temporaryTutors[0];
+        data.set('tutoring_managed', '1');
+        data.delete('tutoring_user_ids[]');
+        temporaryTutors.forEach(tutor => data.append('tutoring_user_ids[]', tutor.user_id));
+        data.set('tutoring_primary_id', primaryTutor?.user_id || '');
         ['career_id', 'academic_period_id', 'project_type_id', 'tutor_id', 'status'].forEach(name => data.set(name, form.elements[name].value));
+        data.set('tutor_id', primaryTutor?.user_id || '');
         const publishingFirstTime = data.get('status') === 'published' && activeProject?.status !== 'published';
         if (publishingFirstTime) {
             try { await preparePublicDescription(data); }
