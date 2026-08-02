@@ -19,6 +19,7 @@ $extensions = is_array($limits['extensions'] ?? null) ? $limits['extensions'] : 
             <div class="ed-upload-dialog__body">
                 <input type="hidden" name="_csrf" value="<?= e((string) ($upload['csrf_token'] ?? '')) ?>">
                 <input type="hidden" name="material_id" value="<?= (int) ($digitalRecord['entity']['id'] ?? 0) ?>">
+                <input type="hidden" name="context" value="<?= e((string) ($upload['context'] ?? '')) ?>">
                 <input type="hidden" name="action" value="add">
                 <button class="ed-upload-picker file-drag-zone" type="button" data-upload-picker-trigger data-upload-dropzone>
                     <i class="fa-solid fa-file-arrow-up upload-icon" aria-hidden="true"></i>

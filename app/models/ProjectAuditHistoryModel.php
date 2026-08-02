@@ -5,6 +5,7 @@ declare(strict_types=1);
 /** Adapta la auditoría existente del proyecto al panel administrativo compartido. */
 final class ProjectAuditHistoryModel
 {
+    private string $context = 'repository';
     private const STATUS_LABELS = [
         'development' => 'En desarrollo', 'under_review' => 'En revisión',
         'changes_required' => 'Requiere cambios', 'approved' => 'Aprobado',
@@ -12,8 +13,9 @@ final class ProjectAuditHistoryModel
         'published' => 'Publicado',
     ];
 
-    public function forProject(int $projectId, int $limit = 20, int $offset = 0): array
+    public function forProject(int $projectId, int $limit = 20, int $offset = 0, string $context = 'repository'): array
     {
+        $this->context = $context === 'academic_management' ? 'academic_management' : 'repository';
         $limit = max(1, min(20, $limit));
         $offset = max(0, $offset);
         $count = Database::connection()->prepare('SELECT COUNT(*) FROM project_audit_log WHERE project_id=:project_id');
@@ -62,7 +64,7 @@ final class ProjectAuditHistoryModel
         return [
             'id' => (int) $row['id'], 'action' => (string) $row['action'],
             'action_label' => $this->actionLabel((string) $row['action']),
-            'summary' => 'Proyecto',
+            'summary' => $this->context === 'academic_management' ? 'Proyecto académico' : 'Proyecto',
             'actor' => [
                 'name' => trim((string) ($row['actor_name'] ?? '')) ?: 'Sistema institucional',
                 'email' => (string) ($row['actor_email'] ?? ''),
@@ -88,7 +90,7 @@ final class ProjectAuditHistoryModel
         $history = (array) ($next['_history_changes'] ?? []);
         if ($history !== []) return array_values(array_filter(array_map(fn (array $change): ?array =>
             isset($change['field']) ? [
-                'field' => (string) $change['field'], 'label' => (string) $change['field'],
+                'field' => (string) $change['field'], 'label' => $this->fieldLabel((string) $change['field']),
                 'old' => $this->displayValue((string) ($change['from'] ?? '')),
                 'new' => $this->displayValue((string) ($change['to'] ?? '')),
             ] : null, $history)));
@@ -110,7 +112,7 @@ final class ProjectAuditHistoryModel
         $rows = [];
         if (trim($reason) !== '') $rows[] = ['key' => 'reason', 'label' => 'Motivo', 'value' => trim($reason)];
         foreach ($metadata as $key => $value) {
-            if ($key === '_history_changes' || str_ends_with((string) $key, '_id') || is_array($value)) continue;
+            if (in_array((string)$key,['_history_changes','context'],true) || str_ends_with((string) $key, '_id') || is_array($value)) continue;
             if ($value === null || $value === '') continue;
             $rows[] = ['key' => (string) $key, 'label' => $this->fieldLabel((string) $key), 'value' => $this->displayValue($value, (string) $key)];
         }
@@ -129,9 +131,18 @@ final class ProjectAuditHistoryModel
     {
         return [
             'status' => 'Estado', 'title' => 'Título', 'subtitle' => 'Descripción breve',
-            'summary' => 'Descripción pública', 'is_available' => 'Disponibilidad',
+            'summary' => $this->context==='academic_management'?'Descripción':'Descripción pública', 'is_available' => 'Disponibilidad',
             'original_name' => 'Archivo', 'presentation_file_id' => 'Archivo de presentación',
             'name' => 'Nombre', 'size_bytes' => 'Tamaño',
+            'restore_hours' => 'Plazo de restauración (horas)', 'version_number' => 'Versión',
+            'previous_name' => 'Nombre anterior', 'new_name' => 'Nombre nuevo',
+            'previous_status' => 'Estado anterior', 'new_status' => 'Estado nuevo',
+            'previous_available' => 'Disponibilidad anterior', 'new_availability' => 'Disponibilidad nueva',
+            'previous_file' => 'Archivo anterior', 'new_file' => 'Archivo nuevo',
+            'project_keywords' => 'Clasificación', 'keywords' => 'Clasificación',
+            'tutor_reference_id' => 'Referencia de Tutoría', 'tutor_id' => 'Tutoría',
+            'entity_label' => 'Entidad', 'area' => 'Área',
+            'project_type' => 'Tipo de proyecto', 'career' => 'Carrera', 'academic_period' => 'Período académico',
             'old_value' => 'Valor anterior', 'new_value' => 'Valor nuevo',
         ][$field] ?? ucfirst(str_replace(['_', '.'], ' ', $field));
     }

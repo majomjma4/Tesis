@@ -4,6 +4,26 @@ if ($project === null): ?>
 <?php else:
     $projectId = (int) $project['id'];
     $detailUrl = (string) $detailUrl;
+    $projectContext = (string) ($projectContext ?? ($publicContext ? 'repository' : 'academic'));
+    $projectCapabilities = array_replace([
+        'view_project' => false,
+        'edit_information' => false,
+        'manage_files' => false,
+        'view_academic_history' => false,
+        'view_admin_history' => false,
+        'manage_publication' => false,
+        'change_status' => false,
+        'manage_participants' => false,
+        'manage_tutoring' => false,
+        'manage_tribunal' => false,
+        'register_delivery' => false,
+        'review_delivery' => false,
+        'create_observation' => false,
+        'respond_observation' => false,
+        'download_files' => false,
+    ], is_array($projectCapabilities ?? null) ? $projectCapabilities : []);
+    $projectStatusTransitions = is_array($projectStatusTransitions ?? null) ? $projectStatusTransitions : [];
+    $isAcademicManagement = $projectContext === 'academic_management';
     $academicLabels = project_academic_labels((string) $project['status']);
     $statusLabel = $publicContext ? 'Publicado' : $academicLabels['status'];
     $isDegreeProject = in_array(mb_strtolower((string)($project['type_code'] ?? ''),'UTF-8'), ['thesis','tesis','degree','titulacion','titulación'], true)
@@ -27,12 +47,13 @@ if ($project === null): ?>
         $authorMetadata = ['key'=>'author','label'=>'Autores','value'=>count($students).' integrantes','icon'=>'fa-users'];
     }
     $previewTypes = ['pdf'=>'pdf','docx'=>'docx','txt'=>'text','png'=>'image','jpg'=>'image','jpeg'=>'image','webp'=>'image'];
-    $documents = array_map(static function (array $file) use ($projectId, $previewActionUrl, $downloadActionUrl, $previewTypes): array {
+    $presentationFileId = (int) ($project['presentation_file_id'] ?? 0);
+    $documents = array_map(static function (array $file) use ($projectId, $presentationFileId, $previewActionUrl, $downloadActionUrl, $previewTypes): array {
         $extension = strtolower((string) $file['extension']);
         $query = '&project_id=' . $projectId . '&file_id=' . (int) $file['id'];
         return ['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'type'=>strtoupper($extension ?: 'FILE'),'mime_type'=>(string)($file['mime_type']??''),
             'size'=>ArchiveService::formatBytes((int)$file['size_bytes']),'sort_order'=>(int)($file['sort_order']??$file['id']),'extension'=>$extension,'available'=>true,
-            'is_presentation'=>(int)($project['presentation_file_id'] ?? 0)===(int)$file['id'],'is_package'=>false,
+            'is_presentation'=>$presentationFileId===(int)$file['id'],'is_package'=>false,
             'preview_supported'=>isset($previewTypes[$extension]),'preview_type'=>$previewTypes[$extension] ?? 'unsupported',
             'preview_url'=>$previewActionUrl.$query,'download_url'=>$downloadActionUrl.$query];
     }, $project['files']);
@@ -56,10 +77,9 @@ if ($project === null): ?>
         $extension=strtolower((string)$version['extension']);
         $versions[]=['name'=>(string)$version['original_name'],'versions_count'=>1,'updated_date'=>date('d/m/Y H:i',strtotime((string)$version['replaced_at'])),'responsible'=>(string)($version['responsible']?:'Administración institucional'),'available'=>true,'versions'=>[ ['file_id'=>(int)$version['file_id'],'id'=>(int)$version['id'],'number'=>(int)$version['version_number'],'name'=>(string)$version['original_name'],'date'=>date('d/m/Y H:i',strtotime((string)$version['replaced_at'])),'responsible'=>(string)($version['responsible']?:'Administración institucional'),'current'=>false,'available'=>true,'extension'=>$extension,'size'=>ArchiveService::formatBytes((int)$version['size_bytes']),'preview_supported'=>false] ]];
     }
-    $tabs = [
-        ['id'=>'information','label'=>'Información','icon'=>'fa-file-lines'],['id'=>'files','label'=>'Documentos','icon'=>'fa-folder-open'],
-        ['id'=>'evolution','label'=>'Historial','icon'=>'fa-clock-rotate-left'],
-    ];
+    $tabs = [['id'=>'information','label'=>'Información','icon'=>'fa-file-lines']];
+    if(!empty($projectCapabilities['download_files']))$tabs[]=['id'=>'files','label'=>'Documentos','icon'=>'fa-folder-open'];
+    if(!empty($projectCapabilities['view_academic_history']))$tabs[]=['id'=>'evolution','label'=>'Historial','icon'=>'fa-clock-rotate-left'];
     foreach ($tabs as &$tabItem) $tabItem['url']=$detailUrl.'&tab='.$tabItem['id']; unset($tabItem);
     $allowedTabs=array_column($tabs,'id'); $activeTab=in_array($activeTab,$allowedTabs,true)?$activeTab:'information';
     $importantDates=array_values(array_filter([
@@ -78,11 +98,9 @@ if ($project === null): ?>
         ['id'=>'participants','title'=>'Participantes','icon'=>'fa-users','type'=>'metadata','content'=>array_merge($participantRows($students),$participantRows($academicTeam),$participantRows($tribunal))],
         ['id'=>'dates','title'=>'Fechas importantes','icon'=>'fa-calendar-days','type'=>'metadata','content'=>$importantDates],
     ];
-    if($publicContext){
+    if($publicContext||$isAcademicManagement){
         $participantTutor=array_values(array_filter($academicTeam,static fn(array $row):bool=>$row['role_code']==='tutor'))[0]??null;
-        $cotutors=array_values(array_filter($academicTeam,static fn(array $row):bool=>$row['role_code']==='cotutor'));
-        $tutorName=trim((string)($project['tutor_name']??($participantTutor['full_name']??'')));
-        $publicTribunal=$isDegreeProject?$tribunal:[];
+        $richTribunal=$isDegreeProject?$tribunal:[];
         $usableEmail=static function(mixed $value):string{$email=trim((string)$value);$lower=mb_strtolower($email,'UTF-8');return filter_var($email,FILTER_VALIDATE_EMAIL)&&!str_ends_with($lower,'.invalid')?$email:'';};
         $person=static function(array $row,string $role,bool $includeEmail=false)use($usableEmail):array{return [
             'user_id'=>(int)($row['user_id']??0),'username'=>trim((string)($row['username']??'')),
@@ -90,40 +108,75 @@ if ($project === null): ?>
             'initial'=>mb_strtoupper(mb_substr(trim((string)($row['full_name']??'U')),0,1,'UTF-8'),'UTF-8'),
             'email'=>$includeEmail?$usableEmail($row['email']??''):'','avatar_url'=>'',
         ];};
-        $publicAuthors=array_map(static function(array $row)use($person):array{return $person($row,'Estudiante')+['leader'=>!empty($row['is_display_leader'])];},$students);
-        $publicTeachingParticipants=array_values(array_filter($project['participants'],static fn(array $row):bool=>in_array((string)$row['role_code'],['tutor','cotutor'],true)||(!empty($row['is_teacher'])&&!in_array((string)$row['role_code'],['student','tribunal','jury'],true))));
+        $richAuthors=array_map(static function(array $row)use($person):array{return $person($row,'Estudiante')+['leader'=>!empty($row['is_display_leader'])];},$students);
+        $richTeachingParticipants=$publicContext
+            ?array_values(array_filter($project['participants'],static fn(array $row):bool=>in_array((string)$row['role_code'],['tutor','cotutor'],true)||(!empty($row['is_teacher'])&&!in_array((string)$row['role_code'],['student','tribunal','jury'],true))))
+            :$academicTeam;
         $tutoringByUser=[];
-        foreach($publicTeachingParticipants as $member){$role=$roleLabels[$member['role_code']]??ucfirst(str_replace('_',' ',(string)$member['role_code']));$tutoringByUser[(int)$member['user_id']]=$person($member,$role,true);}
+        foreach($richTeachingParticipants as $member){$role=$isAcademicManagement?'Tutor':($roleLabels[$member['role_code']]??ucfirst(str_replace('_',' ',(string)$member['role_code'])));$tutoringByUser[(int)$member['user_id']]=$person($member,$role,true);}
         $mainTutorId=(int)($project['tutor_user_id']??0);
         if($mainTutorId>0&&!isset($tutoringByUser[$mainTutorId]))$tutoringByUser[$mainTutorId]=$person(['user_id'=>$mainTutorId,'username'=>$project['tutor_username']??'','full_name'=>$project['tutor_name']??'','email'=>$project['tutor_email']??''],'Tutor',true);
-        $publicTutoring=array_values($tutoringByUser);
-        $publicTribunalMembers=array_map(static fn(array $row):array=>$person($row,$roleLabels[$row['role_code']]??'Miembro del tribunal',true),$publicTribunal);
+        $richTutoring=array_values($tutoringByUser);
+        $richTribunalMembers=array_map(static fn(array $row):array=>$person($row,$roleLabels[$row['role_code']]??'Miembro del tribunal',true),$richTribunal);
+        $richAcademicFields=array_values(array_filter([
+            $publicContext?['key'=>'code','icon'=>'fa-hashtag','label'=>'Código','value'=>(string)$project['code']]:null,
+            ['key'=>'type','icon'=>'fa-folder-tree','label'=>'Tipo de proyecto','value'=>(string)$project['type_name']],
+            ['key'=>'career','icon'=>'fa-graduation-cap','label'=>'Carrera','value'=>(string)$project['career_name']],
+            ['key'=>'period','icon'=>'fa-calendar-days','label'=>'Período académico','value'=>(string)$project['period_name']],
+            ['key'=>'research','icon'=>'fa-microscope','label'=>'Línea de investigación','value'=>(string)($project['research_line_name']??'')],
+            ['key'=>'status','icon'=>'fa-circle-check','label'=>'Estado','value'=>$statusLabel],
+            ['key'=>'stage','icon'=>'fa-flag-checkered','label'=>'Etapa académica','value'=>$stageLabel],
+            $isAcademicManagement?['key'=>'registration','icon'=>'fa-calendar-plus','label'=>'Fecha de registro','value'=>$dateLabel($project['created_at']??null)]:null,
+            $publicContext?['key'=>'completion','icon'=>'fa-calendar-check','label'=>'Fecha de finalización','value'=>$dateLabel($project['academic_completed_at']??null)]:null,
+            $publicContext?['key'=>'publication','icon'=>'fa-building-columns','label'=>'Fecha de publicación','value'=>$dateLabel($project['repository_published_at']??null)]:null,
+        ],static fn(?array $row):bool=>$row!==null&&$row['value']!==''));
         $informationSections=[
-            ['id'=>'description','title'=>'Descripción del proyecto','icon'=>'fa-align-left','type'=>'prose','content'=>$publishedDescription!==''?$publishedDescription:'Este proyecto aún no cuenta con una descripción pública.'],
-            ['id'=>'institutional','title'=>'Información académica','icon'=>'fa-building-columns','type'=>'metadata','content'=>array_values(array_filter([
-                ['key'=>'code','icon'=>'fa-hashtag','label'=>'Código','value'=>(string)$project['code']],['key'=>'type','icon'=>'fa-folder-tree','label'=>'Tipo de proyecto','value'=>(string)$project['type_name']],['key'=>'career','icon'=>'fa-graduation-cap','label'=>'Carrera','value'=>(string)$project['career_name']],
-                ['key'=>'period','icon'=>'fa-calendar-days','label'=>'Período académico','value'=>(string)$project['period_name']],
-                ['key'=>'research','icon'=>'fa-microscope','label'=>'Línea de investigación','value'=>(string)($project['research_line_name']??'')],['key'=>'status','icon'=>'fa-circle-check','label'=>'Estado','value'=>'Publicado'],['key'=>'stage','icon'=>'fa-flag-checkered','label'=>'Etapa académica','value'=>$stageLabel],
-                ['key'=>'completion','icon'=>'fa-calendar-check','label'=>'Fecha de finalización','value'=>$dateLabel($project['academic_completed_at']??null)],['key'=>'publication','icon'=>'fa-building-columns','label'=>'Fecha de publicación','value'=>$dateLabel($project['repository_published_at']??null)],
-            ],static fn(array $row):bool=>$row['value']!==''))],
+            ['id'=>'description','title'=>'Descripción del proyecto','icon'=>'fa-align-left','type'=>'prose','content'=>$publishedDescription!==''?$publishedDescription:($publicContext?'Este proyecto aún no cuenta con una descripción pública.':'Este proyecto aún no cuenta con una descripción registrada.')],
+            ['id'=>'institutional','title'=>'Información académica','icon'=>'fa-building-columns','type'=>'metadata','content'=>$richAcademicFields],
             ['id'=>'participants','title'=>'Participantes','icon'=>'fa-users','type'=>'project_participants','content'=>[
-                'authors'=>$publicAuthors,'tutoring'=>$publicTutoring,'tribunal'=>$publicTribunalMembers,
+                'authors'=>$richAuthors,'tutoring'=>$richTutoring,'tribunal'=>$richTribunalMembers,
+                'show_tribunal'=>$isAcademicManagement&&$isDegreeProject,
             ]],
             ['id'=>'project-classification','title'=>'Clasificación','icon'=>'fa-tags','type'=>'project_tags','content'=>array_map(static fn(array $keyword):string=>(string)$keyword['name'],(array)($project['keywords']??[]))],
         ];
+        if($isAcademicManagement){
+            $institutionalPublication=(string)$project['status']==='published'?$dateLabel($project['repository_published_at']??null):'';
+            $informationSections[]=['id'=>'project-institutional','title'=>'Información institucional','icon'=>'fa-landmark','type'=>'metadata','content'=>array_values(array_filter([
+                ['key'=>'institutional-code','icon'=>'fa-hashtag','label'=>'Código','value'=>(string)$project['code']],
+                $institutionalPublication!==''?['key'=>'institutional-publication','icon'=>'fa-building-columns','label'=>'Fecha de publicación','value'=>$institutionalPublication]:null,
+                ['key'=>'institutional-updated','icon'=>'fa-clock','label'=>'Última actualización','value'=>$dateLabel($project['updated_at']??null),'secondary'=>true],
+            ],static fn(?array $row):bool=>$row!==null&&$row['value']!==''))];
+        }
     }
     $actions=[];
-    if ($isAdministrator) $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
-    elseif (!$publicContext && $canDeliver) $actions[]=['id'=>'delivery','label'=>'Registrar entrega','kind'=>'primary','icon'=>'fa-upload','url'=>$detailUrl.'&tab=review','enabled'=>true];
-    if (!empty($headerPackage['available'])) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'].($publicContext?'&scope=repository':''),'enabled'=>true,'download'=>true];
-    $menuActions=$isAdministrator&&$publicContext?[
-        ['label'=>$project['is_available']?'Marcar como no disponible':'Marcar como disponible','icon'=>$project['is_available']?'fa-ban':'fa-circle-check','enabled'=>true,'action'=>'availability'],
-        ['label'=>'Retirar publicación','icon'=>'fa-box-archive','enabled'=>true,'action'=>'publication'],
-        ['label'=>'Ver historial administrativo','icon'=>'fa-clock-rotate-left','enabled'=>true,'action'=>'admin-history','separator'=>true],
-        ['label'=>'Enviar a Papelera','icon'=>'fa-trash-can','enabled'=>true,'action'=>'trash','danger'=>true,'separator'=>true],
-    ]:[];
-    $digitalRecord=['entity'=>['type'=>'project','id'=>$projectId,'query_key'=>'project_id'],'context'=>$publicContext?'repository':'academic','mode'=>'view','return_url'=>$returnUrl,
-        'breadcrumbs'=>[['label'=>$publicContext?'Repositorio':'Proyectos','url'=>$returnUrl],['label'=>(string)$project['code'],'url'=>null]],
+    if (!empty($projectCapabilities['edit_information'])) $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
+    elseif (!$publicContext && !empty($projectCapabilities['register_delivery']) && $canDeliver) $actions[]=['id'=>'delivery','label'=>'Registrar entrega','kind'=>'primary','icon'=>'fa-upload','url'=>$detailUrl.'&tab=review','enabled'=>true];
+    if (!empty($projectCapabilities['download_files'])&&!empty($headerPackage['available'])) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'].($publicContext?'&scope=repository':($isAcademicManagement?'&context=academic_management':'')),'enabled'=>true,'download'=>true];
+    $menuActions=[];
+    if($publicContext&&!empty($projectCapabilities['manage_publication'])){
+        $menuActions[]=['label'=>$project['is_available']?'Marcar como no disponible':'Marcar como disponible','icon'=>$project['is_available']?'fa-ban':'fa-circle-check','enabled'=>true,'action'=>'availability'];
+        $menuActions[]=['label'=>'Retirar publicación','icon'=>'fa-box-archive','enabled'=>true,'action'=>'publication'];
+    }
+    if($publicContext&&!empty($projectCapabilities['view_admin_history']))$menuActions[]=['label'=>'Ver historial administrativo','icon'=>'fa-clock-rotate-left','enabled'=>true,'action'=>'admin-history','separator'=>$menuActions!==[]];
+    if($publicContext&&!empty($projectCapabilities['edit_information']))$menuActions[]=['label'=>'Enviar a Papelera','icon'=>'fa-trash-can','enabled'=>true,'action'=>'trash','danger'=>true,'separator'=>$menuActions!==[]];
+    if($isAcademicManagement&&!empty($projectCapabilities['change_status']))foreach($projectStatusTransitions as $transition)$menuActions[]=[
+        'label'=>(string)$transition['label'],'icon'=>(string)$transition['icon'],'enabled'=>true,
+        'action'=>'status-transition','transition'=>$transition,
+    ];
+    if($isAcademicManagement&&!empty($projectCapabilities['view_admin_history']))$menuActions[]=[
+        'label'=>'Ver historial administrativo','icon'=>'fa-clock-rotate-left','enabled'=>true,'action'=>'admin-history','separator'=>$menuActions!==[],
+    ];
+    $breadcrumbs = $isAcademicManagement ? [
+        ['label'=>'Gestión académica','url'=>route('admin-academic')],
+        ['label'=>'Proyectos','url'=>$returnUrl],
+        ['label'=>(string)$project['code'],'url'=>null],
+    ] : [
+        ['label'=>$publicContext?'Repositorio':'Proyectos','url'=>$returnUrl],
+        ['label'=>(string)$project['code'],'url'=>null],
+    ];
+    $digitalRecord=['entity'=>['type'=>'project','id'=>$projectId,'query_key'=>'project_id'],'context'=>$projectContext,'mode'=>'view','return_url'=>$returnUrl,
+        'capabilities'=>$projectCapabilities,
+        'breadcrumbs'=>$breadcrumbs,
         'header'=>['title'=>(string)$project['title'],'description'=>(string)($project['subtitle']??''),'type_label'=>(string)$project['type_name'],'type_icon'=>$publicContext?'fa-folder-tree':null,'status_label'=>$statusLabel,'status_tone'=>$project['status']==='published'?'success':'neutral'],
         'metadata'=>array_values(array_filter($publicContext?[
             ['key'=>'period','label'=>'Período académico','value'=>(string)$project['period_name'],'icon'=>'fa-calendar-days'],
@@ -132,25 +185,32 @@ if ($project === null): ?>
             ['key'=>'registration','label'=>'Registro','value'=>$dateLabel($project['created_at']??null),'icon'=>'fa-calendar-plus'],
             ['key'=>'availability','label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible','icon'=>$project['is_available']?'fa-circle-check':'fa-circle-minus'],
         ]:[
-            ['label'=>'Código','value'=>(string)$project['code']],['label'=>'Carrera','value'=>(string)$project['career_name']],['label'=>'Período académico','value'=>(string)$project['period_name']],['label'=>'Tutor','value'=>(string)($project['tutor_name']??'')],['label'=>'Integrantes','value'=>count($students).''],['label'=>'Registro','value'=>$dateLabel($project['created_at']??null)],['label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible']
+            ['label'=>'Código','value'=>(string)$project['code']],['label'=>'Carrera','value'=>(string)$project['career_name']],['label'=>'Período académico','value'=>(string)$project['period_name']],['label'=>'Tutor','value'=>(string)($project['tutor_name']??'')],['label'=>'Integrantes','value'=>count($students).''],['label'=>'Registro','value'=>$dateLabel($project['created_at']??null)],
+            $isAcademicManagement?['label'=>'Etapa académica','value'=>$stageLabel]:null,
+            $isAcademicManagement?null:['label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible']
         ],static fn(?array $row):bool=>$row!==null&&$row['value']!=='')),
         'actions'=>$actions,'menu_actions'=>$menuActions,'tabs'=>$tabs,'active_tab'=>$activeTab,'information_sections'=>$informationSections,
         'documents'=>$documents,'archives'=>$archives,'versions'=>$versions,
-        'can_manage_files'=>$publicContext&&$isAdministrator&&!empty($projectDocuments),
+        'can_manage_files'=>!empty($projectCapabilities['manage_files'])&&($publicContext||$isAcademicManagement)&&!empty($projectDocuments),
         'restorable_files'=>(array)($projectDocuments['restorable']??[]),
-        'file_upload'=>!empty($projectDocuments)?['endpoint'=>(string)$projectDocuments['endpoint'],'csrf_token'=>(string)$projectDocuments['csrf'],'limits'=>(array)$projectDocuments['limits']]:[],
+        'file_upload'=>!empty($projectDocuments)?['context'=>(string)($projectDocuments['context']??$projectContext),'endpoint'=>(string)$projectDocuments['endpoint'],'csrf_token'=>(string)$projectDocuments['csrf'],'limits'=>(array)$projectDocuments['limits']]:[],
         'package'=>(array)($projectDocuments['package']??[]),
         'global_file_actions'=>[],
         'project_histories'=>[
             'academic'=>(array)($project['academic_history']??[]),
             'academic_total'=>(int)($project['academic_history_total']??count((array)($project['academic_history']??[]))),
             'academic_endpoint'=>(string)($academicHistoryEndpoint??''),
-            'modifications'=>(array)($project['post_publication_modifications']??[]),
+            'modifications'=>$publicContext?(array)($project['post_publication_modifications']??[]):[],
         ],
         'endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl,'admin_history'=>(string)($projectHistoryEndpoint??'')], 'version_endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl],
-         'admin_actions'=>['endpoint'=>(string)($projectAdminEndpoint??''),'trash_endpoint'=>(string)($projectTrashEndpoint??''),'csrf_token'=>(string)($projectAdminCsrf??''),'trash_csrf_token'=>(string)($projectTrashCsrf??''),'status'=>'published','is_available'=>!empty($project['is_available']),'redirect'=>$returnUrl],
+         'admin_actions'=>['endpoint'=>(string)($projectAdminEndpoint??''),'trash_endpoint'=>(string)($projectTrashEndpoint??''),'csrf_token'=>(string)($projectAdminCsrf??''),'trash_csrf_token'=>(string)($projectTrashCsrf??''),'status'=>(string)$project['status'],'is_available'=>!empty($project['is_available']),'redirect'=>$returnUrl],
+        'status_transition'=>[
+            'enabled'=>$isAcademicManagement&&!empty($projectCapabilities['change_status']),
+            'endpoint'=>(string)($projectStatusEndpoint??''),'csrf_token'=>(string)($projectStatusCsrf??''),
+            'current_status'=>(string)$project['status'],'items'=>$projectStatusTransitions,
+        ],
         'return_label'=>$publicContext?'Volver al repositorio':'Volver a proyectos'];
-    if($publicContext): ?><style>
+    if($publicContext||$isAcademicManagement): ?><style>
     .digital-record[data-entity-type="project"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:14px;align-items:start}
     .digital-record[data-entity-type="project"] .ed-document-section{padding:19px}
     .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="description"]{grid-column:1/-1}
@@ -158,10 +218,17 @@ if ($project === null): ?>
     .digital-record[data-entity-type="project"] .ed-document-section-header{margin-bottom:13px;padding-bottom:11px}
     .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="description"] .ed-prose{max-width:82ch;font-size:14px;line-height:1.72;overflow-wrap:anywhere}
     .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="description"] .ed-prose p{margin-bottom:12px}
+    .digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="project-institutional"]{grid-column:1/-1;border-top:3px solid #0891b2}
+    .digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="project-institutional"] .ed-information-meta{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="project-institutional"] .ed-information-meta .is-secondary{border-top-color:var(--line);background:var(--surface-soft);color:var(--muted)}
+    .digital-record[data-record-context="academic_management"] :is(.ed-information-meta dd,.ed-participant-identity strong,.ed-participant-identity span,.ed-participant-identity small,.ed-classification-tag>span){word-break:normal;overflow-wrap:break-word}
     @media(max-width:800px){.digital-record[data-entity-type="project"] .ed-information{grid-template-columns:1fr}}
+    @media(max-width:800px){.digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="project-institutional"] .ed-information-meta{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:520px){.digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="project-institutional"] .ed-information-meta{grid-template-columns:1fr}}
     </style><?php endif;
     require __DIR__.'/../repository/_ficha-institucional.php';
+    if($isAcademicManagement&&!empty($digitalRecord['status_transition']['enabled'])&&$projectStatusTransitions)require __DIR__.'/../repository/_project-status-transition-dialog.php';
     if($publicContext):?><style>@media(min-width:801px){.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr)}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-document-section[data-information-section="description"]{grid-column:1/-1}}</style><?php endif;
     if(!$publicContext&&!empty($descriptionReminder)) require __DIR__.'/_description-reminder.php';
-    if($publicContext&&$isAdministrator&&!empty($projectEditorCatalogs)){$projectEditorOnly=true;$catalogs=$projectEditorCatalogs;$projectCsrf=$projectTrashCsrf;$projectEndpoints=['save'=>$projectSaveEndpoint,'trash'=>$projectTrashEndpoint];$projectEditorPayload=array_merge($project,['presentation_files'=>array_values(array_map(static fn(array $file):array=>['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'extension'=>(string)$file['extension'],'format'=>strtoupper((string)$file['extension']),'icon'=>'fa-regular fa-file','size'=>ArchiveService::formatBytes((int)$file['size_bytes'])],$project['files']))]);require __DIR__.'/../admin/projects.php';}
+    if($publicContext&&!empty($projectCapabilities['edit_information'])&&!empty($projectEditorCatalogs)){$projectEditorOnly=true;$catalogs=$projectEditorCatalogs;$projectCsrf=$projectTrashCsrf;$projectEndpoints=['save'=>$projectSaveEndpoint,'trash'=>$projectTrashEndpoint];$projectEditorPayload=array_merge($project,['presentation_files'=>array_values(array_map(static fn(array $file):array=>['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'extension'=>(string)$file['extension'],'format'=>strtoupper((string)$file['extension']),'icon'=>'fa-regular fa-file','size'=>ArchiveService::formatBytes((int)$file['size_bytes'])],$project['files']))]);require __DIR__.'/../admin/projects.php';}
 endif;

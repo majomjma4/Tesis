@@ -6,17 +6,26 @@
 /* Escala tipográfica legible y consistente con el resto del módulo administrativo. */
 .ed-history-eyebrow{font-size:11px}.admin-history-drawer__header p{font-size:12px;line-height:1.5}.ed-history-notice{font-size:11px;line-height:1.45}.ed-history-state{font-size:13px;line-height:1.55}.ed-history-actor{font-size:13px;line-height:1.4}.ed-history-identity{font-size:11px;line-height:1.45;overflow-wrap:anywhere}.ed-history-action{font-size:13px;line-height:1.45}.ed-history-date{font-size:11px}.ed-history-change h3,.ed-history-value strong{font-size:11px;line-height:1.4}.ed-history-value span,.ed-history-transition{font-size:12px;line-height:1.5}.ed-history-transition__arrow{font-size:9px}.ed-history-legacy,.ed-history-empty-detail{font-size:11px;line-height:1.5}.ed-history-legacy strong{font-size:10px}.ed-history-more,.ed-history-cleanup-button{font-size:12px}.ed-history-cleanup small{font-size:10px}.ed-history-cleanup-card>p{font-size:13px}.ed-history-cleanup-card label{font-size:12px}.ed-history-cleanup-actions button{font-size:12px}
 </style>
-<div class="admin-history-overlay" hidden data-record-history-overlay data-endpoint="<?= e((string) $digitalRecord['endpoints']['admin_history']) ?>" data-cleanup-endpoint="<?= e((string) ($digitalRecord['endpoints']['admin_history_cleanup'] ?? '')) ?>" data-material-id="<?= (int) ($digitalRecord['entity']['id'] ?? 0) ?>" data-csrf="<?= e((string) ($digitalRecord['form']['csrf_token'] ?? '')) ?>">
+<?php
+$historyIsProject=(string)($digitalRecord['entity']['type']??'')==='project';
+$historyContext=(string)($digitalRecord['context']??'repository');
+$historyIsAcademicManagement=$historyIsProject&&$historyContext==='academic_management';
+$historyEyebrow=$historyIsAcademicManagement?'Proyecto académico':($historyIsProject?'Proyecto publicado':'Material de apoyo');
+$historyTitle=$historyIsAcademicManagement?'Historial administrativo del proyecto':'Historial administrativo';
+$historyDescription=$historyIsAcademicManagement?'Registro de acciones realizadas en Gestión académica.':'Registro de acciones realizadas sobre este '.($historyIsProject?'proyecto':'material').'.';
+$historyEmpty=$historyIsAcademicManagement?'No hay modificaciones administrativas registradas.':'Aún no existen acciones administrativas registradas para este '.($historyIsProject?'proyecto':'material').'.';
+?>
+<div class="admin-history-overlay" hidden data-record-history-overlay data-context="<?=e($historyContext)?>" data-entity-type="<?=e((string)($digitalRecord['entity']['type']??''))?>" data-endpoint="<?= e((string) $digitalRecord['endpoints']['admin_history']) ?>" data-cleanup-endpoint="<?= e((string) ($digitalRecord['endpoints']['admin_history_cleanup'] ?? '')) ?>" data-material-id="<?= (int) ($digitalRecord['entity']['id'] ?? 0) ?>" data-csrf="<?= e((string) ($digitalRecord['form']['csrf_token'] ?? '')) ?>">
     <aside class="admin-history-drawer" role="dialog" aria-modal="true" aria-labelledby="recordHistoryTitle" aria-describedby="recordHistoryDescription" data-record-history-drawer>
         <header class="admin-history-drawer__header">
-            <div><span class="ed-history-eyebrow"><?= (string) ($digitalRecord['entity']['type'] ?? '') === 'project' ? 'Proyecto publicado' : 'Material de apoyo' ?></span><h2 id="recordHistoryTitle" tabindex="-1">Historial administrativo</h2><p id="recordHistoryDescription">Registro de acciones realizadas sobre este <?= (string) ($digitalRecord['entity']['type'] ?? '') === 'project' ? 'proyecto' : 'material' ?>.</p></div>
+            <div><span class="ed-history-eyebrow"><?=e($historyEyebrow)?></span><h2 id="recordHistoryTitle" tabindex="-1"><?=e($historyTitle)?></h2><p id="recordHistoryDescription"><?=e($historyDescription)?></p></div>
             <button class="ed-history-close" type="button" aria-label="Cerrar historial administrativo" data-record-history-close><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
         </header>
         <div class="admin-history-drawer__body" tabindex="0" data-admin-history-drawer-body>
             <p class="ed-history-notice" role="status" aria-live="polite" hidden data-record-history-notice></p>
             <p class="ed-history-progress" aria-live="polite" hidden data-record-history-progress></p>
             <div class="ed-history-state" role="status" aria-live="polite" hidden data-record-history-loading><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><span>Cargando historial administrativo…</span></div>
-            <div class="ed-history-state" hidden data-record-history-empty><i class="fa-regular fa-clock" aria-hidden="true"></i><span>Aún no existen acciones administrativas registradas para este <?= (string) ($digitalRecord['entity']['type'] ?? '') === 'project' ? 'proyecto' : 'material' ?>.</span></div>
+            <div class="ed-history-state" hidden data-record-history-empty><i class="fa-regular fa-clock" aria-hidden="true"></i><span><?=e($historyEmpty)?></span></div>
             <div class="ed-history-state is-error" role="alert" hidden data-record-history-error><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>No fue posible cargar el historial administrativo.</span></div>
             <div class="ed-history-list" role="list" hidden data-record-history-list></div>
         </div>

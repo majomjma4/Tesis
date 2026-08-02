@@ -20,15 +20,16 @@ final class ProjectDocumentModel
     {
         $q=$this->db->prepare("SELECT * FROM project_files WHERE project_id=:project AND id=:file AND deleted_at IS NULL AND purged_at IS NULL".($lock?' FOR UPDATE':''));$q->execute(['project'=>$projectId,'file'=>$fileId]);$row=$q->fetch();if(!$row)throw new InvalidArgumentException('El archivo ya no está disponible.');return $row;
     }
-    public function activeFileConflict(int $projectId,string $originalName,int $sizeBytes,string $checksum):?array
+    public function activeFileConflict(int $projectId,string $originalName,int $sizeBytes,string $checksum,?int $excludeFileId=null):?array
     {
         $q=$this->db->prepare("SELECT id,original_name,size_bytes,checksum_sha256,
             CASE WHEN original_name=:name_match AND size_bytes=:size_match THEN 'name_size' ELSE 'checksum' END conflict_type
             FROM project_files
             WHERE project_id=:project AND deleted_at IS NULL AND purged_at IS NULL
+              AND (:exclude_id IS NULL OR id<>:exclude_id_again)
               AND ((original_name=:name_lookup AND size_bytes=:size_lookup) OR checksum_sha256=:checksum)
             ORDER BY (original_name=:name_order AND size_bytes=:size_order) DESC,id LIMIT 1");
-        $q->execute(['name_match'=>$originalName,'size_match'=>$sizeBytes,'project'=>$projectId,'name_lookup'=>$originalName,'size_lookup'=>$sizeBytes,'checksum'=>$checksum,'name_order'=>$originalName,'size_order'=>$sizeBytes]);$row=$q->fetch();return $row?:null;
+        $q->execute(['name_match'=>$originalName,'size_match'=>$sizeBytes,'project'=>$projectId,'exclude_id'=>$excludeFileId,'exclude_id_again'=>$excludeFileId,'name_lookup'=>$originalName,'size_lookup'=>$sizeBytes,'checksum'=>$checksum,'name_order'=>$originalName,'size_order'=>$sizeBytes]);$row=$q->fetch();return $row?:null;
     }
     public function add(int $projectId,array $stored,int $actor):array
     {

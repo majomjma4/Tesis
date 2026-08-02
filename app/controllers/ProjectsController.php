@@ -63,10 +63,37 @@ final class ProjectsController
         $descriptionReminder = $isStudentParticipant
             ? $descriptionService->consumePendingReminder((int) $project['id'], $access->currentUserId())
             : null;
+        $projectContext = $isAdministrator ? 'academic_management' : 'academic';
+        $projectCapabilities = (new ProjectCapabilityService())->forCurrentUser($project, $projectContext);
+        $returnUrl = $isAdministrator
+            ? $this->academicManagementReturnUrl((string) ($_GET['return'] ?? ''))
+            : route('projects');
+        $detailUrl = route('project-detail') . '&id=' . (int) $project['id'];
+        if ($isAdministrator) $detailUrl .= '&return=' . rawurlencode($returnUrl);
+        $projectDocuments = null;
+        $projectStatusTransitions = [];
+        if (!empty($projectCapabilities['manage_files'])) {
+            $documentModel = new ProjectDocumentModel();
+            $documentFiles = $documentModel->activeFiles((int) $project['id']);
+            $projectDocuments = [
+                'context' => 'academic_management',
+                'restorable' => $documentModel->restorable((int) $project['id']),
+                'versions' => $documentModel->versions((int) $project['id']),
+                'package' => array_replace((new ProjectPackageService())->describe((int) $project['id'], $documentFiles), [
+                    'download_url' => route('project-package-download') . '&project_id=' . (int) $project['id'] . '&context=academic_management',
+                ]),
+                'limits' => (new ProjectDocumentFileService())->limits(),
+                'endpoint' => route('admin-project-file'),
+                'csrf' => $session->csrfToken('admin_projects'),
+            ];
+        }
+        if (!empty($projectCapabilities['change_status'])) $projectStatusTransitions = (new ProjectStatusTransitionService())->availableTransitions($project);
 
         View::render('projects/detail', [
             'currentPage' => 'projects',
-            'title' => ($project['title'] ?? 'Proyecto no encontrado') . ' | Gestión Académica',
+            'title' => $isAdministrator
+                ? (string) $project['code'] . ' · Gestión académica'
+                : ($project['title'] ?? 'Proyecto no encontrado') . ' | Gestión Académica',
             'bodyClass' => 'project-detail-page',
             'pageStyles' => [asset('css/project-simplified.css'), asset('css/project-description.css')],
             'pageScript' => asset('js/repository-detail.js'),
@@ -75,29 +102,61 @@ final class ProjectsController
             'activeTab' => $tab,
             'isAdministrator' => $isAdministrator,
             'publicContext' => false,
-            'canReview' => $isAdministrator || $access->can('delivery.review') || $access->can('observation.reply'),
-            'canDeliver' => $access->can('delivery.create'),
+            'projectContext' => $projectContext,
+            'projectCapabilities' => $projectCapabilities,
+            'canReview' => !empty($projectCapabilities['review_delivery']) || !empty($projectCapabilities['create_observation']) || !empty($projectCapabilities['respond_observation']),
+            'canDeliver' => !empty($projectCapabilities['register_delivery']),
             'projectEditUrl' => route('projects') . '&edit=' . (int) $project['id'],
-            'detailUrl' => route('project-detail') . '&id=' . (int)$project['id'],
-            'returnUrl' => route('projects'),
-            'previewActionUrl' => route('project-file-preview'),
-            'downloadActionUrl' => route('project-file-download'),
+            'detailUrl' => $detailUrl,
+            'returnUrl' => $returnUrl,
+            'previewActionUrl' => route('project-file-preview') . ($isAdministrator ? '&context=academic_management' : ''),
+            'downloadActionUrl' => route('project-file-download') . ($isAdministrator ? '&context=academic_management' : ''),
+            'projectDocuments' => $projectDocuments,
+            'projectHistoryEndpoint' => !empty($projectCapabilities['view_admin_history'])
+                ? route('admin-project-history') . '&id=' . (int) $project['id'] . '&context=academic_management'
+                : '',
+            'projectStatusTransitions' => $projectStatusTransitions,
+            'projectStatusEndpoint' => !empty($projectCapabilities['change_status']) ? route('admin-project-save') : '',
+            'projectStatusCsrf' => !empty($projectCapabilities['change_status']) ? $session->csrfToken('admin_projects') : '',
             'descriptionReminder' => $descriptionReminder,
             'descriptionCsrf' => $session->csrfToken('project_description'),
             'descriptionSaveEndpoint' => route('project-description-save'),
             'lifecycleDescription' => $descriptionService->effectiveDescription((string) $project['type_code'], $project['summary'] ?? null),
-            'academicHistoryEndpoint' => route('project-academic-history-events') . '&project_id=' . (int) $project['id'],
+            'academicHistoryEndpoint' => !empty($projectCapabilities['view_academic_history']) ? route('project-academic-history-events') . '&project_id=' . (int) $project['id'] . '&context=' . rawurlencode($projectContext) : '',
         ]);
+    }
+
+    private function academicManagementReturnUrl(string $candidate): string
+    {
+        $fallback = route('projects');
+        if ($candidate === '' || strlen($candidate) > 2048) return $fallback;
+        $parts = parse_url($candidate);
+        if ($parts === false || isset($parts['scheme']) || isset($parts['host']) || isset($parts['user']) || isset($parts['pass'])) return $fallback;
+        parse_str((string) ($parts['query'] ?? ''), $query);
+        $page = strtolower(trim((string) ($query['page'] ?? '')));
+        if (!in_array($page, ['projects', 'proyectos', 'mis-proyectos'], true)) return $fallback;
+
+        $safe = ['page' => 'projects'];
+        foreach (['p', 'type_id', 'period_id'] as $key) {
+            $value = filter_var($query[$key] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($value !== false && $value !== null) $safe[$key] = (int) $value;
+        }
+        $perPage = filter_var($query['per_page'] ?? null, FILTER_VALIDATE_INT);
+        if (in_array($perPage, [10, 25, 50, 75, 100], true)) $safe['per_page'] = (int) $perPage;
+        foreach (['search' => 100, 'status' => 32, 'sort' => 32, 'group' => 32, 'attention' => 32] as $key => $limit) {
+            if (!isset($query[$key]) || !is_scalar($query[$key])) continue;
+            $value = mb_substr(trim((string) $query[$key]), 0, $limit);
+            if ($value !== '') $safe[$key] = $value;
+        }
+        return base_url('index.php?' . http_build_query($safe));
     }
 
     public function academicHistoryEvents(): void
     {
         $projectId=filter_var($_GET['project_id']??null,FILTER_VALIDATE_INT);$offset=max(0,(int)($_GET['offset']??0));
-        $session=new AuthSessionService();$access=new ProjectAccessService();$administrator=$session->hasAdminAccess();
-        if(!$projectId||!$access->can('project.view')){$this->json(['success'=>false,'message'=>'El proyecto solicitado no está disponible.','data'=>[]]);}
-        $db=Database::connection();$allowed=$db->prepare("SELECT 1 FROM projects p WHERE p.id=:id AND p.deleted_at IS NULL".($administrator?'':" AND ((p.status='published' AND p.is_available=1) OR p.created_by=:viewer OR EXISTS(SELECT 1 FROM project_participants pp WHERE pp.project_id=p.id AND pp.user_id=:viewer2 AND pp.status='active'))"));
-        $params=['id'=>(int)$projectId];if(!$administrator){$params['viewer']=$access->currentUserId();$params['viewer2']=$access->currentUserId();}$allowed->execute($params);
-        if(!$allowed->fetchColumn()){http_response_code(404);$this->json(['success'=>false,'message'=>'El proyecto solicitado no está disponible.','data'=>[]]);}
+        $context=(string)($_GET['context']??'academic');
+        $capabilities=$projectId?(new ProjectCapabilityService())->forProjectId((int)$projectId,$context):(new ProjectCapabilityService())->none();
+        if(empty($capabilities['view_academic_history'])){http_response_code(403);$this->json(['success'=>false,'message'=>'No tienes autorización para consultar el historial académico de este proyecto.','data'=>[]]);}
         $page=(new ProjectRecordModel())->academicHistoryPage((int)$projectId,$offset,15);
         $this->json(['success'=>true,'message'=>'Historial académico cargado.','data'=>$page]);
     }
@@ -130,7 +189,7 @@ final class ProjectsController
     {
         [$project, $file, $stream] = $this->resolveFile(true);
         $query='&project_id='.(int)$project['id'].'&file_id='.(int)$file['id'];
-        $scope=(string)($_GET['scope']??'')==='repository'?'&scope=repository':'';
+        $scope=(string)($_GET['scope']??'')==='repository'?'&scope=repository':((string)($_GET['context']??'')==='academic_management'?'&context=academic_management':'');
         $version=!empty($file['checksum_sha256'])?'&v='.rawurlencode(substr((string)$file['checksum_sha256'],0,16)):'';
         $preview=(new FilePreviewService())->prepare($this->previewFile($file,$stream),route('project-file-content').$query.$scope.$version,route('project-file-download').$query.$scope);
         fclose($stream);header('Cache-Control: private, no-store, max-age=0');$this->json(['success'=>true,'message'=>$preview['message'],'data'=>['preview'=>$preview]]);
@@ -157,6 +216,10 @@ final class ProjectsController
         $access=new ProjectAccessService(); $admin=(new AuthSessionService())->hasAdminAccess();
         $model=new ProjectRecordModel();
         $repositoryScope=(string)($_GET['scope']??'')==='repository';
+        $academicManagement=(string)($_GET['context']??'')==='academic_management';
+        $context=$repositoryScope?'repository':($academicManagement?'academic_management':'academic');
+        $capabilities=$projectId?(new ProjectCapabilityService())->forProjectId((int)$projectId,$context):(new ProjectCapabilityService())->none();
+        if(empty($capabilities['download_files'])){http_response_code(403);if($json)$this->json(['success'=>false,'message'=>'No tienes autorización para consultar archivos de este proyecto.','data'=>[]]);exit('No tienes autorización para consultar archivos de este proyecto.');}
         $project=($projectId && $access->can('project.view'))?$model->find((int)$projectId,$access->currentUserId(),$admin,$repositoryScope):null;
         $file=($project && $fileId)?$model->findFile((int)$projectId,(int)$fileId):null;
         if(!$project||!$file){http_response_code(404);if($json)$this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);exit('El archivo solicitado no está disponible.');}

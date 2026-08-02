@@ -335,14 +335,10 @@ final class AdminRepositoryModel
                             : 'El proyecto debe estar aprobado antes de publicarse.'
                     );
                 }
-
-                $database->prepare(
-                    "UPDATE projects
-                    SET status='published', published_at=CURRENT_TIMESTAMP,is_available=1
-                    WHERE id=:id"
-                )->execute(['id' => $id]);
-                $after = ['status' => 'published'];
-                $action = 'project_published';
+                (new ProjectStatusTransitionService())->transitionInTransaction(
+                    $database, $id, (string) $before['status'], 'published', '', $actor, 'repository'
+                );
+                return;
             } else {
                 if ($before['status'] !== 'published') {
                     throw new InvalidArgumentException('El proyecto no está publicado.');

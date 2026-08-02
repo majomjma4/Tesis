@@ -57,15 +57,18 @@ final class RepositoryController
         $project = ($projectId !== false && $projectId !== null && $access->can('project.view'))
             ? (new ProjectRecordModel())->find((int)$projectId, $access->currentUserId(), $isAdministrator, true) : null;
         if ($project === null) http_response_code(404);
+        $projectCapabilities=$project!==null?(new ProjectCapabilityService())->forCurrentUser($project,'repository'):(new ProjectCapabilityService())->none();
         if($project!==null){$academicPage=(new ProjectRecordModel())->academicHistoryPage((int)$project['id']);$project['academic_history']=$academicPage['events'];$project['academic_history_total']=$academicPage['total'];}
         $requestedTab=strtolower(trim((string)($_GET['tab']??'information')));
         $activeTab=in_array($requestedTab,['information','files','evolution'],true)?$requestedTab:'information';
         $returnUrl=$this->repositoryReturnUrl((string)($_GET['return']??''));
         $projectDocuments=null;
-        if($project!==null&&$isAdministrator){
+        if($project!==null&&!empty($projectCapabilities['manage_files'])){
             $documentModel=new ProjectDocumentModel();
             $documentFiles=$documentModel->activeFiles((int)$project['id']);
-            $projectDocuments=['restorable'=>$documentModel->restorable((int)$project['id']),'versions'=>$documentModel->versions((int)$project['id']),'package'=>(new ProjectPackageService())->describe((int)$project['id'],$documentFiles),'limits'=>(new ProjectDocumentFileService())->limits(),'endpoint'=>route('admin-project-file'),'csrf'=>$session->csrfToken('admin_repository')];
+            $package=(new ProjectPackageService())->describe((int)$project['id'],$documentFiles);
+            if(!empty($package['download_url']))$package['download_url'].='&scope=repository';
+            $projectDocuments=['context'=>'repository','restorable'=>$documentModel->restorable((int)$project['id']),'versions'=>$documentModel->versions((int)$project['id']),'package'=>$package,'limits'=>(new ProjectDocumentFileService())->limits(),'endpoint'=>route('admin-project-file'),'csrf'=>$session->csrfToken('admin_repository')];
         }
         View::render('projects/detail', [
             'currentPage' => 'repository',
@@ -75,18 +78,20 @@ final class RepositoryController
             'pageScripts'=>$isAdministrator?[asset('js/material-admin-actions.js'),asset('js/repository-detail.js')]:[],
             'project' => $project,
             'activeTab'=>$activeTab,'isAdministrator'=>$isAdministrator,'publicContext'=>true,'canReview'=>false,'canDeliver'=>false,
+            'projectContext'=>'repository',
+            'projectCapabilities'=>$projectCapabilities,
             'projectEditUrl'=>'','detailUrl'=>route('repository-detail').'&id='.(int)($project['id']??0),
             'returnUrl'=>$returnUrl,'previewActionUrl'=>route('project-file-preview').'&scope=repository',
             'downloadActionUrl'=>route('project-file-download').'&scope=repository',
-            'projectAdminEndpoint'=>$isAdministrator?route('admin-repository-publish'):'',
-            'projectHistoryEndpoint'=>$isAdministrator?route('admin-project-history').'&id='.(int)($project['id']??0):'',
-            'projectTrashEndpoint'=>$isAdministrator?route('admin-project-trash'):'',
-            'projectSaveEndpoint'=>$isAdministrator?route('admin-project-save'):'',
-            'projectAdminCsrf'=>$isAdministrator?$session->csrfToken('admin_repository'):'',
-            'projectTrashCsrf'=>$isAdministrator?$session->csrfToken('admin_projects'):'',
-            'projectEditorCatalogs'=>$isAdministrator?(new AdminProjectModel())->catalogs():[],
+            'projectAdminEndpoint'=>!empty($projectCapabilities['manage_publication'])?route('admin-repository-publish'):'',
+            'projectHistoryEndpoint'=>!empty($projectCapabilities['view_admin_history'])?route('admin-project-history').'&id='.(int)($project['id']??0).'&context=repository':'',
+            'projectTrashEndpoint'=>!empty($projectCapabilities['edit_information'])?route('admin-project-trash'):'',
+            'projectSaveEndpoint'=>!empty($projectCapabilities['edit_information'])?route('admin-project-save'):'',
+            'projectAdminCsrf'=>!empty($projectCapabilities['manage_publication'])?$session->csrfToken('admin_repository'):'',
+            'projectTrashCsrf'=>!empty($projectCapabilities['edit_information'])?$session->csrfToken('admin_projects'):'',
+            'projectEditorCatalogs'=>!empty($projectCapabilities['edit_information'])?(new AdminProjectModel())->catalogs():[],
             'projectDocuments'=>$projectDocuments,
-            'academicHistoryEndpoint'=>route('project-academic-history-events').'&project_id='.(int)($project['id']??0),
+            'academicHistoryEndpoint'=>!empty($projectCapabilities['view_academic_history'])?route('project-academic-history-events').'&project_id='.(int)($project['id']??0).'&context=repository':'',
         ]);
     }
 

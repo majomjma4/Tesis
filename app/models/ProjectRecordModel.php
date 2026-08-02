@@ -17,16 +17,18 @@ final class ProjectRecordModel
         $project['participants'] = $this->rows($db, "SELECT pp.user_id,pp.role_code,pp.assigned_at,u.full_name FROM project_participants pp JOIN users u ON u.id=pp.user_id WHERE pp.project_id=:id AND pp.status='active' AND pp.removed_at IS NULL ORDER BY pp.assigned_at,pp.user_id", $projectId);
         $project['deliveries'] = $this->windowRows($db, "SELECT pd.*,u.full_name author_name FROM project_deliveries pd JOIN users u ON u.id=pd.submitted_by WHERE pd.project_id=:id AND pd.version_number>1 ORDER BY pd.submitted_at,pd.id LIMIT {$window}", $projectId);
         $project['observations'] = $this->windowRows($db, "SELECT po.*,u.full_name author_name,pd.version_number FROM project_observations po JOIN users u ON u.id=po.author_id LEFT JOIN project_deliveries pd ON pd.id=po.delivery_id WHERE po.project_id=:id ORDER BY po.created_at,po.id LIMIT {$window}", $projectId);
+        $project['responses'] = $this->windowRows($db, "SELECT response.*,u.full_name author_name,po.id observation_id FROM observation_responses response JOIN project_observations po ON po.id=response.observation_id JOIN users u ON u.id=response.author_id WHERE po.project_id=:id ORDER BY response.created_at,response.id LIMIT {$window}", $projectId);
         $activitySql = "SELECT pal.id,pal.action,pal.previous_state,pal.new_state,pal.created_at,u.full_name actor_name FROM project_audit_log pal LEFT JOIN users u ON u.id=pal.user_id WHERE pal.project_id=:id AND pal.action IN ('project_updated','project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished') ORDER BY pal.created_at,pal.id";
         $project['activity'] = $this->windowRows($db, $activitySql . " LIMIT {$window}", $projectId);
         $events = $this->academicHistory($project);
 
         $deliveryTotal = $this->scalar($db, 'SELECT COUNT(*) FROM project_deliveries WHERE project_id=:id AND version_number>1', $projectId);
         $observationTotal = $this->scalar($db, 'SELECT COUNT(*) FROM project_observations WHERE project_id=:id', $projectId);
+        $responseTotal = $this->scalar($db, 'SELECT COUNT(*) FROM observation_responses response JOIN project_observations observation ON observation.id=response.observation_id WHERE observation.project_id=:id', $projectId);
         $allActivity = $this->windowRows($db, $activitySql, $projectId);
-        $countProject = $project; $countProject['deliveries']=[]; $countProject['observations']=[]; $countProject['activity']=$allActivity;
+        $countProject = $project; $countProject['deliveries']=[]; $countProject['observations']=[]; $countProject['responses']=[]; $countProject['activity']=$allActivity;
         $baseAcademicTotal = count($this->academicHistory($countProject));
-        $total = $baseAcademicTotal + $deliveryTotal + $observationTotal;
+        $total = $baseAcademicTotal + $deliveryTotal + $observationTotal + $responseTotal;
         $page = array_slice($events, $offset, $limit);
         return ['events'=>$page,'total'=>$total,'loaded'=>count($page),'has_more'=>$offset+count($page)<$total,'next_offset'=>$offset+count($page)];
     }
@@ -50,10 +52,13 @@ final class ProjectRecordModel
         if ($publishedOnly) $sql .= " AND p.status='published'" . ($administrator ? '' : ' AND p.is_available=1') . "
             AND EXISTS (SELECT 1 FROM project_files visible_file WHERE visible_file.project_id=p.id AND visible_file.deleted_at IS NULL)
             AND EXISTS (SELECT 1 FROM project_participants visible_student INNER JOIN student_profiles visible_profile ON visible_profile.user_id=visible_student.user_id WHERE visible_student.project_id=p.id AND visible_student.role_code='student' AND visible_student.status='active' AND visible_student.removed_at IS NULL)";
-        if (!$administrator && !$publishedOnly) $sql .= " AND (p.created_by=:viewer OR EXISTS (SELECT 1 FROM project_participants access_participant WHERE access_participant.project_id=p.id AND access_participant.user_id=:viewer AND access_participant.status='active'))";
+        if (!$administrator && !$publishedOnly) $sql .= " AND (p.created_by=:viewer_creator OR EXISTS (SELECT 1 FROM project_participants access_participant WHERE access_participant.project_id=p.id AND access_participant.user_id=:viewer_participant AND access_participant.status='active' AND access_participant.removed_at IS NULL))";
         $statement = $db->prepare($sql);
         $parameters = ['id' => $projectId];
-        if (!$administrator && !$publishedOnly) $parameters['viewer'] = (int) $userId;
+        if (!$administrator && !$publishedOnly) {
+            $parameters['viewer_creator'] = (int) $userId;
+            $parameters['viewer_participant'] = (int) $userId;
+        }
         $statement->execute($parameters);
         $project = $statement->fetch();
         if (!$project) return null;
@@ -174,6 +179,14 @@ final class ProjectRecordModel
                     $this->observationStatusLabel((string) ($observation['status'] ?? '')),
                 ])),
                 'reference' => ['type' => 'observation', 'id' => (int) $observation['id']],
+            ];
+        }
+        foreach ((array) ($project['responses'] ?? []) as $response) {
+            $events[] = [
+                'key' => 'response:' . (int) $response['id'], 'type' => 'response', 'title' => 'Respuesta a observación registrada',
+                'detail' => trim((string) ($response['message'] ?? $response['content'] ?? '')),
+                'actor' => (string) $response['author_name'], 'date' => (string) $response['created_at'],
+                'reference' => ['type' => 'observation', 'id' => (int) $response['observation_id']],
             ];
         }
 
