@@ -15,6 +15,7 @@ final class AdminProjectModel
                AND LOWER(extension) IN ('pdf','docx','txt','png','jpg','jpeg','webp')
              ORDER BY id"
         );
+        $keywordModel=new ProjectKeywordModel();
         foreach($result['items'] as &$item){
             $files->execute(['project_id'=>$item['id']]);
             $item['presentation_files']=array_map(static function(array $file):array{
@@ -34,6 +35,7 @@ final class AdminProjectModel
                 ];
             },$files->fetchAll());
             $item['presentation_file_id']=(int)($item['presentation_file_id']??0);
+            $item['keywords']=$keywordModel->forProject((int)$item['id']);
         }
         unset($item);
         return $result;
@@ -45,7 +47,7 @@ final class AdminProjectModel
         $statement->execute($params);
         return array_map('intval',$statement->fetch()?:[]);
     }
-    public function catalogs():array{$d=Database::connection();return ['types'=>$d->query('SELECT id,code,name FROM project_types WHERE is_active=1 ORDER BY name')->fetchAll(),'careers'=>$d->query('SELECT id,name FROM careers WHERE is_active=1 ORDER BY name')->fetchAll(),'periods'=>$d->query("SELECT id,name,status,starts_on FROM academic_periods WHERE status IN ('active','closed') ORDER BY (status='active') DESC, starts_on DESC")->fetchAll(),'teachers'=>$d->query("SELECT u.id,u.full_name FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.status='active' AND tp.can_tutor=1 ORDER BY u.full_name")->fetchAll()];}
+    public function catalogs():array{$d=Database::connection();return ['types'=>$d->query('SELECT id,code,name FROM project_types WHERE is_active=1 ORDER BY name')->fetchAll(),'careers'=>$d->query('SELECT id,name FROM careers WHERE is_active=1 ORDER BY name')->fetchAll(),'periods'=>$d->query("SELECT id,name,status,starts_on FROM academic_periods WHERE status IN ('active','closed') ORDER BY (status='active') DESC, starts_on DESC")->fetchAll(),'teachers'=>$d->query("SELECT u.id,u.full_name FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.status='active' AND tp.can_tutor=1 ORDER BY u.full_name")->fetchAll(),'keywords'=>(new SupportMaterialModel())->keywordCatalog()];}
     private function filteredQuery(array $filters):array
     {
         $where=[
@@ -117,7 +119,7 @@ final class AdminProjectModel
                         }
                     }
                 }
-                $incoming=['title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'project_type_id'=>$v['project_type_id'],'career_id'=>$v['career_id'],'academic_period_id'=>$v['academic_period_id'],'tutor_id'=>$tutor,'status'=>$v['status']];
+                $incoming=['title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'summary'=>$v['summary']?:null,'project_type_id'=>$v['project_type_id'],'career_id'=>$v['career_id'],'academic_period_id'=>$v['academic_period_id'],'tutor_id'=>$tutor,'status'=>$v['status']];
                 $changed=[];
                 foreach($incoming as $field=>$value){
                     $old=$before[$field]??null;
@@ -125,9 +127,10 @@ final class AdminProjectModel
                     else{$old=$old===null?null:(string)$old;$value=$value===null?null:(string)$value;}
                     if($old!==$value)$changed[$field]=[$old,$value];
                 }
-                if(!$changed)throw new InvalidArgumentException('No se detectaron cambios en el proyecto.');
+                $keywordChange=(new ProjectKeywordModel())->syncDifferential($d,$id,(array)($v['keywords']??[]),(new SupportMaterialModel())->keywordCatalog());
+                if(!$changed&&!$keywordChange['changed'])throw new InvalidArgumentException('No se detectaron cambios en el proyecto.');
                 $publishing=$v['status']==='published'&&(string)$before['status']!=='published';
-                $summary=(string)($before['summary']??'');$descriptionChanged=false;$descriptionOrigin='existing';
+                $summary=(string)($v['summary']??'');$descriptionChanged=false;$descriptionOrigin='existing';
                 if($publishing){
                     $requiredStatus=$typeCode==='thesis'?'tribunal_approved':'approved';
                     if((string)$before['status']!==$requiredStatus)throw new InvalidArgumentException('El proyecto ya no se encuentra en un estado válido para publicación.');
@@ -146,10 +149,12 @@ final class AdminProjectModel
                 $recordAcademicCompletion=isset($changed['status'])
                     && (string)$changed['status'][1]===$finalStatus
                     && empty($before['approved_at']);
-                $q=$d->prepare('UPDATE projects SET code=:code,title=:title,subtitle=:subtitle,summary=:summary,project_type_id=:type,career_id=:career,academic_period_id=:period,tutor_id=:tutor,status=:status,approved_at=CASE WHEN :record_completion=1 AND approved_at IS NULL THEN CURRENT_TIMESTAMP ELSE approved_at END,published_at=CASE WHEN :publishing=1 THEN CURRENT_TIMESTAMP ELSE published_at END,is_available=CASE WHEN :publishing_available=1 THEN 1 ELSE is_available END WHERE id=:id');
-                $q->execute(['code'=>$code,'title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'summary'=>$summary?:null,'type'=>$v['project_type_id'],'career'=>$v['career_id'],'period'=>$v['academic_period_id'],'tutor'=>$tutor,'status'=>$v['status'],'record_completion'=>$recordAcademicCompletion?1:0,'publishing'=>$publishing?1:0,'publishing_available'=>$publishing?1:0,'id'=>$id]);
+                if($changed){$q=$d->prepare('UPDATE projects SET code=:code,title=:title,subtitle=:subtitle,summary=:summary,project_type_id=:type,career_id=:career,academic_period_id=:period,tutor_id=:tutor,status=:status,approved_at=CASE WHEN :record_completion=1 AND approved_at IS NULL THEN CURRENT_TIMESTAMP ELSE approved_at END,published_at=CASE WHEN :publishing=1 THEN CURRENT_TIMESTAMP ELSE published_at END,is_available=CASE WHEN :publishing_available=1 THEN 1 ELSE is_available END WHERE id=:id');
+                $q->execute(['code'=>$code,'title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'summary'=>$summary?:null,'type'=>$v['project_type_id'],'career'=>$v['career_id'],'period'=>$v['academic_period_id'],'tutor'=>$tutor,'status'=>$v['status'],'record_completion'=>$recordAcademicCompletion?1:0,'publishing'=>$publishing?1:0,'publishing_available'=>$publishing?1:0,'id'=>$id]);}
+                elseif($keywordChange['changed']){$d->prepare('UPDATE projects SET updated_at=CURRENT_TIMESTAMP WHERE id=:id')->execute(['id'=>$id]);}
                 if($descriptionChanged)(new ProjectAuditService($d))->record($id,$actor,'project_description_updated','project',$id,['summary'=>null],['summary'=>$summary,'origin'=>$descriptionOrigin,'edited_by_administrator'=>true]);
                 [$previous,$next,$history]=$this->describeChanges($d,$changed);
+                if($keywordChange['changed']){$beforeKeywords=$keywordChange['before']?implode(', ',$keywordChange['before']):'Sin etiquetas';$afterKeywords=$keywordChange['after']?implode(', ',$keywordChange['after']):'Sin etiquetas';$previous['Etiquetas']=$beforeKeywords;$next['Etiquetas']=$afterKeywords;$history[]=['field'=>'Etiquetas','verb'=>'cambiadas','from'=>$beforeKeywords,'to'=>$afterKeywords];}
                 $next['_history_changes']=$history;
                 $auditId=(new ProjectAuditService($d))->record($id,$actor,'project_updated','project',$id,$previous,$next);
                 if(isset($changed['status'])){
@@ -165,13 +170,14 @@ final class AdminProjectModel
             $q=$d->prepare("INSERT INTO projects(code,project_type_id,career_id,academic_period_id,title,subtitle,tutor_id,status,current_stage,created_by) VALUES(:code,:type,:career,:period,:title,:subtitle,:tutor,:status,'registration',:creator)");
             $q->execute(['code'=>$code,'type'=>$v['project_type_id'],'career'=>$v['career_id'],'period'=>$v['academic_period_id'],'title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'tutor'=>$tutor,'status'=>$v['status'],'creator'=>$actor]);
             $id=(int)$d->lastInsertId();
+            (new ProjectKeywordModel())->syncDifferential($d,$id,(array)($v['keywords']??[]),(new SupportMaterialModel())->keywordCatalog());
             (new ProjectAuditService($d))->record($id,$actor,'project_created','project',$id,null,$v+['code'=>$code]);
             return $id;
         });
     }
     private function describeChanges(PDO $db,array $changes):array
     {
-        $labels=['title'=>'Título','subtitle'=>'Descripción breve','project_type_id'=>'Tipo','career_id'=>'Carrera','academic_period_id'=>'Periodo','tutor_id'=>'Tutor','status'=>'Estado','code'=>'Código'];
+        $labels=['title'=>'Título','subtitle'=>'Descripción breve','summary'=>'Descripción','project_type_id'=>'Tipo','career_id'=>'Carrera','academic_period_id'=>'Periodo','tutor_id'=>'Tutor','status'=>'Estado','code'=>'Código'];
         $previous=[];$next=[];$history=[];
         foreach($changes as $field=>[$old,$new]){
             $oldLabel=$this->readableValue($db,$field,$old);$newLabel=$this->readableValue($db,$field,$new);

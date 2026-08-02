@@ -34,4 +34,27 @@ function route(string $page = 'dashboard'): string
 {
     return base_url('index.php?page=' . urlencode($page));
 }
+
+/**
+ * Etiquetas institucionales del estado y del momento del ciclo académico.
+ *
+ * @return array{status:string,stage:string}
+ */
+function project_academic_labels(string $status): array
+{
+    static $labels = [
+        'development' => ['status' => 'En desarrollo', 'stage' => 'En proceso'],
+        'under_review' => ['status' => 'En revisión', 'stage' => 'En proceso'],
+        'changes_required' => ['status' => 'Requiere cambios', 'stage' => 'En proceso'],
+        'approved' => ['status' => 'Aprobado', 'stage' => 'Por publicar'],
+        'defense' => ['status' => 'En tribunal', 'stage' => 'Por finalizar'],
+        'tribunal_approved' => ['status' => 'Aprobado por el Tribunal', 'stage' => 'Por publicar'],
+        'published' => ['status' => 'Publicado', 'stage' => 'Finalizado'],
+    ];
+
+    return $labels[$status] ?? [
+        'status' => $status !== '' ? $status : 'Estado no disponible',
+        'stage' => 'Etapa no disponible',
+    ];
+}
 // Final de construcción de URL internas

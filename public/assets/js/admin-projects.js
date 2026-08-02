@@ -15,6 +15,16 @@
     const advancedOptions = form?.querySelector('[data-advanced-options]');
     const manageParticipants = form?.querySelector('[data-manage-participants]');
     const manageFiles = form?.querySelector('[data-manage-files]');
+    const changeState = form?.querySelector('[data-change-state]');
+    const projectSubmit = form?.querySelector('[type="submit"]');
+    const keywordSelector = form?.querySelector('[data-project-keyword-selector]');
+    const keywordTrigger = form?.querySelector('[data-project-keyword-trigger]');
+    const keywordPanel = form?.querySelector('[data-project-keyword-panel]');
+    const keywordSearch = form?.querySelector('[data-project-keyword-search]');
+    const keywordOptions = form?.querySelector('[data-project-keyword-options]');
+    const keywordSummary = form?.querySelector('[data-project-keyword-summary]');
+    const keywordLimit = form?.querySelector('[data-project-keyword-limit]');
+    const keywordChips = form?.querySelector('[data-project-keyword-chips]');
     const dialogLayers = [modal, trash, saveConfirm, presentationDialog, descriptionDialog].filter(Boolean);
     dialogLayers.forEach(layer => { layer.hidden = true; });
     dialogLayers.forEach(layer => document.body.append(layer));
@@ -32,6 +42,21 @@
     syncProjectDialogs();
     let pendingSaveData = null;
     let activeProject = null;
+    let initialFormState = '';
+    let projectIsSaving = false;
+    const selectedKeywordState = () => [...(keywordOptions?.querySelectorAll('input:checked') || [])].map(input => input.value.normalize('NFC')).sort((a, b) => a.localeCompare(b, 'es'));
+    const editableState = () => JSON.stringify([...['title', 'subtitle', 'tutor_id'].map(name => form?.elements[name]?.value ?? ''), form?.querySelector('[data-project-summary]')?.value ?? '', selectedKeywordState()]);
+    const syncChangeState = () => {
+        const dirty = Boolean(initialFormState) && editableState() !== initialFormState;
+        if (changeState) changeState.hidden = !dirty;
+        if (projectSubmit) {
+            projectSubmit.disabled = !dirty || projectIsSaving;
+            projectSubmit.setAttribute('aria-disabled', String(projectSubmit.disabled));
+        }
+        return dirty;
+    };
+    form?.addEventListener('input', syncChangeState);
+    form?.addEventListener('change', syncChangeState);
     const enhanceQuickSelect = select => {
         const shell = document.createElement('div');
         shell.className = 'ap-quick-dropdown';
@@ -136,7 +161,6 @@
     const periodSelect = form?.elements.academic_period_id;
     const tutorSelect = form?.elements.tutor_id;
     const statusSelect = form?.elements.status;
-    if (typeSelect?.options[0]) typeSelect.options[0].text = 'Seleccionar tipo';
     if (tutorSelect?.options[0]) tutorSelect.options[0].text = 'Seleccionar tutor';
     if (statusSelect && !statusSelect.querySelector('option[value=""]')) statusSelect.add(new Option('Seleccionar estado', ''), 0);
     const thesisOnlyStatuses = [...(statusSelect?.options || [])].filter(option => ['defense', 'tribunal_approved'].includes(option.value));
@@ -164,25 +188,20 @@
         if (periodField) periodField.querySelector('strong').textContent = periodSelect.selectedOptions[0]?.textContent.trim() || 'Sin período activo';
     };
     const syncProjectStatusOptions = () => {
-        const selectedType = typeSelect?.options[typeSelect.selectedIndex];
-        const isThesis = /titulación|tesis/i.test(selectedType?.textContent || '');
+        const typeCode = String(activeProject?.type_code || activeProject?.type_key || '').toLowerCase();
+        const isThesis = typeCode === 'thesis' || /titulación|tesis/i.test(String(activeProject?.type_name || activeProject?.type || ''));
         thesisOnlyStatuses.forEach(option => {
             option.disabled = !isThesis;
             option.hidden = !isThesis;
         });
-        if (!isThesis && ['defense', 'tribunal_approved'].includes(statusSelect?.value)) {
-            statusSelect.value = 'approved';
-        }
-        statusSelect?.dispatchEvent(new Event('change', { bubbles: true }));
     };
-    typeSelect?.addEventListener('change', syncProjectStatusOptions);
     const setProjectDefaults = () => {
         selectFirstAvailable(careerSelect);
         selectFirstAvailable(periodSelect);
         typeSelect.value = '';
         tutorSelect.value = '';
         statusSelect.value = '';
-        [careerSelect, periodSelect, typeSelect, tutorSelect, statusSelect].forEach(select => select?.dispatchEvent(new Event('change', { bubbles: true })));
+        [careerSelect, periodSelect, tutorSelect, statusSelect].forEach(select => select?.dispatchEvent(new Event('change', { bubbles: true })));
     };
     const request = async (url, data) => {
         const response = await fetch(url, { method: 'POST', body: data, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
@@ -190,6 +209,200 @@
         if (!response.ok || !result.success) throw new Error(result.message);
         return result;
     };
+    const renderTribunal = project => {
+        const section = form?.querySelector('[data-project-tribunal]');
+        const content = form?.querySelector('[data-project-tribunal-content]');
+        if (!section || !content) return;
+        const isDegreeProject = String(project?.type_code || project?.project_type_code || '').toLowerCase() === 'thesis';
+        section.hidden = !isDegreeProject;
+        content.replaceChildren();
+        if (!isDegreeProject) return;
+        const members = (Array.isArray(project?.participants) ? project.participants : []).filter(person =>
+            ['tribunal', 'jury'].includes(String(person?.role_code || '').toLowerCase()) && Boolean(Number(person?.is_teacher))
+        );
+        if (!members.length) {
+            const empty = document.createElement('p');
+            empty.className = 'ap-tribunal-empty';
+            empty.innerHTML = '<i class="fa-solid fa-user-group" aria-hidden="true"></i><span>El proyecto aún no tiene un tribunal asignado.</span>';
+            content.append(empty);
+            return;
+        }
+        const list = document.createElement('div');
+        list.className = 'ap-tribunal-list';
+        members.forEach((person, index) => {
+            const name = String(person.full_name || '').trim();
+            const username = String(person.username || '').trim();
+            const email = String(person.email || '').trim();
+            const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'U';
+            const row = document.createElement('article');
+            row.className = 'ap-tribunal-person';
+            const main = document.createElement(email ? 'button' : 'div');
+            main.className = 'ap-tribunal-person-main';
+            if (email) {
+                const contactId = `ap-tribunal-contact-${project.id}-${person.user_id || index}`;
+                main.type = 'button';
+                main.setAttribute('aria-expanded', 'false');
+                main.setAttribute('aria-controls', contactId);
+                main.dataset.tribunalContactToggle = '';
+                const contact = document.createElement('div');
+                contact.className = 'ap-tribunal-contact';
+                contact.id = contactId;
+                contact.hidden = true;
+                const contactLabel = document.createElement('small');
+                contactLabel.textContent = 'Correo institucional';
+                const contactLink = document.createElement('a');
+                contactLink.href = `mailto:${email}`;
+                contactLink.textContent = email;
+                contact.append(contactLabel, contactLink);
+                row.append(main, contact);
+            } else row.append(main);
+            const avatar = document.createElement('span');
+            avatar.className = 'ap-tribunal-avatar';
+            avatar.setAttribute('aria-hidden', 'true');
+            if (person.avatar_url) {
+                const image = document.createElement('img');
+                image.src = person.avatar_url;
+                image.alt = '';
+                avatar.append(image);
+            } else avatar.textContent = initials;
+            const identity = document.createElement('span');
+            identity.className = 'ap-tribunal-identity';
+            const primary = document.createElement('strong');
+            primary.textContent = username ? `@${username}` : name;
+            identity.append(primary);
+            if (username) {
+                const secondary = document.createElement('span');
+                secondary.textContent = name;
+                identity.append(secondary);
+            }
+            const role = document.createElement('small');
+            role.textContent = 'Miembro del tribunal';
+            identity.append(role);
+            main.append(avatar, identity);
+            if (email) {
+                const chevron = document.createElement('i');
+                chevron.className = 'fa-solid fa-chevron-down';
+                chevron.setAttribute('aria-hidden', 'true');
+                main.append(chevron);
+            }
+            list.append(row);
+        });
+        content.append(list);
+    };
+    const closeKeywordSelector = (restoreFocus = false) => {
+        if (!keywordPanel || !keywordTrigger) return;
+        keywordPanel.hidden = true;
+        keywordSelector?.classList.remove('is-open');
+        keywordTrigger.setAttribute('aria-expanded', 'false');
+        if (restoreFocus) keywordTrigger.focus();
+    };
+    const openKeywordSelector = () => {
+        if (!keywordPanel || !keywordTrigger) return;
+        keywordPanel.hidden = false;
+        keywordSelector?.classList.add('is-open');
+        keywordTrigger.setAttribute('aria-expanded', 'true');
+        keywordSearch?.focus();
+    };
+    const renderKeywordSelection = () => {
+        const inputs = [...(keywordOptions?.querySelectorAll('input') || [])];
+        const selected = inputs.filter(input => input.checked);
+        const atLimit = selected.length >= 4;
+        inputs.forEach(input => {
+            input.disabled = atLimit && !input.checked;
+            input.closest('[role="option"]')?.setAttribute('aria-selected', String(input.checked));
+        });
+        if (keywordSummary) keywordSummary.textContent = selected.length ? `${selected.length} ${selected.length === 1 ? 'etiqueta seleccionada' : 'etiquetas seleccionadas'}` : 'Selecciona etiquetas de clasificación';
+        if (keywordLimit) keywordLimit.hidden = !atLimit;
+        if (keywordChips) keywordChips.replaceChildren(...selected.map(input => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'ap-keyword-chip';
+            chip.setAttribute('aria-label', `Quitar ${input.value}`);
+            const label = document.createElement('span');
+            label.textContent = input.value;
+            const icon = document.createElement('i');
+            icon.className = 'fa-solid fa-xmark';
+            icon.setAttribute('aria-hidden', 'true');
+            chip.append(label, icon);
+            chip.addEventListener('click', () => {
+                input.checked = false;
+                renderKeywordSelection();
+                syncChangeState();
+                keywordTrigger?.focus();
+            });
+            return chip;
+        }));
+    };
+    const loadKeywordSelector = project => {
+        if (!keywordOptions) return;
+        const catalogNode = form.querySelector('[data-project-keyword-catalog]');
+        let catalog = [];
+        try { catalog = JSON.parse(catalogNode?.textContent || '[]'); } catch { catalog = []; }
+        const current = (Array.isArray(project?.keywords) ? project.keywords : Array.isArray(project?.tags) ? project.tags : []).map(item => typeof item === 'string' ? item : item?.name).filter(Boolean);
+        const names = [...catalog.map(String), ...current].filter((name, index, values) => values.findIndex(value => value.localeCompare(name, 'es', { sensitivity: 'base' }) === 0) === index);
+        keywordOptions.replaceChildren(...names.map(name => {
+            const row = document.createElement('label');
+            row.className = 'ap-keyword-option';
+            row.setAttribute('role', 'option');
+            row.dataset.keywordSearch = name.normalize('NFD').replace(/\p{Mn}+/gu, '').toLocaleLowerCase('es');
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.name = 'project_keywords[]';
+            input.value = name;
+            input.checked = current.some(item => item.localeCompare(name, 'es', { sensitivity: 'base' }) === 0);
+            const text = document.createElement('span');
+            text.textContent = name;
+            row.append(input, text);
+            input.addEventListener('change', () => { renderKeywordSelection(); syncChangeState(); });
+            input.addEventListener('keydown', event => {
+                if (event.key === 'Escape') { event.preventDefault(); closeKeywordSelector(true); return; }
+                if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+                const visible = [...keywordOptions.querySelectorAll('input:not(:disabled)')].filter(option => !option.closest('[role="option"]')?.hidden);
+                if (!visible.length) return;
+                event.preventDefault();
+                const index = visible.indexOf(input);
+                const next = event.key === 'Home' ? 0 : event.key === 'End' ? visible.length - 1 : event.key === 'ArrowUp' ? Math.max(0, index - 1) : Math.min(visible.length - 1, index + 1);
+                visible[next]?.focus();
+            });
+            return row;
+        }));
+        if (keywordSearch) keywordSearch.value = '';
+        closeKeywordSelector();
+        renderKeywordSelection();
+    };
+    keywordTrigger?.addEventListener('click', () => keywordPanel?.hidden ? openKeywordSelector() : closeKeywordSelector(true));
+    keywordTrigger?.addEventListener('keydown', event => {
+        if (!['ArrowDown', 'Enter', ' '].includes(event.key)) return;
+        event.preventDefault();
+        openKeywordSelector();
+    });
+    keywordSearch?.addEventListener('input', () => {
+        const query = keywordSearch.value.normalize('NFD').replace(/\p{Mn}+/gu, '').trim().toLocaleLowerCase('es');
+        keywordOptions?.querySelectorAll('[data-keyword-search]').forEach(row => { row.hidden = query !== '' && !row.dataset.keywordSearch.includes(query); });
+    });
+    keywordSearch?.addEventListener('keydown', event => {
+        if (!['ArrowDown', 'End'].includes(event.key)) return;
+        const visible = [...(keywordOptions?.querySelectorAll('input:not(:disabled)') || [])].filter(option => !option.closest('[role="option"]')?.hidden);
+        if (!visible.length) return;
+        event.preventDefault();
+        (event.key === 'End' ? visible.at(-1) : visible[0])?.focus();
+    });
+    keywordSelector?.addEventListener('focusout', event => { if (!keywordSelector.contains(event.relatedTarget)) closeKeywordSelector(); });
+    document.addEventListener('click', event => { if (keywordSelector && !keywordSelector.contains(event.target)) closeKeywordSelector(); });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && keywordPanel && !keywordPanel.hidden) {
+            event.preventDefault();
+            closeKeywordSelector(true);
+        }
+    });
+    form?.addEventListener('click', event => {
+        const trigger = event.target.closest('[data-tribunal-contact-toggle]');
+        if (!trigger || !form.contains(trigger)) return;
+        const panel = document.getElementById(trigger.getAttribute('aria-controls'));
+        const expanded = trigger.getAttribute('aria-expanded') === 'true';
+        trigger.setAttribute('aria-expanded', String(!expanded));
+        if (panel) panel.hidden = expanded;
+    });
     const open = project => {
         activeProject = project || null;
         pendingSaveData = null;
@@ -205,10 +418,36 @@
         form.querySelector('[type="submit"]').disabled = false;
         for (const [key, value] of Object.entries(project || {})) if (form.elements[key]) form.elements[key].value = value ?? '';
         if (!project) setProjectDefaults();
-        else [careerSelect, periodSelect, typeSelect, tutorSelect].forEach(select => select?.dispatchEvent(new Event('change', { bubbles: true })));
+        else [careerSelect, periodSelect, tutorSelect].forEach(select => select?.dispatchEvent(new Event('change', { bubbles: true })));
         syncProjectStatusOptions();
         syncFixedFields();
-        document.querySelector('#apTitle').textContent = project ? 'Editar proyecto' : 'Nuevo proyecto';
+        document.querySelector('#apTitle').textContent = project ? 'Editar' : 'Nuevo proyecto';
+        const value = (...keys) => keys.map(key => project?.[key]).find(item => item !== undefined && item !== null && String(item).trim() !== '');
+        const readableDate = raw => {
+            if (!raw) return '';
+            const parsed = new Date(String(raw).replace(' ', 'T') + (String(raw).includes('T') ? '' : 'Z'));
+            return Number.isNaN(parsed.getTime()) ? String(raw) : new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium' }).format(parsed);
+        };
+        const setText = (selector, text, fallback) => {
+            const target = form.querySelector(selector);
+            if (target) target.textContent = text || fallback;
+        };
+        const summary = form.querySelector('[data-project-summary]');
+        if (summary) summary.value = value('summary', 'description', 'full_description') || '';
+        setText('[data-project-type]', value('type_name', 'type'), 'Sin información');
+        setText('[data-project-research-line]', value('research_line_name', 'research_line', 'line_name'), 'Sin información registrada');
+        setText('[data-project-status]', statusSelect?.selectedOptions[0]?.textContent, 'Sin información');
+        setText('[data-project-stage]', value('stage_label', 'current_stage_label', 'current_stage', 'stage'), 'Sin información registrada');
+        setText('[data-project-code]', value('code'), 'Sin información');
+        setText('[data-project-published]', readableDate(value('published_at', 'repository_published_at')), 'Sin publicar');
+        setText('[data-project-updated]', readableDate(value('updated_at')), 'Sin información');
+        const tags = form.querySelector('[data-project-tags]');
+        if (tags) {
+            const values = (Array.isArray(project?.tags) ? project.tags : Array.isArray(project?.keywords) ? project.keywords : []).slice(0, 4);
+            tags.replaceChildren(...(values.length ? values.map(tag => Object.assign(document.createElement('span'), { textContent: typeof tag === 'string' ? tag : tag.name })) : [Object.assign(document.createElement('span'), { textContent: 'Sin etiquetas registradas' })]));
+        }
+        loadKeywordSelector(project);
+        renderTribunal(project);
         if (editWarning) editWarning.hidden = !project;
         if (advancedOptions) {
             advancedOptions.hidden = !project;
@@ -227,6 +466,8 @@
             if (manageFiles) manageFiles.href = projectUrl('documents');
         }
         showProjectDialog(modal);
+        initialFormState = editableState();
+        syncChangeState();
         form.title.focus();
     };
     window.AdminProjectEditor = { open };
@@ -245,9 +486,16 @@
     document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => modal.hidden = true));
     modal?.addEventListener('click', event => { if (event.target === modal) modal.hidden = true; });
     const saveProject = async data => {
-        const submit = form.querySelector('[type="submit"]');
-        submit.disabled = true;
-        try { await request(cfg.dataset.save, data); location.reload(); }
+        projectIsSaving = true;
+        syncChangeState();
+        try {
+            await request(cfg.dataset.save, data);
+            saveConfirm.hidden = true;
+            modal.hidden = true;
+            const destination = new URL(location.href);
+            destination.searchParams.delete('edit');
+            location.replace(destination.toString());
+        }
         catch (error) {
             const message = document.querySelector('#apMessage');
             message.textContent = error.message;
@@ -255,7 +503,10 @@
             message.hidden = false;
             if (modal.hidden) showProjectDialog(modal);
         }
-        finally { submit.disabled = false; }
+        finally {
+            projectIsSaving = false;
+            syncChangeState();
+        }
     };
     const openPresentationDialog = data => {
         const files = Array.isArray(activeProject?.presentation_files) ? activeProject.presentation_files : [];
@@ -314,6 +565,7 @@
     };
     form?.addEventListener('submit', async event => {
         event.preventDefault();
+        if (!syncChangeState()) return;
         const data = new FormData(form);
         ['career_id', 'academic_period_id', 'project_type_id', 'tutor_id', 'status'].forEach(name => data.set(name, form.elements[name].value));
         const publishingFirstTime = data.get('status') === 'published' && activeProject?.status !== 'published';

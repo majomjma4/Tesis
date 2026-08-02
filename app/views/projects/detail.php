@@ -4,19 +4,11 @@ if ($project === null): ?>
 <?php else:
     $projectId = (int) $project['id'];
     $detailUrl = (string) $detailUrl;
-    $statusLabels = ['development'=>'En desarrollo','under_review'=>'En revisión','changes_required'=>'Requiere cambios','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el Tribunal','published'=>'Publicado'];
-    $statusLabel = $publicContext ? 'Publicado' : ($statusLabels[(string) $project['status']] ?? (string) $project['status']);
+    $academicLabels = project_academic_labels((string) $project['status']);
+    $statusLabel = $publicContext ? 'Publicado' : $academicLabels['status'];
     $isDegreeProject = in_array(mb_strtolower((string)($project['type_code'] ?? ''),'UTF-8'), ['thesis','tesis','degree','titulacion','titulación'], true)
         || str_contains(mb_strtolower((string)($project['type_name'] ?? ''),'UTF-8'), 'titul');
-    $stageLabel = $publicContext ? 'Finalizado' : match ((string)$project['status']) {
-        'development' => 'En desarrollo',
-        'under_review', 'changes_required' => 'Revisión académica',
-        'approved' => $isDegreeProject ? 'Preparación para tribunal' : 'Por publicar',
-        'defense' => 'Defensa',
-        'tribunal_approved' => 'Por publicar',
-        'published' => 'Finalizado',
-        default => 'Etapa no definida',
-    };
+    $stageLabel = $academicLabels['stage'];
     $dateLabel = static fn (?string $value): string => $value ? date('d/m/Y', strtotime($value)) : '';
     $roleLabels = ['student'=>'Estudiante','tutor'=>'Tutor','cotutor'=>'Cotutor','tribunal'=>'Tribunal','jury'=>'Jurado'];
     $students = $project['student_authors'] ?? array_values(array_filter($project['participants'], static fn (array $row): bool => $row['role_code'] === 'student'));
@@ -111,7 +103,7 @@ if ($project === null): ?>
             ['id'=>'institutional','title'=>'Información académica','icon'=>'fa-building-columns','type'=>'metadata','content'=>array_values(array_filter([
                 ['key'=>'code','icon'=>'fa-hashtag','label'=>'Código','value'=>(string)$project['code']],['key'=>'type','icon'=>'fa-folder-tree','label'=>'Tipo de proyecto','value'=>(string)$project['type_name']],['key'=>'career','icon'=>'fa-graduation-cap','label'=>'Carrera','value'=>(string)$project['career_name']],
                 ['key'=>'subject','icon'=>'fa-book-open','label'=>'Asignatura académica','value'=>trim((string)($project['subject_code']??'').' · '.(string)($project['subject_name']??''),' ·')],['key'=>'period','icon'=>'fa-calendar-days','label'=>'Período académico','value'=>(string)$project['period_name']],
-                ['key'=>'research','icon'=>'fa-microscope','label'=>'Línea de investigación','value'=>(string)($project['research_line_name']??'')],['key'=>'status','icon'=>'fa-circle-check','label'=>'Estado','value'=>'Publicado'],['key'=>'stage','icon'=>'fa-flag-checkered','label'=>'Etapa académica','value'=>'Finalizado'],
+                ['key'=>'research','icon'=>'fa-microscope','label'=>'Línea de investigación','value'=>(string)($project['research_line_name']??'')],['key'=>'status','icon'=>'fa-circle-check','label'=>'Estado','value'=>'Publicado'],['key'=>'stage','icon'=>'fa-flag-checkered','label'=>'Etapa académica','value'=>$stageLabel],
                 ['key'=>'completion','icon'=>'fa-calendar-check','label'=>'Fecha de finalización','value'=>$dateLabel($project['academic_completed_at']??null)],['key'=>'publication','icon'=>'fa-building-columns','label'=>'Fecha de publicación','value'=>$dateLabel($project['repository_published_at']??null)],
             ],static fn(array $row):bool=>$row['value']!==''))],
             ['id'=>'participants','title'=>'Participantes','icon'=>'fa-users','type'=>'project_participants','content'=>[
@@ -121,7 +113,7 @@ if ($project === null): ?>
         ];
     }
     $actions=[];
-    if ($isAdministrator) $actions[]=['id'=>'edit','label'=>'Editar proyecto','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
+    if ($isAdministrator) $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
     elseif (!$publicContext && $canDeliver) $actions[]=['id'=>'delivery','label'=>'Registrar entrega','kind'=>'primary','icon'=>'fa-upload','url'=>$detailUrl.'&tab=review','enabled'=>true];
     if (!empty($headerPackage['available'])) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'].($publicContext?'&scope=repository':''),'enabled'=>true,'download'=>true];
     $menuActions=$isAdministrator&&$publicContext?[

@@ -67,6 +67,56 @@ final class ProjectKeywordModel
         $this->attach($db, $projectId, $keywordIds);
     }
 
+    /**
+     * Sincroniza únicamente las asociaciones agregadas o retiradas.
+     *
+     * @return array{changed:bool,before:array,after:array,inserted:array,deleted:array}
+     */
+    public function syncDifferential(PDO $db, int $projectId, array $submittedNames, array $allowedNames): array
+    {
+        if ($projectId < 1) throw new InvalidArgumentException('El proyecto no es válido.');
+        $allowed = [];
+        foreach ($allowedNames as $name) {
+            $display = preg_replace('/\s+/u', ' ', trim((string) $name)) ?? '';
+            if ($display !== '') $allowed[$this->normalizeName($display)] = $display;
+        }
+        $current = $this->forProject($projectId, $db);
+        $currentIds = array_map('intval', array_column($current, 'id'));
+        $currentNames = array_values(array_map('strval', array_column($current, 'name')));
+        foreach ($currentNames as $name) $allowed[$this->normalizeName($name)] = $name;
+        $requested = [];
+        foreach ($submittedNames as $name) {
+            $key = $this->normalizeName((string) $name);
+            if ($key === '') continue;
+            if (!isset($allowed[$key])) throw new InvalidArgumentException('La selección contiene una etiqueta de clasificación no permitida.');
+            $requested[$key] = $allowed[$key];
+        }
+        if (count($requested) > self::MAX_PER_PROJECT) throw new InvalidArgumentException('Un proyecto puede tener como máximo cuatro palabras clave.');
+
+        $selectedIds = [];
+        $selectedNames = [];
+        $find = $db->prepare('SELECT id,name FROM keywords WHERE normalized_name=:normalized_name AND is_active=1 LIMIT 1');
+        foreach ($requested as $key => $display) {
+            $find->execute(['normalized_name' => $key]);
+            $keyword = $find->fetch();
+            $keywordId = $keyword ? (int) $keyword['id'] : $this->create($db, $display);
+            $selectedIds[] = $keywordId;
+            $selectedNames[] = $keyword ? (string) $keyword['name'] : $display;
+        }
+        $inserted = array_values(array_diff($selectedIds, $currentIds));
+        $deleted = array_values(array_diff($currentIds, $selectedIds));
+        if ($deleted) {
+            $placeholders = implode(',', array_fill(0, count($deleted), '?'));
+            $delete = $db->prepare("DELETE FROM project_keywords WHERE project_id=? AND keyword_id IN ($placeholders)");
+            $delete->execute(array_merge([$projectId], $deleted));
+        }
+        if ($inserted) {
+            $insert = $db->prepare('INSERT IGNORE INTO project_keywords(project_id,keyword_id) VALUES(:project_id,:keyword_id)');
+            foreach ($inserted as $keywordId) $insert->execute(['project_id' => $projectId, 'keyword_id' => $keywordId]);
+        }
+        return ['changed'=>$inserted!==[]||$deleted!==[],'before'=>$currentNames,'after'=>$selectedNames,'inserted'=>$inserted,'deleted'=>$deleted];
+    }
+
     public function normalizeName(string $name): string
     {
         $name = preg_replace('/\s+/u', ' ', trim($name)) ?? '';

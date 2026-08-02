@@ -2297,8 +2297,9 @@ function updateRecordDirtyState() {
     if (recordForm) recordForm.dataset.dirty = String(dirty);
     if (recordSubmitButton) recordSubmitButton.disabled = !dirty || recordIsSubmitting;
     recordDirtyMessage?.classList.toggle("is-dirty", dirty);
-    if (recordDirtyMessageText) recordDirtyMessageText.textContent = dirty ? "Hay cambios sin guardar." : "No hay cambios pendientes.";
-    if (recordDirtyMessageIcon) recordDirtyMessageIcon.className = `fa-solid ${dirty ? "fa-triangle-exclamation" : "fa-circle-check"}`;
+    if (recordDirtyMessage) recordDirtyMessage.hidden = !dirty;
+    if (recordDirtyMessageText && dirty) recordDirtyMessageText.textContent = "Hay cambios pendientes.";
+    if (recordDirtyMessageIcon && dirty) recordDirtyMessageIcon.className = "fa-solid fa-triangle-exclamation";
     return dirty;
 }
 
