@@ -8,6 +8,12 @@ $package = is_array($digitalRecord['package'] ?? null) ? $digitalRecord['package
 $canManageFiles = !empty($digitalRecord['can_manage_files']) && !empty($digitalRecord['file_upload']);
 $restorableFiles = is_array($digitalRecord['restorable_files'] ?? null) ? $digitalRecord['restorable_files'] : [];
 $globalFileActions = is_array($digitalRecord['global_file_actions'] ?? null) ? $digitalRecord['global_file_actions'] : [];
+$documentReview = is_array($digitalRecord['document_review'] ?? null) ? $digitalRecord['document_review'] : [];
+$documentReviewEnabled = $recordIsProject
+    && (string)($digitalRecord['context'] ?? '') === 'academic_management'
+    && (string)($digitalRecord['admin_actions']['status'] ?? '') === 'development'
+    && $documentReview !== [];
+$documentReviewSummary = is_array($documentReview['summary'] ?? null) ? $documentReview['summary'] : [];
 $selectableFiles = array_values(array_merge($documents, $archives));
 $retirableFiles = array_values(array_filter($selectableFiles, static fn (array $file): bool => empty($file['is_package'])));
 $selectedDocument = current(array_filter(
@@ -15,10 +21,11 @@ $selectedDocument = current(array_filter(
     static fn (array $file): bool => !empty($file['is_presentation'])
         && (!array_key_exists('available', $file) || !empty($file['available']))
 )) ?: null;
+$archiveGroupLabel = $documentReviewEnabled ? 'Archivos ZIP' : 'Archivos comprimidos adicionales';
 $documentGroups = array_filter([
     'Archivo de presentación' => array_values(array_filter($documents, static fn (array $document): bool => !empty($document['is_presentation']) && empty($document['is_package']))),
     'Archivos del ' . $recordFileOwner => array_values(array_filter($documents, static fn (array $document): bool => empty($document['is_presentation']) && empty($document['is_package']))),
-    'Archivos comprimidos adicionales' => $archives,
+    $archiveGroupLabel => $archives,
 ]);
 $visualForExtension = static function (string $extension): array {
     $normalized = mb_strtolower(ltrim(trim($extension), '.'), 'UTF-8');
@@ -42,6 +49,8 @@ $visualForExtension = static function (string $extension): array {
 .ed-document-group{padding:7px}.ed-document-group+.ed-document-group{border-top:1px solid var(--line)}
 .ed-document-group h3{margin:4px 8px 6px;color:var(--muted);font-size:9px;letter-spacing:.075em;text-transform:uppercase}
 .ed-document-list{display:grid}
+.ed-document-review-note{margin:14px 14px 0;padding:12px 14px;border:1px solid color-mix(in srgb,#2563eb 25%,var(--line));border-radius:11px;background:color-mix(in srgb,#2563eb 6%,var(--surface));color:var(--text);font-size:12px;line-height:1.5}.ed-document-review-note strong{display:block;margin-bottom:2px;font-size:13px}.ed-document-status{display:inline-flex;align-items:center;min-height:23px;padding:4px 8px;border:1px solid var(--line);border-radius:999px;background:var(--surface-soft);color:var(--text);font-size:10px;font-weight:800;line-height:1.2;white-space:nowrap}.ed-document-status[data-document-status="under_review"]{border-color:#d6a329;background:#fff8df;color:#775400}.ed-document-status[data-document-status="approved"]{border-color:#65b77a;background:#eaf8ee;color:#176b2c}.ed-document-status[data-document-status="corrections_requested"]{border-color:#e0a12c;background:#fff3d4;color:#7a4b00}
+.digital-record[data-record-context="academic_management"][data-record-status="development"] .ed-files-heading p{white-space:normal;word-break:normal;overflow-wrap:break-word}
 .ed-document-row{width:100%;min-height:66px;padding:10px 11px;border:0;border-radius:10px;background:transparent;background-clip:padding-box;overflow:hidden;color:var(--text);display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:11px;font:inherit;text-align:left;transition:.16s ease}
 .ed-document-row:hover{background:var(--surface-soft)}
 .ed-document-row.is-selected{background:#eff6ff;color:var(--primary);box-shadow:inset 3px 0 0 var(--primary)}
@@ -137,7 +146,16 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
 <div class="ed-files-layout" data-record-files>
     <section class="ed-files-panel" aria-labelledby="recordFilesTitle">
         <header class="ed-files-heading">
-            <div><h2 id="recordFilesTitle">Archivos del <?= e($recordFileOwner) ?></h2><p data-record-file-count><?= count($selectableFiles) ?> <?= count($selectableFiles) === 1 ? 'archivo registrado' : 'archivos registrados' ?></p></div>
+            <div><h2 id="recordFilesTitle">Archivos del <?= e($recordFileOwner) ?></h2><p data-record-file-count><?php
+                if ($documentReviewEnabled && (int)($documentReviewSummary['total'] ?? 0) > 0) {
+                    $parts=[(int)$documentReviewSummary['total'].' '.((int)$documentReviewSummary['total']===1?'documento':'documentos')];
+                    foreach (['approved'=>['aprobado','aprobados'],'under_review'=>['en revisión','en revisión'],'corrections_requested'=>['con correcciones','con correcciones'],'development'=>['en desarrollo','en desarrollo']] as $key=>$labels) {
+                        $count=(int)($documentReviewSummary[$key]??0);
+                        if($count>0)$parts[]=$count.' '.$labels[$count===1?0:1];
+                    }
+                    echo e(implode(' · ',$parts));
+                } else echo count($selectableFiles).' '.(count($selectableFiles)===1?'archivo registrado':'archivos registrados');
+            ?></p></div>
             <?php $showPackageDownload = !empty($package['available']) && (int)($package['file_count'] ?? 0) >= 2; ?>
             <?php if ($showPackageDownload || $canManageFiles || $globalFileActions): ?><div class="ed-files-global-actions" data-file-global-actions>
                 <button class="ed-files-global-toggle" type="button" data-file-global-toggle aria-label="Acciones de archivos del <?= e($recordFileOwner) ?>" aria-haspopup="menu" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
@@ -155,6 +173,7 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
                 </div>
             </div><?php endif; ?>
         </header>
+        <?php if ($documentReviewEnabled): ?><div class="ed-document-review-note" role="note"><strong>Documentos en desarrollo</strong><span>Estos archivos forman parte del expediente de trabajo del proyecto. La edición corresponde al estudiante mientras el proyecto permanezca En desarrollo. Puedes consultar y descargar los documentos, pero no modificarlos.</span></div><?php endif; ?>
         <?php if ($canManageFiles): ?>
             <div class="ed-file-selection-bar" data-file-selection-bar hidden>
                 <strong data-file-selection-count role="status" aria-live="polite">0 archivos seleccionados</strong>
@@ -163,11 +182,11 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
         <?php endif; ?>
         <div class="ed-files-empty-inline" data-record-files-empty<?= $selectableFiles ? ' hidden' : '' ?>><i class="fa-regular fa-folder-open" aria-hidden="true"></i><h3>Este <?= e($recordFileOwner) ?> no contiene archivos</h3><p>Los documentos aparecerán aquí cuando sean incorporados al expediente.</p></div>
         <?php $documentIndex = 0; foreach ($documentGroups as $groupLabel => $groupDocuments):
-            $groupKey = $groupLabel === 'Archivo de presentación' ? 'presentation' : ($groupLabel === 'Archivos comprimidos adicionales' ? 'archives' : 'additional'); ?>
+            $groupKey = $groupLabel === 'Archivo de presentación' ? 'presentation' : ($groupLabel === $archiveGroupLabel ? 'archives' : 'additional'); ?>
             <section class="ed-document-group" data-file-group="<?= e($groupKey) ?>" aria-labelledby="recordFileGroup<?= $documentIndex ?>">
                 <h3 id="recordFileGroup<?= $documentIndex ?>"><?= e($groupLabel) ?></h3>
                 <div class="ed-document-list" data-file-group-list role="list" aria-label="<?= e($groupLabel) ?>">
-                    <?php foreach ($groupDocuments as $document): $selected = !empty($document['is_presentation']); $available = !array_key_exists('available', $document) || !empty($document['available']); $fileVisual = $visualForExtension((string) ($document['extension'] ?? '')); $canRetire = $canManageFiles && empty($document['is_package']); $presentationEligible = $available && !empty($document['preview_supported']) && empty($document['is_package']); ?>
+                    <?php foreach ($groupDocuments as $document): $selected = !empty($document['is_presentation']); $available = !array_key_exists('available', $document) || !empty($document['available']); $fileVisual = $visualForExtension((string) ($document['extension'] ?? '')); $canRetire = $canManageFiles && empty($document['is_package']); $presentationEligible = $available && !empty($document['preview_supported']) && empty($document['is_package']) && (!array_key_exists('presentation_eligible',$document)||!empty($document['presentation_eligible'])); ?>
                         <div class="ed-document-item" role="listitem" data-record-file-item>
                         <?php if ($canRetire): ?><input class="ed-file-checkbox" type="checkbox" data-file-select value="<?= (int) $document['id'] ?>" aria-label="Seleccionar <?= e($document['name']) ?>" hidden><?php endif; ?>
                         <button class="ed-document-row<?= $selected ? ' is-selected' : '' ?><?= $available ? '' : ' is-unavailable' ?>" type="button"<?= $available ? '' : ' disabled' ?>
@@ -185,17 +204,23 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
                             data-zip-entry-preview-url="<?= e((string) ($document['zip_entry_preview_url'] ?? '')) ?>"
                             data-zip-entry-download-url="<?= e((string) ($document['zip_entry_download_url'] ?? '')) ?>"
                             data-download-url="<?= e($document['download_url']) ?>"
+                            data-document-status="<?= e((string)($document['document_status'] ?? '')) ?>"
+                            data-document-status-label="<?= e((string)($document['document_status_label'] ?? '')) ?>"
+                            data-current-version-number="<?= (int)($document['current_version_number'] ?? 1) ?>"
+                            data-current-updated-at="<?= e((string)($document['current_updated_at'] ?? '')) ?>"
+                            data-current-updated-label="<?= e((string)($document['current_updated_label'] ?? '')) ?>"
                             aria-pressed="<?= $selected ? 'true' : 'false' ?>"
                             aria-label="<?= e($document['name'] . ', ' . $fileVisual['label'] . ', ' . $document['size']) ?>">
                             <i class="fa-solid <?= e($fileVisual['icon']) ?>" aria-hidden="true"></i>
                             <span><strong title="<?= e($document['name']) ?>"><?= e($document['name']) ?></strong><small><?= e($fileVisual['label']) ?> · <?= e($document['size']) ?></small></span>
                             <span class="ed-file-marks" data-file-marks>
+                                <?php if ($documentReviewEnabled): ?><span class="ed-document-status" data-document-status="<?= e((string)($document['document_status'] ?? 'development')) ?>" aria-label="Estado documental: <?= e((string)($document['document_status_label'] ?? 'En desarrollo')) ?>"><?= e((string)($document['document_status_label'] ?? 'En desarrollo')) ?></span><?php endif; ?>
                                 <?php if (!empty($document['is_presentation'])): ?><span class="ed-file-mark is-presentation" data-file-presentation-mark><i class="fa-solid fa-display" aria-hidden="true"></i> Presentación</span><?php endif; ?>
                                 <?php if (!empty($document['is_package'])): ?><span class="ed-file-mark is-package">Paquete</span><?php endif; ?>
                                 <?php if (!$available): ?><span class="ed-file-mark is-unavailable"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> <?= !empty($document['physical_available']) ? 'Material no disponible' : 'Archivo no encontrado' ?></span><?php endif; ?>
                             </span>
                         </button>
-                        <?php if ($available || $canRetire): ?>
+                        <?php if (!$documentReviewEnabled && ($available || $canRetire)): ?>
                             <button class="ed-file-menu-toggle" type="button" data-file-menu-toggle aria-haspopup="menu" aria-expanded="false" aria-controls="recordFileMenu-<?= (int) $document['id'] ?>" aria-label="Acciones de <?= e($document['name']) ?>"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
                             <div class="ed-file-menu" id="recordFileMenu-<?= (int) $document['id'] ?>" data-file-menu role="menu" hidden>
                                 <?php if ($available): ?><a role="menuitem" data-file-download-action href="<?= e($document['download_url']) ?>" download><i class="fa-solid fa-download" aria-hidden="true"></i>Descargar</a><?= $canRetire ? '<hr>' : '' ?><?php endif; ?>

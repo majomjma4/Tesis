@@ -2,7 +2,13 @@
 <section class="ed-files-panel ed-viewer viewer-normal" aria-labelledby="recordViewerTitle" data-record-viewer>
     <header class="ed-viewer-head">
         <button class="ed-back-to-files" type="button" data-back-to-files><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Volver al listado</button>
-        <div><strong id="recordViewerTitle" data-viewer-name><?= e((string) ($selectedDocument['name'] ?? 'Archivo')) ?></strong><span data-viewer-meta><?= e((string) ($selectedDocument['type'] ?? 'Archivo')) ?> · <?= e((string) ($selectedDocument['size'] ?? '')) ?></span></div>
+        <div><strong id="recordViewerTitle" data-viewer-name><?= e((string) ($selectedDocument['name'] ?? 'Archivo')) ?></strong><span data-viewer-meta><?= e(implode(' · ',array_values(array_filter([
+            (string)($selectedDocument['type'] ?? 'Archivo'),
+            (string)($selectedDocument['size'] ?? ''),
+            $documentReviewEnabled&&!empty($selectedDocument['document_status_label'])?'Estado: '.(string)$selectedDocument['document_status_label']:'',
+            $documentReviewEnabled&&!empty($selectedDocument)?'Versión '.(int)($selectedDocument['current_version_number']??1):'',
+            $documentReviewEnabled&&!empty($selectedDocument['current_updated_label'])?'Actualizado: '.(string)$selectedDocument['current_updated_label']:'',
+        ])))) ?></span></div>
         <div class="ed-viewer-actions">
             <div class="ed-viewer-zoom" data-viewer-zoom-controls aria-label="Zoom del documento" hidden>
                 <button type="button" data-viewer-zoom-out aria-label="Alejar documento" disabled><i class="fa-solid fa-minus" aria-hidden="true"></i></button>

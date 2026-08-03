@@ -1765,6 +1765,9 @@ function selectNeutralFile(button) {
         const labels = [
             button.dataset.filePresentation === "true" ? "Presentación" : "",
             button.dataset.filePackage === "true" ? "Paquete" : "",
+            button.dataset.documentStatusLabel ? `Estado: ${button.dataset.documentStatusLabel}` : "",
+            button.dataset.documentStatusLabel ? `Versión ${button.dataset.currentVersionNumber || "1"}` : "",
+            button.dataset.currentUpdatedLabel ? `Actualizado: ${button.dataset.currentUpdatedLabel}` : "",
         ];
         neutralViewerMeta.textContent = [button.dataset.fileType ?? "Archivo", button.dataset.fileSize ?? "Tamaño no disponible", ...labels].filter(Boolean).join(" · ");
     }

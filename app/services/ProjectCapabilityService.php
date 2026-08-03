@@ -62,6 +62,7 @@ final class ProjectCapabilityService
         if ($context === 'academic_management') {
             if (!$administrator) return $capabilities;
             foreach (['view_project','edit_information','manage_files','view_academic_history','view_admin_history','change_status','request_corrections','manage_participants','manage_tutoring','manage_tribunal','manage_publication','download_files'] as $key) $capabilities[$key] = true;
+            if ((string)($project['status'] ?? '') === 'development') $capabilities['manage_files'] = false;
             return $capabilities;
         }
 

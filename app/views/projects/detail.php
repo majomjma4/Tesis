@@ -48,18 +48,32 @@ if ($project === null): ?>
     }
     $previewTypes = ['pdf'=>'pdf','docx'=>'docx','txt'=>'text','png'=>'image','jpg'=>'image','jpeg'=>'image','webp'=>'image'];
     $presentationFileId = (int) ($project['presentation_file_id'] ?? 0);
-    $documents = array_map(static function (array $file) use ($projectId, $presentationFileId, $previewActionUrl, $downloadActionUrl, $previewTypes): array {
+    $zipContextQuery=$publicContext?'&scope=repository':($isAcademicManagement?'&context=academic_management':'');
+    $zipListActionUrl=route('project-zip-list').$zipContextQuery;
+    $zipEntryPreviewActionUrl=route('project-zip-entry-preview').$zipContextQuery;
+    $zipEntryDownloadActionUrl=route('project-zip-entry-download').$zipContextQuery;
+    $documents = array_map(static function (array $file) use ($projectId, $presentationFileId, $previewActionUrl, $downloadActionUrl, $previewTypes, $zipContextQuery, $zipListActionUrl, $zipEntryPreviewActionUrl, $zipEntryDownloadActionUrl): array {
         $extension = strtolower((string) $file['extension']);
         $query = '&project_id=' . $projectId . '&file_id=' . (int) $file['id'];
+        $isBrowsableZip=$extension==='zip'&&$zipContextQuery!=='';
         return ['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'type'=>strtoupper($extension ?: 'FILE'),'mime_type'=>(string)($file['mime_type']??''),
             'size'=>ArchiveService::formatBytes((int)$file['size_bytes']),'sort_order'=>(int)($file['sort_order']??$file['id']),'extension'=>$extension,'available'=>true,
             'is_presentation'=>$presentationFileId===(int)$file['id'],'is_package'=>false,
-            'preview_supported'=>isset($previewTypes[$extension]),'preview_type'=>$previewTypes[$extension] ?? 'unsupported',
-            'preview_url'=>$previewActionUrl.$query,'download_url'=>$downloadActionUrl.$query];
+            'presentation_eligible'=>$extension!=='zip',
+            'preview_supported'=>isset($previewTypes[$extension])||$isBrowsableZip,'preview_type'=>$isBrowsableZip?'zip':($previewTypes[$extension]??'unsupported'),
+            'preview_url'=>$previewActionUrl.$query,'download_url'=>$downloadActionUrl.$query,
+            'zip_url'=>$isBrowsableZip?$zipListActionUrl.$query:'',
+            'zip_entry_preview_url'=>$isBrowsableZip?$zipEntryPreviewActionUrl.$query:'',
+            'zip_entry_download_url'=>$isBrowsableZip?$zipEntryDownloadActionUrl.$query:'',
+            'document_status'=>(string)($file['document_status']??''),
+            'document_status_label'=>(string)($file['document_status_label']??''),
+            'current_version_number'=>(int)($file['current_version_number']??1),
+            'current_updated_at'=>(string)($file['current_updated_at']??$file['created_at']??''),
+            'current_updated_label'=>!empty($file['current_updated_at']??$file['created_at']??null)?date('d/m/Y H:i',strtotime((string)($file['current_updated_at']??$file['created_at']))):''];
     }, $project['files']);
     $archives = array_values(array_filter($documents, static fn(array $file): bool => $file['extension']==='zip'));
     $documents = array_values(array_filter($documents, static fn(array $file): bool => $file['extension']!=='zip'));
-    $headerPackage = (new ProjectPackageService())->describe($projectId, (array) $project['files']);
+    $headerPackage = [];
     $versions = [];
     foreach ($project['deliveries'] as $delivery) {
         $deliveryFiles = array_values(array_filter($project['files'], static fn(array $file): bool => (int)($file['delivery_id'] ?? 0)===(int)$delivery['id']));
@@ -212,9 +226,10 @@ if ($project === null): ?>
         'documents'=>$documents,'archives'=>$archives,'versions'=>$versions,
         'can_manage_files'=>!empty($projectCapabilities['manage_files'])&&($publicContext||$isAcademicManagement)&&!empty($projectDocuments),
         'restorable_files'=>(array)($projectDocuments['restorable']??[]),
-        'file_upload'=>!empty($projectDocuments)?['context'=>(string)($projectDocuments['context']??$projectContext),'endpoint'=>(string)$projectDocuments['endpoint'],'csrf_token'=>(string)$projectDocuments['csrf'],'limits'=>(array)$projectDocuments['limits']]:[],
-        'package'=>(array)($projectDocuments['package']??[]),
+        'file_upload'=>!empty($projectCapabilities['manage_files'])&&!empty($projectDocuments)?['context'=>(string)($projectDocuments['context']??$projectContext),'endpoint'=>(string)$projectDocuments['endpoint'],'csrf_token'=>(string)$projectDocuments['csrf'],'limits'=>(array)$projectDocuments['limits']]:[],
+        'package'=>[],
         'global_file_actions'=>[],
+        'document_review'=>$isAcademicManagement&&(string)$project['status']==='development'?(array)($documentReview??[]):[],
         'project_histories'=>[
             'academic'=>(array)($project['academic_history']??[]),
             'academic_total'=>(int)($project['academic_history_total']??count((array)($project['academic_history']??[]))),

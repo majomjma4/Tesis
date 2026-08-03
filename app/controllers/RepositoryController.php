@@ -65,10 +65,7 @@ final class RepositoryController
         $projectDocuments=null;
         if($project!==null&&!empty($projectCapabilities['manage_files'])){
             $documentModel=new ProjectDocumentModel();
-            $documentFiles=$documentModel->activeFiles((int)$project['id']);
-            $package=(new ProjectPackageService())->describe((int)$project['id'],$documentFiles);
-            if(!empty($package['download_url']))$package['download_url'].='&scope=repository';
-            $projectDocuments=['context'=>'repository','restorable'=>$documentModel->restorable((int)$project['id']),'versions'=>$documentModel->versions((int)$project['id']),'package'=>$package,'limits'=>(new ProjectDocumentFileService())->limits(),'endpoint'=>route('admin-project-file'),'csrf'=>$session->csrfToken('admin_repository')];
+            $projectDocuments=['context'=>'repository','restorable'=>$documentModel->restorable((int)$project['id']),'versions'=>$documentModel->versions((int)$project['id']),'limits'=>(new ProjectDocumentFileService())->limits(),'endpoint'=>route('admin-project-file'),'csrf'=>$session->csrfToken('admin_repository')];
         }
         View::render('projects/detail', [
             'currentPage' => 'repository',

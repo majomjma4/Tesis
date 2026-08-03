@@ -66,6 +66,11 @@ final class ProjectsController
             ? $descriptionService->consumePendingReminder((int) $project['id'], $access->currentUserId())
             : null;
         $projectCapabilities = (new ProjectCapabilityService())->forCurrentUser($project, $projectContext);
+        $documentReview = null;
+        if ($projectContext === 'academic_management' && (string)$project['status'] === 'development') {
+            $documentReview = (new ProjectDocumentReviewService())->describeCurrentFiles((int)$project['id'], (array)$project['files']);
+            $project['files'] = $documentReview['files'];
+        }
         $returnUrl = $isAdministrator
             ? $this->academicManagementReturnUrl((string) ($_GET['return'] ?? ''))
             : route('projects');
@@ -73,19 +78,15 @@ final class ProjectsController
         if ($isAdministrator) $detailUrl .= '&return=' . rawurlencode($returnUrl);
         $projectDocuments = null;
         $projectStatusTransitions = [];
-        if (!empty($projectCapabilities['manage_files'])) {
+        if (!empty($projectCapabilities['manage_files']) || $documentReview !== null) {
             $documentModel = new ProjectDocumentModel();
-            $documentFiles = $documentModel->activeFiles((int) $project['id']);
             $projectDocuments = [
                 'context' => 'academic_management',
-                'restorable' => $documentModel->restorable((int) $project['id']),
+                'restorable' => !empty($projectCapabilities['manage_files']) ? $documentModel->restorable((int) $project['id']) : [],
                 'versions' => $documentModel->versions((int) $project['id']),
-                'package' => array_replace((new ProjectPackageService())->describe((int) $project['id'], $documentFiles), [
-                    'download_url' => route('project-package-download') . '&project_id=' . (int) $project['id'] . '&context=academic_management',
-                ]),
                 'limits' => (new ProjectDocumentFileService())->limits(),
-                'endpoint' => route('admin-project-file'),
-                'csrf' => $session->csrfToken('admin_projects'),
+                'endpoint' => !empty($projectCapabilities['manage_files']) ? route('admin-project-file') : '',
+                'csrf' => !empty($projectCapabilities['manage_files']) ? $session->csrfToken('admin_projects') : '',
             ];
         }
         if (!empty($projectCapabilities['change_status'])) {
@@ -126,6 +127,7 @@ final class ProjectsController
             'previewActionUrl' => route('project-file-preview') . ($isAdministrator ? '&context=academic_management' : ''),
             'downloadActionUrl' => route('project-file-download') . ($isAdministrator ? '&context=academic_management' : ''),
             'projectDocuments' => $projectDocuments,
+            'documentReview' => $documentReview,
             'projectHistoryEndpoint' => !empty($projectCapabilities['view_admin_history'])
                 ? route('admin-project-history') . '&id=' . (int) $project['id'] . '&context=academic_management'
                 : '',
@@ -225,6 +227,90 @@ final class ProjectsController
     {
         [, $file, $stream] = $this->resolveFile(); session_write_close(); $this->stream($file,$stream,'attachment');
     }
+
+    public function zipList(): void
+    {
+        [$project,$file,$path,$temporary]=$this->resolveProjectArchive(true);
+        try{$archive=(new ArchiveService())->listDirectory($path,(string)($_GET['path']??''));}
+        finally{$this->discardProjectArchive($path,$temporary);}
+        if(empty($archive['success'])){$status=match($archive['status']??''){'not_found'=>404,'invalid_path'=>400,default=>422};http_response_code($status);$this->json(['success'=>false,'message'=>$archive['message'],'data'=>['archive'=>$archive]]);}
+        $this->json(['success'=>true,'message'=>$archive['message'],'data'=>['archive'=>$archive]]);
+    }
+
+    public function zipEntryPreview(): void
+    {
+        [$project,$file,$entry]=$this->resolveProjectArchiveEntry(true);
+        $query=$this->projectArchiveQuery($project,$file,(string)$entry['path']);
+        try{$preview=(new FilePreviewService())->prepare($entry,route('project-zip-entry-content').$query,route('project-zip-entry-download').$query);}
+        finally{$this->closeProjectArchiveEntry($entry);}
+        $this->json(['success'=>true,'message'=>$preview['message'],'data'=>['preview'=>$preview]]);
+    }
+
+    public function zipEntryContent(): void
+    {
+        [,,$entry]=$this->resolveProjectArchiveEntry();$previewService=new FilePreviewService();
+        if(!$previewService->canStreamInline($entry)){$this->closeProjectArchiveEntry($entry);http_response_code(415);exit('Este formato no puede visualizarse dentro de la plataforma.');}
+        session_write_close();$this->streamProjectArchiveEntry($entry,'inline');
+    }
+
+    public function zipEntryDownload(): void
+    {
+        [,,$entry]=$this->resolveProjectArchiveEntry();session_write_close();$this->streamProjectArchiveEntry($entry,'attachment');
+    }
+
+    private function resolveProjectArchive(bool $json=false):array
+    {
+        [$project,$context]=$this->resolveProjectArchiveAccess($json);$projectId=(int)$project['id'];
+        $fileId=filter_var($_GET['file_id']??null,FILTER_VALIDATE_INT);
+        $file=$fileId?(new ProjectRecordModel())->findFile($projectId,(int)$fileId):null;
+        $extension=strtolower((string)($file['extension']??''));$mime=strtolower((string)($file['mime_type']??''));
+        if($file===null||($extension!=='zip'&&!in_array($mime,['application/zip','application/x-zip-compressed'],true)))$this->failProjectArchive(404,'El paquete solicitado no está disponible.',$json);
+        try{$path=(new ProjectDocumentFileService())->resolveStoredFile($projectId,(string)$file['storage_name']);}
+        catch(Throwable){$this->failProjectArchive(404,'El paquete solicitado no está disponible.',$json);}
+        $file['context']=$context;
+        return [$project,$file,$path,false];
+    }
+
+    private function resolveProjectArchiveEntry(bool $json=false):array
+    {
+        [$project,$file,$path,$temporary]=$this->resolveProjectArchive($json);
+        try{$entry=(new ArchiveService())->openFileStream($path,(string)($_GET['path']??''));}
+        finally{$this->discardProjectArchive($path,$temporary);}
+        if(empty($entry['success'])){$status=match($entry['status']??''){'invalid_path'=>400,'not_found'=>404,default=>422};$this->failProjectArchive($status,(string)($entry['message']??'No fue posible abrir el archivo interno.'),$json);}
+        return [$project,$file,$entry];
+    }
+
+    private function resolveProjectArchiveAccess(bool $json):array
+    {
+        if(session_status()!==PHP_SESSION_ACTIVE)session_start();
+        if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET')$this->failProjectArchive(405,'Método no permitido.',$json);
+        $scope=(string)($_GET['scope']??'');$requestedContext=(string)($_GET['context']??'');
+        $repository=$scope==='repository'&&$requestedContext==='';$academicManagement=$scope===''&&$requestedContext==='academic_management';
+        if(!$repository&&!$academicManagement)$this->failProjectArchive(422,'El contexto documental no es válido.',$json);
+        $context=$repository?'repository':'academic_management';$projectId=filter_var($_GET['project_id']??null,FILTER_VALIDATE_INT);
+        $capabilities=$projectId?(new ProjectCapabilityService())->forProjectId((int)$projectId,$context):(new ProjectCapabilityService())->none();
+        if(empty($capabilities['download_files']))$this->failProjectArchive(403,'No tienes autorización para consultar archivos de este proyecto.',$json);
+        $access=new ProjectAccessService();$session=new AuthSessionService();
+        $project=$projectId&&$access->can('project.view')?(new ProjectRecordModel())->find((int)$projectId,$access->currentUserId(),$session->hasAdminAccess(),$repository):null;
+        if($project===null)$this->failProjectArchive(404,'El proyecto solicitado no está disponible en este contexto.',$json);
+        return [$project,$context];
+    }
+
+    private function projectArchiveQuery(array $project,array $file,string $path):string
+    {
+        $context=(string)($file['context']??'');$query='&project_id='.(int)$project['id'];
+        $query.='&file_id='.(int)$file['id'];
+        $query.=$context==='repository'?'&scope=repository':'&context=academic_management';
+        return $query.'&path='.rawurlencode($path);
+    }
+
+    private function discardProjectArchive(string $path,bool $temporary):void{if($temporary&&is_file($path))@unlink($path);}
+    private function closeProjectArchiveEntry(array $entry):void{if(isset($entry['stream'])&&is_resource($entry['stream']))fclose($entry['stream']);if(isset($entry['archive'])&&$entry['archive'] instanceof ZipArchive)$entry['archive']->close();}
+    private function streamProjectArchiveEntry(array $entry,string $disposition):never
+    {
+        $name=basename(str_replace('\\','/',(string)$entry['name']));header('Content-Type: '.(string)$entry['mime']);header('Content-Length: '.(int)$entry['size']);header("Content-Disposition: {$disposition}; filename*=UTF-8''".rawurlencode($name));header('X-Content-Type-Options: nosniff');header('Cache-Control: private, no-store, max-age=0');if($disposition==='inline')header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");fpassthru($entry['stream']);$this->closeProjectArchiveEntry($entry);exit;
+    }
+    private function failProjectArchive(int $status,string $message,bool $json):never{http_response_code($status);if($json)$this->json(['success'=>false,'message'=>$message,'data'=>[]]);header('Content-Type: text/plain; charset=UTF-8');exit($message);}
 
     private function resolveFile(bool $json=false): array
     {
