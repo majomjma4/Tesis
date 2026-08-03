@@ -87,6 +87,11 @@ if ($project === null): ?>
         ['label'=>'Aprobación del tribunal','value'=>$dateLabel($project['tribunal_approved_at']??null)],['label'=>'Publicación','value'=>$dateLabel($project['published_at']??null)],
     ],static fn(array $row):bool=>$row['value']!==''));
     $publishedDescription=trim((string)($project['summary']??''));
+    $reviewNotice=!empty($project['review_situation']['has_pending_observations'])?[
+        'message'=>'Este proyecto tiene observaciones pendientes de la última revisión.',
+        'count'=>(int)$project['review_situation']['pending_observations_count'],
+        'date'=>$project['review_situation']['latest_corrections_requested_at']??null,
+    ]:null;
     $informationSections = [
         ['id'=>'description','title'=>$publicContext?'Descripción del proyecto':'Descripción','icon'=>'fa-align-left','type'=>'prose','content'=>$publicContext?($publishedDescription!==''?$publishedDescription:'Este proyecto aún no cuenta con una descripción pública.'):(string)($project['summary'] ?: $project['subtitle'] ?: 'Este expediente no registra un resumen institucional.')],
         ['id'=>'institutional','title'=>'Información académica','icon'=>'fa-building-columns','type'=>'metadata','content'=>array_values(array_filter([
@@ -115,30 +120,47 @@ if ($project === null): ?>
         $tutoringByUser=[];
         foreach($richTeachingParticipants as $member){$role=$isAcademicManagement?'Tutor':($roleLabels[$member['role_code']]??ucfirst(str_replace('_',' ',(string)$member['role_code'])));$tutoringByUser[(int)$member['user_id']]=$person($member,$role,true);}
         $mainTutorId=(int)($project['tutor_user_id']??0);
-        if($mainTutorId>0&&!isset($tutoringByUser[$mainTutorId]))$tutoringByUser[$mainTutorId]=$person(['user_id'=>$mainTutorId,'username'=>$project['tutor_username']??'','full_name'=>$project['tutor_name']??'','email'=>$project['tutor_email']??''],'Tutor',true);
+        if($mainTutorId>0&&$tutoringByUser===[])$tutoringByUser[$mainTutorId]=$person(['user_id'=>$mainTutorId,'username'=>$project['tutor_username']??'','full_name'=>$project['tutor_name']??'','email'=>$project['tutor_email']??''],'Tutor',true);
         $richTutoring=array_values($tutoringByUser);
+        $primaryActiveTutor=$richTutoring[0]??null;
+        $headerTutorNames=array_values(array_filter(array_map(static fn(array $tutor):string=>trim((string)($tutor['name']??'')),$richTutoring)));
+        $headerTutorValue=$headerTutorNames!==[]?implode(', ',$headerTutorNames):(trim((string)($project['tutor_name']??''))?:'Sin tutor asignado');
         $richTribunalMembers=array_map(static fn(array $row):array=>$person($row,$roleLabels[$row['role_code']]??'Miembro del tribunal',true),$richTribunal);
+        $academicProgressStatuses=$isDegreeProject
+            ?['development','under_review','approved','defense','tribunal_approved','published']
+            :['development','under_review','approved','published'];
+        $academicProgressCurrentIndex=array_search((string)$project['status'],$academicProgressStatuses,true);
+        $academicProgressSteps=[];
+        foreach($academicProgressStatuses as $progressIndex=>$progressStatus){
+            $academicProgressSteps[]=[
+                'status'=>$progressStatus,
+                'label'=>project_academic_labels($progressStatus)['status'],
+                'state'=>$academicProgressCurrentIndex!==false&&$progressIndex<$academicProgressCurrentIndex?'completed':($progressIndex===$academicProgressCurrentIndex?'current':'pending'),
+            ];
+        }
         $richAcademicFields=array_values(array_filter([
-            $publicContext?['key'=>'code','icon'=>'fa-hashtag','label'=>'Código','value'=>(string)$project['code']]:null,
+            ($publicContext||$isAcademicManagement)?['key'=>'code','icon'=>'fa-hashtag','label'=>'Código','value'=>(string)$project['code']]:null,
             ['key'=>'type','icon'=>'fa-folder-tree','label'=>'Tipo de proyecto','value'=>(string)$project['type_name']],
             ['key'=>'career','icon'=>'fa-graduation-cap','label'=>'Carrera','value'=>(string)$project['career_name']],
-            ['key'=>'period','icon'=>'fa-calendar-days','label'=>'Período académico','value'=>(string)$project['period_name']],
+            !$isAcademicManagement?['key'=>'period','icon'=>'fa-calendar-days','label'=>'Período académico','value'=>(string)$project['period_name']]:null,
             ['key'=>'research','icon'=>'fa-microscope','label'=>'Línea de investigación','value'=>(string)($project['research_line_name']??'')],
             ['key'=>'status','icon'=>'fa-circle-check','label'=>'Estado','value'=>$statusLabel],
-            ['key'=>'stage','icon'=>'fa-flag-checkered','label'=>'Etapa académica','value'=>$stageLabel],
+            !$isAcademicManagement?['key'=>'stage','icon'=>'fa-flag-checkered','label'=>'Etapa académica','value'=>$stageLabel]:null,
             $isAcademicManagement?['key'=>'registration','icon'=>'fa-calendar-plus','label'=>'Fecha de registro','value'=>$dateLabel($project['created_at']??null)]:null,
             $publicContext?['key'=>'completion','icon'=>'fa-calendar-check','label'=>'Fecha de finalización','value'=>$dateLabel($project['academic_completed_at']??null)]:null,
             $publicContext?['key'=>'publication','icon'=>'fa-building-columns','label'=>'Fecha de publicación','value'=>$dateLabel($project['repository_published_at']??null)]:null,
         ],static fn(?array $row):bool=>$row!==null&&$row['value']!==''));
-        $informationSections=[
+        $informationSections=array_values(array_filter([
             ['id'=>'description','title'=>'Descripción del proyecto','icon'=>'fa-align-left','type'=>'prose','content'=>$publishedDescription!==''?$publishedDescription:($publicContext?'Este proyecto aún no cuenta con una descripción pública.':'Este proyecto aún no cuenta con una descripción registrada.')],
             ['id'=>'institutional','title'=>'Información académica','icon'=>'fa-building-columns','type'=>'metadata','content'=>$richAcademicFields],
+            $isAcademicManagement?['id'=>'academic-progress','title'=>'Progreso académico','icon'=>'fa-route','type'=>'academic_progress','content'=>$academicProgressSteps]:null,
+            $isAcademicManagement&&$reviewNotice!==null?['id'=>'review-notice','title'=>'Observaciones pendientes','icon'=>'fa-triangle-exclamation','type'=>'review_notice','content'=>$reviewNotice]:null,
             ['id'=>'participants','title'=>'Participantes','icon'=>'fa-users','type'=>'project_participants','content'=>[
                 'authors'=>$richAuthors,'tutoring'=>$richTutoring,'tribunal'=>$richTribunalMembers,
                 'show_tribunal'=>$isAcademicManagement&&$isDegreeProject,
             ]],
             ['id'=>'project-classification','title'=>'Clasificación','icon'=>'fa-tags','type'=>'project_tags','content'=>array_map(static fn(array $keyword):string=>(string)$keyword['name'],(array)($project['keywords']??[]))],
-        ];
+        ],static fn(?array $section):bool=>$section!==null));
     }
     $actions=[];
     if (!empty($projectCapabilities['edit_information'])) $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
@@ -169,17 +191,15 @@ if ($project === null): ?>
         ['key'=>'availability','label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible','icon'=>$project['is_available']?'fa-circle-check':'fa-circle-minus'],
     ];
     $academicManagementHeaderMetadata = [
-        ['key'=>'code','label'=>'Código','value'=>trim((string)$project['code'])?:'Sin código','icon'=>'fa-hashtag'],
+        $authorMetadata??['key'=>'author','label'=>'Autor','value'=>'Sin autor registrado','icon'=>'fa-user-graduate'],
+        ['key'=>'tutor','label'=>'Tutor','value'=>$headerTutorValue??(trim((string)($project['tutor_name']??''))?:'Sin tutor asignado'),'icon'=>'fa-chalkboard-user'],
         ['key'=>'period','label'=>'Período académico','value'=>trim((string)$project['period_name'])?:'Sin período registrado','icon'=>'fa-calendar-days'],
         ['key'=>'registration','label'=>'Fecha de inicio','value'=>$dateLabel($project['created_at']??null)?:'Sin fecha registrada','icon'=>'fa-calendar-plus'],
-        ['key'=>'tutor','label'=>'Tutor','value'=>trim((string)($project['tutor_name']??''))?:'Sin tutor asignado','icon'=>'fa-chalkboard-user'],
-        ['key'=>'status','label'=>'Estado','value'=>$statusLabel,'icon'=>'fa-circle-check'],
-        ['key'=>'stage','label'=>'Etapa académica','value'=>$stageLabel,'icon'=>'fa-flag-checkered'],
         ['key'=>'updated','label'=>'Última actualización','value'=>$dateLabel($project['updated_at']??null)?:'Sin actualización registrada','icon'=>'fa-clock'],
     ];
-    $headerMetadata = (string)$project['status']==='published'
-        ? $publishedHeaderMetadata
-        : ($isAcademicManagement ? $academicManagementHeaderMetadata : [
+    $headerMetadata = $isAcademicManagement
+        ? $academicManagementHeaderMetadata
+        : ((string)$project['status']==='published' ? $publishedHeaderMetadata : [
             ['label'=>'Código','value'=>(string)$project['code']],['label'=>'Carrera','value'=>(string)$project['career_name']],['label'=>'Período académico','value'=>(string)$project['period_name']],['label'=>'Tutor','value'=>(string)($project['tutor_name']??'')],['label'=>'Integrantes','value'=>count($students).''],['label'=>'Registro','value'=>$dateLabel($project['created_at']??null)],['label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible'],
         ]);
     $digitalRecord=['entity'=>['type'=>'project','id'=>$projectId,'query_key'=>'project_id'],'context'=>$projectContext,'mode'=>'view','return_url'=>$returnUrl,
@@ -207,7 +227,7 @@ if ($project === null): ?>
             'endpoint'=>(string)($projectStatusEndpoint??''),'csrf_token'=>(string)($projectStatusCsrf??''),
             'current_status'=>(string)$project['status'],'items'=>$projectStatusTransitions,
         ],
-        'review_notice'=>!empty($project['review_situation']['has_pending_observations'])?['message'=>'Este proyecto tiene observaciones pendientes de la última revisión.','count'=>(int)$project['review_situation']['pending_observations_count'],'date'=>$project['review_situation']['latest_corrections_requested_at']??null]:null,
+        'review_notice'=>$isAcademicManagement?null:$reviewNotice,
         'return_label'=>$publicContext?'Volver al repositorio':($isAcademicManagement?'Volver a proyectos activos':'Volver a proyectos')];
     if($publicContext||$isAcademicManagement): ?><style>
     .digital-record[data-entity-type="project"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:14px;align-items:start}
@@ -233,16 +253,46 @@ if ($project === null): ?>
     .digital-record[data-record-context="academic_management"] .ed-meta>div{min-width:0}
     .digital-record[data-record-context="academic_management"] .ed-meta :is(dt,dd){word-break:normal;overflow-wrap:break-word}
     .digital-record[data-record-context="academic_management"] .ed-meta :is([data-record-meta="code"],[data-record-meta="registration"],[data-record-meta="updated"]) dd{overflow-wrap:normal}
-    @container project-admin-header (min-width:1050px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(7,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:auto}.digital-record[data-record-context="academic_management"][data-record-status="published"] .ed-meta{grid-template-columns:repeat(5,minmax(0,1fr))}}
-    @container project-admin-header (min-width:760px) and (max-width:1049.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(8,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:span 2}.digital-record[data-record-context="academic_management"] .ed-meta>div:nth-child(5){grid-column:2/span 2}.digital-record[data-record-context="academic_management"][data-record-status="published"] .ed-meta{grid-template-columns:repeat(5,minmax(0,1fr))}.digital-record[data-record-context="academic_management"][data-record-status="published"] .ed-meta>div{grid-column:auto}}
-    @container project-admin-header (min-width:540px) and (max-width:759.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(6,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div:nth-child(-n+3){grid-column:span 2}.digital-record[data-record-context="academic_management"] .ed-meta>div:nth-child(n+4){grid-column:span 3}}
-    @container project-admin-header (min-width:420px) and (max-width:539.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(4,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:span 2}.digital-record[data-record-context="academic_management"] .ed-meta>div:last-child{grid-column:2/span 2}}
-    @container project-admin-header (max-width:419.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:1fr}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:auto}}
-    @media(max-width:800px){.digital-record[data-entity-type="project"] .ed-information{grid-template-columns:1fr}}
+    .digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="institutional"]{grid-column:1;grid-row:2}
+    .digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="academic-progress"]{grid-column:1;grid-row:3;margin-top:4px;border-top:3px solid var(--primary)}
+    .digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="review-notice"]{grid-column:1;grid-row:4;margin-top:4px;padding:13px 15px;border-color:#fde68a;background:#fffbeb;color:#854d0e;box-shadow:none}
+    .digital-record[data-record-context="academic_management"] .ed-review-notice-inline{min-width:0;display:flex;align-items:flex-start;gap:10px}
+    .digital-record[data-record-context="academic_management"] .ed-review-notice-inline>i{flex:0 0 auto;margin-top:2px}
+    .digital-record[data-record-context="academic_management"] .ed-review-notice-inline>div{min-width:0;display:grid;gap:3px}
+    .digital-record[data-record-context="academic_management"] .ed-review-notice-inline strong{font-size:12px;line-height:1.5}
+    .digital-record[data-record-context="academic_management"] .ed-review-notice-inline span{font-size:11px;line-height:1.45}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress-scroll{max-width:100%;min-width:0;overflow:visible}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress{min-width:0;margin:0;padding:4px 0 2px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));list-style:none}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress[data-step-count="4"]{min-width:0;grid-template-columns:repeat(4,minmax(0,1fr))}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress li{position:relative;min-width:0;display:grid;grid-template-rows:30px auto;justify-items:center;gap:8px;color:var(--muted);text-align:center}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress li:not(:last-child)::after{position:absolute;z-index:0;top:14px;left:calc(50% + 15px);width:calc(100% - 30px);height:2px;background:var(--line);content:""}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress li[data-step-state="completed"]:not(:last-child)::after{background:#16a34a}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress-marker{position:relative;z-index:1;width:30px;height:30px;border:2px solid var(--line);border-radius:50%;background:var(--surface);color:var(--muted);display:grid;place-items:center;font-size:10px;font-weight:850}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress li[data-step-state="completed"] .ed-academic-progress-marker{border-color:#16a34a;background:#16a34a;color:#fff}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress li[aria-current="step"] .ed-academic-progress-marker{border-color:var(--primary);background:var(--primary);color:#fff;box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 14%,transparent)}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress-label{max-width:112px;font-size:10px;font-weight:780;line-height:1.35;word-break:normal;overflow-wrap:break-word}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress li[data-step-state="completed"] .ed-academic-progress-label{color:#15803d}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress li[aria-current="step"] .ed-academic-progress-label{color:var(--primary);font-weight:900}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress-current{display:block;margin-top:2px;font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+    @container project-admin-header (min-width:900px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(5,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:auto}}
+    @container project-admin-header (min-width:650px) and (max-width:899.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(6,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div:nth-child(-n+3){grid-column:span 2}.digital-record[data-record-context="academic_management"] .ed-meta>div:nth-child(n+4){grid-column:span 3}}
+    @container project-admin-header (min-width:480px) and (max-width:649.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(2,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:auto}}
+    @container project-admin-header (max-width:479.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:1fr}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:auto}}
+    @media(max-width:1100px){
+        .digital-record[data-record-context="academic_management"] .ed-academic-progress[data-step-count="6"]{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:22px}
+        .digital-record[data-record-context="academic_management"] .ed-academic-progress[data-step-count="6"] li:nth-child(3)::after{display:none}
+    }
+    @media(max-width:800px){.digital-record[data-entity-type="project"] .ed-information{grid-template-columns:1fr}.digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="academic-progress"],.digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="review-notice"]{grid-column:auto;grid-row:auto}}
+    @media(max-width:520px){
+        .digital-record[data-record-context="academic_management"] .ed-academic-progress,.digital-record[data-record-context="academic_management"] .ed-academic-progress[data-step-count="4"],.digital-record[data-record-context="academic_management"] .ed-academic-progress[data-step-count="6"]{grid-template-columns:1fr;row-gap:0;padding:0}
+        .digital-record[data-record-context="academic_management"] .ed-academic-progress li{min-height:48px;padding:0 0 14px;grid-template-columns:30px minmax(0,1fr);grid-template-rows:auto;align-items:start;justify-items:start;gap:11px;text-align:left}
+        .digital-record[data-record-context="academic_management"] .ed-academic-progress li:not(:last-child)::after,.digital-record[data-record-context="academic_management"] .ed-academic-progress[data-step-count="6"] li:nth-child(3)::after{display:block;top:30px;left:14px;width:2px;height:calc(100% - 30px)}
+        .digital-record[data-record-context="academic_management"] .ed-academic-progress-label{max-width:none;padding-top:6px}
+    }
     </style><?php endif;
     require __DIR__.'/../repository/_ficha-institucional.php';
     if(!empty($digitalRecord['status_transition']['enabled'])) require __DIR__.'/../repository/_project-status-transition-dialog.php';
     if($publicContext):?><style>@media(min-width:801px){.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr)}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-document-section[data-information-section="description"]{grid-column:1/-1}}</style><?php endif;
     if(!$publicContext&&!empty($descriptionReminder)) require __DIR__.'/_description-reminder.php';
-    if($publicContext&&!empty($projectCapabilities['edit_information'])&&!empty($projectEditorCatalogs)){$projectEditorOnly=true;$catalogs=$projectEditorCatalogs;$projectCsrf=$projectTrashCsrf;$projectEndpoints=['save'=>$projectSaveEndpoint,'trash'=>$projectTrashEndpoint];$projectEditorPayload=array_merge($project,['status_label'=>$statusLabel,'stage_label'=>$stageLabel,'presentation_files'=>array_values(array_map(static fn(array $file):array=>['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'extension'=>(string)$file['extension'],'format'=>strtoupper((string)$file['extension']),'icon'=>'fa-regular fa-file','size'=>ArchiveService::formatBytes((int)$file['size_bytes'])],$project['files']))]);require __DIR__.'/../admin/projects.php';}
+    if(($publicContext||$isAcademicManagement)&&!empty($projectCapabilities['edit_information'])&&!empty($projectEditorCatalogs)){$projectEditorOnly=true;$catalogs=$projectEditorCatalogs;$projectCsrf=$projectTrashCsrf;$projectEndpoints=['save'=>$projectSaveEndpoint,'trash'=>$projectTrashEndpoint];$projectStatusDialog=['enabled'=>false];$projectEditorPayload=array_merge($project,['tutor_id'=>(int)($primaryActiveTutor['user_id']??$project['tutor_id']??0),'tutor_user_id'=>(int)($primaryActiveTutor['user_id']??$project['tutor_user_id']??0),'tutor_username'=>(string)($primaryActiveTutor['username']??$project['tutor_username']??''),'tutor_name'=>(string)($primaryActiveTutor['name']??$project['tutor_name']??''),'tutor_email'=>(string)($primaryActiveTutor['email']??$project['tutor_email']??''),'status_label'=>$statusLabel,'stage_label'=>$stageLabel,'capabilities'=>$projectCapabilities,'status_actions'=>$projectStatusTransitions,'status_transitions'=>$projectStatusTransitions,'presentation_files'=>array_values(array_map(static fn(array $file):array=>['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'extension'=>(string)$file['extension'],'format'=>strtoupper((string)$file['extension']),'icon'=>'fa-regular fa-file','size'=>ArchiveService::formatBytes((int)$file['size_bytes'])],$project['files']))]);require __DIR__.'/../admin/projects.php';}
 endif;

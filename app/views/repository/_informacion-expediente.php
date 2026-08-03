@@ -117,8 +117,8 @@ body.dark-mode .ed-form-state{color:#6ee7b7}body.dark-mode .ed-form-state.is-dir
 <?php else: ?>
 <div class="ed-information">
     <?php foreach ($sections as $section): $content = $section['content']; ?>
-        <section class="ed-document-section" data-information-section="<?= e($section['id']) ?>"<?= $section['type']==='project_participants'?' aria-label="Participantes"':' aria-labelledby="ed-section-'.e($section['id']).'"' ?>>
-            <?php if($section['type']!=='project_participants'):?><header class="ed-document-section-header">
+        <section class="ed-document-section" data-information-section="<?= e($section['id']) ?>"<?= $section['type']==='project_participants'?' aria-label="Participantes"':($section['type']==='review_notice'?' aria-label="Aviso de observaciones pendientes"':' aria-labelledby="ed-section-'.e($section['id']).'"') ?>>
+            <?php if(!in_array($section['type'],['project_participants','review_notice'],true)):?><header class="ed-document-section-header">
                 <h2 class="ed-document-heading" id="ed-section-<?= e($section['id']) ?>"><i class="fa-solid <?= e($section['icon']) ?>" aria-hidden="true"></i><?= e($section['title']) ?></h2>
                 <?php if ($section['id'] === 'keywords'): ?><p class="ed-document-section-description">Etiquetas de clasificación.</p><?php endif; ?>
             </header><?php endif;?>
@@ -135,6 +135,19 @@ body.dark-mode .ed-form-state{color:#6ee7b7}body.dark-mode .ed-form-state.is-dir
                 </div>
             <?php elseif ($section['type'] === 'metadata'): ?>
                 <dl class="ed-information-meta"><?php foreach ($content as $item): ?><div<?= !empty($item['secondary'])?' class="is-secondary"':'' ?><?= !empty($item['key']) ? ' data-material-field="' . e($item['key']) . '"' : '' ?>><dt><?php if(!empty($item['icon'])):?><i class="fa-solid <?=e((string)$item['icon'])?>" aria-hidden="true"></i><?php endif;?><?= e($item['label']) ?></dt><dd><?= e($item['value']) ?></dd></div><?php endforeach; ?></dl>
+            <?php elseif ($section['type'] === 'academic_progress'): ?>
+                <div class="ed-academic-progress-scroll" tabindex="0" role="region" aria-label="Progreso académico del proyecto">
+                    <ol class="ed-academic-progress" data-step-count="<?=count($content)?>">
+                        <?php foreach($content as $step):$stepState=(string)($step['state']??'pending');$isCurrent=$stepState==='current';?>
+                            <li data-step-state="<?=e($stepState)?>"<?= $isCurrent?' aria-current="step"':'' ?>>
+                                <span class="ed-academic-progress-marker" aria-hidden="true"><i class="fa-solid <?=$stepState==='completed'?'fa-check':($isCurrent?'fa-location-dot':'fa-circle')?>"></i></span>
+                                <span class="ed-academic-progress-label"><?=e((string)$step['label'])?><?php if($isCurrent):?><small class="ed-academic-progress-current">Paso actual</small><?php endif;?></span>
+                            </li>
+                        <?php endforeach;?>
+                    </ol>
+                </div>
+            <?php elseif ($section['type'] === 'review_notice'): ?>
+                <aside class="ed-review-notice-inline" role="status"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div><strong><?=e((string)$content['message'])?></strong><?php if(!empty($content['count'])):?><span><?=(int)$content['count']?> observación<?=((int)$content['count']===1?'':'es')?> pendiente<?=((int)$content['count']===1?'':'s')?>.</span><?php endif;?></div></aside>
             <?php elseif ($section['type'] === 'project_tags'): ?>
                 <?php if ($content): ?><div class="ed-tags"><?php foreach ($content as $tag): ?><span class="ed-classification-tag is-tone-<?= e($classificationTone((string)$tag)) ?>"><i class="fa-solid fa-tag" aria-hidden="true"></i><span><?= e($tag) ?></span></span><?php endforeach; ?></div>
                 <?php else: ?><p class="ed-project-classification-empty">Este proyecto no tiene etiquetas de clasificación registradas.</p><?php endif; ?>

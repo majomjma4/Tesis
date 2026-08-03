@@ -102,10 +102,14 @@ final class ProjectsController
                 ? (string) $project['code'] . ' · Gestión académica'
                 : ($project['title'] ?? 'Proyecto no encontrado') . ' | Gestión Académica',
             'bodyClass' => 'project-detail-page',
-            'pageStyles' => [asset('css/project-simplified.css'), asset('css/project-description.css')],
+            'pageStyles' => array_values(array_filter([
+                asset('css/project-simplified.css'), asset('css/project-description.css'),
+                $isAdministrator ? asset('css/admin-projects.css') : null,
+            ])),
             'pageScript' => asset('js/repository-detail.js'),
             'pageScripts' => array_values(array_filter([
                 $descriptionReminder ? asset('js/project-description.js') : null,
+                $isAdministrator ? asset('js/admin-projects.js') : null,
                 $isAdministrator && $projectStatusTransitions !== [] ? asset('js/project-status-transition.js') : null,
             ])),
             'project' => $project,
@@ -128,6 +132,10 @@ final class ProjectsController
             'projectStatusTransitions' => $projectStatusTransitions,
             'projectStatusEndpoint' => $isAdministrator ? route('admin-project-save') : '',
             'projectStatusCsrf' => $isAdministrator ? $session->csrfToken('admin_projects') : '',
+            'projectSaveEndpoint' => $isAdministrator ? route('admin-project-save') : '',
+            'projectTrashEndpoint' => $isAdministrator ? route('admin-project-trash') : '',
+            'projectTrashCsrf' => $isAdministrator ? $session->csrfToken('admin_projects') : '',
+            'projectEditorCatalogs' => $isAdministrator ? (new AdminProjectModel())->catalogs() : [],
             'descriptionReminder' => $descriptionReminder,
             'descriptionCsrf' => $session->csrfToken('project_description'),
             'descriptionSaveEndpoint' => route('project-description-save'),
