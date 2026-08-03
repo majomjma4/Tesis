@@ -581,7 +581,7 @@ body.modal-open{
 .review-card{
     border-top:5px solid var(--warning);
 }
-.changes-card{
+.action-card{
     border-top:5px solid var(--danger);
 }
 .documents-card{

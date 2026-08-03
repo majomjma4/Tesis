@@ -282,7 +282,7 @@ CREATE TABLE project_deliveries (
   version_number INT UNSIGNED NOT NULL,
   title VARCHAR(220) NOT NULL,
   comment TEXT NULL,
-  status ENUM('submitted','under_review','changes_required','approved') NOT NULL DEFAULT 'submitted',
+  status ENUM('submitted','under_review','corrections_requested','approved') NOT NULL DEFAULT 'submitted',
   submitted_by BIGINT UNSIGNED NOT NULL,
   submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_delivery_version (project_id, version_number),

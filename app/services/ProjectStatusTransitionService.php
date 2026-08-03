@@ -16,19 +16,9 @@ final class ProjectStatusTransitionService
             ],
         ],
         'under_review' => [
-            'changes_required' => [
-                'label' => 'Solicitar cambios', 'icon' => 'fa-rotate-left', 'reason_required' => true,
-                'effect' => 'El proyecto volverá a sus participantes para atender las observaciones.',
-            ],
             'approved' => [
                 'label' => 'Aprobar', 'icon' => 'fa-circle-check',
                 'effect' => 'La revisión académica quedará aprobada.',
-            ],
-        ],
-        'changes_required' => [
-            'under_review' => [
-                'label' => 'Enviar nuevamente a revisión', 'icon' => 'fa-paper-plane',
-                'effect' => 'El proyecto regresará a revisión académica.',
             ],
         ],
         'approved' => [

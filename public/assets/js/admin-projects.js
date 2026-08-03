@@ -30,6 +30,9 @@
     const tutoringEditor = form?.querySelector('[data-tutoring-editor]');
     const tutoringAdd = form?.querySelector('[data-tutoring-add]');
     const tutoringNote = form?.querySelector('[data-tutoring-note]');
+    const statusActions = form?.querySelector('[data-project-status-actions]');
+    const statusComplete = form?.querySelector('[data-project-status-complete]');
+    const statusDialog = document.querySelector('[data-project-status-dialog]');
     const dialogLayers = [modal, trash, saveConfirm, presentationDialog, descriptionDialog].filter(Boolean);
     dialogLayers.forEach(layer => { layer.hidden = true; });
     dialogLayers.forEach(layer => document.body.append(layer));
@@ -73,11 +76,46 @@
     const syncChangeState = () => {
         const dirty = Boolean(initialFormState) && editableState() !== initialFormState;
         if (changeState) changeState.hidden = !dirty;
+        statusActions?.querySelectorAll('[data-project-status-transition]').forEach(button => {
+            button.disabled = dirty;
+            button.setAttribute('aria-disabled', String(dirty));
+            button.title = dirty ? 'Guarda o descarta los cambios generales antes de modificar el estado.' : '';
+        });
         if (projectSubmit) {
             projectSubmit.disabled = !dirty || projectIsSaving;
             projectSubmit.setAttribute('aria-disabled', String(projectSubmit.disabled));
         }
         return dirty;
+    };
+    const renderStatusTransitions = project => {
+        if (!statusActions || !statusComplete) return;
+        const allowed = Boolean(project?.capabilities?.change_status || project?.capabilities?.request_corrections || project?.capabilities?.manage_publication);
+        const transitions = allowed && Array.isArray(project?.status_actions)
+            ? project.status_actions
+            : (allowed && Array.isArray(project?.status_transitions) ? project.status_transitions : []);
+        statusActions.replaceChildren(...transitions.map(transition => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'ap-project-status-action';
+            button.classList.toggle('is-exceptional', transition.action === 'revert_publication');
+            button.dataset.projectStatusTransition = JSON.stringify(transition);
+            button.setAttribute('aria-controls', 'projectStatusTransitionDialog');
+            const icon = document.createElement('i');
+            icon.className = `fa-solid ${transition.icon || 'fa-arrow-right'}`;
+            icon.setAttribute('aria-hidden', 'true');
+            const label = document.createElement('span');
+            label.textContent = transition.label || 'Cambiar estado';
+            button.append(icon, label);
+            return button;
+        }));
+        statusActions.hidden = transitions.length === 0;
+        const published = String(project?.status || '') === 'published';
+        statusComplete.textContent = project?.publication_reversion?.message || 'El proyecto ha finalizado su flujo académico.';
+        statusComplete.hidden = !published;
+        if (statusDialog) {
+            statusDialog.dataset.projectId = String(project?.id || '');
+            statusDialog.dataset.currentStatus = String(project?.status || '');
+        }
     };
     form?.addEventListener('input', syncChangeState);
     form?.addEventListener('change', syncChangeState);
@@ -185,8 +223,6 @@
     const periodSelect = form?.elements.academic_period_id;
     const tutorSelect = form?.elements.tutor_id;
     const statusSelect = form?.elements.status;
-    if (statusSelect && !statusSelect.querySelector('option[value=""]')) statusSelect.add(new Option('Seleccionar estado', ''), 0);
-    const thesisOnlyStatuses = [...(statusSelect?.options || [])].filter(option => ['defense', 'tribunal_approved'].includes(option.value));
     if (careerSelect) {
         [...careerSelect.options].forEach(option => { if (!option.value || !option.textContent.includes('Desarrollo de Software')) option.remove(); });
         selectFirstAvailable(careerSelect);
@@ -210,20 +246,12 @@
         if (careerField) careerField.querySelector('strong').textContent = 'Desarrollo de Software';
         if (periodField) periodField.querySelector('strong').textContent = periodSelect.selectedOptions[0]?.textContent.trim() || 'Sin período activo';
     };
-    const syncProjectStatusOptions = () => {
-        const typeCode = String(activeProject?.type_code || activeProject?.type_key || '').toLowerCase();
-        const isThesis = typeCode === 'thesis' || /titulación|tesis/i.test(String(activeProject?.type_name || activeProject?.type || ''));
-        thesisOnlyStatuses.forEach(option => {
-            option.disabled = !isThesis;
-            option.hidden = !isThesis;
-        });
-    };
     const setProjectDefaults = () => {
         selectFirstAvailable(careerSelect);
         selectFirstAvailable(periodSelect);
         typeSelect.value = '';
         tutorSelect.value = '';
-        statusSelect.value = '';
+        statusSelect.value = 'development';
         [careerSelect, periodSelect, tutorSelect, statusSelect].forEach(select => select?.dispatchEvent(new Event('change', { bubbles: true })));
     };
     const request = async (url, data) => {
@@ -567,10 +595,6 @@
         pendingSaveData = null;
         document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         form.reset();
-        thesisOnlyStatuses.forEach(option => {
-            option.disabled = false;
-            option.hidden = false;
-        });
         const formMessage = document.querySelector('#apMessage');
         formMessage.hidden = true;
         formMessage.textContent = '';
@@ -578,7 +602,6 @@
         for (const [key, value] of Object.entries(project || {})) if (form.elements[key]) form.elements[key].value = value ?? '';
         if (!project) setProjectDefaults();
         else [careerSelect, periodSelect, tutorSelect].forEach(select => select?.dispatchEvent(new Event('change', { bubbles: true })));
-        syncProjectStatusOptions();
         syncFixedFields();
         document.querySelector('#apTitle').textContent = project ? 'Editar' : 'Nuevo proyecto';
         const value = (...keys) => keys.map(key => project?.[key]).find(item => item !== undefined && item !== null && String(item).trim() !== '');
@@ -595,8 +618,9 @@
         if (summary) summary.value = value('summary', 'description', 'full_description') || '';
         setText('[data-project-type]', value('type_name', 'type'), 'Sin información');
         setText('[data-project-research-line]', value('research_line_name', 'research_line', 'line_name'), 'Sin información registrada');
-        setText('[data-project-status]', statusSelect?.selectedOptions[0]?.textContent, 'Sin información');
+        setText('[data-project-status]', value('status_label'), project ? 'Sin información' : 'En desarrollo');
         setText('[data-project-stage]', value('stage_label', 'current_stage_label', 'current_stage', 'stage'), 'Sin información registrada');
+        renderStatusTransitions(project);
         setText('[data-project-code]', value('code'), 'Sin información');
         setText('[data-project-published]', readableDate(value('published_at', 'repository_published_at')), 'Sin publicar');
         setText('[data-project-updated]', readableDate(value('updated_at')), 'Sin información');

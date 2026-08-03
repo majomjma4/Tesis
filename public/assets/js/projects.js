@@ -4,6 +4,7 @@
     const cards = [...root.querySelectorAll('[data-project-card]')];
     const search = root.querySelector('[data-project-search]');
     const status = root.querySelector('[data-project-status]');
+    const situation = root.querySelector('[data-project-situation]');
     const type = root.querySelector('[data-project-type]');
     const period = root.querySelector('[data-project-period]');
     const sort = root.querySelector('[data-project-sort]');
@@ -28,6 +29,7 @@
     };
     if (search) search.value = initialParams.get('q') || '';
     if (status && [...status.options].some(option => option.value === initialParams.get('status'))) status.value = initialParams.get('status');
+    if (situation && [...situation.options].some(option => option.value === initialParams.get('situation'))) situation.value = initialParams.get('situation');
     if (type && [...type.options].some(option => option.value === initialParams.get('type'))) type.value = initialParams.get('type');
     if (period && [...period.options].some(option => option.value === initialParams.get('period'))) period.value = initialParams.get('period');
     if (sort && [...sort.options].some(option => option.value === initialParams.get('sort'))) sort.value = initialParams.get('sort');
@@ -101,7 +103,7 @@
         sync();
         document.addEventListener('click', event => { if (!shell.contains(event.target)) close(); });
     }
-    [status, type, period, sort].forEach(enhanceSelect);
+    [status, situation, type, period, sort].forEach(enhanceSelect);
 
     function renderPagination(total) {
         if (!pagination) return;
@@ -139,7 +141,7 @@
     function update(resetPage = true) {
         if (resetPage) currentPage = 1;
         const query = normalize(search?.value.trim());
-        const filtered = cards.filter(card => (!query || normalize(card.dataset.search).includes(query)) && (!status?.value || card.dataset.status === status.value) && (!type?.value || card.dataset.type === type.value) && (!period?.value || card.dataset.period === period.value));
+        const filtered = cards.filter(card => (!query || normalize(card.dataset.search).includes(query)) && (!status?.value || card.dataset.status === status.value) && (!situation?.value || card.dataset.situation === situation.value) && (!type?.value || card.dataset.type === type.value) && (!period?.value || card.dataset.period === period.value));
         const sortValue = sort?.value || 'activity';
         if (sortValue !== appliedSort) {
             [...cards].sort((a, b) => sortValue === 'title' ? a.dataset.title.localeCompare(b.dataset.title, 'es') : sortValue === 'progress' ? Number(b.dataset.progress) - Number(a.dataset.progress) : Number(b.dataset.activity) - Number(a.dataset.activity)).forEach(card => grid?.append(card));
@@ -154,23 +156,24 @@
         renderPagination(orderedFiltered.length);
         if (empty) empty.hidden = filtered.length > 0;
         if (grid) grid.hidden = filtered.length === 0;
-        const active = Boolean(query || status?.value || type?.value || period?.value);
+        const active = Boolean(query || status?.value || situation?.value || type?.value || period?.value);
         root.querySelectorAll('[data-project-clear]').forEach(button => button.hidden = !active);
         if (report) {
             const descriptions = [];
             if (query) descriptions.push(`búsqueda “${search.value.trim()}”`);
             if (status?.value) descriptions.push(`estado ${status.options[status.selectedIndex].text}`);
+            if (situation?.value) descriptions.push(`situación ${situation.options[situation.selectedIndex].text}`);
             if (type?.value) descriptions.push(`tipo ${type.options[type.selectedIndex].text}`);
             if (period?.value) descriptions.push(`periodo ${period.value}`);
             report.textContent = active ? `Mostrando ${filtered.length} de ${cards.length} proyectos: ${descriptions.join(', ')}.` : `Mostrando tus ${cards.length} proyectos.`;
         }
         const params = new URLSearchParams(window.location.search);
-        const values = { q: search?.value.trim() || '', status: status?.value || '', type: type?.value || '', period: period?.value || '', sort: sort?.value === 'activity' ? '' : (sort?.value || '') };
+        const values = { q: search?.value.trim() || '', status: status?.value || '', situation: situation?.value || '', type: type?.value || '', period: period?.value || '', sort: sort?.value === 'activity' ? '' : (sort?.value || '') };
         Object.entries(values).forEach(([key, value]) => value ? params.set(key, value) : params.delete(key));
         window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
     }
     type?.addEventListener('change', syncStatusWorkflow);
-    [search, status, type, period, sort].forEach(control => control?.addEventListener(control === search ? 'input' : 'change', update));
-    root.querySelectorAll('[data-project-clear]').forEach(button => button.addEventListener('click', () => { if (search) search.value = ''; if (status) { status.value = ''; status.dispatchEvent(new Event('change')); } if (type) { type.value = ''; type.dispatchEvent(new Event('change')); } if (period) { period.value = ''; period.dispatchEvent(new Event('change')); } update(); search?.focus(); }));
+    [search, status, situation, type, period, sort].forEach(control => control?.addEventListener(control === search ? 'input' : 'change', update));
+    root.querySelectorAll('[data-project-clear]').forEach(button => button.addEventListener('click', () => { if (search) search.value = ''; if (status) { status.value = ''; status.dispatchEvent(new Event('change')); } if (situation) { situation.value = ''; situation.dispatchEvent(new Event('change')); } if (type) { type.value = ''; type.dispatchEvent(new Event('change')); } if (period) { period.value = ''; period.dispatchEvent(new Event('change')); } update(); search?.focus(); }));
     update();
 })();

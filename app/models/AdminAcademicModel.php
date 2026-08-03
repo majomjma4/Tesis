@@ -6,7 +6,6 @@ final class AdminAcademicModel
     private const PROJECT_STATUS_LABELS = [
         'development' => 'En desarrollo',
         'under_review' => 'En revisión',
-        'changes_required' => 'Requiere cambios',
         'approved' => 'Aprobado',
         'defense' => 'En tribunal',
         'tribunal_approved' => 'Aprobado por el Tribunal',

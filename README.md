@@ -89,7 +89,7 @@ Estados disponibles:
 
 - Pendiente
 - Revisado
-- Requiere cambios
+- Correcciones solicitadas
 - Finalizado
 
 # Centro de notificaciones

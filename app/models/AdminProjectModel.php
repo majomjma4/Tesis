@@ -2,13 +2,19 @@
 declare(strict_types=1);
 final class AdminProjectModel
 {
-    private const STATUSES=['development','under_review','changes_required','approved','defense','tribunal_approved','published'];
+    private const STATUSES=['development','under_review','approved','defense','tribunal_approved'];
+    private const WRITABLE_STATUSES=['development','under_review','approved','defense','tribunal_approved','published'];
     private const PROJECT_KEYWORD_EXCLUSIONS=['reglamento','normativa','plantilla','formato','guía documental','manual','tutorial'];
-    private const STATUS_LABELS=['development'=>'En desarrollo','under_review'=>'En revisión','changes_required'=>'Requiere cambios','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el Tribunal','published'=>'Publicado'];
+    private const STATUS_LABELS=['development'=>'En desarrollo','under_review'=>'En revisión','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el Tribunal','published'=>'Publicado'];
     public function listing(array $f,array $pagination=[]):array
     {
         [$from,$x]=$this->filteredQuery($f);
-        $sql="SELECT p.id,p.code,p.title,p.subtitle,p.status,p.project_type_id,p.career_id,p.academic_period_id,p.tutor_id,p.presentation_file_id,p.updated_at,pt.name type_name,c.name career_name,ap.name period_name,u.full_name tutor_name,(SELECT COUNT(*) FROM project_participants pp WHERE pp.project_id=p.id AND pp.status='active') participant_count".$from.' ORDER BY p.updated_at DESC';
+        $sql="SELECT p.id,p.code,p.title,p.subtitle,p.status,p.project_type_id,p.career_id,p.academic_period_id,p.tutor_id,p.presentation_file_id,p.published_at,p.updated_at,pt.name type_name,pt.code type_code,c.name career_name,ap.name period_name,u.full_name tutor_name,
+             CASE WHEN p.status='published' AND p.published_at IS NOT NULL THEN TIMESTAMPDIFF(SECOND,p.published_at,CURRENT_TIMESTAMP) ELSE NULL END publication_reversion_elapsed_seconds,
+             (SELECT COUNT(*) FROM project_participants pp WHERE pp.project_id=p.id AND pp.status='active') participant_count,
+             (SELECT COUNT(*) FROM project_participants pa WHERE pa.project_id=p.id AND pa.role_code='student' AND pa.status='active' AND pa.removed_at IS NULL) author_count,
+             (SELECT COUNT(*) FROM project_participants pj WHERE pj.project_id=p.id AND pj.role_code IN ('tribunal','jury') AND pj.status='active' AND pj.removed_at IS NULL) tribunal_count,
+             (SELECT COUNT(*) FROM project_files pf WHERE pf.project_id=p.id AND pf.deleted_at IS NULL AND pf.purged_at IS NULL) active_file_count".$from.' ORDER BY p.updated_at DESC';
         $result=PaginationService::run(Database::connection(),'SELECT COUNT(*)'.$from,$sql,$x,$pagination?:PaginationService::request());
         $files=Database::connection()->prepare(
             "SELECT id,original_name name,extension,size_bytes
@@ -19,6 +25,7 @@ final class AdminProjectModel
         $keywordModel=new ProjectKeywordModel();
         $tutoringByProject=[];
         $projectIds=array_values(array_filter(array_map('intval',array_column($result['items'],'id'))));
+        $reviewSituations=(new ProjectReviewSituationService())->forProjects($projectIds);
         if($projectIds){
             $placeholders=implode(',',array_fill(0,count($projectIds),'?'));
             $tutoring=Database::connection()->prepare("SELECT pp.project_id,pp.user_id,pp.role_code,u.username,u.full_name,u.email,1 is_teacher
@@ -52,6 +59,7 @@ final class AdminProjectModel
             $item['presentation_file_id']=(int)($item['presentation_file_id']??0);
             $item['keywords']=$keywordModel->forProject((int)$item['id']);
             $item['participants']=$tutoringByProject[(int)$item['id']]??[];
+            $item['review_situation']=$reviewSituations[(int)$item['id']]??ProjectReviewSituationService::emptySituation();
         }
         unset($item);
         return $result;
@@ -59,7 +67,7 @@ final class AdminProjectModel
     public function summary(array $filters=[]):array
     {
         [$from,$params]=$this->filteredQuery($filters);
-        $statement=Database::connection()->prepare("SELECT COUNT(*) total,SUM(p.status='development') development,SUM(p.status IN ('under_review','changes_required')) review,SUM(p.status='approved') approved,SUM(p.status IN ('defense','tribunal_approved')) defense".$from);
+        $statement=Database::connection()->prepare("SELECT COUNT(*) total,SUM(p.status='development') development,SUM(p.status='under_review') review,SUM(p.status='approved') approved,SUM(p.status IN ('defense','tribunal_approved')) defense".$from);
         $statement->execute($params);
         return array_map('intval',$statement->fetch()?:[]);
     }
@@ -75,6 +83,7 @@ final class AdminProjectModel
     {
         $where=[
             'p.deleted_at IS NULL',
+            "p.status <> 'published'",
             "EXISTS (
                 SELECT 1
                 FROM project_participants student_participant
@@ -97,7 +106,8 @@ final class AdminProjectModel
         $status=(string)($filters['status']??'');
         if(in_array($status,self::STATUSES,true)){$where[]='p.status=:s';$params['s']=$status;}
         if(($filters['group']??'')==='finished')$where[]="p.status IN ('approved','defense','tribunal_approved','published')";
-        if(($filters['attention']??'')==='observations')$where[]="EXISTS(SELECT 1 FROM project_observations po WHERE po.project_id=p.id AND po.status='pending')";
+        $situation=ProjectReviewSituationService::normalizeFilter((string)($filters['situation']??''));
+        if($situation!=='')$where[]=(new ProjectReviewSituationService())->filterCondition($situation,'p');
         $typeId=(int)($filters['type_id']??0);
         if($typeId>0){$where[]='p.project_type_id=:t';$params['t']=$typeId;}
         $periodId=(int)($filters['period_id']??0);
@@ -105,10 +115,10 @@ final class AdminProjectModel
         $from=" FROM projects p JOIN project_types pt ON pt.id=p.project_type_id JOIN careers c ON c.id=p.career_id JOIN academic_periods ap ON ap.id=p.academic_period_id LEFT JOIN users u ON u.id=p.tutor_id WHERE ".implode(' AND ',$where);
         return [$from,$params];
     }
-    public function save(array $v,int $id,int $actor):int
+    public function save(array $v,int $id,int $actor,bool $allowStatusChange=false):int
     {
         $this->validate($v);
-        return Database::transaction(function(PDO $d)use($v,$id,$actor):int{
+        return Database::transaction(function(PDO $d)use($v,$id,$actor,$allowStatusChange):int{
             $tutor=$v['tutor_id']?:null;
             $tutoringChange=['changed'=>false];
             $type=$d->prepare('SELECT code FROM project_types WHERE id=:id AND is_active=1');
@@ -119,6 +129,7 @@ final class AdminProjectModel
                 $q=$d->prepare('SELECT id,code,title,subtitle,summary,status,project_type_id,career_id,academic_period_id,tutor_id,presentation_file_id,approved_at,created_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE');
                 $q->execute(['id'=>$id]);$before=$q->fetch();
                 if(!$before)throw new InvalidArgumentException('El proyecto ya no existe.');
+                if(!$allowStatusChange)$v['status']=(string)$before['status'];
                 if(!empty($v['tutoring_managed'])){
                     $tutoringChange=(new ProjectTutoringService())->sync($d,$id,(array)($v['tutoring_user_ids']??[]),(int)($v['tutoring_primary_id']??0),$before['tutor_id']===null?null:(int)$before['tutor_id']);
                     $tutor=(int)$tutoringChange['after_primary'];
@@ -235,5 +246,5 @@ final class AdminProjectModel
         return $label===false?'Sin asignar':(string)$label;
     }
     public function trash(int $id,string $reason,int $actor):void{if($id<1||mb_strlen(trim($reason))<5)throw new InvalidArgumentException('Indica brevemente el motivo de eliminación.');Database::transaction(function(PDO $d)use($id,$reason,$actor):void{$q=$d->prepare('SELECT id,title,status FROM projects WHERE id=:id AND deleted_at IS NULL');$q->execute(['id'=>$id]);$before=$q->fetch();if(!$before)throw new InvalidArgumentException('El proyecto ya no está disponible.');$d->prepare('UPDATE projects SET deleted_at=CURRENT_TIMESTAMP,deleted_by=:actor,deletion_reason=:reason WHERE id=:id')->execute(['actor'=>$actor,'reason'=>trim($reason),'id'=>$id]);(new ProjectAuditService($d))->record($id,$actor,'project_trashed','project',$id,$before,['deleted'=>true],trim($reason));});}
-    private function validate(array $v):void{if(mb_strlen($v['title'])<5)throw new InvalidArgumentException('Ingresa un título de al menos cinco caracteres.');if($v['project_type_id']<1||$v['career_id']<1||$v['academic_period_id']<1)throw new InvalidArgumentException('Completa tipo, carrera y periodo académico.');if(!in_array($v['status'],self::STATUSES,true))throw new InvalidArgumentException('El estado seleccionado no es válido.');if(in_array($v['status'],['defense','tribunal_approved'],true)){$q=Database::connection()->prepare('SELECT code FROM project_types WHERE id=:id');$q->execute(['id'=>$v['project_type_id']]);if($q->fetchColumn()!=='thesis')throw new InvalidArgumentException('Los estados del Tribunal solo corresponden a proyectos de tesis.');}}
+    private function validate(array $v):void{if(mb_strlen($v['title'])<5)throw new InvalidArgumentException('Ingresa un título de al menos cinco caracteres.');if($v['project_type_id']<1||$v['career_id']<1||$v['academic_period_id']<1)throw new InvalidArgumentException('Completa tipo, carrera y periodo académico.');if(!in_array($v['status'],self::WRITABLE_STATUSES,true))throw new InvalidArgumentException('El estado seleccionado no es válido.');if(in_array($v['status'],['defense','tribunal_approved'],true)){$q=Database::connection()->prepare('SELECT code FROM project_types WHERE id=:id');$q->execute(['id'=>$v['project_type_id']]);if($q->fetchColumn()!=='thesis')throw new InvalidArgumentException('Los estados del Tribunal solo corresponden a proyectos de tesis.');}}
 }

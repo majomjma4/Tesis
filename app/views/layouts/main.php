@@ -43,7 +43,7 @@
                 </a>
                 <a href="<?= e(route('projects')) ?>" class="menu-item <?= ($currentPage ?? '') === 'projects' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-folder-open"></i></span>
-                    <span>Proyectos</span>
+                    <span><?= $isAdministratorLayout ? 'Proyectos activos' : 'Proyectos' ?></span>
                 </a>
                 <?php if ($isAdministratorLayout): ?>
                 <a href="<?= e(route('admin-users')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-users' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-users"></i></span><span>Usuarios</span></a>

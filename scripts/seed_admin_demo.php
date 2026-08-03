@@ -176,7 +176,7 @@ final class AdminDemoSeeder
         $projects = [
             ['TIT-2026-001','thesis','Sistema inteligente para la gestión de turnos médicos','Plataforma web accesible para centros de salud','under_review','review','valentina.mora.demo@correo.com','diana.alegria.pendiente@local.invalid','TIT-801'],
             ['PIS-2026-001','pis','Aplicación móvil para rutas de transporte urbano','Seguimiento de recorridos y alertas para usuarios','development','development','ana.torres.demo@correo.com','maribel.fierro.pendiente@local.invalid','PROY-401'],
-            ['PRA-2026-001','practice','Automatización del inventario de equipos tecnológicos','Práctica preprofesional aplicada al control institucional','changes_required','review','diego.paredes.demo@correo.com','maria.navarrete.pendiente@local.invalid','SEG-601'],
+            ['PRA-2026-001','practice','Automatización del inventario de equipos tecnológicos','Práctica preprofesional aplicada al control institucional','development','development','diego.paredes.demo@correo.com','maria.navarrete.pendiente@local.invalid','SEG-601'],
             ['VIN-2026-001','community','Alfabetización digital para emprendedores locales','Proyecto de vinculación con herramientas de comercio electrónico','approved','final_documents','sofia.lopez.demo@correo.com','maribel.fierro.pendiente@local.invalid','PROY-401'],
             ['TIT-2026-002','thesis','Modelo de detección temprana de riesgos académicos','Análisis de indicadores para acompañamiento estudiantil','completed','closed','valentina.mora.demo@correo.com','diana.alegria.pendiente@local.invalid','TIT-801'],
             ['PIS-2026-002','pis','Panel de monitoreo energético para laboratorios','Visualización en tiempo real de consumo eléctrico','published','published','carlos.mendoza.demo@correo.com','maria.navarrete.pendiente@local.invalid','PROY-401'],
@@ -215,7 +215,7 @@ final class AdminDemoSeeder
         $student = $this->userIds['valentina.mora.demo@correo.com'];
         $teacher = $this->userIds['diana.alegria.pendiente@local.invalid'];
         $stage = $this->requiredId("SELECT id FROM project_stages WHERE project_id={$reviewProject} AND stage_code='review'", 'Falta etapa de revisión.');
-        $this->execute("INSERT INTO project_deliveries(project_id,stage_id,version_number,title,comment,status,submitted_by,submitted_at) VALUES(:project,:stage,1,'Informe de avance v1','Primera versión para revisión.','changes_required',:student,DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 6 DAY))", ['project'=>$reviewProject,'stage'=>$stage,'student'=>$student]);
+        $this->execute("INSERT INTO project_deliveries(project_id,stage_id,version_number,title,comment,status,submitted_by,submitted_at) VALUES(:project,:stage,1,'Informe de avance v1','Primera versión para revisión.','corrections_requested',:student,DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 6 DAY))", ['project'=>$reviewProject,'stage'=>$stage,'student'=>$student]);
         $delivery = (int)$this->db->lastInsertId();
         $this->execute("INSERT INTO project_observations(project_id,delivery_id,author_id,category,location_reference,body,status,created_at) VALUES
             (:project,:delivery,:teacher,'Metodología','Página 18','Explicar el criterio utilizado para seleccionar la muestra y justificar su tamaño.','pending',DATE_SUB(CURRENT_TIMESTAMP,INTERVAL 4 DAY)),

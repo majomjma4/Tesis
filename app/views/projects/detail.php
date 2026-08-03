@@ -139,19 +139,14 @@ if ($project === null): ?>
             ]],
             ['id'=>'project-classification','title'=>'Clasificación','icon'=>'fa-tags','type'=>'project_tags','content'=>array_map(static fn(array $keyword):string=>(string)$keyword['name'],(array)($project['keywords']??[]))],
         ];
-        if($isAcademicManagement){
-            $institutionalPublication=(string)$project['status']==='published'?$dateLabel($project['repository_published_at']??null):'';
-            $informationSections[]=['id'=>'project-institutional','title'=>'Información institucional','icon'=>'fa-landmark','type'=>'metadata','content'=>array_values(array_filter([
-                ['key'=>'institutional-code','icon'=>'fa-hashtag','label'=>'Código','value'=>(string)$project['code']],
-                $institutionalPublication!==''?['key'=>'institutional-publication','icon'=>'fa-building-columns','label'=>'Fecha de publicación','value'=>$institutionalPublication]:null,
-                ['key'=>'institutional-updated','icon'=>'fa-clock','label'=>'Última actualización','value'=>$dateLabel($project['updated_at']??null),'secondary'=>true],
-            ],static fn(?array $row):bool=>$row!==null&&$row['value']!==''))];
-        }
     }
     $actions=[];
     if (!empty($projectCapabilities['edit_information'])) $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
     elseif (!$publicContext && !empty($projectCapabilities['register_delivery']) && $canDeliver) $actions[]=['id'=>'delivery','label'=>'Registrar entrega','kind'=>'primary','icon'=>'fa-upload','url'=>$detailUrl.'&tab=review','enabled'=>true];
-    if (!empty($projectCapabilities['download_files'])&&!empty($headerPackage['available'])) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'].($publicContext?'&scope=repository':($isAcademicManagement?'&context=academic_management':'')),'enabled'=>true,'download'=>true];
+    if (!$isAcademicManagement&&!empty($projectCapabilities['download_files'])&&!empty($headerPackage['available'])) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'].($publicContext?'&scope=repository':''),'enabled'=>true,'download'=>true];
+    if($isAcademicManagement&&(string)$project['status']==='published')$actions[]=['id'=>'repository','label'=>'Ver en Repositorio','kind'=>'secondary','icon'=>'fa-book-open','url'=>route('repository-detail').'&id='.$projectId,'enabled'=>true];
+    $statusActionCount=$isAcademicManagement&&!empty($projectCapabilities['change_status'])?count($projectStatusTransitions):0;
+    foreach($statusActionCount>0?$projectStatusTransitions:[] as $transition)$actions[]=['id'=>'status-'.$transition['target'],'label'=>(string)$transition['label'],'kind'=>'secondary','icon'=>(string)$transition['icon'],'icon_style'=>'fa-solid','enabled'=>true,'trigger'=>'status-transition','transition'=>$transition];
     $menuActions=[];
     if($publicContext&&!empty($projectCapabilities['manage_publication'])){
         $menuActions[]=['label'=>$project['is_available']?'Marcar como no disponible':'Marcar como disponible','icon'=>$project['is_available']?'fa-ban':'fa-circle-check','enabled'=>true,'action'=>'availability'];
@@ -159,36 +154,39 @@ if ($project === null): ?>
     }
     if($publicContext&&!empty($projectCapabilities['view_admin_history']))$menuActions[]=['label'=>'Ver historial administrativo','icon'=>'fa-clock-rotate-left','enabled'=>true,'action'=>'admin-history','separator'=>$menuActions!==[]];
     if($publicContext&&!empty($projectCapabilities['edit_information']))$menuActions[]=['label'=>'Enviar a Papelera','icon'=>'fa-trash-can','enabled'=>true,'action'=>'trash','danger'=>true,'separator'=>$menuActions!==[]];
-    if($isAcademicManagement&&!empty($projectCapabilities['change_status']))foreach($projectStatusTransitions as $transition)$menuActions[]=[
-        'label'=>(string)$transition['label'],'icon'=>(string)$transition['icon'],'enabled'=>true,
-        'action'=>'status-transition','transition'=>$transition,
-    ];
-    if($isAcademicManagement&&!empty($projectCapabilities['view_admin_history']))$menuActions[]=[
-        'label'=>'Ver historial administrativo','icon'=>'fa-clock-rotate-left','enabled'=>true,'action'=>'admin-history','separator'=>$menuActions!==[],
-    ];
     $breadcrumbs = $isAcademicManagement ? [
-        ['label'=>'Gestión académica','url'=>route('admin-academic')],
-        ['label'=>'Proyectos','url'=>$returnUrl],
+        ['label'=>'Proyectos activos','url'=>$returnUrl],
         ['label'=>(string)$project['code'],'url'=>null],
     ] : [
         ['label'=>$publicContext?'Repositorio':'Proyectos','url'=>$returnUrl],
         ['label'=>(string)$project['code'],'url'=>null],
     ];
+    $publishedHeaderMetadata = [
+        ['key'=>'period','label'=>'Período académico','value'=>(string)$project['period_name'],'icon'=>'fa-calendar-days'],
+        ['key'=>'tutor','label'=>'Tutor','value'=>(string)($project['tutor_name']??''),'icon'=>'fa-chalkboard-user'],
+        $authorMetadata,
+        ['key'=>'registration','label'=>'Registro','value'=>$dateLabel($project['created_at']??null),'icon'=>'fa-calendar-plus'],
+        ['key'=>'availability','label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible','icon'=>$project['is_available']?'fa-circle-check':'fa-circle-minus'],
+    ];
+    $academicManagementHeaderMetadata = [
+        ['key'=>'code','label'=>'Código','value'=>trim((string)$project['code'])?:'Sin código','icon'=>'fa-hashtag'],
+        ['key'=>'period','label'=>'Período académico','value'=>trim((string)$project['period_name'])?:'Sin período registrado','icon'=>'fa-calendar-days'],
+        ['key'=>'registration','label'=>'Fecha de inicio','value'=>$dateLabel($project['created_at']??null)?:'Sin fecha registrada','icon'=>'fa-calendar-plus'],
+        ['key'=>'tutor','label'=>'Tutor','value'=>trim((string)($project['tutor_name']??''))?:'Sin tutor asignado','icon'=>'fa-chalkboard-user'],
+        ['key'=>'status','label'=>'Estado','value'=>$statusLabel,'icon'=>'fa-circle-check'],
+        ['key'=>'stage','label'=>'Etapa académica','value'=>$stageLabel,'icon'=>'fa-flag-checkered'],
+        ['key'=>'updated','label'=>'Última actualización','value'=>$dateLabel($project['updated_at']??null)?:'Sin actualización registrada','icon'=>'fa-clock'],
+    ];
+    $headerMetadata = (string)$project['status']==='published'
+        ? $publishedHeaderMetadata
+        : ($isAcademicManagement ? $academicManagementHeaderMetadata : [
+            ['label'=>'Código','value'=>(string)$project['code']],['label'=>'Carrera','value'=>(string)$project['career_name']],['label'=>'Período académico','value'=>(string)$project['period_name']],['label'=>'Tutor','value'=>(string)($project['tutor_name']??'')],['label'=>'Integrantes','value'=>count($students).''],['label'=>'Registro','value'=>$dateLabel($project['created_at']??null)],['label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible'],
+        ]);
     $digitalRecord=['entity'=>['type'=>'project','id'=>$projectId,'query_key'=>'project_id'],'context'=>$projectContext,'mode'=>'view','return_url'=>$returnUrl,
         'capabilities'=>$projectCapabilities,
         'breadcrumbs'=>$breadcrumbs,
         'header'=>['title'=>(string)$project['title'],'description'=>(string)($project['subtitle']??''),'type_label'=>(string)$project['type_name'],'type_icon'=>$publicContext?'fa-folder-tree':null,'status_label'=>$statusLabel,'status_tone'=>$project['status']==='published'?'success':'neutral'],
-        'metadata'=>array_values(array_filter($publicContext?[
-            ['key'=>'period','label'=>'Período académico','value'=>(string)$project['period_name'],'icon'=>'fa-calendar-days'],
-            ['key'=>'tutor','label'=>'Tutor','value'=>(string)($project['tutor_name']??''),'icon'=>'fa-chalkboard-user'],
-            $authorMetadata,
-            ['key'=>'registration','label'=>'Registro','value'=>$dateLabel($project['created_at']??null),'icon'=>'fa-calendar-plus'],
-            ['key'=>'availability','label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible','icon'=>$project['is_available']?'fa-circle-check':'fa-circle-minus'],
-        ]:[
-            ['label'=>'Código','value'=>(string)$project['code']],['label'=>'Carrera','value'=>(string)$project['career_name']],['label'=>'Período académico','value'=>(string)$project['period_name']],['label'=>'Tutor','value'=>(string)($project['tutor_name']??'')],['label'=>'Integrantes','value'=>count($students).''],['label'=>'Registro','value'=>$dateLabel($project['created_at']??null)],
-            $isAcademicManagement?['label'=>'Etapa académica','value'=>$stageLabel]:null,
-            $isAcademicManagement?null:['label'=>'Disponibilidad','value'=>$project['is_available']?'Disponible':'No disponible']
-        ],static fn(?array $row):bool=>$row!==null&&$row['value']!=='')),
+        'metadata'=>array_values(array_filter($headerMetadata,static fn(?array $row):bool=>$row!==null&&$row['value']!=='')),
         'actions'=>$actions,'menu_actions'=>$menuActions,'tabs'=>$tabs,'active_tab'=>$activeTab,'information_sections'=>$informationSections,
         'documents'=>$documents,'archives'=>$archives,'versions'=>$versions,
         'can_manage_files'=>!empty($projectCapabilities['manage_files'])&&($publicContext||$isAcademicManagement)&&!empty($projectDocuments),
@@ -205,11 +203,12 @@ if ($project === null): ?>
         'endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl,'admin_history'=>(string)($projectHistoryEndpoint??'')], 'version_endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl],
          'admin_actions'=>['endpoint'=>(string)($projectAdminEndpoint??''),'trash_endpoint'=>(string)($projectTrashEndpoint??''),'csrf_token'=>(string)($projectAdminCsrf??''),'trash_csrf_token'=>(string)($projectTrashCsrf??''),'status'=>(string)$project['status'],'is_available'=>!empty($project['is_available']),'redirect'=>$returnUrl],
         'status_transition'=>[
-            'enabled'=>$isAcademicManagement&&!empty($projectCapabilities['change_status']),
+            'enabled'=>$isAcademicManagement&&$projectStatusTransitions!==[],
             'endpoint'=>(string)($projectStatusEndpoint??''),'csrf_token'=>(string)($projectStatusCsrf??''),
             'current_status'=>(string)$project['status'],'items'=>$projectStatusTransitions,
         ],
-        'return_label'=>$publicContext?'Volver al repositorio':'Volver a proyectos'];
+        'review_notice'=>!empty($project['review_situation']['has_pending_observations'])?['message'=>'Este proyecto tiene observaciones pendientes de la última revisión.','count'=>(int)$project['review_situation']['pending_observations_count'],'date'=>$project['review_situation']['latest_corrections_requested_at']??null]:null,
+        'return_label'=>$publicContext?'Volver al repositorio':($isAcademicManagement?'Volver a proyectos activos':'Volver a proyectos')];
     if($publicContext||$isAcademicManagement): ?><style>
     .digital-record[data-entity-type="project"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:14px;align-items:start}
     .digital-record[data-entity-type="project"] .ed-document-section{padding:19px}
@@ -218,17 +217,32 @@ if ($project === null): ?>
     .digital-record[data-entity-type="project"] .ed-document-section-header{margin-bottom:13px;padding-bottom:11px}
     .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="description"] .ed-prose{max-width:82ch;font-size:14px;line-height:1.72;overflow-wrap:anywhere}
     .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="description"] .ed-prose p{margin-bottom:12px}
-    .digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="project-institutional"]{grid-column:1/-1;border-top:3px solid #0891b2}
-    .digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="project-institutional"] .ed-information-meta{grid-template-columns:repeat(3,minmax(0,1fr))}
-    .digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="project-institutional"] .ed-information-meta .is-secondary{border-top-color:var(--line);background:var(--surface-soft);color:var(--muted)}
     .digital-record[data-record-context="academic_management"] :is(.ed-information-meta dd,.ed-participant-identity strong,.ed-participant-identity span,.ed-participant-identity small,.ed-classification-tag>span){word-break:normal;overflow-wrap:break-word}
+    .digital-record[data-record-context="academic_management"] .ed-meta [data-record-meta="code"]{--ed-meta-accent:#0891b2}
+    .digital-record[data-record-context="academic_management"] .ed-meta [data-record-meta="status"]{--ed-meta-accent:#16a34a}
+    .digital-record[data-record-context="academic_management"] .ed-meta [data-record-meta="stage"]{--ed-meta-accent:#2563eb}
+    .digital-record[data-record-context="academic_management"] .ed-label{min-height:25px;padding:6px 11px;border-color:var(--line);background:var(--surface-soft);color:var(--muted)}
+    .digital-record[data-record-context="academic_management"] .ed-label[data-record-status-label]{--project-status-color:#2563eb;background:color-mix(in srgb,var(--project-status-color) 14%,var(--surface));border-color:color-mix(in srgb,var(--project-status-color) 38%,var(--line));color:color-mix(in srgb,var(--project-status-color) 88%,var(--text));box-shadow:0 2px 8px color-mix(in srgb,var(--project-status-color) 12%,transparent)}
+    .digital-record[data-record-context="academic_management"][data-record-status="development"] .ed-label[data-record-status-label]{--project-status-color:#2563eb}
+    .digital-record[data-record-context="academic_management"][data-record-status="under_review"] .ed-label[data-record-status-label]{--project-status-color:#d97706}
+    .digital-record[data-record-context="academic_management"][data-record-status="approved"] .ed-label[data-record-status-label]{--project-status-color:#16a34a}
+    .digital-record[data-record-context="academic_management"][data-record-status="defense"] .ed-label[data-record-status-label]{--project-status-color:#7c3aed}
+    .digital-record[data-record-context="academic_management"][data-record-status="tribunal_approved"] .ed-label[data-record-status-label]{--project-status-color:#0f766e}
+    .digital-record[data-record-context="academic_management"][data-record-status="published"] .ed-label[data-record-status-label]{--project-status-color:#15803d}
+    .digital-record[data-record-context="academic_management"] .ed-header{container:project-admin-header/inline-size}
+    .digital-record[data-record-context="academic_management"] .ed-meta>div{min-width:0}
+    .digital-record[data-record-context="academic_management"] .ed-meta :is(dt,dd){word-break:normal;overflow-wrap:break-word}
+    .digital-record[data-record-context="academic_management"] .ed-meta :is([data-record-meta="code"],[data-record-meta="registration"],[data-record-meta="updated"]) dd{overflow-wrap:normal}
+    @container project-admin-header (min-width:1050px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(7,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:auto}.digital-record[data-record-context="academic_management"][data-record-status="published"] .ed-meta{grid-template-columns:repeat(5,minmax(0,1fr))}}
+    @container project-admin-header (min-width:760px) and (max-width:1049.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(8,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:span 2}.digital-record[data-record-context="academic_management"] .ed-meta>div:nth-child(5){grid-column:2/span 2}.digital-record[data-record-context="academic_management"][data-record-status="published"] .ed-meta{grid-template-columns:repeat(5,minmax(0,1fr))}.digital-record[data-record-context="academic_management"][data-record-status="published"] .ed-meta>div{grid-column:auto}}
+    @container project-admin-header (min-width:540px) and (max-width:759.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(6,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div:nth-child(-n+3){grid-column:span 2}.digital-record[data-record-context="academic_management"] .ed-meta>div:nth-child(n+4){grid-column:span 3}}
+    @container project-admin-header (min-width:420px) and (max-width:539.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(4,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:span 2}.digital-record[data-record-context="academic_management"] .ed-meta>div:last-child{grid-column:2/span 2}}
+    @container project-admin-header (max-width:419.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:1fr}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:auto}}
     @media(max-width:800px){.digital-record[data-entity-type="project"] .ed-information{grid-template-columns:1fr}}
-    @media(max-width:800px){.digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="project-institutional"] .ed-information-meta{grid-template-columns:repeat(2,minmax(0,1fr))}}
-    @media(max-width:520px){.digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="project-institutional"] .ed-information-meta{grid-template-columns:1fr}}
     </style><?php endif;
     require __DIR__.'/../repository/_ficha-institucional.php';
-    if($isAcademicManagement&&!empty($digitalRecord['status_transition']['enabled'])&&$projectStatusTransitions)require __DIR__.'/../repository/_project-status-transition-dialog.php';
+    if(!empty($digitalRecord['status_transition']['enabled'])) require __DIR__.'/../repository/_project-status-transition-dialog.php';
     if($publicContext):?><style>@media(min-width:801px){.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr)}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-document-section[data-information-section="description"]{grid-column:1/-1}}</style><?php endif;
     if(!$publicContext&&!empty($descriptionReminder)) require __DIR__.'/_description-reminder.php';
-    if($publicContext&&!empty($projectCapabilities['edit_information'])&&!empty($projectEditorCatalogs)){$projectEditorOnly=true;$catalogs=$projectEditorCatalogs;$projectCsrf=$projectTrashCsrf;$projectEndpoints=['save'=>$projectSaveEndpoint,'trash'=>$projectTrashEndpoint];$projectEditorPayload=array_merge($project,['presentation_files'=>array_values(array_map(static fn(array $file):array=>['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'extension'=>(string)$file['extension'],'format'=>strtoupper((string)$file['extension']),'icon'=>'fa-regular fa-file','size'=>ArchiveService::formatBytes((int)$file['size_bytes'])],$project['files']))]);require __DIR__.'/../admin/projects.php';}
+    if($publicContext&&!empty($projectCapabilities['edit_information'])&&!empty($projectEditorCatalogs)){$projectEditorOnly=true;$catalogs=$projectEditorCatalogs;$projectCsrf=$projectTrashCsrf;$projectEndpoints=['save'=>$projectSaveEndpoint,'trash'=>$projectTrashEndpoint];$projectEditorPayload=array_merge($project,['status_label'=>$statusLabel,'stage_label'=>$stageLabel,'presentation_files'=>array_values(array_map(static fn(array $file):array=>['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'extension'=>(string)$file['extension'],'format'=>strtoupper((string)$file['extension']),'icon'=>'fa-regular fa-file','size'=>ArchiveService::formatBytes((int)$file['size_bytes'])],$project['files']))]);require __DIR__.'/../admin/projects.php';}
 endif;

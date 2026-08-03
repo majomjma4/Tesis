@@ -45,6 +45,7 @@ anonimizados.
 
 ## Migraciones recientes
 
+- `20260818_project_delivery_corrections_result.sql`: reemplaza el resultado heredado `changes_required` de las entregas por `corrections_requested`, normaliza proyectos heredados a `development` sin alterar su actividad académica y conserva un respaldo técnico para la reversión controlada.
 - `20260803_persist_support_materials.sql` traslada el material de apoyo y sus
   archivos a MariaDB. Permite editar metadatos, conservar descargas, gestionar
   documentos y retirar o restaurar publicaciones sin perder registros.

@@ -9,7 +9,7 @@ final class ProjectCapabilityService
         'view_project', 'edit_information', 'manage_files', 'view_academic_history',
         'view_admin_history', 'change_status', 'manage_participants', 'manage_tutoring',
         'manage_tribunal', 'manage_publication', 'register_delivery', 'review_delivery',
-        'create_observation', 'respond_observation', 'download_files',
+        'create_observation', 'respond_observation', 'request_corrections', 'download_files',
     ];
 
     /** @return array<string,bool> */
@@ -61,7 +61,7 @@ final class ProjectCapabilityService
 
         if ($context === 'academic_management') {
             if (!$administrator) return $capabilities;
-            foreach (['view_project','edit_information','manage_files','view_academic_history','view_admin_history','change_status','manage_participants','manage_tutoring','manage_tribunal','manage_publication','download_files'] as $key) $capabilities[$key] = true;
+            foreach (['view_project','edit_information','manage_files','view_academic_history','view_admin_history','change_status','request_corrections','manage_participants','manage_tutoring','manage_tribunal','manage_publication','download_files'] as $key) $capabilities[$key] = true;
             return $capabilities;
         }
 

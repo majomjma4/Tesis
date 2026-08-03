@@ -52,6 +52,8 @@ final class ProjectsController
             (new ErrorController())->notFound();
             return;
         }
+        $projectContext = $isAdministrator ? 'academic_management' : 'academic';
+        $project['review_situation']=(new ProjectReviewSituationService())->forProject((int)$project['id']);
         $academicPage = (new ProjectRecordModel())->academicHistoryPage((int) $project['id']);
         $project['academic_history'] = $academicPage['events'];
         $project['academic_history_total'] = $academicPage['total'];
@@ -63,7 +65,6 @@ final class ProjectsController
         $descriptionReminder = $isStudentParticipant
             ? $descriptionService->consumePendingReminder((int) $project['id'], $access->currentUserId())
             : null;
-        $projectContext = $isAdministrator ? 'academic_management' : 'academic';
         $projectCapabilities = (new ProjectCapabilityService())->forCurrentUser($project, $projectContext);
         $returnUrl = $isAdministrator
             ? $this->academicManagementReturnUrl((string) ($_GET['return'] ?? ''))
@@ -87,7 +88,13 @@ final class ProjectsController
                 'csrf' => $session->csrfToken('admin_projects'),
             ];
         }
-        if (!empty($projectCapabilities['change_status'])) $projectStatusTransitions = (new ProjectStatusTransitionService())->availableTransitions($project);
+        if (!empty($projectCapabilities['change_status'])) {
+            $projectStatusTransitions = (new ProjectStatusTransitionService())->availableTransitions($project);
+        }
+        if (!empty($projectCapabilities['request_corrections'])) {
+            $correctionAction=(new ProjectReviewService())->availableCorrectionAction($project);
+            if($correctionAction!==null)$projectStatusTransitions[]=$correctionAction;
+        }
 
         View::render('projects/detail', [
             'currentPage' => 'projects',
@@ -97,7 +104,10 @@ final class ProjectsController
             'bodyClass' => 'project-detail-page',
             'pageStyles' => [asset('css/project-simplified.css'), asset('css/project-description.css')],
             'pageScript' => asset('js/repository-detail.js'),
-            'pageScripts' => $descriptionReminder ? [asset('js/project-description.js')] : [],
+            'pageScripts' => array_values(array_filter([
+                $descriptionReminder ? asset('js/project-description.js') : null,
+                $isAdministrator && $projectStatusTransitions !== [] ? asset('js/project-status-transition.js') : null,
+            ])),
             'project' => $project,
             'activeTab' => $tab,
             'isAdministrator' => $isAdministrator,
@@ -116,8 +126,8 @@ final class ProjectsController
                 ? route('admin-project-history') . '&id=' . (int) $project['id'] . '&context=academic_management'
                 : '',
             'projectStatusTransitions' => $projectStatusTransitions,
-            'projectStatusEndpoint' => !empty($projectCapabilities['change_status']) ? route('admin-project-save') : '',
-            'projectStatusCsrf' => !empty($projectCapabilities['change_status']) ? $session->csrfToken('admin_projects') : '',
+            'projectStatusEndpoint' => $isAdministrator ? route('admin-project-save') : '',
+            'projectStatusCsrf' => $isAdministrator ? $session->csrfToken('admin_projects') : '',
             'descriptionReminder' => $descriptionReminder,
             'descriptionCsrf' => $session->csrfToken('project_description'),
             'descriptionSaveEndpoint' => route('project-description-save'),
@@ -143,7 +153,7 @@ final class ProjectsController
         }
         $perPage = filter_var($query['per_page'] ?? null, FILTER_VALIDATE_INT);
         if (in_array($perPage, [10, 25, 50, 75, 100], true)) $safe['per_page'] = (int) $perPage;
-        foreach (['search' => 100, 'status' => 32, 'sort' => 32, 'group' => 32, 'attention' => 32] as $key => $limit) {
+        foreach (['search' => 100, 'status' => 32, 'situation' => 32, 'sort' => 32, 'group' => 32] as $key => $limit) {
             if (!isset($query[$key]) || !is_scalar($query[$key])) continue;
             $value = mb_substr(trim((string) $query[$key]), 0, $limit);
             if ($value !== '') $safe[$key] = $value;

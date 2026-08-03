@@ -18,7 +18,7 @@ final class ProjectRecordModel
         $project['deliveries'] = $this->windowRows($db, "SELECT pd.*,u.full_name author_name FROM project_deliveries pd JOIN users u ON u.id=pd.submitted_by WHERE pd.project_id=:id AND pd.version_number>1 ORDER BY pd.submitted_at,pd.id LIMIT {$window}", $projectId);
         $project['observations'] = $this->windowRows($db, "SELECT po.*,u.full_name author_name,pd.version_number FROM project_observations po JOIN users u ON u.id=po.author_id LEFT JOIN project_deliveries pd ON pd.id=po.delivery_id WHERE po.project_id=:id ORDER BY po.created_at,po.id LIMIT {$window}", $projectId);
         $project['responses'] = $this->windowRows($db, "SELECT response.*,u.full_name author_name,po.id observation_id FROM observation_responses response JOIN project_observations po ON po.id=response.observation_id JOIN users u ON u.id=response.author_id WHERE po.project_id=:id ORDER BY response.created_at,response.id LIMIT {$window}", $projectId);
-        $activitySql = "SELECT pal.id,pal.action,pal.previous_state,pal.new_state,pal.created_at,u.full_name actor_name FROM project_audit_log pal LEFT JOIN users u ON u.id=pal.user_id WHERE pal.project_id=:id AND pal.action IN ('project_updated','project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished') ORDER BY pal.created_at,pal.id";
+        $activitySql = "SELECT pal.id,pal.action,pal.previous_state,pal.new_state,pal.created_at,u.full_name actor_name FROM project_audit_log pal LEFT JOIN users u ON u.id=pal.user_id WHERE pal.project_id=:id AND pal.action IN ('project_updated','project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished','project_publication_reverted','project_corrections_requested') ORDER BY pal.created_at,pal.id";
         $project['activity'] = $this->windowRows($db, $activitySql . " LIMIT {$window}", $projectId);
         $events = $this->academicHistory($project);
 
@@ -96,9 +96,17 @@ final class ProjectRecordModel
         $project['files'] = $this->rows($db, "SELECT pf.*,u.full_name AS uploaded_by_name,pd.version_number,pd.title AS delivery_title,pd.status AS delivery_status,pd.submitted_at
             FROM project_files pf LEFT JOIN users u ON u.id=pf.uploaded_by LEFT JOIN project_deliveries pd ON pd.id=pf.delivery_id
             WHERE pf.project_id=:id AND pf.deleted_at IS NULL AND pf.purged_at IS NULL ORDER BY pf.sort_order,pf.created_at DESC,pf.id DESC", $projectId);
+        foreach ($project['files'] as &$projectFile) if (!empty($projectFile['delivery_status'])) {
+            $projectFile['delivery_status_label'] = project_delivery_status_label((string) $projectFile['delivery_status']);
+        }
+        unset($projectFile);
         $project['deliveries'] = $this->rows($db, "SELECT pd.*,u.full_name AS author_name,ps.label AS stage_label
             FROM project_deliveries pd INNER JOIN users u ON u.id=pd.submitted_by LEFT JOIN project_stages ps ON ps.id=pd.stage_id
             WHERE pd.project_id=:id ORDER BY pd.submitted_at ASC,pd.id ASC", $projectId);
+        foreach ($project['deliveries'] as &$projectDelivery) {
+            $projectDelivery['status_label'] = project_delivery_status_label((string) $projectDelivery['status']);
+        }
+        unset($projectDelivery);
         $project['observations'] = $this->rows($db, "SELECT po.*,u.full_name AS author_name,pd.version_number
             FROM project_observations po INNER JOIN users u ON u.id=po.author_id LEFT JOIN project_deliveries pd ON pd.id=po.delivery_id
             WHERE po.project_id=:id ORDER BY po.created_at ASC,po.id ASC", $projectId);
@@ -163,10 +171,10 @@ final class ProjectRecordModel
         foreach ((array) $project['deliveries'] as $delivery) {
             if ((int) $delivery['version_number'] <= 1) continue;
             $events[] = [
-                'key' => 'delivery:' . (int) $delivery['id'], 'type' => 'delivery', 'title' => 'Nueva entrega registrada',
+                'key' => 'delivery:' . (int) $delivery['id'], 'type' => 'delivery', 'title' => 'Nueva versión enviada',
                 'detail' => trim((string) ($delivery['comment'] ?: $delivery['title'])),
                 'actor' => (string) $delivery['author_name'], 'date' => (string) $delivery['submitted_at'],
-                'meta' => ['Entrega ' . (int) $delivery['version_number']],
+                'meta' => ['Entrega ' . (int) $delivery['version_number'], project_delivery_status_label((string) $delivery['status'])],
             ];
         }
         foreach ((array) $project['observations'] as $observation) {
@@ -206,7 +214,7 @@ final class ProjectRecordModel
 
         $statusLabels = [
             'development' => 'En desarrollo', 'under_review' => 'En revisión',
-            'changes_required' => 'Requiere cambios', 'approved' => 'Aprobado',
+            'changes_required' => 'Correcciones solicitadas', 'approved' => 'Aprobado',
             'defense' => 'En tribunal', 'tribunal_approved' => 'Aprobado por el Tribunal',
             'published' => 'Publicado',
         ];
@@ -215,7 +223,29 @@ final class ProjectRecordModel
         foreach ((array) $project['activity'] as $audit) {
             $action = (string) $audit['action'];
             if (in_array($action, ['project_unpublished', 'project_republished'], true)) continue;
-            if ($publicationRecorded) continue;
+            if ($action === 'project_corrections_requested') {
+                $next = json_decode((string) ($audit['new_state'] ?? ''), true);
+                $count = is_array($next) ? (int) ($next['observation_count'] ?? 0) : 0;
+                $events[] = [
+                    'key' => 'corrections-requested:' . (int) $audit['id'],
+                    'type' => 'observation',
+                    'title' => 'Tutor solicitó correcciones',
+                    'detail' => ($count === 1 ? 'Se registró 1 observación.' : 'Se registraron ' . $count . ' observaciones.') . "\nEl proyecto volvió a En desarrollo.",
+                    'actor' => (string) ($audit['actor_name'] ?: 'Sistema académico'),
+                    'date' => (string) $audit['created_at'],
+                    'meta' => ['En revisión → En desarrollo'],
+                ];
+                continue;
+            }
+            if ($action === 'project_publication_reverted') {
+                [$from, $to] = $this->statusChange($audit, $statusLabels);
+                if ($from !== null && $to !== null) $events[] = [
+                    'key' => 'publication-reverted:' . (int) $audit['id'], 'type' => 'status', 'title' => 'Publicación revertida',
+                    'detail' => ($statusLabels[$from] ?? $from) . "\n↓\n" . ($statusLabels[$to] ?? $to),
+                    'actor' => (string) ($audit['actor_name'] ?: 'Sistema académico'), 'date' => (string) $audit['created_at'],
+                ];
+                continue;
+            }
             [$from, $to] = $this->statusChange($audit, $statusLabels);
             if ($from === null || $to === null || $from === $to) continue;
             if ($to === 'published' && $publicationRecorded) continue;
@@ -231,6 +261,14 @@ final class ProjectRecordModel
                 $type = 'tribunal-approval';
                 $title = 'Proyecto aprobado por tribunal';
                 $detail = '';
+            } elseif ($to === 'under_review') {
+                $type = 'status';
+                $title = 'Proyecto enviado a revisión';
+                $detail = ($statusLabels[$from] ?? $from) . "\n↓\nEn revisión";
+            } elseif ($to === 'approved') {
+                $type = 'status';
+                $title = 'Proyecto aprobado';
+                $detail = 'La revisión académica finalizó satisfactoriamente.';
             } else {
                 $type = 'status';
                 $title = 'Cambio de estado';

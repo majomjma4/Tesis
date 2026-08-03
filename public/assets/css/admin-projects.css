@@ -285,3 +285,18 @@ body.project-dialog-open{overflow:hidden!important}
     line-height:1.4;
     overflow-wrap:anywhere;
 }
+
+/* Acciones de estado gobernadas por la política académica del backend. */
+#apForm .ap-project-status-card{align-items:start}
+#apForm .ap-project-status-card>i{margin-top:2px}
+.ap-project-status-actions{margin-top:9px;display:flex;flex-wrap:wrap;gap:7px}
+.ap-project-status-actions[hidden],.ap-project-status-complete[hidden]{display:none!important}
+.ap-project-status-action{min-height:34px;padding:6px 10px;border:1px solid color-mix(in srgb,var(--blue) 30%,var(--line));border-radius:9px;background:var(--surface);color:var(--blue);display:inline-flex;align-items:center;justify-content:center;gap:7px;font:inherit;font-size:.72rem;font-weight:800;line-height:1.3;cursor:pointer}
+.ap-project-status-action:hover,.ap-project-status-action:focus-visible{border-color:var(--blue);background:color-mix(in srgb,var(--blue) 7%,var(--surface));outline:0}
+.ap-project-status-action:focus-visible{box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 22%,transparent)}
+.ap-project-status-action.is-exceptional{border-color:color-mix(in srgb,#dc2626 34%,var(--line));color:#b91c1c}
+.ap-project-status-action.is-exceptional:hover,.ap-project-status-action.is-exceptional:focus-visible{border-color:#dc2626;background:color-mix(in srgb,#dc2626 7%,var(--surface))}
+.ap-project-status-action:disabled{cursor:not-allowed;opacity:.52}
+.ap-project-status-complete{margin:7px 0 0;color:var(--muted);font-size:.69rem;line-height:1.45}
+@media(max-width:520px){.ap-project-status-actions{display:grid;grid-template-columns:1fr}.ap-project-status-action{width:100%}}
+.ap-status-stack{display:grid;justify-items:start;gap:6px;min-width:0}.ap-review-situation{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid #fcd34d;border-radius:999px;background:#fffbeb;color:#92400e;font-size:10px;font-weight:800;white-space:nowrap}

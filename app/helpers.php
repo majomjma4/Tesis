@@ -45,7 +45,6 @@ function project_academic_labels(string $status): array
     static $labels = [
         'development' => ['status' => 'En desarrollo', 'stage' => 'En proceso'],
         'under_review' => ['status' => 'En revisión', 'stage' => 'En proceso'],
-        'changes_required' => ['status' => 'Requiere cambios', 'stage' => 'En proceso'],
         'approved' => ['status' => 'Aprobado', 'stage' => 'Por publicar'],
         'defense' => ['status' => 'En tribunal', 'stage' => 'Por finalizar'],
         'tribunal_approved' => ['status' => 'Aprobado por el Tribunal', 'stage' => 'Por publicar'],
@@ -56,5 +55,17 @@ function project_academic_labels(string $status): array
         'status' => $status !== '' ? $status : 'Estado no disponible',
         'stage' => 'Etapa no disponible',
     ];
+}
+
+/** Traduce resultados de entregas; conserva el token anterior solo para lectura histórica. */
+function project_delivery_status_label(string $status): string
+{
+    return match ($status) {
+        'submitted' => 'Enviada',
+        'under_review' => 'En revisión',
+        'corrections_requested', 'changes_required' => 'Correcciones solicitadas',
+        'approved' => 'Aprobada',
+        default => $status !== '' ? $status : 'Sin resultado',
+    };
 }
 // Final de construcción de URL internas

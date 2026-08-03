@@ -12,7 +12,8 @@
     <?php else: ?>
         <section class="projects-toolbar" aria-label="Buscar y filtrar proyectos">
             <label class="projects-search"><i class="fa-solid fa-magnifying-glass"></i><span class="sr-only">Buscar proyectos</span><input type="search" data-project-search placeholder="Buscar por título, tutor, tipo o periodo"></label>
-            <label><span class="sr-only">Estado</span><select data-project-status><option value="">Todos los estados</option><option value="development">En desarrollo</option><option value="review">En revisión</option><option value="changes">Requiere cambios</option><option value="approved">Aprobado</option><option value="defense">En tribunal</option><option value="tribunal_approved">Aprobado por el Tribunal</option><option value="published">Publicado</option></select></label>
+            <label><span class="sr-only">Estado</span><select data-project-status><option value="">Todos los estados</option><option value="development">En desarrollo</option><option value="under_review">En revisión</option><option value="approved">Aprobado</option><option value="defense">En tribunal</option><option value="tribunal_approved">Aprobado por el Tribunal</option><option value="published">Publicado</option></select></label>
+            <label><span class="sr-only">Situación de revisión</span><select data-project-situation><option value="">Todas las situaciones</option><option value="pending">Con observaciones pendientes</option></select></label>
             <label><span class="sr-only">Tipo</span><select data-project-type><option value="">Todos los tipos</option><option value="thesis">Titulación</option><option value="thesis_profile">Perfil de tesis</option><option value="pis">Integrador</option><option value="practice">Prácticas</option><option value="community">Vinculación</option></select></label>
             <label><span class="sr-only">Periodo académico</span><select data-project-period><option value="">Todos los periodos</option><option value="2026-I">2026-I</option><option value="2025-II">2025-II</option></select></label>
             <label><span class="sr-only">Ordenar</span><select data-project-sort><option value="activity">Actividad reciente</option><option value="title">Título A–Z</option><option value="progress">Mayor progreso</option></select></label>
@@ -26,7 +27,7 @@
                 $actionUrl = route('project-detail') . '&id=' . (int) $project['id'];
                 $cardAction = 'Abrir proyecto';
                 $phaseContext = [];
-                if ($project['status_key'] === 'review') {
+                if ($project['status_key'] === 'under_review') {
                     $phaseContext = ['Última entrega' => $project['latest_delivery']['version'] ?? 'Sin entregas', 'Observaciones pendientes' => count($project['observations'])];
                     $cardAction = 'Atender revisión'; $actionUrl .= '&tab=review';
                 } elseif ($project['status_key'] === 'approved') {
@@ -44,8 +45,10 @@
                     if (!empty($project['repository_id'])) $actionUrl = route('repository-detail') . '&id=' . (int) $project['repository_id'];
                 } else $phaseContext = ['Etapa' => $project['stage'], 'Expediente' => $project['status']];
             ?>
-                <article class="projects-card" data-project-card data-search="<?= e($search) ?>" data-status="<?= e($project['status_key']) ?>" data-type="<?= e($project['type_key']) ?>" data-period="<?= e($project['period']) ?>" data-metric="<?= e($project['metric_bucket']) ?>" data-title="<?= e($project['title']) ?>" data-progress="<?= (int) $project['progress'] ?>" data-activity="<?= (int) $project['activity_order'] ?>">
+                <?php $hasPendingReview=!empty($project['review_situation']['has_pending_observations']); ?>
+                <article class="projects-card" data-project-card data-search="<?= e($search) ?>" data-status="<?= e($project['status_key']) ?>" data-situation="<?=$hasPendingReview?'pending':'none'?>" data-type="<?= e($project['type_key']) ?>" data-period="<?= e($project['period']) ?>" data-metric="<?= e($project['metric_bucket']) ?>" data-title="<?= e($project['title']) ?>" data-progress="<?= (int) $project['progress'] ?>" data-activity="<?= (int) $project['activity_order'] ?>">
                     <header><span class="projects-type"><?= e($project['type']) ?></span><span class="projects-status is-<?= e($project['status_key']) ?>"><?= e($project['status']) ?></span></header>
+                    <?php if($hasPendingReview):?><span class="projects-review-situation"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>Observaciones pendientes</span><?php endif;?>
                     <div class="projects-card-title"><h2><?= e($project['title']) ?></h2></div>
                     <div class="project-card-tutor"><i class="fa-solid fa-chalkboard-user"></i><span><small>Tutor</small><strong><?= e($project['tutor'] ?: 'Por asignar') ?></strong></span><em><?= e($project['period']) ?></em></div>
                     <dl class="project-card-context"><?php foreach ($phaseContext as $label => $value): ?><div><dt><?= e($label) ?></dt><dd><?= e((string) $value) ?></dd></div><?php endforeach; ?></dl>

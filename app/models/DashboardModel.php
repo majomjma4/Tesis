@@ -7,12 +7,13 @@ final class DashboardModel
     public function getAdminDashboard(): array
     {
         $connection = Database::connection();
+        $projects = $this->adminProjectSummary($connection);
         return [
             'users' => $this->adminUserSummary($connection),
-            'projects' => $this->adminProjectSummary($connection),
+            'projects' => $projects,
             'weekly_activity' => $this->adminWeeklyActivity($connection),
             'activity' => $this->adminActivity($connection),
-            'alerts' => $this->adminAlerts($connection),
+            'alerts' => $this->adminAlerts($connection,(int)$projects['pending_observations']),
             'dates' => $this->adminUpcomingDates($connection),
             'updated_at' => date('Y-m-d H:i:s'),
         ];
@@ -22,7 +23,7 @@ final class DashboardModel
     {
         return [
             'users' => ['total' => 0, 'active' => 0, 'blocked' => 0, 'recent' => 0],
-            'projects' => ['total' => 0, 'active' => 0, 'items' => []],
+            'projects' => ['total' => 0, 'active' => 0, 'pending_observations' => 0, 'items' => []],
             'weekly_activity' => 0,
             'activity' => [],
             'alerts' => [],
@@ -44,17 +45,17 @@ final class DashboardModel
 
     private function adminProjectSummary(PDO $connection): array
     {
-        $row=$connection->query("SELECT COUNT(*) total,SUM(status IN ('development','under_review','changes_required','approved','defense','tribunal_approved')) active,SUM(status='development') development,SUM(status='under_review') review,SUM(status='changes_required') attention,SUM(status='approved') approved,SUM(status='defense') defense,SUM(status='tribunal_approved') tribunal_approved,SUM(status='published') published FROM projects WHERE deleted_at IS NULL")->fetch()?:[];
+        $row=$connection->query("SELECT COUNT(*) total,SUM(status IN ('development','under_review','approved','defense','tribunal_approved')) active,SUM(status='development') development,SUM(status='under_review') review,SUM(status='approved') approved,SUM(status='defense') defense,SUM(status='tribunal_approved') tribunal_approved,SUM(status='published') published FROM projects WHERE deleted_at IS NULL")->fetch()?:[];
+        $reviewSituation=(new ProjectReviewSituationService())->aggregate($connection,true);
         $items=[
             ['status'=>'development','label'=>'En desarrollo','count'=>(int)($row['development']??0),'url'=>route('projects').'&status=development'],
             ['status'=>'under_review','label'=>'En revisión','count'=>(int)($row['review']??0),'url'=>route('projects').'&status=under_review'],
-            ['status'=>'changes_required','label'=>'Requieren cambios','count'=>(int)($row['attention']??0),'url'=>route('projects').'&status=changes_required'],
             ['status'=>'approved','label'=>'Aprobados','count'=>(int)($row['approved']??0),'url'=>route('projects').'&status=approved'],
             ['status'=>'defense','label'=>'En tribunal','count'=>(int)($row['defense']??0),'url'=>route('projects').'&status=defense'],
             ['status'=>'tribunal_approved','label'=>'Aprobados por el Tribunal','count'=>(int)($row['tribunal_approved']??0),'url'=>route('projects').'&status=tribunal_approved'],
-            ['status'=>'published','label'=>'Publicados','count'=>(int)($row['published']??0),'url'=>route('projects').'&status=published'],
+            ['status'=>'published','label'=>'Publicados','count'=>(int)($row['published']??0),'url'=>route('admin-repository')],
         ];
-        return ['total'=>(int)($row['total']??0),'active'=>(int)($row['active']??0),'items'=>$items];
+        return ['total'=>(int)($row['total']??0),'active'=>(int)($row['active']??0),'pending_observations'=>$reviewSituation['pending'],'items'=>$items];
     }
 
     private function adminWeeklyActivity(PDO $connection): int
@@ -77,18 +78,18 @@ final class DashboardModel
         ], $statement->fetchAll());
     }
 
-    private function adminAlerts(PDO $connection): array
+    private function adminAlerts(PDO $connection, int $pendingProjectCount): array
     {
         $counts = [
             'blocked' => (int) $connection->query("SELECT COUNT(*) FROM users WHERE status='blocked' AND deleted_at IS NULL AND purged_at IS NULL")->fetchColumn(),
-            'observations' => (int) $connection->query("SELECT COUNT(*) FROM project_observations o INNER JOIN projects p ON p.id=o.project_id WHERE o.status='pending' AND p.deleted_at IS NULL")->fetchColumn(),
+            'observations' => $pendingProjectCount,
             'trash' => (int) $connection->query("SELECT (SELECT COUNT(*) FROM projects WHERE deleted_at IS NOT NULL)+(SELECT COUNT(*) FROM users WHERE deleted_at IS NOT NULL AND purged_at IS NULL)")->fetchColumn(),
             'temporary' => (int) $connection->query("SELECT COUNT(*) FROM users u WHERE u.must_change_password=1 AND u.is_admin=0 AND u.deleted_at IS NULL AND u.purged_at IS NULL AND u.temporary_password_expires_at IS NOT NULL AND u.temporary_password_expires_at <= CURRENT_TIMESTAMP")->fetchColumn(),
         ];
         $alerts = [];
         if ($counts['temporary'] > 0) $alerts[] = ['priority'=>400,'tone'=>'danger','icon'=>'fa-key','title'=>'Contraseñas temporales vencidas','text'=>$counts['temporary'].' '.($counts['temporary'] === 1 ? 'persona debe' : 'personas deben').' actualizar su acceso.','count'=>$counts['temporary'],'url'=>route('admin-users')];
         if ($counts['blocked'] > 0) $alerts[] = ['priority'=>300,'tone'=>'danger','icon'=>'fa-user-lock','title'=>'Cuentas bloqueadas','text'=>$counts['blocked'].' '.($counts['blocked'] === 1 ? 'cuenta requiere' : 'cuentas requieren').' revisión.','count'=>$counts['blocked'],'url'=>route('admin-users').'&status=blocked'];
-        if ($counts['observations'] > 0) $alerts[] = ['priority'=>200,'tone'=>'warning','icon'=>'fa-comment-dots','title'=>'Observaciones pendientes','text'=>$counts['observations'].' '.($counts['observations'] === 1 ? 'observación sigue abierta.' : 'observaciones siguen abiertas.'),'count'=>$counts['observations'],'url'=>route('projects').'&attention=observations'];
+        if ($counts['observations'] > 0) $alerts[] = ['priority'=>200,'tone'=>'warning','icon'=>'fa-comment-dots','title'=>'Observaciones pendientes','text'=>$counts['observations'].' '.($counts['observations'] === 1 ? 'proyecto requiere' : 'proyectos requieren').' atención del estudiante.','count'=>$counts['observations'],'url'=>route('projects').'&review_situation=pending'];
         if ($counts['trash'] > 0) $alerts[] = ['priority'=>100,'tone'=>'neutral','icon'=>'fa-trash-can','title'=>'Elementos en papelera','text'=>$counts['trash'].' '.($counts['trash'] === 1 ? 'elemento permanece recuperable.' : 'elementos permanecen recuperables.'),'count'=>$counts['trash'],'url'=>route('admin-trash')];
         usort($alerts, static fn(array $first,array $second):int => $second['priority'] <=> $first['priority']);
         return array_slice($alerts, 0, 4);
@@ -142,7 +143,7 @@ final class DashboardModel
                 'meta' => 'Prioridad alta',
             ],
             [
-                'cardClass' => 'changes-card',
+                'cardClass' => 'action-card',
                 'icon' => 'fa-calendar-check',
                 'label' => 'Proxima accion',
                 'title' => 'Revisar observaciones',

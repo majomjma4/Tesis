@@ -3,7 +3,7 @@
  * tipo de proyecto: Tesis azul, Perfil morado, Prácticas coral, PIS verde y Vinculación naranja;
  * Cada estado del proyecto conserva un color exclusivo en todas las pantallas.
  */
-:root{--status-development:37,99,235;--status-review:245,158,11;--status-changes:239,68,68;--status-approved:16,185,129;--status-completed:8,145,178;--status-published:139,92,246;--status-defense:79,70,229;--status-tribunal-approved:13,148,136}
+:root{--status-development:37,99,235;--status-review:245,158,11;--status-danger:239,68,68;--status-approved:16,185,129;--status-completed:8,145,178;--status-published:139,92,246;--status-defense:79,70,229;--status-tribunal-approved:13,148,136}
 
 /* Cards informativas sin un tipo o estado específico. */
 .app-page-content :is(article,section,div,a)[class$="-card"]:not(.status-card):not(.repository-card),
@@ -25,7 +25,7 @@
 .repository-project-card--vinculacion{--card-accent:var(--project-linkage)}
 
 /* El estado prevalece sobre el tipo en las pantallas de seguimiento. */
-.app-page-content .projects-card[data-status="review"],
+.app-page-content .projects-card[data-status="under_review"],
 .app-page-content .ap-list>article[data-project-status="under_review"]{--card-accent:var(--status-review)}
 .app-page-content .projects-card[data-status="approved"],.app-page-content .ap-list>article[data-project-status="approved"]{--card-accent:var(--status-approved)}
 .app-page-content .ap-list>article[data-project-status="defense"]{--card-accent:var(--status-defense)}
@@ -33,7 +33,6 @@
 .app-page-content .projects-card[data-status="published"],.app-page-content .ap-list>article[data-project-status="published"]{--card-accent:var(--status-published)}
 .app-page-content .projects-card[data-status="defense"]{--card-accent:var(--status-defense)}
 .app-page-content .projects-card[data-status="tribunal_approved"]{--card-accent:var(--status-tribunal-approved)}
-.app-page-content .ap-list>article[data-project-status="changes_required"]{--card-accent:var(--status-changes)}
 .app-page-content .ap-list>article[data-project-status="development"]{--card-accent:var(--status-development)}
 
 /* El detalle conserva el color del estado del expediente en sus cards principales. */
@@ -49,10 +48,10 @@
 .app-page-content .ar-list>article:has(button:disabled){--card-accent:239,68,68}
 
 /* Función real de las cards del Dashboard. */
-.app-page-content .admin-metrics>a:nth-child(1),.app-page-content .admin-dashboard-context>.upcoming-dates{--card-accent:var(--project-linkage)}
-.app-page-content .admin-metrics>a:nth-child(2){--card-accent:var(--project-thesis)}
+.app-page-content .admin-metrics>a:nth-child(1),.app-page-content .admin-metrics>a:nth-child(2),.app-page-content .admin-dashboard-context>.upcoming-dates{--card-accent:var(--project-linkage)}
+.app-page-content .admin-metrics>a:nth-child(3){--card-accent:var(--project-thesis)}
 .app-page-content .admin-dashboard-focus>.project-overview{--card-accent:var(--project-pis)}
-.app-page-content .admin-metrics>a:nth-child(3),.app-page-content .admin-dashboard-context>.recent-admin-activity{--card-accent:var(--project-profile)}
+.app-page-content .admin-metrics>a:nth-child(4),.app-page-content .admin-dashboard-context>.recent-admin-activity{--card-accent:var(--project-profile)}
 .app-page-content .admin-dashboard-focus>.important-alerts{--card-accent:239,68,68}
 
 /* Resúmenes administrativos: el color representa el estado descrito. */
@@ -79,25 +78,24 @@
 /* Estados que ya utiliza el index original. */
 .app-page-content :is(.review-card,.pending-card,.warning-card){--card-accent:var(--project-linkage)}
 .app-page-content :is(.approved-card,.success-card,.completed-card){--card-accent:var(--project-pis)}
-.app-page-content :is(.changes-card,.danger-card,.error-card,.needs-attention){--card-accent:239,68,68}
+.app-page-content :is(.action-card,.danger-card,.error-card,.needs-attention){--card-accent:239,68,68}
 
 /* Barras y etiquetas: el mismo estado usa el mismo color en cada pantalla. */
 .project-status-row[data-project-status="development"]{--status-accent:var(--status-development)}
 .project-status-row[data-project-status="under_review"]{--status-accent:var(--status-review)}
-.project-status-row[data-project-status="changes_required"]{--status-accent:var(--status-changes)}
 .project-status-row[data-project-status="approved"]{--status-accent:var(--status-approved)}
 .project-status-row[data-project-status="defense"]{--status-accent:var(--status-defense)}
 .project-status-row[data-project-status="tribunal_approved"]{--status-accent:var(--status-tribunal-approved)}
 .project-status-row[data-project-status="published"]{--status-accent:var(--status-published)}
 .project-status-row[data-project-status] .status-track span{background:linear-gradient(90deg,rgb(var(--status-accent)),rgba(var(--status-accent),.68))}
 
-.projects-card[data-status="review"] .projects-status,.ap-list>article[data-project-status="under_review"] .ap-status{color:#92400e;background:rgba(var(--status-review),.15)}
+.projects-card[data-status="under_review"] .projects-status,.ap-list>article[data-project-status="under_review"] .ap-status{color:#92400e;background:rgba(var(--status-review),.15)}
 .projects-card[data-status="approved"] .projects-status,.ap-list>article[data-project-status="approved"] .ap-status{color:#047857;background:rgba(var(--status-approved),.15)}
 .projects-card[data-status="published"] .projects-status,.ap-list>article[data-project-status="published"] .ap-status,.ar-list>article:has(button[data-publish="unpublish"]) .ar-status{color:#6d28d9;background:rgba(var(--status-published),.15)}
 .projects-card[data-status="defense"] .projects-status{color:#4338ca;background:rgba(var(--status-defense),.15)}
 .projects-card[data-status="tribunal_approved"] .projects-status{color:#0f766e;background:rgba(var(--status-tribunal-approved),.15)}
 .ap-list>article[data-project-status="development"] .ap-status{color:#1d4ed8;background:rgba(var(--status-development),.14)}
-.ap-list>article[data-project-status="changes_required"] .ap-status,.ar-list>article:has(button:disabled) .ar-status{color:#b91c1c;background:rgba(var(--status-changes),.14)}
+.ar-list>article:has(button:disabled) .ar-status{color:#b91c1c;background:rgba(var(--status-danger),.14)}
 .ap-list>article[data-project-status="defense"] .ap-status{color:#4338ca;background:rgba(var(--status-defense),.15)}
 .ap-list>article[data-project-status="tribunal_approved"] .ap-status{color:#0f766e;background:rgba(var(--status-tribunal-approved),.15)}
 .ar-list>article:has(button[data-publish="publish"]) .ar-status{color:#92400e;background:rgba(var(--status-review),.15)}

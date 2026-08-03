@@ -8,7 +8,7 @@ final class ProjectAuditHistoryModel
     private string $context = 'repository';
     private const STATUS_LABELS = [
         'development' => 'En desarrollo', 'under_review' => 'En revisión',
-        'changes_required' => 'Requiere cambios', 'approved' => 'Aprobado',
+        'changes_required' => 'Correcciones solicitadas', 'approved' => 'Aprobado',
         'defense' => 'En tribunal', 'tribunal_approved' => 'Aprobado por el Tribunal',
         'published' => 'Publicado',
     ];
@@ -130,13 +130,15 @@ final class ProjectAuditHistoryModel
     private function fieldLabel(string $field): string
     {
         return [
-            'status' => 'Estado', 'title' => 'Título', 'subtitle' => 'Descripción breve',
+            'status' => 'Estado', 'current_stage' => 'Etapa interna', 'stage_label' => 'Etapa académica', 'qa_preparation' => 'Preparación QA',
+            'title' => 'Título', 'subtitle' => 'Descripción breve',
             'summary' => $this->context==='academic_management'?'Descripción':'Descripción pública', 'is_available' => 'Disponibilidad',
             'original_name' => 'Archivo', 'presentation_file_id' => 'Archivo de presentación',
             'name' => 'Nombre', 'size_bytes' => 'Tamaño',
             'restore_hours' => 'Plazo de restauración (horas)', 'version_number' => 'Versión',
             'previous_name' => 'Nombre anterior', 'new_name' => 'Nombre nuevo',
             'previous_status' => 'Estado anterior', 'new_status' => 'Estado nuevo',
+            'original_published_at' => 'Fecha original de publicación', 'publication_reverted_at' => 'Fecha de reversión',
             'previous_available' => 'Disponibilidad anterior', 'new_availability' => 'Disponibilidad nueva',
             'previous_file' => 'Archivo anterior', 'new_file' => 'Archivo nuevo',
             'project_keywords' => 'Clasificación', 'keywords' => 'Clasificación',
@@ -154,6 +156,8 @@ final class ProjectAuditHistoryModel
             'project_description_updated' => 'Editó la descripción pública',
             'project_published' => 'Publicó el proyecto', 'project_republished' => 'Restauró la publicación',
             'project_unpublished' => 'Retiró la publicación', 'project_availability_changed' => 'Cambió la disponibilidad',
+            'project_publication_reverted' => 'Publicación revertida',
+            'project_qa_prepared' => 'Preparó el proyecto para pruebas de Gestión académica',
             'project_trashed' => 'Envió el proyecto a Papelera', 'project_restored' => 'Restauró el proyecto',
             'project.file_added' => 'Agregó un archivo al proyecto', 'project.file_replaced' => 'Reemplazó un archivo del proyecto',
             'project.file_removed' => 'Retiró un archivo del proyecto', 'project.file_restored' => 'Restauró un archivo del proyecto',
@@ -164,6 +168,8 @@ final class ProjectAuditHistoryModel
             'project.presentation_changed' => 'Cambió el archivo de presentación',
             'project.presentation_removed' => 'Quitó el archivo de presentación',
             'delivery_submitted' => 'Registró una entrega académica',
+            'project_corrections_requested' => 'Correcciones solicitadas',
+            'project_legacy_status_migrated' => 'Normalizó un estado académico heredado',
             'project_approved' => 'Aprobó el proyecto',
             'project_tribunal_approved' => 'Registró la aprobación del tribunal',
             'tribunal_approved' => 'Registró la aprobación del tribunal',

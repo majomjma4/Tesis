@@ -19,15 +19,18 @@ final class ProjectModel
             LEFT JOIN project_participants pp ON pp.project_id=p.id AND pp.status='active' AND pp.removed_at IS NULL
             WHERE p.deleted_at IS NULL AND (p.created_by=:user OR pp.user_id=:user) ORDER BY p.updated_at DESC,p.id DESC");
         $statement->execute(['user'=>$userId]);
-        $labels=['development'=>'En desarrollo','under_review'=>'En revisión','changes_required'=>'Requiere cambios','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el Tribunal','published'=>'Publicado'];
-        return array_map(static function(array $row)use($labels):array{
+        $rows=$statement->fetchAll();
+        $situations=(new ProjectReviewSituationService())->forProjects(array_map('intval',array_column($rows,'id')));
+        return array_map(static function(array $row)use($situations):array{
             $status=(string)$row['status'];
+            $labels=project_academic_labels($status);
             return ['id'=>(int)$row['id'],'code'=>(string)$row['code'],'title'=>(string)$row['title'],'subtitle'=>(string)($row['subtitle']??''),
-                'status'=>$labels[$status]??$status,'status_key'=>$status,'type'=>(string)$row['type'],'type_key'=>(string)$row['type_key'],
+                'status'=>$labels['status'],'status_key'=>$status,'type'=>(string)$row['type'],'type_key'=>(string)$row['type_key'],
                 'career'=>(string)$row['career'],'period'=>(string)$row['period'],'tutor'=>(string)($row['tutor']??''),'stage'=>(string)$row['current_stage'],
                 'last_activity'=>'Actualización del expediente · '.date('d/m/Y',strtotime((string)$row['updated_at'])),
-                'metric_bucket'=>in_array($status,['published','tribunal_approved'],true)?'finished':($status==='changes_required'?'changes':($status==='under_review'?'review':'active'))];
-        },$statement->fetchAll());
+                'metric_bucket'=>in_array($status,['published','tribunal_approved'],true)?'finished':($status==='under_review'?'review':'active'),
+                'review_situation'=>$situations[(int)$row['id']]??ProjectReviewSituationService::emptySituation()];
+        },$rows);
     }
 
     /** Busca un expediente comprobando temporalmente su pertenencia. */
@@ -72,12 +75,12 @@ final class ProjectModel
 
         $statusLabels = [
             'development' => 'En desarrollo', 'under_review' => 'En revisión',
-            'changes_required' => 'Requiere cambios', 'approved' => 'Aprobado',
+            'approved' => 'Aprobado',
             'defense' => 'En tribunal', 'tribunal_approved' => 'Aprobado por el Tribunal',
             'published' => 'Publicado',
         ];
         $statusKey = match ((string) $row['status']) {
-            'under_review', 'changes_required' => 'review',
+            'under_review' => 'review',
             default => (string) $row['status'],
         };
         $updatedAt = (string) ($row['updated_at'] ?? '');
@@ -121,15 +124,16 @@ final class ProjectModel
 
     public function getProjectMetrics(array $projects): array
     {
-        $counts = ['active' => 0, 'review' => 0, 'changes' => 0, 'finished' => 0];
+        $counts = ['active' => 0, 'review' => 0, 'pending_observations' => 0, 'finished' => 0];
         foreach ($projects as $project) {
             $bucket = $project['metric_bucket'];
             if (isset($counts[$bucket])) $counts[$bucket]++;
+            if (!empty($project['review_situation']['has_pending_observations'])) $counts['pending_observations']++;
         }
         return [
             ['key' => 'active', 'label' => 'Activos', 'icon' => 'fa-folder-open', 'count' => $counts['active']],
             ['key' => 'review', 'label' => 'En revisión', 'icon' => 'fa-magnifying-glass', 'count' => $counts['review']],
-            ['key' => 'changes', 'label' => 'Requieren cambios', 'icon' => 'fa-triangle-exclamation', 'count' => $counts['changes']],
+            ['key' => 'pending_observations', 'label' => 'Observaciones pendientes', 'icon' => 'fa-triangle-exclamation', 'count' => $counts['pending_observations']],
             ['key' => 'finished', 'label' => 'Publicados', 'icon' => 'fa-circle-check', 'count' => $counts['finished']],
         ];
     }
@@ -189,7 +193,7 @@ final class ProjectModel
                 'file' => 'Documento.pdf', 'preview_path' => 'Vista Previa/Documento.pdf', 'size' => '2.4 MB',
                 'comment' => 'Versión preparada para la revisión académica del tutor.',
             ],
-            ['version' => 'v3', 'title' => 'Marco teórico y propuesta', 'date' => '24 Jun 2026', 'status' => 'Requiere cambios', 'stage' => 'Desarrollo', 'author' => $project['participants'][0]['name'], 'file' => 'Informe_v3.docx', 'preview_path' => 'Vista Previa/Informe.docx', 'size' => '1.8 MB', 'comment' => 'Documento de Word conservado como versión anterior.'],
+            ['version' => 'v3', 'title' => 'Marco teórico y propuesta', 'date' => '24 Jun 2026', 'status' => 'Correcciones solicitadas', 'stage' => 'Desarrollo', 'author' => $project['participants'][0]['name'], 'file' => 'Informe_v3.docx', 'preview_path' => 'Vista Previa/Informe.docx', 'size' => '1.8 MB', 'comment' => 'Documento de Word conservado como versión anterior.'],
             ['version' => 'v2', 'title' => 'Código y anexos', 'date' => '10 Jun 2026', 'status' => 'Archivada', 'stage' => 'Desarrollo', 'author' => $project['participants'][0]['name'], 'file' => 'respaldo.zip', 'preview_path' => 'respaldo.zip', 'size' => '3.6 MB', 'comment' => 'Paquete navegable con archivos complementarios del proyecto.'],
         ];
         $project['observations'] = array_map(static fn (array $observation, int $index): array => $observation + [
