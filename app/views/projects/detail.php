@@ -169,6 +169,7 @@ if ($project === null): ?>
     if($isAcademicManagement&&(string)$project['status']==='published')$actions[]=['id'=>'repository','label'=>'Ver en Repositorio','kind'=>'secondary','icon'=>'fa-book-open','url'=>route('repository-detail').'&id='.$projectId,'enabled'=>true];
     $statusActionCount=$isAcademicManagement&&!empty($projectCapabilities['change_status'])?count($projectStatusTransitions):0;
     foreach($statusActionCount>0?$projectStatusTransitions:[] as $transition)$actions[]=['id'=>'status-'.$transition['target'],'label'=>(string)$transition['label'],'kind'=>'secondary','icon'=>(string)$transition['icon'],'icon_style'=>'fa-solid','enabled'=>true,'trigger'=>'status-transition','transition'=>$transition];
+    if($isAcademicManagement)$actions=array_values(array_filter($actions,static fn(array $action):bool=>($action['id']??'')==='edit'));
     $menuActions=[];
     if($publicContext&&!empty($projectCapabilities['manage_publication'])){
         $menuActions[]=['label'=>$project['is_available']?'Marcar como no disponible':'Marcar como disponible','icon'=>$project['is_available']?'fa-ban':'fa-circle-check','enabled'=>true,'action'=>'availability'];
