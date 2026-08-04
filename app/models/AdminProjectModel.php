@@ -211,7 +211,7 @@ final class AdminProjectModel
                     $from=self::STATUS_LABELS[(string)$changed['status'][0]]??(string)$changed['status'][0];
                     $to=self::STATUS_LABELS[(string)$changed['status'][1]]??(string)$changed['status'][1];
                     (new AdminActivityService($d))->record($actor,'project_status_changed','Cambió el estado de “'.$v['title'].'” de '.$from.' a '.$to,'Proyectos','project',$id,$v['title'],'correct',['from'=>$changed['status'][0],'to'=>$changed['status'][1]]);
-                    if($publishing)(new ProjectAuditService($d))->record($id,$actor,'project_published','project',$id,['status'=>$changed['status'][0]],['status'=>'published','description_origin'=>$descriptionChanged?$descriptionOrigin:'existing']);
+                    if($publishing){(new ProjectAuditService($d))->record($id,$actor,'project_published','project',$id,['status'=>$changed['status'][0]],['status'=>'published','description_origin'=>$descriptionChanged?$descriptionOrigin:'existing']);(new ProjectDocumentArchiveService())->archiveHistoricalVersionsForProjectInTransaction($d,$id,$actor,'Publicación institucional del proyecto.');}
                 }
                 return $id;
             }

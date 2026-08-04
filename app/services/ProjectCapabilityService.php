@@ -11,6 +11,8 @@ final class ProjectCapabilityService
         'manage_tribunal', 'manage_publication', 'register_delivery', 'review_delivery',
         'create_observation', 'respond_observation', 'request_corrections', 'download_files',
         'review_documents',
+        'create_adjustment_request', 'view_adjustment_requests', 'respond_adjustment_request',
+        'address_adjustment_request', 'close_adjustment_request',
     ];
 
     /** @return array<string,bool> */
@@ -64,6 +66,7 @@ final class ProjectCapabilityService
         if ($context === 'academic_management') {
             if (!$administrator) return $capabilities;
             foreach (['view_project','edit_information','manage_files','view_academic_history','view_admin_history','change_status','request_corrections','manage_participants','manage_tutoring','manage_tribunal','manage_publication','download_files'] as $key) $capabilities[$key] = true;
+            foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request'] as $key) $capabilities[$key] = true;
             if ((string)($project['status'] ?? '') === 'development') $capabilities['manage_files'] = false;
             return $capabilities;
         }
@@ -92,6 +95,15 @@ final class ProjectCapabilityService
                 && in_array(strtolower((string) ($participant['role_code'] ?? '')), ['tutor','co_tutor','cotutor','co-tutor'], true)
             )) > 0;
         $capabilities['review_documents'] = in_array('teacher', $roles, true) && $assignedTutor;
+        if (in_array('teacher', $roles, true) && $assignedTutor) $capabilities['view_adjustment_requests'] = true;
+        $isOwnerStudent = in_array('student', $roles, true) && count(array_filter($participants, static fn (array $participant): bool =>
+            (int) ($participant['user_id'] ?? 0) === $userId && strtolower((string) ($participant['role_code'] ?? '')) === 'student'
+        )) > 0;
+        if ($isOwnerStudent) {
+            $capabilities['view_adjustment_requests'] = true;
+            $capabilities['respond_adjustment_request'] = true;
+            $capabilities['address_adjustment_request'] = true;
+        }
 
         // Los permisos académicos globales existen, pero esta pantalla aún no tiene endpoints operativos.
         $capabilities['register_delivery'] = false;
@@ -120,6 +132,42 @@ final class ProjectCapabilityService
         );
         $assignment->execute(['project'=>(int)$project['id'], 'user'=>$userId]);
         return (bool) $assignment->fetchColumn();
+    }
+
+    /** @return array<string,bool> Capacidades de ajustes recalculadas con identidad persistida. */
+    public function adjustmentCapabilitiesInTransaction(PDO $db, array $project, int $userId, string $context): array
+    {
+        $result = $this->none();
+        if ($userId < 1 || !in_array($context, ['academic_management', 'academic'], true)) return $result;
+        $identity = $db->prepare(
+            "SELECT u.is_admin,r.code FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id
+             WHERE u.id=:user AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL"
+        );
+        $identity->execute(['user'=>$userId]);
+        $rows = $identity->fetchAll();
+        if ($rows === []) return $result;
+        $isAdmin = count(array_filter($rows, static fn(array $row): bool => !empty($row['is_admin']) || strtolower((string)$row['code']) === 'administrator')) > 0;
+        if ($context === 'academic_management' && $isAdmin) {
+            foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request'] as $key) $result[$key] = true;
+            return $result;
+        }
+        if ($context !== 'academic' || $isAdmin) return $result;
+        $roles = array_map(static fn(array $row): string => strtolower((string)$row['code']), $rows);
+        $assignment = $db->prepare(
+            "SELECT LOWER(role_code) FROM project_participants WHERE project_id=:project AND user_id=:user
+             AND status='active' AND removed_at IS NULL"
+        );
+        $assignment->execute(['project'=>(int)$project['id'], 'user'=>$userId]);
+        $projectRoles = array_map('strval', $assignment->fetchAll(PDO::FETCH_COLUMN));
+        $tutor = in_array('teacher', $roles, true) && ((int)($project['tutor_id'] ?? 0) === $userId
+            || array_intersect($projectRoles, ['tutor','co_tutor','cotutor','co-tutor']) !== []);
+        $student = in_array('student', $roles, true) && in_array('student', $projectRoles, true);
+        if ($tutor || $student) $result['view_adjustment_requests'] = true;
+        if ($student) {
+            $result['respond_adjustment_request'] = true;
+            $result['address_adjustment_request'] = true;
+        }
+        return $result;
     }
 
     /** @return array<string,bool> */

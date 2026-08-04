@@ -9,7 +9,7 @@ final class ProjectDocumentModel
 
     public function lockProject(int $id):array
     {
-        $q=$this->db->prepare("SELECT id,title,presentation_file_id,status,deleted_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE");
+        $q=$this->db->prepare("SELECT id,title,tutor_id,presentation_file_id,status,deleted_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE");
         $q->execute(['id'=>$id]);$row=$q->fetch();if(!$row)throw new InvalidArgumentException('El proyecto ya no está disponible.');return $row;
     }
     public function activeFiles(int $projectId):array
@@ -43,9 +43,10 @@ final class ProjectDocumentModel
         $n=$this->db->prepare('SELECT COALESCE(MAX(version_number),0)+1 FROM project_file_versions WHERE file_id=:id');$n->execute(['id'=>$fileId]);$version=(int)$n->fetchColumn();
         $q=$this->db->prepare('INSERT INTO project_file_versions(file_id,project_id,version_number,original_name,storage_name,storage_path,extension,mime_type,size_bytes,checksum_sha256,replaced_by,replacement_reason) VALUES(:file,:project,:version,:name,:storage,:path,:extension,:mime,:size,:checksum,:actor,:reason)');
         $q->execute(['file'=>$fileId,'project'=>$projectId,'version'=>$version,'name'=>$old['original_name'],'storage'=>$old['storage_name'],'path'=>$old['storage_path'],'extension'=>$old['extension'],'mime'=>$old['mime_type'],'size'=>$old['size_bytes'],'checksum'=>$old['checksum_sha256'],'actor'=>$actor,'reason'=>$reason!==''?$reason:null]);
+        $previousVersionId=(int)$this->db->lastInsertId();
         $q=$this->db->prepare('UPDATE project_files SET original_name=:name,storage_name=:storage,storage_path=:path,extension=:extension,mime_type=:mime,size_bytes=:size,checksum_sha256=:checksum,uploaded_by=:actor,created_at=UTC_TIMESTAMP() WHERE id=:file AND project_id=:project');
         $q->execute(['name'=>$stored['original_name'],'storage'=>$stored['storage_name'],'path'=>$stored['storage_path'],'extension'=>$stored['extension'],'mime'=>$stored['mime_type'],'size'=>$stored['size_bytes'],'checksum'=>$stored['checksum_sha256'],'actor'=>$actor,'file'=>$fileId,'project'=>$projectId]);
-        return ['file'=>$this->findActiveFile($projectId,$fileId),'version_number'=>$version,'old'=>$old];
+        return ['file'=>$this->findActiveFile($projectId,$fileId),'version_number'=>$version,'previous_version_id'=>$previousVersionId,'old'=>$old];
     }
     public function setPresentation(int $projectId,?int $fileId,int $actor):array
     {

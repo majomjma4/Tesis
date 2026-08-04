@@ -334,11 +334,22 @@ CREATE TABLE project_file_versions (
   replaced_by BIGINT UNSIGNED NULL,
   replaced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   replacement_reason VARCHAR(500) NULL,
+  physical_status ENUM('active','archived','unavailable') NOT NULL DEFAULT 'active',
+  archived_at DATETIME NULL,
+  archived_by BIGINT UNSIGNED NULL,
+  verified_at DATETIME NULL,
+  checksum_verified TINYINT(1) NOT NULL DEFAULT 0,
+  storage_tier VARCHAR(40) NOT NULL DEFAULT 'active',
+  retention_until DATE NULL,
+  legal_hold TINYINT(1) NOT NULL DEFAULT 0,
+  unavailable_reason VARCHAR(500) NULL,
+  archive_reason VARCHAR(500) NULL,
   UNIQUE KEY uq_project_file_version_number(file_id, version_number),
   INDEX idx_project_file_version_project(project_id, replaced_at),
   CONSTRAINT fk_project_file_version_file FOREIGN KEY(file_id) REFERENCES project_files(id) ON DELETE CASCADE,
   CONSTRAINT fk_project_file_version_project FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_project_file_version_actor FOREIGN KEY(replaced_by) REFERENCES users(id),
+  CONSTRAINT fk_project_file_version_archived_by FOREIGN KEY(archived_by) REFERENCES users(id),
   CONSTRAINT chk_project_file_version_positive CHECK(version_number > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -356,6 +367,35 @@ CREATE TABLE project_file_review_states (
   CONSTRAINT fk_project_file_review_project FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_project_file_review_file FOREIGN KEY(file_id) REFERENCES project_files(id) ON DELETE CASCADE,
   CONSTRAINT fk_project_file_review_actor FOREIGN KEY(reviewed_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_file_version_changes (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT UNSIGNED NOT NULL,
+  file_id BIGINT UNSIGNED NOT NULL,
+  previous_version_id BIGINT UNSIGNED NULL,
+  previous_checksum CHAR(64) NOT NULL,
+  new_checksum CHAR(64) NOT NULL,
+  previous_version_number INT UNSIGNED NOT NULL,
+  new_version_number INT UNSIGNED NOT NULL,
+  changed_by BIGINT UNSIGNED NOT NULL,
+  changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reason VARCHAR(500) NOT NULL,
+  declared_summary VARCHAR(2000) NOT NULL,
+  sections_json JSON NULL,
+  previous_document_status ENUM('development','under_review','approved','corrections_requested') NOT NULL,
+  new_document_status ENUM('development','under_review','approved','corrections_requested') NOT NULL DEFAULT 'development',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_project_file_version_change_new(file_id,new_checksum),
+  UNIQUE KEY uq_project_file_version_change_number(file_id,new_version_number),
+  INDEX idx_file_version_change_project_date(project_id,changed_at,id),
+  CONSTRAINT fk_file_version_change_project FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_file_version_change_file FOREIGN KEY(file_id) REFERENCES project_files(id) ON DELETE CASCADE,
+  CONSTRAINT fk_file_version_change_previous FOREIGN KEY(previous_version_id) REFERENCES project_file_versions(id) ON DELETE SET NULL,
+  CONSTRAINT fk_file_version_change_actor FOREIGN KEY(changed_by) REFERENCES users(id),
+  CONSTRAINT chk_file_version_change_checksums CHECK(previous_checksum<>new_checksum),
+  CONSTRAINT chk_file_version_change_numbers CHECK(new_version_number=previous_version_number+1),
+  CONSTRAINT chk_file_version_change_sections CHECK(sections_json IS NULL OR JSON_VALID(sections_json))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE project_observations (
@@ -384,6 +424,86 @@ CREATE TABLE observation_responses (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_responses_observation FOREIGN KEY (observation_id) REFERENCES project_observations(id) ON DELETE CASCADE,
   CONSTRAINT fk_responses_author FOREIGN KEY (author_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_file_version_addressed_observations (
+  change_id BIGINT UNSIGNED NOT NULL,
+  observation_id BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY(change_id,observation_id),
+  INDEX idx_version_addressed_observation(observation_id,change_id),
+  CONSTRAINT fk_version_addressed_change FOREIGN KEY(change_id) REFERENCES project_file_version_changes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_version_addressed_observation FOREIGN KEY(observation_id) REFERENCES project_observations(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_file_version_archive_manifests (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT UNSIGNED NOT NULL,
+  file_id BIGINT UNSIGNED NOT NULL,
+  version_id BIGINT UNSIGNED NOT NULL,
+  checksum_sha256 CHAR(64) NOT NULL,
+  size_bytes BIGINT UNSIGNED NOT NULL,
+  mime_type VARCHAR(120) NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  version_number INT UNSIGNED NOT NULL,
+  replaced_at DATETIME NOT NULL,
+  replaced_by BIGINT UNSIGNED NULL,
+  historical_document_status VARCHAR(40) NOT NULL,
+  declared_summary VARCHAR(2000) NULL,
+  sections_json JSON NULL,
+  addressed_observations_json JSON NULL,
+  storage_tier VARCHAR(40) NOT NULL,
+  archived_reason VARCHAR(500) NOT NULL,
+  verified_at DATETIME NOT NULL,
+  checksum_verified TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_archive_manifest_version(version_id),
+  INDEX idx_archive_manifest_project(project_id,version_number),
+  CONSTRAINT fk_archive_manifest_project FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_archive_manifest_file FOREIGN KEY(file_id) REFERENCES project_files(id) ON DELETE CASCADE,
+  CONSTRAINT fk_archive_manifest_version FOREIGN KEY(version_id) REFERENCES project_file_versions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_archive_manifest_actor FOREIGN KEY(replaced_by) REFERENCES users(id),
+  CONSTRAINT chk_archive_manifest_sections CHECK(sections_json IS NULL OR JSON_VALID(sections_json)),
+  CONSTRAINT chk_archive_manifest_observations CHECK(addressed_observations_json IS NULL OR JSON_VALID(addressed_observations_json))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_adjustment_requests (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT UNSIGNED NOT NULL,
+  requested_by BIGINT UNSIGNED NOT NULL,
+  request_type VARCHAR(60) NOT NULL,
+  message TEXT NOT NULL,
+  related_section VARCHAR(100) NULL,
+  related_field VARCHAR(100) NULL,
+  file_id BIGINT UNSIGNED NULL,
+  status ENUM('pending','addressed','closed') NOT NULL DEFAULT 'pending',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  addressed_at DATETIME NULL,
+  closed_at DATETIME NULL,
+  closed_by BIGINT UNSIGNED NULL,
+  lock_version INT UNSIGNED NOT NULL DEFAULT 1,
+  INDEX idx_adjustment_project_status_date(project_id,status,created_at,id),
+  INDEX idx_adjustment_requester(requested_by),
+  INDEX idx_adjustment_file(file_id),
+  INDEX idx_adjustment_closed_by(closed_by),
+  CONSTRAINT fk_adjustment_project FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_adjustment_requester FOREIGN KEY(requested_by) REFERENCES users(id),
+  CONSTRAINT fk_adjustment_file FOREIGN KEY(file_id) REFERENCES project_files(id),
+  CONSTRAINT fk_adjustment_closed_by FOREIGN KEY(closed_by) REFERENCES users(id),
+  CONSTRAINT chk_adjustment_lock_version CHECK(lock_version>0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_adjustment_request_responses (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  request_id BIGINT UNSIGNED NOT NULL,
+  author_id BIGINT UNSIGNED NOT NULL,
+  message TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_adjustment_response_request_date(request_id,created_at,id),
+  INDEX idx_adjustment_response_author(author_id),
+  CONSTRAINT fk_adjustment_response_request FOREIGN KEY(request_id) REFERENCES project_adjustment_requests(id) ON DELETE CASCADE,
+  CONSTRAINT fk_adjustment_response_author FOREIGN KEY(author_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE project_comments (
@@ -445,7 +565,7 @@ CREATE TABLE notifications (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NOT NULL,
   project_id BIGINT UNSIGNED NULL,
-  type ENUM('delivery','observation','status_change','review','reminder','system','tribunal','repository','comment') NOT NULL,
+  type ENUM('delivery','observation','status_change','review','reminder','system','tribunal','repository','comment','adjustment') NOT NULL,
   title VARCHAR(180) NOT NULL,
   message TEXT NOT NULL,
   action_url VARCHAR(500) NULL,

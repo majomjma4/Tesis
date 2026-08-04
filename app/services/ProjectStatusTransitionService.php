@@ -149,6 +149,7 @@ final class ProjectStatusTransitionService
                 ['status' => $targetStatus, 'context' => $context === 'repository' ? 'repository' : 'academic_management'],
                 $reason !== '' ? $reason : null
             );
+            if ($publishes) (new ProjectDocumentArchiveService())->archiveHistoricalVersionsForProjectInTransaction($db,$projectId,$actor,'Publicación institucional del proyecto.');
             (new ProjectDescriptionService($db))->registerStatusReminder($projectId, $auditId);
 
             $labels = project_academic_labels($targetStatus);

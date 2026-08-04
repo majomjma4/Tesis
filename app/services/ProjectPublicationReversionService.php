@@ -72,6 +72,7 @@ final class ProjectPublicationReversionService
             $update->execute(['status'=>$target,'id'=>$projectId,'published_at'=>$publishedAt]);
             if($update->rowCount()!==1)throw new ProjectStatusTransitionException('La publicación ya no puede revertirse porque el estado cambió o finalizó la ventana de 24 horas.',409);
 
+            $db->prepare("UPDATE project_file_versions SET legal_hold=1 WHERE project_id=:project AND physical_status='archived'")->execute(['project'=>$projectId]);
             (new ProjectAuditService($db))->record(
                 $projectId,$actor,'project_publication_reverted','project',$projectId,
                 ['status'=>'published','published_at'=>$publishedAt,'is_available'=>(bool)$project['is_available']],

@@ -54,18 +54,41 @@ final class ProjectsController
         }
         $projectContext = $isAdministrator ? 'academic_management' : 'academic';
         $project['review_situation']=(new ProjectReviewSituationService())->forProject((int)$project['id']);
-        $academicPage = (new ProjectRecordModel())->academicHistoryPage((int) $project['id']);
+        $academicPage = (new ProjectAcademicTimelineService())->page((int) $project['id']);
+        foreach ($academicPage['events'] as &$academicEvent) {
+            $academicEvent['date'] = (string)($academicEvent['occurred_at_local'] ?? $academicEvent['date'] ?? '');
+            $visibleMeta = (array)($academicEvent['meta'] ?? []);
+            if (!empty($academicEvent['file']['name'])) $visibleMeta[] = 'Archivo: ' . (string)$academicEvent['file']['name'];
+            if (($academicEvent['event_type'] ?? '') === 'document_version_uploaded') $visibleMeta[] = 'Activa';
+            if (($academicEvent['event_type'] ?? '') === 'document_version_archived') {
+                $visibleMeta[] = 'Archivada';
+                if ((int)($academicEvent['metadata']['payload']['unavailable_count'] ?? 0) > 0) $visibleMeta[] = 'No disponible';
+            }
+            $academicEvent['meta'] = array_values(array_unique($visibleMeta));
+        }
+        unset($academicEvent);
         $project['academic_history'] = $academicPage['events'];
         $project['academic_history_total'] = $academicPage['total'];
 
         $descriptionService = new ProjectDescriptionService();
         $isStudentParticipant = !$isAdministrator && in_array('student', $access->currentRoles(), true)
             && count(array_filter($project['participants'], static fn (array $participant): bool =>
-                (int) $participant['user_id'] === $access->currentUserId() && (string) $participant['role_code'] === 'student')) > 0;
+                (int) $participant['user_id'] === $access->currentUserId()
+                && (string) $participant['role_code'] === 'student'
+                && (string) ($participant['status'] ?? 'active') === 'active'
+                && empty($participant['removed_at']))) > 0;
         $descriptionReminder = $isStudentParticipant
             ? $descriptionService->consumePendingReminder((int) $project['id'], $access->currentUserId())
             : null;
         $projectCapabilities = (new ProjectCapabilityService())->forCurrentUser($project, $projectContext);
+        $adjustmentData = ['items' => [], 'summary' => ['has_pending_adjustments' => false, 'pending_count' => 0, 'latest' => null]];
+        if ($projectContext === 'academic' && $isStudentParticipant && !empty($projectCapabilities['view_adjustment_requests'])) {
+            try {
+                $adjustmentData['summary'] = (new ProjectAdjustmentSituationService())->forProject((int) $project['id']);
+            } catch (ProjectAdjustmentRequestException $exception) {
+                error_log('Project adjustment UI: ' . $exception->getMessage());
+            }
+        }
         $documentReview = null;
         if ($projectContext === 'academic_management' && (string)$project['status'] === 'development') {
             $documentReview = (new ProjectDocumentReviewService())->describeCurrentFiles((int)$project['id'], (array)$project['files']);
@@ -105,11 +128,13 @@ final class ProjectsController
             'bodyClass' => 'project-detail-page',
             'pageStyles' => array_values(array_filter([
                 asset('css/project-simplified.css'), asset('css/project-description.css'),
+                asset('css/project-adjustments.css'), asset('css/project-academic-timeline.css'),
                 $isAdministrator ? asset('css/admin-projects.css') : null,
             ])),
             'pageScript' => asset('js/repository-detail.js'),
             'pageScripts' => array_values(array_filter([
                 $descriptionReminder ? asset('js/project-description.js') : null,
+                !empty($projectCapabilities['create_adjustment_request']) ? asset('js/project-adjustments.js') : null,
                 $isAdministrator ? asset('js/admin-projects.js') : null,
                 $isAdministrator && $projectStatusTransitions !== [] ? asset('js/project-status-transition.js') : null,
             ])),
@@ -128,9 +153,8 @@ final class ProjectsController
             'downloadActionUrl' => route('project-file-download') . ($isAdministrator ? '&context=academic_management' : ''),
             'projectDocuments' => $projectDocuments,
             'documentReview' => $documentReview,
-            'projectHistoryEndpoint' => !empty($projectCapabilities['view_admin_history'])
-                ? route('admin-project-history') . '&id=' . (int) $project['id'] . '&context=academic_management'
-                : '',
+            // La auditoría administrativa permanece interna; no se expone como acción del historial académico.
+            'projectHistoryEndpoint' => '',
             'projectStatusTransitions' => $projectStatusTransitions,
             'projectStatusEndpoint' => $isAdministrator ? route('admin-project-save') : '',
             'projectStatusCsrf' => $isAdministrator ? $session->csrfToken('admin_projects') : '',
@@ -143,6 +167,12 @@ final class ProjectsController
             'descriptionSaveEndpoint' => route('project-description-save'),
             'lifecycleDescription' => $descriptionService->effectiveDescription((string) $project['type_code'], $project['summary'] ?? null),
             'academicHistoryEndpoint' => !empty($projectCapabilities['view_academic_history']) ? route('project-academic-history-events') . '&project_id=' . (int) $project['id'] . '&context=' . rawurlencode($projectContext) : '',
+            'adjustmentData' => $adjustmentData,
+            'adjustmentCsrf' => $session->csrfToken('project_adjustment'),
+            'adjustmentEndpoints' => [
+                'create' => route('project-adjustment-create'), 'respond' => route('project-adjustment-respond'),
+                'address' => route('project-adjustment-address'), 'close' => route('project-adjustment-close'),
+            ],
         ]);
     }
 
@@ -177,7 +207,9 @@ final class ProjectsController
         $context=(string)($_GET['context']??'academic');
         $capabilities=$projectId?(new ProjectCapabilityService())->forProjectId((int)$projectId,$context):(new ProjectCapabilityService())->none();
         if(empty($capabilities['view_academic_history'])){http_response_code(403);$this->json(['success'=>false,'message'=>'No tienes autorización para consultar el historial académico de este proyecto.','data'=>[]]);}
-        $page=(new ProjectRecordModel())->academicHistoryPage((int)$projectId,$offset,15);
+        $page=$context==='repository'
+            ?(new ProjectRecordModel())->academicHistoryPage((int)$projectId,$offset,15)
+            :(new ProjectAcademicTimelineService())->page((int)$projectId,$offset,15);
         $this->json(['success'=>true,'message'=>'Historial académico cargado.','data'=>$page]);
     }
 

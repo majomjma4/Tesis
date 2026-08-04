@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 final class NotificationModel
 {
-    private const TYPES = ['delivery', 'observation', 'status_change', 'review', 'reminder', 'system', 'tribunal', 'repository', 'comment'];
+    private const TYPES = ['delivery', 'observation', 'status_change', 'review', 'reminder', 'system', 'tribunal', 'repository', 'comment', 'adjustment'];
 
     public function __construct(private readonly ?PDO $db = null)
     {

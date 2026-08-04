@@ -45,6 +45,9 @@ anonimizados.
 
 ## Migraciones recientes
 
+- `20260824_project_document_archives.sql`: añade estados físicos, retención, legal hold y manifiestos verificables sin mover ni eliminar binarios históricos.
+- `20260822_project_file_version_changes.sql`: registra resúmenes estructurados de reemplazos documentales y su relación íntegra con observaciones atendidas.
+- `20260820_project_adjustment_requests.sql`: incorpora solicitudes administrativas de ajuste, respuestas independientes y notificaciones consolidadas de tipo `adjustment`, sin mezclarlas con observaciones académicas.
 - `20260818_project_delivery_corrections_result.sql`: reemplaza el resultado heredado `changes_required` de las entregas por `corrections_requested`, normaliza proyectos heredados a `development` sin alterar su actividad académica y conserva un respaldo técnico para la reversión controlada.
 - `20260803_persist_support_materials.sql` traslada el material de apoyo y sus
   archivos a MariaDB. Permite editar metadatos, conservar descargas, gestionar

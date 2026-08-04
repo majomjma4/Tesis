@@ -26,6 +26,12 @@ final class ProjectDocumentController
             }
             if($action==='replace'){
                 $fileId=(int)($_POST['file_id']??0);$stored=$storage->storeUpload($projectId,(array)($_FILES['file']??[]));
+                if($this->documentContext==='academic_management'){
+                    try{$result=Database::transaction(fn(PDO $db):array=>(new ProjectFileVersionChangeService())->replaceInTransaction($db,$projectId,$fileId,(string)($_POST['expected_checksum']??''),$stored,$actor,'academic_management',$_POST));}
+                    catch(ProjectDocumentVersionException $e){$storage->discardStored($stored);$this->json(false,$e->getMessage(),[],$e->httpStatus());}
+                    catch(Throwable $e){$storage->discardStored($stored);throw $e;}
+                    $this->json(true,'Archivo reemplazado correctamente.',['file'=>$this->filePayload($result['file'],$projectId),'version_change'=>$result]);
+                }
                 try{$result=Database::transaction(function(PDO $db)use($model,$projectId,$fileId,$stored,$actor){$model->lockProject($projectId);$conflict=$model->activeFileConflict($projectId,(string)$stored['original_name'],(int)$stored['size_bytes'],(string)$stored['checksum_sha256'],$fileId);if($conflict!==null)throw new InvalidArgumentException(($conflict['conflict_type']??'')==='name_size'?'Ya existe otro archivo activo con el mismo nombre y tamaño.':'Ya existe otro archivo activo con el mismo contenido.');$current=$model->findActiveFile($projectId,$fileId,true);if(hash_equals((string)$current['checksum_sha256'],(string)$stored['checksum_sha256']))throw new InvalidArgumentException('El archivo seleccionado tiene el mismo contenido que la versión actual.');$result=$model->replace($projectId,$fileId,$stored,$actor,trim((string)($_POST['reason']??'')));$this->audit($db,$actor,'project.file_replaced','Reemplazó un archivo del proyecto',$projectId,$result['file'],['version_number'=>$result['version_number'],'previous_name'=>$result['old']['original_name']]);$this->notifyAuthors($db,$projectId,'Se reemplazó un archivo del proyecto','El archivo '.$result['old']['original_name'].' tiene una nueva versión en el expediente.');return $result;});}catch(Throwable $e){$storage->discardStored($stored);throw $e;}
                 $this->json(true,'Archivo reemplazado correctamente.',['file'=>$this->filePayload($result['file'],$projectId)]);
             }

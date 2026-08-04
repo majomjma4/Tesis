@@ -45,6 +45,8 @@ function project_academic_labels(string $status): array
     static $labels = [
         'development' => ['status' => 'En desarrollo', 'stage' => 'En proceso'],
         'under_review' => ['status' => 'En revisión', 'stage' => 'En proceso'],
+        'corrections_requested' => ['status' => 'Correcciones solicitadas', 'stage' => 'En proceso'],
+        'changes_required' => ['status' => 'Correcciones solicitadas', 'stage' => 'En proceso'],
         'approved' => ['status' => 'Aprobado', 'stage' => 'Por publicar'],
         'defense' => ['status' => 'En tribunal', 'stage' => 'Por finalizar'],
         'tribunal_approved' => ['status' => 'Aprobado por el Tribunal', 'stage' => 'Por publicar'],
