@@ -18,6 +18,7 @@ final class ProjectStatusTransitionService
         'under_review' => [
             'approved' => [
                 'label' => 'Aprobar', 'icon' => 'fa-circle-check',
+                'requirements' => ['documents_approved'],
                 'effect' => 'La revisión académica quedará aprobada.',
             ],
         ],
@@ -179,12 +180,23 @@ final class ProjectStatusTransitionService
             } elseif ($requirement === 'files') {
                 $met = (int) ($project['active_file_count'] ?? count((array) ($project['files'] ?? []))) > 0;
                 $result[] = ['key' => 'files', 'label' => 'Al menos un archivo activo', 'met' => $met, 'message' => 'Agrega al menos un archivo activo antes de publicar el proyecto.'];
+            } elseif ($requirement === 'documents_approved') {
+                $summary = (array) ($project['document_review_summary'] ?? []);
+                if ($summary === [] && (int) ($project['id'] ?? 0) > 0) {
+                    $summary = (new ProjectDocumentReviewService())->approvalSummaryForProject((int) $project['id']);
+                }
+                $total = (int) ($summary['total'] ?? 0);
+                $met = $total > 0 && !empty($summary['all_active_documents_approved']);
+                $message = $total === 0
+                    ? 'El proyecto no puede aprobarse porque no contiene documentos activos.'
+                    : 'El proyecto no puede aprobarse hasta que todos sus documentos vigentes estén aprobados.';
+                $result[] = ['key'=>'documents_approved', 'label'=>'Documentos vigentes aprobados', 'met'=>$met, 'message'=>$message];
             }
         }
         return $result;
     }
 
-    /** @return array{author_count:int,tribunal_count:int,active_file_count:int} */
+    /** @return array{author_count:int,tribunal_count:int,active_file_count:int,document_review_summary:array<string,mixed>} */
     private function requirementData(PDO $db, int $projectId): array
     {
         $query = $db->prepare(
@@ -195,7 +207,12 @@ final class ProjectStatusTransitionService
         );
         $query->execute(['authors_id' => $projectId, 'tribunal_id' => $projectId, 'files_id' => $projectId]);
         $row = $query->fetch() ?: [];
-        return ['author_count' => (int) ($row['author_count'] ?? 0), 'tribunal_count' => (int) ($row['tribunal_count'] ?? 0), 'active_file_count' => (int) ($row['active_file_count'] ?? 0)];
+        return [
+            'author_count'=>(int)($row['author_count'] ?? 0),
+            'tribunal_count'=>(int)($row['tribunal_count'] ?? 0),
+            'active_file_count'=>(int)($row['active_file_count'] ?? 0),
+            'document_review_summary'=>(new ProjectDocumentReviewService($db))->approvalSummaryForProject($projectId),
+        ];
     }
 
     private function participantCount(array $project, array $roles): int

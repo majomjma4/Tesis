@@ -66,6 +66,18 @@ final class ProjectDocumentReviewService
         ];
     }
 
+    /** Fuente central del requisito de aprobación para todos los documentos activos y vigentes. */
+    public function approvalSummaryForProject(int $projectId): array
+    {
+        $db = $this->db ?? Database::connection();
+        $query = $db->prepare(
+            'SELECT id,project_id,original_name,checksum_sha256,created_at,deleted_at,purged_at
+             FROM project_files WHERE project_id=:project AND deleted_at IS NULL AND purged_at IS NULL ORDER BY id'
+        );
+        $query->execute(['project'=>$projectId]);
+        return $this->describeCurrentFiles($projectId, $query->fetchAll())['summary'];
+    }
+
     public function label(string $status): string
     {
         return match ($status) {

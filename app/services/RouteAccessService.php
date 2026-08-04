@@ -36,7 +36,7 @@ final class RouteAccessService
 
     private function isSupportMaterialFileJsonRequest(string $page): bool
     {
-        return in_array($page,['admin-support-material-file','admin-project-file'],true)
+        return in_array($page,['admin-support-material-file','admin-project-file','project-document-review-save'],true)
             && (str_contains(strtolower((string)($_SERVER['HTTP_ACCEPT']??'')),'application/json')
                 || strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH']??''))==='xmlhttprequest');
     }

@@ -76,6 +76,7 @@ match ($page) {
     'project-zip-entry-content' => (new ProjectsController())->zipEntryContent(),
     'project-zip-entry-download' => (new ProjectsController())->zipEntryDownload(),
     'admin-project-file' => (new ProjectDocumentController())->change(),
+    'project-document-review-save' => (new ProjectDocumentReviewController())->save(),
     'project-description-save' => (new ProjectsController())->saveDescription(),
     'new-project', 'nuevo-proyecto' => (new ProjectsController())->create(),
     'repository', 'repositorio' => (new RepositoryController())->index(),

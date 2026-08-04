@@ -10,6 +10,7 @@ final class ProjectCapabilityService
         'view_admin_history', 'change_status', 'manage_participants', 'manage_tutoring',
         'manage_tribunal', 'manage_publication', 'register_delivery', 'review_delivery',
         'create_observation', 'respond_observation', 'request_corrections', 'download_files',
+        'review_documents',
     ];
 
     /** @return array<string,bool> */
@@ -28,7 +29,7 @@ final class ProjectCapabilityService
     {
         if ($projectId < 1) return $this->none();
         $query = Database::connection()->prepare(
-            "SELECT p.id,p.created_by,p.status,p.is_available,p.deleted_at,pt.code type_code,
+             "SELECT p.id,p.created_by,p.tutor_id,p.status,p.is_available,p.deleted_at,pt.code type_code,
              (SELECT COUNT(*) FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL) active_file_count,
              (SELECT COUNT(*) FROM project_participants author WHERE author.project_id=p.id AND author.role_code='student' AND author.status='active' AND author.removed_at IS NULL) author_count
              FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id=:id"
@@ -57,6 +58,7 @@ final class ProjectCapabilityService
             (string) ($participant['status'] ?? 'active') === 'active' && empty($participant['removed_at'])
         ));
         $related = (int) ($project['created_by'] ?? 0) === $userId
+            || (int) ($project['tutor_id'] ?? 0) === $userId
             || count(array_filter($participants, static fn (array $participant): bool => (int) ($participant['user_id'] ?? 0) === $userId)) > 0;
 
         if ($context === 'academic_management') {
@@ -84,12 +86,40 @@ final class ProjectCapabilityService
         $capabilities['view_academic_history'] = true;
         $capabilities['download_files'] = true;
 
+        $assignedTutor = (int) ($project['tutor_id'] ?? 0) === $userId
+            || count(array_filter($participants, static fn (array $participant): bool =>
+                (int) ($participant['user_id'] ?? 0) === $userId
+                && in_array(strtolower((string) ($participant['role_code'] ?? '')), ['tutor','co_tutor','cotutor','co-tutor'], true)
+            )) > 0;
+        $capabilities['review_documents'] = in_array('teacher', $roles, true) && $assignedTutor;
+
         // Los permisos académicos globales existen, pero esta pantalla aún no tiene endpoints operativos.
         $capabilities['register_delivery'] = false;
         $capabilities['review_delivery'] = false;
         $capabilities['create_observation'] = false;
         $capabilities['respond_observation'] = false;
         return $capabilities;
+    }
+
+    /** Valida la capacidad sensible con datos bloqueados por el caso de uso. */
+    public function canReviewDocumentsInTransaction(PDO $db, array $project, int $userId, string $context): bool
+    {
+        if ($context !== 'academic' || $userId < 1 || (int) ($project['id'] ?? 0) < 1) return false;
+        $identity = $db->prepare(
+            "SELECT 1 FROM users u INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id
+             WHERE u.id=:user AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL
+               AND r.code='teacher' LIMIT 1"
+        );
+        $identity->execute(['user'=>$userId]);
+        if (!$identity->fetchColumn()) return false;
+        if ((int) ($project['tutor_id'] ?? 0) === $userId) return true;
+        $assignment = $db->prepare(
+            "SELECT 1 FROM project_participants
+             WHERE project_id=:project AND user_id=:user AND status='active' AND removed_at IS NULL
+               AND LOWER(role_code) IN ('tutor','co_tutor','cotutor','co-tutor') LIMIT 1"
+        );
+        $assignment->execute(['project'=>(int)$project['id'], 'user'=>$userId]);
+        return (bool) $assignment->fetchColumn();
     }
 
     /** @return array<string,bool> */
