@@ -66,6 +66,18 @@ final class NotificationModel
             $parameters['type'] = $type;
         }
 
+        $projectId = (int) ($filters['project_id'] ?? 0);
+        if ($projectId > 0) {
+            $conditions[] = 'project_id = :project_id';
+            $parameters['project_id'] = $projectId;
+        }
+
+        $date = (string) ($filters['date'] ?? '');
+        if ($date !== '') {
+            $conditions[] = 'DATE(created_at) = :date';
+            $parameters['date'] = $date;
+        }
+
         if (($filters['status'] ?? '') === 'read') {
             $conditions[] = 'is_read = 1';
         } elseif (($filters['status'] ?? '') === 'unread') {

@@ -9,7 +9,7 @@
         <form method="post" class="admin-password-form" novalidate>
             <input type="hidden" name="_csrf" value="<?= e($passwordCsrfToken) ?>">
             <label><span>Contraseña actual</span><input type="password" name="current_password" autocomplete="current-password" required></label>
-            <label><span>Nueva contraseña</span><input type="password" name="new_password" autocomplete="new-password" required><small>Mínimo 10 caracteres, mayúscula, minúscula, número y símbolo.</small></label>
+            <label><span>Nueva contraseña</span><input type="password" name="new_password" autocomplete="new-password" required><small>Mínimo 4 caracteres, mayúscula, minúscula, número y símbolo.</small></label>
             <label><span>Confirmar nueva contraseña</span><input type="password" name="new_password_confirmation" autocomplete="new-password" required></label>
             <button type="submit"><i class="fa-solid fa-key"></i> Actualizar contraseña</button>
         </form>

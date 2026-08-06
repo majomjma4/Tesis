@@ -1,7 +1,24 @@
 const shell = document.querySelector("#notificationsShell");
 const preloader = document.querySelector("#notificationsPreloader");
 const searchInput = document.querySelector("#notificationSearch");
-const statusFilter = document.querySelector("#notificationStatusFilter");
+
+const statusFilter = {
+    get value() {
+        return document.querySelector(".ed-tab[aria-current='page']")?.dataset.tabStatus || "all";
+    },
+    set value(val) {
+        document.querySelectorAll(".ed-tab").forEach(tab => {
+            const active = tab.dataset.tabStatus === val;
+            tab.setAttribute("aria-selected", String(active));
+            if (active) {
+                tab.setAttribute("aria-current", "page");
+            } else {
+                tab.removeAttribute("aria-current");
+            }
+        });
+    }
+};
+
 const typeFilter = document.querySelector("#notificationTypeFilter");
 const filterControls = [...document.querySelectorAll("[data-filter-control]")];
 const clearFiltersButton = document.querySelector("#clearNotificationFilters");
@@ -129,8 +146,8 @@ function createRow(notification) {
     const row = document.createElement("article");
     row.className = `notification-row type-${typeClass(notification.type)} ${notification.is_read ? "is-read" : "is-unread"}`;
     row.dataset.notificationId = notification.id; row.dataset.read = String(notification.is_read); row.dataset.type = notification.type;
-    const dot = document.createElement(notification.deleted_at ? "input" : "span");
-    if (notification.deleted_at) { dot.type = "checkbox"; dot.className = "trash-notification-checkbox"; dot.value = notification.id; dot.setAttribute("aria-label", `Seleccionar ${notification.title}`); }
+    const dot = document.createElement((notification.deleted_at && statusFilter.value === "trash") ? "input" : "span");
+    if (notification.deleted_at && statusFilter.value === "trash") { dot.type = "checkbox"; dot.className = "trash-notification-checkbox"; dot.value = notification.id; dot.setAttribute("aria-label", `Seleccionar ${notification.title}`); }
     else { dot.className = "unread-dot"; dot.setAttribute("aria-label", notification.is_read ? "Leida" : "No leida"); }
     const icon = document.createElement("span"); icon.className = "notification-type-icon";
     const iconGlyph = document.createElement("i"); iconGlyph.className = `fa-solid ${iconFor(notification.type)}`; icon.append(iconGlyph);
@@ -152,10 +169,14 @@ function createRow(notification) {
     const more = createButton("more-notification", "Mas opciones", "fa-ellipsis-vertical", "menu"); more.setAttribute("aria-haspopup", "menu"); more.setAttribute("aria-expanded", "false");
     const menu = document.createElement("div"); menu.className = "notification-context-menu"; menu.role = "menu"; menu.hidden = true;
     [["delete", "Archivar", "Ocultar de la bandeja sin eliminar"], ["destroy", "Mover a la papelera", "Se eliminara automaticamente en 30 dias"]].forEach(([action, label, description]) => { const b = document.createElement("button"); b.type = "button"; b.role = "menuitem"; b.dataset.menuAction = action; if (action === "destroy") b.className = "danger"; const text = document.createElement("span"); const strong = document.createElement("strong"); strong.textContent = label; const small = document.createElement("small"); small.textContent = description; text.append(strong, small); b.append(text); menu.append(b); });
-    if (notification.deleted_at || notification.archived_at) {
+    
+    const isSentTab = statusFilter.value === "sent";
+    if (notification.deleted_at && statusFilter.value === "trash") {
         const restore = createButton("view-notification", "Restaurar", "", "restore");
         actions.append(restore);
         row.classList.add("is-hidden-notification");
+    } else if (isSentTab) {
+        actions.append(view);
     } else {
         actions.append(view, toggle, more, menu);
     }
@@ -177,7 +198,7 @@ function renderGroups(groups, sectionCounters = {}) {
         const list = document.createElement("div"); list.className = "notification-list"; notifications.forEach((item) => list.append(createRow(item))); section.append(heading, list);
         groupsContainer?.insertBefore(section, paginationContainer || emptyState);
     });
-    if (emptyState) { emptyState.hidden = total > 0; emptyState.querySelector("h2").textContent = searchInput?.value || statusFilter?.value !== "all" || typeFilter?.value !== "all" ? "No se encontraron notificaciones con los filtros seleccionados." : "No tienes notificaciones por el momento."; }
+    if (emptyState) { emptyState.hidden = total > 0; emptyState.querySelector("h2").textContent = searchInput?.value || statusFilter.value !== "all" || typeFilter?.value !== "all" ? "No se encontraron notificaciones con los filtros seleccionados." : "No tienes notificaciones por el momento."; }
     updateContextualCards(sectionCounters);
     updateTrashSelection();
 }
@@ -239,7 +260,7 @@ function updateTrashSelection() {
     if (deleteSelectedButton) deleteSelectedButton.disabled = selected.length === 0;
     if (emptyTrashButton) emptyTrashButton.disabled = checkboxes.length === 0;
     if (selectAllTrash) { selectAllTrash.checked = checkboxes.length > 0 && selected.length === checkboxes.length; selectAllTrash.indeterminate = selected.length > 0 && selected.length < checkboxes.length; }
-    if (statusFilter?.value === "trash") setSummaryCard("week", "Seleccionadas", selected.length);
+    if (statusFilter.value === "trash") setSummaryCard("week", "Seleccionadas", selected.length);
 }
 
 function setSummaryCard(key, label, value) {
@@ -250,19 +271,19 @@ function setSummaryCard(key, label, value) {
 }
 
 function updateContextualCards(sectionCounters) {
-    const mode = statusFilter?.value;
+    const mode = statusFilter.value;
     if (mode === "hidden") {
         setSummaryCard("unread", "Archivadas", sectionCounters.total || 0);
-        setSummaryCard("today", "No leidas", sectionCounters.unread || 0);
+        setSummaryCard("today", "No leídas", sectionCounters.unread || 0);
         setSummaryCard("week", "Esta semana", sectionCounters.week || 0);
         setSummaryCard("total", "Total archivadas", sectionCounters.total || 0);
     } else if (mode === "trash") {
         setSummaryCard("unread", "En papelera", sectionCounters.total || 0);
-        setSummaryCard("today", "Proximas a eliminarse", sectionCounters.expiring || 0);
+        setSummaryCard("today", "Próximas a eliminarse", sectionCounters.expiring || 0);
         setSummaryCard("week", "Seleccionadas", selectedTrashIds().length);
         setSummaryCard("total", "Total", sectionCounters.total || 0);
     } else {
-        setSummaryCard("unread", "No leidas", document.querySelector('[data-counter-card="unread"] strong')?.textContent || 0);
+        setSummaryCard("unread", "No leídas", document.querySelector('[data-counter-card="unread"] strong')?.textContent || 0);
         document.querySelector('[data-counter-card="today"] div span').textContent = "Hoy";
         document.querySelector('[data-counter-card="week"] div span').textContent = "Esta semana";
         document.querySelector('[data-counter-card="total"] div span').textContent = "Total activas";
@@ -272,9 +293,23 @@ function updateContextualCards(sectionCounters) {
 async function loadNotifications(showMessage = false) {
     requestController?.abort(); requestController = new AbortController();
     refreshButton?.setAttribute("disabled", ""); refreshButton?.querySelector("i")?.classList.add("is-spinning");
-    const showingHidden = statusFilter?.value === "hidden";
-    const showingTrash = statusFilter?.value === "trash";
-    const params = new URLSearchParams({ search: searchInput?.value || "", type: typeFilter?.value === "all" ? "" : typeFilter?.value || "", status: ["read", "unread"].includes(statusFilter?.value) ? statusFilter.value : "", hidden: showingHidden ? "1" : "0", trash: showingTrash ? "1" : "0", notification_page: String(currentPage), notifications_per_page: String(notificationsPerPage) });
+    const showingHidden = statusFilter.value === "hidden";
+    const showingTrash = statusFilter.value === "trash";
+    
+    const projectFilter = document.querySelector("#notificationProjectFilter");
+    const dateFilter = document.querySelector("#notificationDateFilter");
+    
+    const params = new URLSearchParams({
+        search: searchInput?.value || "",
+        type: typeFilter?.value === "all" ? "" : typeFilter?.value || "",
+        status: ["read", "unread", "sent"].includes(statusFilter.value) ? statusFilter.value : "",
+        hidden: showingHidden ? "1" : "0",
+        trash: showingTrash ? "1" : "0",
+        project_id: projectFilter?.value || "0",
+        date: dateFilter?.value || "",
+        notification_page: String(currentPage),
+        notifications_per_page: String(notificationsPerPage)
+    });
     try {
         const payload = await request(`${endpoints.list}&${params}`, { signal: requestController.signal });
         updateCounters(payload.data.counters); renderGroups(payload.data.groups, payload.data.sectionCounters); renderPagination(payload.data.pagination); if (errorState) errorState.hidden = true;
@@ -291,22 +326,87 @@ const debouncedLoad = debounce(() => loadNotifications(), 300);
 searchInput?.addEventListener("input", () => { currentPage = 1; updateFilterState(); debouncedLoad(); });
 
 function closeFilterMenus(restoreFocus = false) {
-    filterControls.forEach((control) => { const menu = control.querySelector(".notification-filter-menu"); const trigger = control.querySelector(".notification-filter-trigger"); menu.hidden = true; trigger.setAttribute("aria-expanded", "false"); if (restoreFocus && control.contains(document.activeElement)) trigger.focus(); });
+    filterControls.forEach((control) => {
+        const type = control.dataset.filterControl;
+        
+        if (type === "date") {
+            return;
+        }
+        const menu = control.querySelector(".notification-filter-menu");
+        const trigger = control.querySelector(".notification-filter-trigger");
+        if (!menu || !trigger) {
+            console.warn("Filter control missing expected elements:", control);
+            return;
+        }
+        menu.hidden = true;
+        trigger.setAttribute("aria-expanded", "false");
+        if (restoreFocus && control.contains(document.activeElement)) trigger.focus();
+    });
 }
 
 function updateFilterState() {
     const active = [];
+
     filterControls.forEach((control) => {
+        const type = control.dataset.filterControl;
+
+        // El filtro de fecha no usa select ni menú desplegable
+        if (type === "date") {
+            return;
+        }
+
         const select = control.querySelector("select");
-        const selectedOption = control.querySelector(`[data-filter-value="${CSS.escape(select.value)}"]`);
-        const prefix = control.dataset.filterControl === "status" ? "Estado" : "Tipo";
-        const label = selectedOption?.querySelector("span:nth-child(2)")?.textContent || (prefix === "Estado" ? "Todas" : "Todos");
-        control.querySelector(".notification-filter-trigger>span").textContent = `${prefix}: ${label}`;
-        if (select.value !== "all") active.push(`${prefix}: ${label}`);
+        const triggerLabel = control.querySelector(
+            ".notification-filter-trigger > span"
+        );
+
+        if (!select) {
+            console.warn(
+                "Filter control missing select element:",
+                control
+            );
+            return;
+        }
+
+        const selectedOption = control.querySelector(
+            `[data-filter-value="${CSS.escape(select.value)}"]`
+        );
+
+        const prefix = type === "project" ? "Proyecto" : "Tipo";
+
+        const label =
+            selectedOption?.querySelector("span:nth-child(2)")?.textContent ||
+            "Todos";
+
+        if (triggerLabel) {
+            triggerLabel.textContent = `${prefix}: ${label}`;
+        }
+
+        if (select.value !== "all" && select.value !== "0") {
+            active.push(`${prefix}: ${label}`);
+        }
     });
-    if (activeFilter && activeFilterLabel) { activeFilter.hidden = active.length === 0; activeFilterLabel.textContent = active.join(" · "); }
-    if (trashToolbar) trashToolbar.hidden = statusFilter?.value !== "trash";
-    if (clearFiltersButton) clearFiltersButton.hidden = !searchInput?.value.trim() && active.length === 0;
+
+    const dateFilter = document.querySelector("#notificationDateFilter");
+
+    if (dateFilter?.value) {
+        active.push(`Fecha: ${dateFilter.value}`);
+    }
+
+    if (activeFilter && activeFilterLabel) {
+        activeFilter.hidden = active.length === 0;
+        activeFilterLabel.textContent = active.join(" · ");
+    }
+
+    if (trashToolbar && statusFilter) {
+        trashToolbar.hidden = statusFilter.value !== "trash";
+    }
+
+    if (clearFiltersButton) {
+        clearFiltersButton.hidden =
+            !searchInput?.value.trim() &&
+            active.length === 0;
+    }
 }
 
 function selectFilter(control, value, requestUpdate = true) {
@@ -318,13 +418,138 @@ function selectFilter(control, value, requestUpdate = true) {
 }
 
 filterControls.forEach((control) => {
-    const trigger = control.querySelector(".notification-filter-trigger"); const menu = control.querySelector(".notification-filter-menu");
-    trigger.addEventListener("click", () => { const open = menu.hidden; closeFilterMenus(); menu.hidden = !open; trigger.setAttribute("aria-expanded", String(open)); if (open) menu.querySelector('[aria-selected="true"]')?.focus(); });
-    menu.addEventListener("click", (event) => { const option = event.target.closest("[data-filter-value]"); if (option) selectFilter(control, option.dataset.filterValue); });
-    menu.addEventListener("keydown", (event) => { const options = [...menu.querySelectorAll("[data-filter-value]")]; const current = options.indexOf(document.activeElement); if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); options[(current + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length]?.focus(); } if (event.key === "Home") { event.preventDefault(); options[0]?.focus(); } if (event.key === "End") { event.preventDefault(); options.at(-1)?.focus(); } if (["Enter", " "].includes(event.key)) { event.preventDefault(); document.activeElement?.click(); } });
+    const type = control.dataset.filterControl;
+
+    // El filtro de fecha usa un input, no un menú desplegable.
+    if (type === "date") {
+        const dateInput = control.querySelector(
+            "#notificationDateFilter, input[type='date']"
+        );
+
+        if (dateInput) {
+            dateInput.addEventListener("change", () => {
+                updateFilterState();
+
+                // Si tu archivo ya tiene una función para recargar
+                // la lista, déjala aquí.
+                // Ejemplo:
+                // loadNotifications();
+            });
+        }
+
+        return;
+    }
+
+    const trigger = control.querySelector(
+        ".notification-filter-trigger"
+    );
+
+    const menu = control.querySelector(
+        ".notification-filter-menu"
+    );
+
+    if (!trigger || !menu) {
+        console.warn(
+            "Dropdown filter missing trigger or menu element:",
+            control
+        );
+        return;
+    }
+
+    trigger.addEventListener("click", () => {
+        const open = menu.hidden;
+
+        closeFilterMenus();
+
+        menu.hidden = !open;
+        trigger.setAttribute(
+            "aria-expanded",
+            String(open)
+        );
+
+        if (open) {
+            menu.querySelector(
+                '[aria-selected="true"]'
+            )?.focus();
+        }
+    });
+
+    menu.addEventListener("click", (event) => {
+        const option = event.target.closest(
+            "[data-filter-value]"
+        );
+
+        if (option) {
+            selectFilter(
+                control,
+                option.dataset.filterValue
+            );
+        }
+    });
+
+    menu.addEventListener("keydown", (event) => {
+        const options = [
+            ...menu.querySelectorAll(
+                "[data-filter-value]"
+            )
+        ];
+
+        const current = options.indexOf(
+            document.activeElement
+        );
+
+        if (
+            event.key === "ArrowDown" ||
+            event.key === "ArrowUp"
+        ) {
+            event.preventDefault();
+
+            const direction =
+                event.key === "ArrowDown" ? 1 : -1;
+
+            const nextIndex =
+                (
+                    current +
+                    direction +
+                    options.length
+                ) % options.length;
+
+            options[nextIndex]?.focus();
+        }
+
+        if (event.key === "Home") {
+            event.preventDefault();
+            options[0]?.focus();
+        }
+
+        if (event.key === "End") {
+            event.preventDefault();
+            options.at(-1)?.focus();
+        }
+
+        if (
+            event.key === "Enter" ||
+            event.key === " "
+        ) {
+            event.preventDefault();
+            document.activeElement?.click();
+        }
+    });
 });
 
-function clearAllFilters() { searchInput.value = ""; currentPage = 1; filterControls.forEach((control) => selectFilter(control, "all", false)); updateFilterState(); loadNotifications(); searchInput.focus(); }
+function clearAllFilters() {
+    searchInput.value = "";
+    currentPage = 1;
+    filterControls.forEach((control) => {
+        const defaultValue = control.dataset.filterControl === "project" ? "0" : "all";
+        selectFilter(control, defaultValue, false);
+    });
+    const dateFilter = document.querySelector("#notificationDateFilter");
+    if (dateFilter) dateFilter.value = "";
+    updateFilterState();
+    loadNotifications();
+    searchInput.focus();
+}
 clearFiltersButton?.addEventListener("click", clearAllFilters);
 document.querySelector("#clearActiveNotificationFilter")?.addEventListener("click", clearAllFilters);
 updateFilterState();
@@ -422,6 +647,12 @@ function fillDetail(item, destinationUrl = null) {
     document.querySelector("#notificationModalProject").textContent = item.project_name || item.project || "Notificacion general";
     document.querySelector("#notificationModalDate").textContent = item.created_at || "";
     document.querySelector("#notificationModalStatus").textContent = item.is_read ? "Leida" : "No leida";
+    
+    const isSentTab = statusFilter.value === "sent";
+    document.querySelector("#notificationModalStatus").hidden = isSentTab;
+    const markUnreadBtn = document.querySelector("#notificationModalMarkUnread");
+    if (markUnreadBtn) markUnreadBtn.hidden = isSentTab;
+
     const destination = document.querySelector("#notificationModalDestination");
     if (destination) {
         destination.hidden = !destinationUrl;
@@ -471,6 +702,7 @@ document.querySelector("#confirmDeleteNotification")?.addEventListener("click", 
         }
     } catch {}
 });
+
 document.querySelectorAll("[data-modal-close]").forEach((button) => button.addEventListener("click", () => closeModal(button.closest(".notification-modal-overlay"))));
 document.addEventListener("click", (event) => { if (!event.target.closest(".notification-row-actions")) closeMenus(); if (!event.target.closest(".notification-filter-custom")) closeFilterMenus(); });
 document.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchInput?.focus(); } if (event.key === "Escape") { closeMenus(); const hasOpenFilter = filterControls.some((control) => !control.querySelector(".notification-filter-menu").hidden); if (hasOpenFilter) closeFilterMenus(true); else if (detailModal && !detailModal.hidden) closeModal(detailModal); else if (deleteModal && !deleteModal.hidden) closeModal(deleteModal); else if (document.activeElement === searchInput) { searchInput.value = ""; searchInput.blur(); updateFilterState(); loadNotifications(); } } });
@@ -489,3 +721,105 @@ function revealNotifications() {
 
 window.setTimeout(revealNotifications, 650);
 window.setTimeout(revealNotifications, 2500);
+
+// Bindings for tabs navigation
+document.querySelectorAll(".ed-tab").forEach(tab => {
+    tab.addEventListener("click", (e) => {
+        e.preventDefault();
+        statusFilter.value = tab.dataset.tabStatus;
+        currentPage = 1;
+        
+        // Hide/show trash toolbar depending on tab
+        if (trashToolbar) {
+            trashToolbar.hidden = tab.dataset.tabStatus !== "trash";
+        }
+        
+        // Manage active styling classes manually if necessary
+        document.querySelectorAll(".ed-tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        
+        loadNotifications();
+    });
+});
+
+// Date filter binding
+document.querySelector("#notificationDateFilter")?.addEventListener("change", () => {
+    currentPage = 1;
+    updateFilterState();
+    loadNotifications();
+});
+
+// Admin New Notification button and modal logic
+const btnNewNotification = document.querySelector("#btnNewNotification");
+const createModal = document.querySelector("#notificationCreateModal");
+const createForm = document.querySelector("#notificationCreateForm");
+const scopeSelect = document.querySelector("#newNotificationScope");
+const errorMsg = document.querySelector("#newNotificationError");
+
+if (btnNewNotification && createModal) {
+    btnNewNotification.addEventListener("click", () => {
+        createForm?.reset();
+        if (scopeSelect) {
+            scopeSelect.dispatchEvent(new Event("change"));
+        }
+        if (errorMsg) errorMsg.hidden = true;
+        openModal(createModal, btnNewNotification);
+    });
+}
+
+if (scopeSelect) {
+    scopeSelect.addEventListener("change", () => {
+        const scope = scopeSelect.value;
+        document.querySelector("#groupScopeUser").hidden = scope !== "user";
+        document.querySelector("#groupScopeRole").hidden = scope !== "role";
+        document.querySelector("#groupScopeProject").hidden = scope !== "project";
+        document.querySelector("#groupScopeAll").hidden = scope !== "all";
+
+        document.querySelector("#newNotificationUser").required = scope === "user";
+        document.querySelector("#newNotificationRole").required = scope === "role";
+        document.querySelector("#newNotificationProject").required = scope === "project";
+        document.querySelector("#confirmAllCheckbox").required = scope === "all";
+    });
+}
+
+if (createForm) {
+    createForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const btnSubmit = document.querySelector("#btnSubmitNewNotification");
+        if (btnSubmit) btnSubmit.disabled = true;
+        if (errorMsg) errorMsg.hidden = true;
+
+        try {
+            const formData = new FormData(createForm);
+            const body = new URLSearchParams(formData);
+            const endpoint = endpoints["admin-send"] || "";
+            if (!endpoint) throw new Error("Endpoint de envío no configurado.");
+            
+            const adminCsrf = createForm.querySelector("[name='_csrf']")?.value || csrfToken;
+            const response = await fetch(endpoint, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRF-Token": adminCsrf,
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body
+            });
+
+            const payload = await response.json().catch(() => ({ success: false, message: "Respuesta no valida." }));
+            if (!response.ok || !payload.success) throw new Error(payload.message || "No fue posible enviar la notificacion.");
+
+            showToast(payload.message);
+            closeModal(createModal);
+            loadNotifications();
+        } catch (error) {
+            if (errorMsg) {
+                errorMsg.textContent = error.message;
+                errorMsg.hidden = false;
+            }
+        } finally {
+            if (btnSubmit) btnSubmit.disabled = false;
+        }
+    });
+}

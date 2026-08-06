@@ -17,8 +17,8 @@ final class ProjectModel
             FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id INNER JOIN careers c ON c.id=p.career_id
             INNER JOIN academic_periods ap ON ap.id=p.academic_period_id LEFT JOIN users t ON t.id=p.tutor_id
             LEFT JOIN project_participants pp ON pp.project_id=p.id AND pp.status='active' AND pp.removed_at IS NULL
-            WHERE p.deleted_at IS NULL AND (p.created_by=:user OR pp.user_id=:user) ORDER BY p.updated_at DESC,p.id DESC");
-        $statement->execute(['user'=>$userId]);
+            WHERE p.deleted_at IS NULL AND (p.created_by = :created_by_user OR pp.user_id= :participant_user) ORDER BY p.updated_at DESC,p.id DESC");
+        $statement->execute(['created_by_user'=>$userId,'participant_user'=>$userId]);
         $rows=$statement->fetchAll();
         $situations=(new ProjectReviewSituationService())->forProjects(array_map('intval',array_column($rows,'id')));
         return array_map(static function(array $row)use($situations):array{
