@@ -6,7 +6,7 @@ if (calendarRoot) {
     const endpoint = calendarRoot.dataset.eventsUrl;
     const projectUrl = calendarRoot.dataset.projectUrl || '';
     const projectFilterId = Number(calendarRoot.dataset.projectFilter || 0);
-    const typeLabels = { delivery: 'Entrega', meeting: 'Reunión', review: 'Revisión', deadline: 'Fecha límite' };
+    const typeLabels = { delivery: 'Entregas', meeting: 'Reuniones', review: 'Revisiones', deadline: 'Fechas límite' };
     const priorityLabels = { low: 'Baja', medium: 'Media', high: 'Alta' };
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const compactAgenda = window.matchMedia('(max-width: 1180px)');
@@ -139,13 +139,13 @@ if (calendarRoot) {
     function renderAgenda() {
         const date = fromKey(selectedDate), list = $('#calendarAgendaList'), items = filteredEvents().filter((event) => event.date === selectedDate); list.innerHTML = '';
         $('#calendarAgendaTitle').textContent = date.toLocaleDateString('es-EC', { weekday: 'long' }); $('#calendarAgendaDate').textContent = date.toLocaleDateString('es-EC', { day: 'numeric', month: 'long', year: 'numeric' });
-        if (!items.length) list.append(emptyState(searchTerm || activeFilter !== 'all' ? 'fa-magnifying-glass' : 'fa-calendar-plus', searchTerm || activeFilter !== 'all' ? 'Sin coincidencias para este día' : 'Tu día está disponible', searchTerm || activeFilter !== 'all' ? 'Limpia los filtros o consulta otra fecha.' : 'Agrega una entrega, reunión o revisión para mantener tu planificación al día.', searchTerm || activeFilter !== 'all'));
+        if (!items.length) list.append(emptyState(searchTerm || activeFilter !== 'all' ? 'fa-magnifying-glass' : 'fa-calendar-plus', searchTerm || activeFilter !== 'all' ? 'Sin coincidencias para este día' : 'No hay eventos programados', searchTerm || activeFilter !== 'all' ? 'Limpia los filtros o consulta otra fecha.' : 'No se han registrado actividades académicas para esta fecha', searchTerm || activeFilter !== 'all'));
         else items.forEach((event) => list.append(eventCard(event)));
         renderUpcoming();
     }
     function renderUpcoming() {
         const list = $('#calendarUpcomingList'), upcoming = sortEvents(events.filter((event) => !event.completed && event.date >= dateKey(today))).slice(0, 5); list.innerHTML = ''; $('#calendarUpcomingBadge').textContent = upcoming.length;
-        if (!upcoming.length) { list.innerHTML = '<p class="upcoming-empty">No tienes eventos pendientes. ¡Agenda al día!</p>'; return; }
+        if (!upcoming.length) { list.innerHTML = '<p class="upcoming-empty">No hay próximos eventos programados</p>'; return; }
         upcoming.forEach((event) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'calendar-upcoming-item'; button.innerHTML = `<span class="upcoming-date"><strong>${fromKey(event.date).getDate()}</strong>${fromKey(event.date).toLocaleDateString('es-EC', { month: 'short' })}</span><span><strong></strong><small>${typeLabels[event.type]}</small></span>`; button.querySelector('span:nth-child(2) strong').textContent = event.title; button.addEventListener('click', () => openDetails(event)); list.append(button); });
     }
     function renderFilterStatus() {
