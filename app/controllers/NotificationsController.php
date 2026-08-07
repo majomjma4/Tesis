@@ -143,6 +143,7 @@ final class NotificationsController
                 'project_id' => $projectId,
                 'date' => $date
             ];
+            $model->purgeExpiredTrash(60);
             $result = $model->getByUserPaginated($this->currentUserId(), $filters, ['page' => $page, 'size' => $perPage, 'pageKey' => 'notification_page', 'sizeKey' => 'notifications_per_page']);
             $notifications = $result['items'];
             $pagination = $result['pagination'];

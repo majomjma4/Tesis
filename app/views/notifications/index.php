@@ -156,7 +156,7 @@
     </div>
 
     <section class="notification-trash-toolbar" id="notificationTrashToolbar" aria-label="Acciones de papelera" hidden>
-        <div class="notification-trash-notice"><span><i class="fa-regular fa-clock"></i></span><div><strong>La papelera se vacía automáticamente después de 30 días</strong><p>Puedes restaurar o eliminar definitivamente las notificaciones antes de ese plazo.</p></div></div>
+        <div class="notification-trash-notice"><span><i class="fa-regular fa-clock"></i></span><div><strong>La papelera se vacía automáticamente después de 60 días</strong><p>Puedes restaurar o eliminar definitivamente las notificaciones antes de ese plazo.</p></div></div>
         <div class="notification-trash-selection">
             <label><input type="checkbox" id="selectAllTrashNotifications"><span>Seleccionar todas</span></label>
             <span id="trashSelectionCount">0 seleccionadas</span>

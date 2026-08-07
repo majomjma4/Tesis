@@ -3,6 +3,11 @@
 if ($project === null): ?>
     <section class="repository-detail-not-found"><i class="fa-solid fa-folder-open"></i><h1>Proyecto no encontrado</h1><p>El expediente solicitado no existe o no está disponible para tu cuenta.</p><a class="open-btn" href="<?= e($returnUrl) ?>">Volver</a></section>
 <?php else:
+    $isStudentContext = !empty($isStudentContext) || ($projectContext === 'academic' && !(new AuthSessionService())->hasAdminAccess());
+    if ($isStudentContext) {
+        require __DIR__ . '/_student-workspace.php';
+        return;
+    }
     $projectId = (int) $project['id'];
     $detailUrl = (string) $detailUrl;
     $projectContext = (string) ($projectContext ?? ($publicContext ? 'repository' : 'academic'));

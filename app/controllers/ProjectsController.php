@@ -129,13 +129,13 @@ final class ProjectsController
             'pageStyles' => array_values(array_filter([
                 asset('css/project-simplified.css'), asset('css/project-description.css'),
                 asset('css/project-adjustments.css'), asset('css/project-academic-timeline.css'),
-                $isAdministrator ? asset('css/admin-projects.css') : null,
+                $isAdministrator ? asset('css/admin-projects.css') : asset('css/student-project-workspace.css'),
             ])),
             'pageScript' => asset('js/repository-detail.js'),
             'pageScripts' => array_values(array_filter([
                 $descriptionReminder ? asset('js/project-description.js') : null,
                 !empty($projectCapabilities['create_adjustment_request']) ? asset('js/project-adjustments.js') : null,
-                $isAdministrator ? asset('js/admin-projects.js') : null,
+                $isAdministrator ? asset('js/admin-projects.js') : asset('js/student-project-workspace.js'),
                 $isAdministrator && $projectStatusTransitions !== [] ? asset('js/project-status-transition.js') : null,
             ])),
             'project' => $project,

@@ -127,7 +127,7 @@ final class NotificationModel
             "SELECT COUNT(*) total,
                     COALESCE(SUM(is_read = 0), 0) unread,
                     COALESCE(SUM(YEARWEEK(created_at, 1) = YEARWEEK(CURRENT_DATE(), 1)), 0) week,
-                    COALESCE(SUM(deleted_at IS NOT NULL AND deleted_at <= DATE_SUB(NOW(), INTERVAL 23 DAY)), 0) expiring
+                    COALESCE(SUM(deleted_at IS NOT NULL AND deleted_at <= DATE_SUB(NOW(), INTERVAL 53 DAY)), 0) expiring
              FROM notifications WHERE user_id = :user_id AND $visibility"
         );
         $statement->execute(['user_id' => $userId]);
@@ -202,7 +202,7 @@ final class NotificationModel
         return $statement->rowCount() === 1;
     }
 
-    public function purgeExpiredTrash(int $days = 30): int
+    public function purgeExpiredTrash(int $days = 60): int
     {
         $days = max(1, min($days, 365));
         $statement = $this->connection()->prepare(

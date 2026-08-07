@@ -168,7 +168,7 @@ function createRow(notification) {
     const toggle = createButton("mark-notification", toggleLabel, notification.is_read ? "fa-eye" : "fa-eye-slash", "toggle-read"); toggle.setAttribute("aria-pressed", String(notification.is_read));
     const more = createButton("more-notification", "Mas opciones", "fa-ellipsis-vertical", "menu"); more.setAttribute("aria-haspopup", "menu"); more.setAttribute("aria-expanded", "false");
     const menu = document.createElement("div"); menu.className = "notification-context-menu"; menu.role = "menu"; menu.hidden = true;
-    [["delete", "Archivar", "Ocultar de la bandeja sin eliminar"], ["destroy", "Mover a la papelera", "Se eliminara automaticamente en 30 dias"]].forEach(([action, label, description]) => { const b = document.createElement("button"); b.type = "button"; b.role = "menuitem"; b.dataset.menuAction = action; if (action === "destroy") b.className = "danger"; const text = document.createElement("span"); const strong = document.createElement("strong"); strong.textContent = label; const small = document.createElement("small"); small.textContent = description; text.append(strong, small); b.append(text); menu.append(b); });
+    [["delete", "Archivar", "Ocultar de la bandeja sin eliminar"], ["destroy", "Mover a la papelera", "Se eliminara automaticamente en 60 dias"]].forEach(([action, label, description]) => { const b = document.createElement("button"); b.type = "button"; b.role = "menuitem"; b.dataset.menuAction = action; if (action === "destroy") b.className = "danger"; const text = document.createElement("span"); const strong = document.createElement("strong"); strong.textContent = label; const small = document.createElement("small"); small.textContent = description; text.append(strong, small); b.append(text); menu.append(b); });
     
     const isSentTab = statusFilter.value === "sent";
     if (notification.deleted_at && statusFilter.value === "trash") {
@@ -624,7 +624,7 @@ groupsContainer?.addEventListener("click", async (event) => {
         pendingDeleteMode = action === "destroy" ? "destroy" : "archive";
         const moveToTrash = pendingDeleteMode === "destroy";
         document.querySelector("#notificationDeleteTitle").textContent = moveToTrash ? "¿Mover esta notificacion a la papelera?" : "¿Deseas archivar esta notificacion?";
-        document.querySelector("#notificationDeleteText").textContent = moveToTrash ? "Podras restaurarla desde Papelera durante 30 dias. Despues se eliminara automaticamente." : "La notificacion saldra del listado principal, pero podras recuperarla desde el filtro Archivadas.";
+        document.querySelector("#notificationDeleteText").textContent = moveToTrash ? "Podras restaurarla desde Papelera durante 60 dias. Despues se eliminara automaticamente." : "La notificacion saldra del listado principal, pero podras recuperarla desde el filtro Archivadas.";
         document.querySelector("#confirmDeleteNotification").textContent = moveToTrash ? "Mover a la papelera" : "Archivar";
         openModal(deleteModal, menuButton);
     }
@@ -770,15 +770,25 @@ if (btnNewNotification && createModal) {
 if (scopeSelect) {
     scopeSelect.addEventListener("change", () => {
         const scope = scopeSelect.value;
-        document.querySelector("#groupScopeUser").hidden = scope !== "user";
-        document.querySelector("#groupScopeRole").hidden = scope !== "role";
-        document.querySelector("#groupScopeProject").hidden = scope !== "project";
-        document.querySelector("#groupScopeAll").hidden = scope !== "all";
+        const userGroup = document.querySelector("#groupScopeUser");
+        const roleGroup = document.querySelector("#groupScopeRole");
+        const projectGroup = document.querySelector("#groupScopeProject");
+        const allGroup = document.querySelector("#groupScopeAll");
 
-        document.querySelector("#newNotificationUser").required = scope === "user";
-        document.querySelector("#newNotificationRole").required = scope === "role";
-        document.querySelector("#newNotificationProject").required = scope === "project";
-        document.querySelector("#confirmAllCheckbox").required = scope === "all";
+        if (userGroup) userGroup.hidden = scope !== "user";
+        if (roleGroup) roleGroup.hidden = scope !== "role";
+        if (projectGroup) projectGroup.hidden = scope !== "project";
+        if (allGroup) allGroup.hidden = scope !== "all";
+
+        const userInput = document.querySelector("#newNotificationUser");
+        const roleInput = document.querySelector("#newNotificationRole");
+        const projectInput = document.querySelector("#newNotificationProject");
+        const confirmAllInput = document.querySelector("#confirmAllCheckbox");
+
+        if (userInput) { userInput.required = scope === "user"; if (scope !== "user") userInput.value = ""; }
+        if (roleInput) { roleInput.required = scope === "role"; }
+        if (projectInput) { projectInput.required = scope === "project"; if (scope !== "project") projectInput.value = ""; }
+        if (confirmAllInput) { confirmAllInput.required = scope === "all"; if (scope !== "all") confirmAllInput.checked = false; }
     });
 }
 
