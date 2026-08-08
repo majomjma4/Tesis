@@ -17,7 +17,7 @@ const resetReloadedPage = () => {
     ].join(",")).forEach(layer => { layer.hidden = true; });
     document.querySelectorAll("details[open]").forEach(details => details.removeAttribute("open"));
     document.body.classList.remove(
-        "modal-open", "user-dialog-open", "project-dialog-open", "calendar-agenda-open",
+        "modal-open", "user-dialog-open", "project-dialog-open",
         "repository-preview-modal-open", "project-file-modal-open"
     );
     if (!isFullPageReload) return;

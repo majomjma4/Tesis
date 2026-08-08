@@ -2,110 +2,104 @@
 
 declare(strict_types=1);
 
+/** Agenda personal persistida; los eventos se aíslan por su propietario. */
 final class CalendarModel
 {
-    private string $storageFile;
+    private const TYPES = ['delivery', 'meeting', 'review', 'deadline', 'personal'];
+    private const PRIORITIES = ['low', 'medium', 'high'];
 
-    public function __construct()
+    public function getEventsForOwner(int $ownerId): array
     {
-        $this->storageFile = ROOT_PATH . '/storage/calendar/events.json';
-        $this->ensureStorage();
+        $statement = Database::connection()->prepare(
+            'SELECT id,project_id,title,event_type,priority,event_date,event_time,description,is_completed,created_at,updated_at
+             FROM project_events WHERE created_by=:owner ORDER BY event_date,event_time IS NULL,event_time,id'
+        );
+        $statement->execute(['owner'=>$this->owner($ownerId)]);
+        return array_map(fn(array $event): array => $this->present($event), $statement->fetchAll());
     }
 
-    // Inicio de gestión pública de eventos
-    // Expone las operaciones de lectura, guardado y eliminación sobre el almacenamiento temporal.
-    public function getEvents(): array
+    public function saveForOwner(array $data, int $ownerId): array
     {
-        $contents = @file_get_contents($this->storageFile);
-        $events = json_decode($contents ?: '[]', true);
-        return is_array($events) ? array_values($events) : [];
+        $owner = $this->owner($ownerId);
+        $event = $this->normalize($data);
+        $id = $this->id($data['id'] ?? null);
+        $db = Database::connection();
+        if ($id === null) {
+            $insert = $db->prepare(
+                'INSERT INTO project_events(project_id,title,event_type,priority,event_date,event_time,description,is_completed,created_by)
+                 VALUES(NULL,:title,:type,:priority,:date,:time,:description,:completed,:owner)'
+            );
+            $insert->execute($event + ['owner'=>$owner]);
+            return $this->findOwned($db, (int)$db->lastInsertId(), $owner);
+        }
+        $this->findOwned($db, $id, $owner);
+        $update = $db->prepare(
+            'UPDATE project_events SET title=:title,event_type=:type,priority=:priority,event_date=:date,event_time=:time,description=:description,is_completed=:completed
+             WHERE id=:id AND created_by=:owner'
+        );
+        $update->execute($event + ['id'=>$id,'owner'=>$owner]);
+        return $this->findOwned($db, $id, $owner);
     }
 
-    public function save(array $data): array
+    public function deleteForOwner(mixed $value, int $ownerId): void
     {
-        $events = $this->getEvents();
-        $id = trim((string) ($data['id'] ?? ''));
-        $event = $this->normalize($data, $id !== '' ? $id : bin2hex(random_bytes(8)));
-        $index = array_search($event['id'], array_column($events, 'id'), true);
-
-        if ($index === false) {
-            $events[] = $event;
-        } else {
-            $events[$index] = $event;
-        }
-
-        $this->write($events);
-        return $event;
+        $id = $this->id($value);
+        if ($id === null) throw new CalendarEventException('El evento solicitado no es válido.', 422);
+        $owner = $this->owner($ownerId);
+        $db = Database::connection();
+        $this->findOwned($db, $id, $owner);
+        $delete = $db->prepare('DELETE FROM project_events WHERE id=:id AND created_by=:owner');
+        $delete->execute(['id'=>$id,'owner'=>$owner]);
+        if ($delete->rowCount() !== 1) throw new CalendarEventException('El evento ya no está disponible.', 404);
     }
 
-    public function delete(string $id): bool
+    private function normalize(array $data): array
     {
-        $events = $this->getEvents();
-        $remaining = array_values(array_filter($events, static fn(array $event): bool => ($event['id'] ?? '') !== $id));
-        if (count($events) === count($remaining)) {
-            return false;
-        }
-        $this->write($remaining);
-        return true;
-    }
-    // Final de gestión pública de eventos
-
-    // Inicio de normalización de eventos
-    // Valida campos permitidos, limita textos y construye la estructura persistible.
-    private function normalize(array $data, string $id): array
-    {
-        $types = ['delivery', 'meeting', 'review', 'deadline'];
-        $priorities = ['low', 'medium', 'high'];
-        $type = in_array($data['type'] ?? '', $types, true) ? $data['type'] : 'delivery';
-        $priority = in_array($data['priority'] ?? '', $priorities, true) ? $data['priority'] : 'medium';
-        $date = (string) ($data['date'] ?? '');
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-            throw new InvalidArgumentException('La fecha no es válida.');
-        }
-        $title = trim(strip_tags((string) ($data['title'] ?? '')));
-        if ($title === '') {
-            throw new InvalidArgumentException('El título es obligatorio.');
-        }
-
+        $type = (string)($data['type'] ?? '');
+        if (!in_array($type, self::TYPES, true)) throw new CalendarEventException('La categoría no es válida.', 422);
+        $priority = (string)($data['priority'] ?? '');
+        if (!in_array($priority, self::PRIORITIES, true)) throw new CalendarEventException('La prioridad no es válida.', 422);
+        $title = trim(strip_tags((string)($data['title'] ?? '')));
+        if ($title === '') throw new CalendarEventException('El título es obligatorio.', 422);
+        if (mb_strlen($title) > 100) throw new CalendarEventException('El título no puede superar 100 caracteres.', 422);
+        $description = trim(strip_tags((string)($data['description'] ?? '')));
+        if (mb_strlen($description) > 300) throw new CalendarEventException('La descripción no puede superar 300 caracteres.', 422);
         return [
-            'id' => $id,
-            'title' => mb_substr($title, 0, 100),
-            'date' => $date,
-            'type' => $type,
-            'priority' => $priority,
-            'projectId' => max(0, (int) ($data['projectId'] ?? 0)),
-            'description' => mb_substr(trim(strip_tags((string) ($data['description'] ?? ''))), 0, 300),
-            'completed' => filter_var($data['completed'] ?? false, FILTER_VALIDATE_BOOLEAN),
-            'updatedAt' => date(DATE_ATOM),
+            'title'=>$title,
+            'date'=>$this->date((string)($data['date'] ?? '')),
+            'time'=>$this->time($data['time'] ?? null),
+            'type'=>$type,
+            'priority'=>$priority,
+            'description'=>$description === '' ? null : $description,
+            'completed'=>filter_var($data['completed'] ?? false, FILTER_VALIDATE_BOOLEAN),
         ];
     }
-    // Final de normalización de eventos
 
-    // Inicio de almacenamiento temporal
-    // Prepara el archivo inicial y centraliza su escritura segura mediante bloqueo exclusivo.
-    private function ensureStorage(): void
+    private function findOwned(PDO $db, int $id, int $owner): array
     {
-        $directory = dirname($this->storageFile);
-        if (!is_dir($directory)) {
-            mkdir($directory, 0775, true);
-        }
-        if (!is_file($this->storageFile)) {
-            $today = new DateTimeImmutable('today');
-            $seed = [
-                ['id'=>'demo-1','title'=>'Reunión con el tutor','date'=>$today->format('Y-m-d'),'type'=>'meeting','priority'=>'high','description'=>'Revisar observaciones y definir el siguiente avance.','completed'=>false,'updatedAt'=>date(DATE_ATOM)],
-                ['id'=>'demo-2','title'=>'Entrega del avance','date'=>$today->modify('+3 days')->format('Y-m-d'),'type'=>'delivery','priority'=>'high','description'=>'Subir la versión corregida del documento.','completed'=>false,'updatedAt'=>date(DATE_ATOM)],
-                ['id'=>'demo-3','title'=>'Revisión de referencias','date'=>$today->modify('+7 days')->format('Y-m-d'),'type'=>'review','priority'=>'medium','description'=>'Validar citas, bibliografía y anexos.','completed'=>false,'updatedAt'=>date(DATE_ATOM)],
-            ];
-            $this->write($seed);
-        }
+        $exists = $db->prepare('SELECT created_by FROM project_events WHERE id=:id');
+        $exists->execute(['id'=>$id]);
+        $creator = $exists->fetchColumn();
+        if ($creator === false) throw new CalendarEventException('El evento no existe.', 404);
+        if ((int)$creator !== $owner) throw new CalendarEventException('No tienes permiso para modificar este evento.', 403);
+        $query = $db->prepare('SELECT id,project_id,title,event_type,priority,event_date,event_time,description,is_completed,created_at,updated_at FROM project_events WHERE id=:id AND created_by=:owner');
+        $query->execute(['id'=>$id,'owner'=>$owner]);
+        return $this->present((array)$query->fetch());
     }
 
-    private function write(array $events): void
+    private function present(array $event): array
     {
-        $json = json_encode(array_values($events), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if ($json === false || file_put_contents($this->storageFile, $json, LOCK_EX) === false) {
-            throw new RuntimeException('No fue posible guardar el calendario.');
-        }
+        return ['id'=>(int)$event['id'],'projectId'=>$event['project_id'] === null ? 0 : (int)$event['project_id'],'title'=>(string)$event['title'],'date'=>(string)$event['event_date'],'time'=>empty($event['event_time']) ? null : substr((string)$event['event_time'],0,5),'type'=>(string)$event['event_type'],'priority'=>(string)$event['priority'],'description'=>(string)($event['description'] ?? ''),'completed'=>(bool)$event['is_completed'],'updatedAt'=>(string)($event['updated_at'] ?? $event['created_at'] ?? '')];
     }
-    // Final de almacenamiento temporal
+
+    private function owner(int $value): int { if ($value < 1) throw new CalendarEventException('La sesión no está activa.', 403); return $value; }
+    private function id(mixed $value): ?int { if ($value === null || $value === '') return null; if (filter_var($value, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]) === false) throw new CalendarEventException('El evento solicitado no es válido.', 422); return (int)$value; }
+    private function date(string $value): string { $date=DateTimeImmutable::createFromFormat('!Y-m-d',$value);$errors=DateTimeImmutable::getLastErrors();if(!$date||($errors!==false&&($errors['warning_count']>0||$errors['error_count']>0))||$date->format('Y-m-d')!==$value)throw new CalendarEventException('La fecha no es válida.',422);return $value; }
+    private function time(mixed $value): ?string { $value=trim((string)$value);if($value==='')return null;$time=DateTimeImmutable::createFromFormat('!H:i',$value);$errors=DateTimeImmutable::getLastErrors();if(!$time||($errors!==false&&($errors['warning_count']>0||$errors['error_count']>0))||$time->format('H:i')!==$value)throw new CalendarEventException('La hora no es válida.',422);return $value.':00'; }
+}
+
+final class CalendarEventException extends RuntimeException
+{
+    public function __construct(string $message, private readonly int $httpStatus) { parent::__construct($message); }
+    public function httpStatus(): int { return $this->httpStatus; }
 }

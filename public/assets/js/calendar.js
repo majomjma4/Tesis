@@ -4,12 +4,15 @@ if (calendarRoot) {
     const $ = (selector) => document.querySelector(selector);
     const $$ = (selector) => [...document.querySelectorAll(selector)];
     const endpoint = calendarRoot.dataset.eventsUrl;
+    const csrfToken = calendarRoot.dataset.csrf || '';
     const projectUrl = calendarRoot.dataset.projectUrl || '';
     const projectFilterId = Number(calendarRoot.dataset.projectFilter || 0);
-    const typeLabels = { delivery: 'Entregas', meeting: 'Reuniones', review: 'Revisiones', deadline: 'Fechas límite' };
+    const toastElement = $('#calendarToast');
+    if (toastElement?.parentElement !== document.body) document.body.append(toastElement);
+    const typeLabels = { delivery: 'Entregas', meeting: 'Reuniones', review: 'Revisiones', deadline: 'Fechas límite', personal: 'Personal' };
     const priorityLabels = { low: 'Baja', medium: 'Media', high: 'Alta' };
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const compactAgenda = window.matchMedia('(max-width: 1180px)');
+    const compactCalendar = window.matchMedia('(max-width: 1180px)');
     const viewStorageKey = 'tesis-calendar-view';
     let events = JSON.parse(calendarRoot.dataset.calendarEvents || '[]');
     let visibleDate = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -50,13 +53,13 @@ if (calendarRoot) {
     // Inicio de comunicación y mensajes
     // Centraliza las solicitudes al endpoint y la retroalimentación temporal para el usuario.
     async function request(method, payload) {
-        const response = await fetch(endpoint, { method, headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, body: payload ? JSON.stringify(payload) : undefined });
+        const response = await fetch(endpoint, { method, headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrfToken }, body: payload ? JSON.stringify({ ...payload, _csrf: csrfToken }) : undefined });
         const result = await response.json().catch(() => ({ success: false, message: 'El servidor devolvió una respuesta inválida.' }));
         if (!response.ok || !result.success) throw new Error(result.message || 'No fue posible completar la operación.');
         return result;
     }
     function toast(message, error = false, action = null) {
-        const element = $('#calendarToast'); element.innerHTML = ''; const text = document.createElement('span'); text.textContent = message; element.append(text); element.classList.toggle('error', error);
+        const element = toastElement; element.innerHTML = ''; const text = document.createElement('span'); text.textContent = message; element.append(text); element.classList.toggle('error', error);
         if (action) { const button = document.createElement('button'); button.type = 'button'; button.textContent = action.label; button.addEventListener('click', async () => { button.disabled = true; await action.handler(); element.hidden = true; }); element.append(button); }
         element.hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => { element.hidden = true; }, action ? 6000 : 3200);
     }
@@ -92,7 +95,7 @@ if (calendarRoot) {
             cell.innerHTML = `<span class="calendar-number">${date.getDate()}</span><span class="calendar-cell-events"></span>`;
             items.slice(0, 3).forEach((item) => cell.lastElementChild.append(createChip(item)));
             if (items.length > 3) { const more = document.createElement('small'); more.textContent = `+${items.length - 3} más`; cell.lastElementChild.append(more); }
-            cell.addEventListener('click', (event) => { if (event.target.closest('.calendar-event-chip')) return; selectedDate = key; if (date.getMonth() !== month) visibleDate = new Date(date.getFullYear(), date.getMonth(), 1); renderAll(); if (compactAgenda.matches) openAgenda(); });
+            cell.addEventListener('click', (event) => { if (event.target.closest('.calendar-event-chip')) return; selectedDate = key; if (date.getMonth() !== month) visibleDate = new Date(date.getFullYear(), date.getMonth(), 1); renderAll(); openAgendaModal(); });
             cell.addEventListener('dblclick', (event) => { if (items.length || event.target.closest('.calendar-event-chip')) return; selectedDate = key; openModal(); });
             makeDropTarget(cell, key); grid.append(cell);
         }
@@ -103,7 +106,7 @@ if (calendarRoot) {
             const date = addDays(week, index), key = dateKey(date), items = filteredEvents().filter((event) => event.date === key);
             const column = document.createElement('section'); column.className = `calendar-week-column${key === dateKey(today) ? ' today' : ''}`;
             column.innerHTML = `<button type="button" class="calendar-week-heading"><span>${date.toLocaleDateString('es-EC', { weekday: 'short' })}</span><strong>${date.getDate()}</strong></button><div class="calendar-week-events"></div>`;
-            column.querySelector('button').addEventListener('click', () => { selectedDate = key; renderAgenda(); if (compactAgenda.matches) openAgenda(); });
+            column.querySelector('button').addEventListener('click', () => { selectedDate = key; renderAgenda(); openAgendaModal(); });
             const body = column.lastElementChild;
             if (!items.length) body.innerHTML = '<span class="week-empty">Sin eventos</span>';
             items.forEach((item) => { const card = document.createElement('button'); card.type = 'button'; card.className = `calendar-week-card ${item.type}${item.completed ? ' completed' : ''}${isOverdue(item) ? ' overdue' : ''}`; card.draggable = true; card.dataset.eventId = item.id; card.innerHTML = `<strong></strong><small>${isOverdue(item) ? 'Vencido · ' : ''}${typeLabels[item.type]}</small>`; card.querySelector('strong').textContent = item.title; card.addEventListener('click', () => openDetails(item)); card.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/calendar-event', item.id)); body.append(card); });
@@ -123,7 +126,7 @@ if (calendarRoot) {
     function eventCard(event, variant = 'agenda') {
         const article = document.createElement('article'); article.className = `calendar-agenda-item ${variant}${event.completed ? ' is-completed' : ''}`;
         article.innerHTML = `<span class="agenda-accent ${event.type}"></span><div class="agenda-content"><div class="agenda-topline"><span class="agenda-meta"></span><span class="agenda-badges"><span class="overdue-badge" hidden>Vencido</span><span class="priority-badge ${event.priority || 'medium'}">${priorityLabels[event.priority || 'medium']}</span></span></div><h3></h3><p></p><div class="agenda-actions"></div></div>`;
-        article.querySelector('.agenda-meta').textContent = typeLabels[event.type]; article.querySelector('h3').textContent = event.title; article.querySelector('p').textContent = event.description || 'Sin descripción.';
+        article.querySelector('.agenda-meta').textContent = `${typeLabels[event.type]}${event.time ? ` · ${event.time}` : ''}`; article.querySelector('h3').textContent = event.title; article.querySelector('p').textContent = event.description || 'Sin descripción.';
         article.querySelector('.overdue-badge').hidden = !isOverdue(event); article.classList.toggle('is-overdue', isOverdue(event));
         const actions = article.querySelector('.agenda-actions'); actions.append(actionButton(event.completed ? 'fa-arrow-rotate-left' : 'fa-check', event.completed ? 'Reabrir' : 'Completar', () => toggleComplete(event)), actionButton('fa-pen', 'Editar', () => openModal(event)), actionButton('fa-trash-can', 'Eliminar', () => openDeleteDialog(event), true), navigationButton(event));
         article.addEventListener('click', (clickEvent) => { if (!clickEvent.target.closest('.agenda-actions')) openDetails(event); });
@@ -146,7 +149,7 @@ if (calendarRoot) {
     function renderUpcoming() {
         const list = $('#calendarUpcomingList'), upcoming = sortEvents(events.filter((event) => !event.completed && event.date >= dateKey(today))).slice(0, 5); list.innerHTML = ''; $('#calendarUpcomingBadge').textContent = upcoming.length;
         if (!upcoming.length) { list.innerHTML = '<p class="upcoming-empty">No hay próximos eventos programados</p>'; return; }
-        upcoming.forEach((event) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'calendar-upcoming-item'; button.innerHTML = `<span class="upcoming-date"><strong>${fromKey(event.date).getDate()}</strong>${fromKey(event.date).toLocaleDateString('es-EC', { month: 'short' })}</span><span><strong></strong><small>${typeLabels[event.type]}</small></span>`; button.querySelector('span:nth-child(2) strong').textContent = event.title; button.addEventListener('click', () => openDetails(event)); list.append(button); });
+        upcoming.forEach((event) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'calendar-upcoming-item'; button.innerHTML = `<span class="upcoming-date"><strong>${fromKey(event.date).getDate()}</strong>${fromKey(event.date).toLocaleDateString('es-EC', { month: 'short' })}</span><span><strong></strong><small>${typeLabels[event.type]}${event.time ? ` · ${event.time}` : ''}</small></span>`; button.querySelector('span:nth-child(2) strong').textContent = event.title; button.addEventListener('click', () => openDetails(event)); list.append(button); });
     }
     function renderFilterStatus() {
         const status = $('#calendarFilterStatus'), active = activeFilter !== 'all' || activePriority !== 'all' || Boolean(searchTerm) || Boolean(quickScope); status.hidden = !active;
@@ -194,17 +197,74 @@ if (calendarRoot) {
 
     // Inicio de diálogos y persistencia de eventos
     // Controla formularios, detalles, agenda móvil y operaciones que modifican recordatorios.
-    function openModal(event = null) {
-        $('#calendarEventForm').reset(); $('#calendarEventId').value = event?.id || ''; $('#calendarEventTitle').value = event?.title || ''; $('#calendarEventDate').value = event?.date || selectedDate; $('#calendarEventType').value = event?.type || 'delivery'; $('#calendarEventPriority').value = event?.priority || 'medium'; $('#calendarEventDescription').value = event?.description || ''; $('#calendarDescriptionCount').textContent = (event?.description || '').length; $('#calendarModalTitle').textContent = event ? 'Editar evento' : 'Nuevo evento'; syncSelectStyles(); $('#calendarEventModal').hidden = false; document.body.classList.add('modal-open'); setTimeout(() => $('#calendarEventTitle').focus(), 0);
+    const dateField = $('#calendarEventDate'), timeField = $('#calendarEventTime'), dateTrigger = $('#calendarEventDateTrigger'), timeTrigger = $('#calendarEventTimeTrigger'), datePicker = $('#calendarDatePicker'), timePicker = $('#calendarTimePicker');
+    let pickerMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    function formatPickerDate(value) { return value ? fromKey(value).toLocaleDateString('es-EC', { day: '2-digit', month: 'long', year: 'numeric' }) : 'Seleccionar fecha'; }
+    function syncDateTimeControls() { dateTrigger.querySelector('span').textContent = formatPickerDate(dateField.value); timeTrigger.querySelector('span').textContent = timeField.value || 'Sin hora'; }
+    function closeDateTimePickers() { datePicker.hidden = true; timePicker.hidden = true; dateTrigger.setAttribute('aria-expanded', 'false'); timeTrigger.setAttribute('aria-expanded', 'false'); }
+    function renderDatePicker() {
+        $('#calendarDateHeading').textContent = pickerMonth.toLocaleDateString('es-EC', { month: 'long', year: 'numeric' });
+        const days = $('#calendarDateDays'); days.replaceChildren();
+        const first = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth(), 1), offset = (first.getDay() + 6) % 7, cursor = new Date(first);
+        cursor.setDate(1 - offset);
+        for (let index = 0; index < 42; index += 1) {
+            const day = new Date(cursor), key = dateKey(day), button = document.createElement('button');
+            button.type = 'button'; button.textContent = String(day.getDate()); button.dataset.date = key;
+            button.classList.toggle('is-outside', day.getMonth() !== pickerMonth.getMonth()); button.classList.toggle('is-selected', key === dateField.value); button.classList.toggle('is-today', key === dateKey(today));
+            button.addEventListener('click', () => { dateField.value = key; dateField.dispatchEvent(new Event('change', { bubbles: true })); syncDateTimeControls(); closeDateTimePickers(); });
+            days.append(button); cursor.setDate(cursor.getDate() + 1);
+        }
     }
-    function closeModal() { $('#calendarEventModal').hidden = true; document.body.classList.remove('modal-open'); }
-    function openDetails(event) { activeDetailEvent = event; $('#calendarDetailType').textContent = typeLabels[event.type]; $('#calendarDetailType').className = `calendar-detail-type ${event.type}`; $('#calendarDetailTitle').textContent = event.title; $('#calendarDetailDate').textContent = fromKey(event.date).toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); $('#calendarDetailPriority').textContent = `Prioridad ${priorityLabels[event.priority || 'medium'].toLowerCase()}`; $('#calendarDetailStatus').textContent = event.completed ? 'Completado' : isOverdue(event) ? 'Vencido' : 'Pendiente'; $('#calendarDetailDescription').textContent = event.description || 'Este recordatorio no tiene una descripción adicional.'; const destination = eventDestination(event); $('#calendarDetailProjectLink').href = destination.url; $('#calendarDetailProjectLink span').textContent = destination.label; $('#calendarDetailComplete').innerHTML = event.completed ? '<i class="fa-solid fa-arrow-rotate-left"></i> Reabrir' : '<i class="fa-solid fa-check"></i> Completar'; $('#calendarDetailModal').hidden = false; document.body.classList.add('modal-open'); $('#calendarDetailClose').focus(); }
+    function syncTimeInputs() { const [hour = '', minute = ''] = (timeField.value || ':').split(':'); $('#calendarTimeHour').value = hour; $('#calendarTimeMinute').value = minute; }
+    function applyTime() {
+        const hour = $('#calendarTimeHour').value.trim(), minute = $('#calendarTimeMinute').value.trim();
+        if (hour === '' && minute === '') { timeField.value = ''; }
+        else if (/^\d{1,2}$/.test(hour) && /^\d{1,2}$/.test(minute) && Number(hour) <= 23 && Number(minute) <= 59) { timeField.value = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`; }
+        else { $('#calendarTimeHour').focus(); return; }
+        timeField.dispatchEvent(new Event('change', { bubbles: true })); syncDateTimeControls(); closeDateTimePickers();
+    }
+    function openDatePicker() { closeDateTimePickers(); const base = dateField.value ? fromKey(dateField.value) : today; pickerMonth = new Date(base.getFullYear(), base.getMonth(), 1); renderDatePicker(); datePicker.hidden = false; dateTrigger.setAttribute('aria-expanded', 'true'); }
+    function openTimePicker() { closeDateTimePickers(); syncTimeInputs(); timePicker.hidden = false; timeTrigger.setAttribute('aria-expanded', 'true'); }
+    dateTrigger.addEventListener('click', (event) => { event.stopPropagation(); openDatePicker(); }); timeTrigger.addEventListener('click', (event) => { event.stopPropagation(); openTimePicker(); });
+    $('#calendarDatePrev').addEventListener('click', () => { pickerMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1); renderDatePicker(); }); $('#calendarDateNext').addEventListener('click', () => { pickerMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1); renderDatePicker(); });
+    $('#calendarDateToday').addEventListener('click', () => { dateField.value = dateKey(today); dateField.dispatchEvent(new Event('change', { bubbles: true })); syncDateTimeControls(); closeDateTimePickers(); }); $('#calendarDateClear').addEventListener('click', () => { dateField.value = ''; dateField.dispatchEvent(new Event('change', { bubbles: true })); syncDateTimeControls(); closeDateTimePickers(); });
+    $('#calendarTimeClose').addEventListener('click', closeDateTimePickers); $('#calendarTimeApply').addEventListener('click', applyTime); $('#calendarTimeClear').addEventListener('click', () => { timeField.value = ''; timeField.dispatchEvent(new Event('change', { bubbles: true })); syncDateTimeControls(); closeDateTimePickers(); });
+    ['#calendarTimeHour', '#calendarTimeMinute'].forEach((selector) => $(selector).addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); applyTime(); } }));
+    document.addEventListener('click', (event) => { if (!event.target.closest('[data-calendar-date-control], [data-calendar-time-control]')) closeDateTimePickers(); });
+
+    // En pantallas compactas, el modal se monta directamente en <body>. De ese
+    // modo no queda atrapado por el contexto de apilamiento del contenido de la
+    // página (que puede tener transformaciones durante la navegación).
+    const agenda = $('#calendarAgenda');
+    const agendaModal = $('#calendarAgendaModal');
+    function mountAgendaModal() {
+        if (agenda.parentElement === agendaModal) return;
+        document.body.append(agendaModal);
+        agendaModal.classList.add('calendar-page');
+        agendaModal.append(agenda);
+    }
+    function restoreAgendaSidebar() {
+        if (agenda.parentElement !== calendarRoot) calendarRoot.append(agenda);
+        if (agendaModal.parentElement !== calendarRoot) calendarRoot.append(agendaModal);
+        agendaModal.classList.remove('calendar-page');
+    }
+    function syncAgendaModalMode() {
+        closeAgendaModal();
+        if (compactCalendar.matches) mountAgendaModal();
+        else restoreAgendaSidebar();
+    }
+    function openAgendaModal() { if (!compactCalendar.matches) return; mountAgendaModal(); agendaModal.hidden = false; agenda.classList.add('is-modal-open'); document.body.classList.add('modal-open'); $('#calendarAgendaClose').focus(); }
+    function closeAgendaModal() { $('#calendarAgendaModal').hidden = true; $('#calendarAgenda').classList.remove('is-modal-open'); document.body.classList.remove('modal-open'); }
+    function openModal(event = null) {
+        closeAgendaModal();
+        $('#calendarEventForm').reset(); $('#calendarEventId').value = event?.id || ''; $('#calendarEventTitle').value = event?.title || ''; $('#calendarEventDate').value = event?.date || selectedDate; $('#calendarEventTime').value = event?.time || ''; $('#calendarEventType').value = event?.type || 'delivery'; $('#calendarEventPriority').value = event?.priority || 'medium'; $('#calendarEventDescription').value = event?.description || ''; $('#calendarDescriptionCount').textContent = (event?.description || '').length; $('#calendarModalTitle').textContent = event ? 'Editar evento' : 'Nuevo evento'; syncSelectStyles(); syncDateTimeControls(); $('#calendarEventModal').hidden = false; document.body.classList.add('modal-open'); setTimeout(() => $('#calendarEventTitle').focus(), 0);
+    }
+    function closeModal() { closeDateTimePickers(); $('#calendarEventModal').hidden = true; document.body.classList.remove('modal-open'); }
+    function openDetails(event) { closeAgendaModal(); activeDetailEvent = event; $('#calendarDetailType').textContent = typeLabels[event.type]; $('#calendarDetailType').className = `calendar-detail-type ${event.type}`; $('#calendarDetailTitle').textContent = event.title; $('#calendarDetailDate').textContent = `${fromKey(event.date).toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${event.time ? ` — ${event.time}` : ''}`; $('#calendarDetailPriority').textContent = `Prioridad ${priorityLabels[event.priority || 'medium'].toLowerCase()}`; $('#calendarDetailStatus').textContent = event.completed ? 'Completado' : isOverdue(event) ? 'Vencido' : 'Pendiente'; $('#calendarDetailDescription').textContent = event.description || 'Este recordatorio no tiene una descripción adicional.'; const destination = eventDestination(event); $('#calendarDetailProjectLink').href = destination.url; $('#calendarDetailProjectLink span').textContent = destination.label; $('#calendarDetailComplete').innerHTML = event.completed ? '<i class="fa-solid fa-arrow-rotate-left"></i> Reabrir' : '<i class="fa-solid fa-check"></i> Completar'; $('#calendarDetailModal').hidden = false; document.body.classList.add('modal-open'); $('#calendarDetailClose').focus(); }
     function closeDetails() { activeDetailEvent = null; $('#calendarDetailModal').hidden = true; document.body.classList.remove('modal-open'); }
-    function openAgenda() { if (!compactAgenda.matches) return; $('#calendarAgenda').classList.add('is-open'); $('#calendarAgendaBackdrop').hidden = false; document.body.classList.add('calendar-agenda-open'); $('#calendarOpenAgendaBtn').setAttribute('aria-expanded', 'true'); }
-    function closeAgenda() { $('#calendarAgenda').classList.remove('is-open'); $('#calendarAgendaBackdrop').hidden = true; document.body.classList.remove('calendar-agenda-open'); $('#calendarOpenAgendaBtn').setAttribute('aria-expanded', 'false'); }
-    function openDeleteDialog(event) { pendingDelete = event; $('#calendarDeleteMessage').textContent = `Se eliminará “${event.title}” del ${fromKey(event.date).toLocaleDateString('es-EC', { day: 'numeric', month: 'long' })}. Esta acción no se puede deshacer.`; $('#calendarDeleteModal').hidden = false; document.body.classList.add('modal-open'); $('#calendarDeleteConfirm').focus(); }
+    function openDeleteDialog(event) { closeDateTimePickers(); closeCustomSelects(); closeAgendaModal(); pendingDelete = event; $('#calendarDeleteMessage').textContent = `Se eliminará “${event.title}” del ${fromKey(event.date).toLocaleDateString('es-EC', { day: 'numeric', month: 'long' })}. Esta acción no se puede deshacer.`; $('#calendarDeleteModal').hidden = false; document.body.classList.add('modal-open'); $('#calendarDeleteConfirm').focus(); }
     function closeDeleteDialog() { pendingDelete = null; $('#calendarDeleteModal').hidden = true; document.body.classList.remove('modal-open'); }
-    async function deleteConfirmed() { if (!pendingDelete) return; const event = { ...pendingDelete }; const button = $('#calendarDeleteConfirm'); button.disabled = true; try { await request('DELETE', { id: event.id }); events = events.filter((item) => item.id !== event.id); closeDeleteDialog(); renderAll(); toast('Evento eliminado.', false, { label: 'Deshacer', handler: async () => { try { await saveOne(event); toast('Evento restaurado correctamente.'); } catch (error) { toast(error.message, true); } } }); } catch (error) { toast(error.message, true); } finally { button.disabled = false; } }
+    async function deleteConfirmed() { if (!pendingDelete) return; const event = { ...pendingDelete }; const button = $('#calendarDeleteConfirm'); button.disabled = true; try { await request('DELETE', { id: event.id }); events = events.filter((item) => item.id !== event.id); closeDeleteDialog(); renderAll(); toast('Evento eliminado.', false, { label: 'Deshacer', handler: async () => { try { await saveOne({ ...event, id: '' }); toast('Evento restaurado correctamente.'); } catch (error) { toast(error.message, true); } } }); } catch (error) { toast(error.message, true); } finally { button.disabled = false; } }
     async function saveOne(event, render = true) { const result = await request('POST', event); const index = events.findIndex((item) => item.id === result.data.id); if (index >= 0) events[index] = result.data; else events.push(result.data); if (render) renderAll(); return result.data; }
     async function moveEvent(id, newDate) { const event = events.find((item) => item.id === id); if (!event || event.date === newDate) return; const previous = event.date; event.date = newDate; renderAll(); try { await saveOne(event); selectedDate = newDate; renderAll(); toast(`Evento movido al ${fromKey(newDate).toLocaleDateString('es-EC', { day: 'numeric', month: 'long' })}.`); } catch (error) { event.date = previous; renderAll(); toast(error.message, true); } }
     async function toggleComplete(event) { try { await saveOne({ ...event, completed: !event.completed }); toast(event.completed ? 'Evento reabierto.' : 'Evento completado. ¡Buen trabajo!'); } catch (error) { toast(error.message, true); } }
@@ -216,8 +276,8 @@ if (calendarRoot) {
     $$('.calendar-stat-action').forEach((button) => button.addEventListener('click', () => applyQuickScope(button.dataset.scope)));
     $$('.calendar-view-switcher button').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view))); $$('.calendar-filter[data-filter]').forEach((button) => button.addEventListener('click', () => { clearQuickScope(); activeFilter = button.dataset.filter; $$('.calendar-filter[data-filter]').forEach((item) => item.classList.toggle('active', item === button)); renderAll(); }));
     $$('.calendar-priority-filter').forEach((button) => button.addEventListener('click', () => { clearQuickScope(); activePriority = activePriority === button.dataset.priority ? 'all' : button.dataset.priority; $$('.calendar-priority-filter').forEach((item) => item.classList.toggle('active', item.dataset.priority === activePriority)); renderAll(); }));
-    $('#calendarSearch').addEventListener('input', (event) => { clearQuickScope(); searchTerm = normalizeSearch(event.target.value.trim()); renderAll(); }); $('#calendarClearFilters').addEventListener('click', clearFilters); $('#calendarNewEventBtn').addEventListener('click', () => openModal()); $('#calendarAgendaAdd').addEventListener('click', () => openModal());
-    $('#calendarOpenAgendaBtn').addEventListener('click', openAgenda); $('#calendarAgendaClose').addEventListener('click', closeAgenda); $('#calendarAgendaBackdrop').addEventListener('click', closeAgenda); $('#calendarModalClose').addEventListener('click', closeModal); $('#calendarModalCancel').addEventListener('click', closeModal); $('#calendarEventModal').addEventListener('click', (event) => { if (event.target === $('#calendarEventModal')) closeModal(); });
+    $('#calendarSearch').addEventListener('input', (event) => { clearQuickScope(); searchTerm = normalizeSearch(event.target.value.trim()); renderAll(); }); $('#calendarClearFilters').addEventListener('click', clearFilters); $('#calendarNewEventBtn').addEventListener('click', () => openModal()); $('#calendarAgendaAdd').addEventListener('click', () => openModal()); $('#calendarAgendaClose').addEventListener('click', closeAgendaModal); $('#calendarAgendaModal').addEventListener('click', (event) => { if (event.target === $('#calendarAgendaModal')) closeAgendaModal(); });
+    $('#calendarModalClose').addEventListener('click', closeModal); $('#calendarModalCancel').addEventListener('click', closeModal); $('#calendarEventModal').addEventListener('click', (event) => { if (event.target === $('#calendarEventModal')) closeModal(); });
     $('#calendarEventDescription').addEventListener('input', (event) => $('#calendarDescriptionCount').textContent = event.target.value.length);
     $$('.calendar-select-wrap select').forEach((select) => select.addEventListener('change', syncSelectStyles));
     $('#calendarSort').addEventListener('change', (event) => { sortMode = event.target.value; renderAll(); });
@@ -227,17 +287,19 @@ if (calendarRoot) {
         formEvent.preventDefault(); const button = $('#calendarSaveBtn'); button.disabled = true;
         try {
             const existing = events.find((item) => item.id === $('#calendarEventId').value);
-            const payload = { id: $('#calendarEventId').value, title: $('#calendarEventTitle').value.trim(), date: $('#calendarEventDate').value, type: $('#calendarEventType').value, priority: $('#calendarEventPriority').value, description: $('#calendarEventDescription').value.trim(), completed: existing?.completed || false };
+            const payload = { id: $('#calendarEventId').value, title: $('#calendarEventTitle').value.trim(), date: $('#calendarEventDate').value, time: $('#calendarEventTime').value || null, type: $('#calendarEventType').value, priority: $('#calendarEventPriority').value, description: $('#calendarEventDescription').value.trim(), completed: existing?.completed || false };
             await saveOne(payload, false); toast(existing ? 'Evento actualizado.' : 'Evento creado correctamente.');
             selectedDate = payload.date; visibleDate = new Date(fromKey(payload.date).getFullYear(), fromKey(payload.date).getMonth(), 1); closeModal(); renderAll();
         } catch (error) { toast(error.message, true); } finally { button.disabled = false; }
     });
-    document.addEventListener('keydown', (event) => { if (event.key !== 'Escape') return; if ($('.calendar-select-wrap.is-open')) { closeCustomSelects(); return; } if (!$('#calendarDeleteModal').hidden) closeDeleteDialog(); else if (!$('#calendarDetailModal').hidden) closeDetails(); else if (!$('#calendarEventModal').hidden) closeModal(); else closeAgenda(); }); compactAgenda.addEventListener('change', (event) => { if (!event.matches) closeAgenda(); });
+    document.addEventListener('keydown', (event) => { if (event.key !== 'Escape') return; if (!datePicker.hidden || !timePicker.hidden) { closeDateTimePickers(); return; } if ($('.calendar-select-wrap.is-open')) { closeCustomSelects(); return; } if (!$('#calendarDeleteModal').hidden) closeDeleteDialog(); else if (!$('#calendarDetailModal').hidden) closeDetails(); else if (!$('#calendarEventModal').hidden) closeModal(); else if (!$('#calendarAgendaModal').hidden && compactCalendar.matches) closeAgendaModal(); }); compactCalendar.addEventListener('change', syncAgendaModalMode);
     let touchStartX = 0, touchStartY = 0;
     $('.calendar-view-stage').addEventListener('touchstart', (event) => { const touch = event.changedTouches[0]; touchStartX = touch.clientX; touchStartY = touch.clientY; }, { passive: true });
-    $('.calendar-view-stage').addEventListener('touchend', (event) => { const touch = event.changedTouches[0], deltaX = touch.clientX - touchStartX, deltaY = touch.clientY - touchStartY; if (!compactAgenda.matches || Math.abs(deltaX) < 55 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return; navigate(deltaX < 0 ? 1 : -1); toast(deltaX < 0 ? 'Siguiente período' : 'Período anterior'); }, { passive: true });
+    $('.calendar-view-stage').addEventListener('touchend', (event) => { const touch = event.changedTouches[0], deltaX = touch.clientX - touchStartX, deltaY = touch.clientY - touchStartY; if (!compactCalendar.matches || Math.abs(deltaX) < 55 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return; navigate(deltaX < 0 ? 1 : -1); toast(deltaX < 0 ? 'Siguiente período' : 'Período anterior'); }, { passive: true });
+    syncAgendaModalMode();
     initCustomSelects();
     $$('.calendar-view-switcher button').forEach((button) => { const selected = button.dataset.view === activeView; button.classList.toggle('active', selected); button.setAttribute('aria-selected', String(selected)); });
     renderAll();
+    request('GET').then((result) => { if (Array.isArray(result.data)) { events = result.data; renderAll(); } }).catch(() => {});
     // Final de eventos de interacción
 }

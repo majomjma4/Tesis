@@ -21,6 +21,8 @@ final class RouteAccessService
             header('Location: '.route('login'));exit;
         }
         $session->refresh($identity);
+        try{(new CalendarEventReminderService())->syncForOwner((int)$identity['id']);}
+        catch(Throwable $exception){error_log('Calendar event reminders: '.$exception->getMessage());}
         $expired=!empty($identity['temporary_password_expires_at'])&&strtotime((string)$identity['temporary_password_expires_at'])<=time();
         $requiresTemporaryPasswordChange=(bool)$identity['must_change_password']&&!(bool)$identity['is_admin'];
         if($requiresTemporaryPasswordChange&&((int)$identity['password_warning_count']>=3||$expired)&&!in_array($page,['change-password','logout'],true)){header('Location: '.route('change-password'));exit;}

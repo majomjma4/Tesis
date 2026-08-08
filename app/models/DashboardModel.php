@@ -97,7 +97,7 @@ final class DashboardModel
 
     private function adminUpcomingDates(PDO $connection): array
     {
-        $sql = "SELECT label, event_date, kind FROM (SELECT CONCAT('Inicio de ', name) label, starts_on event_date, 'period' kind FROM academic_periods WHERE starts_on >= CURRENT_DATE UNION ALL SELECT CONCAT('Cierre de ', name), ends_on, 'period' FROM academic_periods WHERE ends_on >= CURRENT_DATE UNION ALL SELECT title, event_date, 'event' FROM project_events WHERE event_date >= CURRENT_DATE AND is_completed=0) dates ORDER BY event_date ASC LIMIT 5";
+        $sql = "SELECT label, event_date, kind FROM (SELECT CONCAT('Inicio de ', name) label, starts_on event_date, 'period' kind FROM academic_periods WHERE starts_on >= CURRENT_DATE UNION ALL SELECT CONCAT('Cierre de ', name), ends_on, 'period' FROM academic_periods WHERE ends_on >= CURRENT_DATE UNION ALL SELECT title, event_date, 'event' FROM project_events WHERE project_id IS NOT NULL AND event_date >= CURRENT_DATE AND is_completed=0) dates ORDER BY event_date ASC LIMIT 5";
         $rows = $connection->query($sql)->fetchAll();
         return array_map(fn(array $row): array => [
             'label'=>(string)$row['label'],
