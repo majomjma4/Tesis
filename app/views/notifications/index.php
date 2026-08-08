@@ -64,96 +64,33 @@
             <button class="notification-action secondary" id="refreshNotifications" type="button">
                 <i class="fa-solid fa-rotate"></i><span>Actualizar</span>
             </button>
-            <button class="notification-action secondary" id="markAllNotificationsRead" type="button" <?= $sidebarSummary['unread'] === 0 ? 'disabled' : '' ?>>
-                <i class="fa-solid fa-check-double"></i><span>Marcar todas como leídas</span>
-            </button>
         </div>
     </header>
 
     <section class="notification-stats" aria-label="Resumen de notificaciones">
         <?php foreach ($summary as $item): ?>
             <article class="notification-stat tone-<?= e($item['tone']) ?>" data-counter-card="<?= e($item['key']) ?>">
-                <span class="notification-stat-icon"><i class="fa-solid <?= e($item['icon']) ?>"></i></span>
-                <div><strong><?= e($item['value']) ?></strong><span><?= e($item['label']) ?></span></div>
+                <span class="notification-stat-icon"><i class="fa-solid <?= e($item['icon']) ?>" aria-hidden="true"></i></span>
+                <div><strong class="notification-stat-value"><?= e($item['value']) ?></strong><span class="notification-stat-label"><?= e($item['label']) ?></span></div>
             </article>
         <?php endforeach; ?>
     </section>
 
     <!-- Pestañas Principales con estilo del sistema -->
-    <nav class="ed-tabs" role="tablist" style="margin-bottom: 20px;">
-        <button class="ed-tab" data-tab-status="all" role="tab" aria-selected="true" aria-current="page" type="button">
-            <i class="fa-solid fa-layer-group"></i>Recibidas
-        </button>
-        <button class="ed-tab" data-tab-status="unread" role="tab" aria-selected="false" type="button">
-            <i class="fa-solid fa-eye-slash"></i>No leídas
-        </button>
-        <button class="ed-tab" data-tab-status="hidden" role="tab" aria-selected="false" type="button">
-            <i class="fa-solid fa-box-archive"></i>Archivadas
-        </button>
-        <?php if ($isAdmin): ?>
-            <button class="ed-tab" data-tab-status="sent" role="tab" aria-selected="false" type="button">
-                <i class="fa-solid fa-paper-plane"></i>Enviadas
-            </button>
-        <?php endif; ?>
-        <button class="ed-tab" data-tab-status="trash" role="tab" aria-selected="false" type="button">
-            <i class="fa-solid fa-trash-can"></i>Papelera
-        </button>
-    </nav>
-
-    <section class="notification-toolbar" aria-label="Busqueda y filtros">
-        <label class="notification-search" for="notificationSearch">
+    <section class="notification-toolbar notification-projects-pattern" aria-label="Búsqueda y filtros">
+        <label class="notification-search notification-filter-search" for="notificationSearch">
             <i class="fa-solid fa-magnifying-glass"></i>
             <input id="notificationSearch" type="search" placeholder="Buscar por título, mensaje o proyecto" autocomplete="off">
-            <kbd>Ctrl K</kbd>
         </label>
 
-        <!-- Filtro por tipo -->
-        <div class="notification-filter notification-filter-custom" data-filter-control="type">
-            <i class="fa-solid fa-tags"></i>
-            <select id="notificationTypeFilter" class="notification-filter-native" tabindex="-1" aria-hidden="true">
-                <?php foreach ($typeFilters as $value => $label): ?><option value="<?= e($value) ?>"><?= e($label) ?></option><?php endforeach; ?>
-            </select>
-            <button class="notification-filter-trigger" type="button" aria-haspopup="listbox" aria-expanded="false"><span>Tipo: Todos</span><i class="fa-solid fa-chevron-down"></i></button>
-            <div class="notification-filter-menu" role="listbox" aria-label="Filtrar por tipo" hidden>
-                <?php foreach ($typeFilters as $value => $label): ?>
-                    <button type="button" role="option" data-filter-value="<?= e($value) ?>" aria-selected="<?= $value === 'all' ? 'true' : 'false' ?>"><span class="filter-option-icon"><i class="fa-solid fa-bell"></i></span><span><?= e($label) ?></span><i class="fa-solid fa-check filter-option-check"></i></button>
-                <?php endforeach; ?>
-            </div>
-        </div>
+        <label class="notification-filter-control" data-filter-control="status"><span>Mostrar</span><select id="notificationStatusFilter" aria-label="Mostrar notificaciones"><option value="all">Todas</option><option value="unread">No leídas</option><option value="hidden">Archivadas</option><?php if ($isAdmin): ?><option value="sent">Enviadas</option><?php endif; ?><option value="trash">Papelera</option></select></label>
+        <label class="notification-filter-control" data-filter-control="type"><span>Tipo</span><select id="notificationTypeFilter" aria-label="Filtrar por tipo"><?php foreach ($typeFilters as $value => $label): ?><option value="<?= e($value) ?>"><?= e($label) ?></option><?php endforeach; ?></select></label>
 
-        <!-- Filtro por proyecto -->
-        <div class="notification-filter notification-filter-custom" data-filter-control="project">
-            <i class="fa-solid fa-folder-open"></i>
-            <select id="notificationProjectFilter" class="notification-filter-native" tabindex="-1" aria-hidden="true">
-                <option value="0">Proyectos: Todos</option>
-                <?php foreach ($activeProjects as $ap): ?>
-                    <option value="<?= e($ap['id']) ?>"><?= e($ap['title']) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <button class="notification-filter-trigger" type="button" aria-haspopup="listbox" aria-expanded="false"><span>Proyecto: Todos</span><i class="fa-solid fa-chevron-down"></i></button>
-            <div class="notification-filter-menu" role="listbox" aria-label="Filtrar por proyecto" hidden>
-                <button type="button" role="option" data-filter-value="0" aria-selected="true"><span class="filter-option-icon"><i class="fa-regular fa-folder-open"></i></span><span>Todos</span><i class="fa-solid fa-check filter-option-check"></i></button>
-                <?php foreach ($activeProjects as $ap): ?>
-                    <button type="button" role="option" data-filter-value="<?= e($ap['id']) ?>" aria-selected="false"><span class="filter-option-icon"><i class="fa-regular fa-folder"></i></span><span><?= e($ap['code'] . ' · ' . $ap['title']) ?></span><i class="fa-solid fa-check filter-option-check"></i></button>
-                <?php endforeach; ?>
-            </div>
-        </div>
+        <div class="notification-date-filter" data-filter-control="date"><button class="notification-date-trigger" id="notificationDateTrigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="notificationDatePopover"><i class="fa-regular fa-calendar"></i><span>Fecha</span><small>Filtrar por fecha</small></button><div class="notification-date-popover" id="notificationDatePopover" role="dialog" aria-label="Filtrar por rango de fechas" hidden><label>Desde<input type="date" id="notificationDateFrom"></label><label>Hasta<input type="date" id="notificationDateTo"></label><div><button class="notification-action secondary" id="clearNotificationDate" type="button">Limpiar</button><button class="notification-action primary" id="applyNotificationDate" type="button">Aplicar</button></div></div></div>
 
-        <!-- Filtro por fecha -->
-        <div class="notification-filter" data-filter-control="date" style="padding: 0 10px;">
-            <i class="fa-regular fa-calendar"></i>
-            <input type="date" id="notificationDateFilter" class="notification-date-input" aria-label="Filtrar por fecha" style="border: none; outline: none; background: transparent; font-family: inherit; color: var(--text); cursor: pointer; width: 100%;">
-        </div>
-
-        <button class="clear-filter" id="clearNotificationFilters" type="button" aria-label="Limpiar filtros" hidden>
-            <i class="fa-solid fa-filter-circle-xmark"></i><span>Limpiar</span>
-        </button>
     </section>
 
-    <div class="notification-active-filter" id="notificationActiveFilter" hidden>
-        <span><i class="fa-solid fa-filter"></i>Filtro activo: <strong id="notificationActiveFilterLabel"></strong></span>
-        <button type="button" id="clearActiveNotificationFilter" aria-label="Quitar filtro activo"><i class="fa-solid fa-xmark"></i></button>
-    </div>
+    <div class="notification-active-filter" id="notificationActiveFilter" aria-live="polite" hidden></div>
 
     <section class="notification-trash-toolbar" id="notificationTrashToolbar" aria-label="Acciones de papelera" hidden>
         <div class="notification-trash-notice"><span><i class="fa-regular fa-clock"></i></span><div><strong>La papelera se vacía automáticamente después de 60 días</strong><p>Puedes restaurar o eliminar definitivamente las notificaciones antes de ese plazo.</p></div></div>
@@ -170,6 +107,7 @@
 
     <div class="notifications-layout">
         <main class="notification-groups" id="notificationGroups">
+            <header class="notification-listing-heading"><div><span>Actividad</span><h2>Bandeja de notificaciones</h2></div><button class="notification-action secondary" id="markAllNotificationsRead" type="button" <?= $sidebarSummary['unread'] === 0 ? 'hidden' : '' ?>><i class="fa-solid fa-check-double"></i><span>Marcar todas como leídas</span></button></header>
             <?php foreach ($groups as $group => $notificationsList): ?>
                 <section class="notification-group" aria-labelledby="group-<?= e(strtolower(str_replace(' ', '-', $group))) ?>">
                     <div class="notification-group-heading">
@@ -199,7 +137,7 @@
                                         <button class="more-notification" data-notification-action="menu" type="button" aria-label="Mas opciones" aria-haspopup="menu" aria-expanded="false" title="Mas opciones"><i class="fa-solid fa-ellipsis-vertical"></i></button>
                                         <div class="notification-context-menu" role="menu" hidden>
                                             <button type="button" role="menuitem" data-menu-action="delete"><i class="fa-solid fa-box-archive"></i><span><strong>Archivar</strong><small>Ocultar de la bandeja sin eliminar</small></span></button>
-                                            <button type="button" role="menuitem" class="danger" data-menu-action="destroy"><i class="fa-regular fa-trash-can"></i><span><strong>Mover a la papelera</strong><small>Se eliminará automáticamente en 30 días</small></span></button>
+                                            <button type="button" role="menuitem" class="danger" data-menu-action="destroy"><i class="fa-regular fa-trash-can"></i><span><strong>Mover a la papelera</strong><small>Se eliminará automáticamente en 60 días</small></span></button>
                                         </div>
                                     </div>
                                 </div>
@@ -270,77 +208,46 @@
 <!-- Modal de creación exclusivo del administrador -->
 <?php if ($isAdmin): ?>
 <div class="notification-modal-overlay" id="notificationCreateModal" hidden>
-    <section class="notification-detail-modal" role="dialog" aria-modal="true" aria-labelledby="notificationCreateTitle" style="width: min(580px, 100%);">
+    <section class="notification-detail-modal" role="dialog" aria-modal="true" aria-labelledby="notificationCreateTitle">
         <button class="notification-modal-close" type="button" data-modal-close aria-label="Cerrar modal de creación"><i class="fa-solid fa-xmark"></i></button>
-        <header class="notification-message-header" style="background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(37,99,235,0.02)); padding-bottom: 18px; margin-bottom: 20px;">
+        <header class="notification-message-header">
             <span class="notifications-eyebrow"><i class="fa-solid fa-gear"></i> Gestión Administrativa</span>
             <h2 id="notificationCreateTitle">Nueva notificación</h2>
             <p style="color: var(--muted); font-size: 13px; margin: 5px 0 0;">Envía un aviso dirigido o institucional a los usuarios del sistema.</p>
         </header>
 
-        <form id="notificationCreateForm" style="display: grid; gap: 15px; padding: 0 10px 10px;">
+        <form id="notificationCreateForm">
             <input type="hidden" name="_csrf" value="<?= e($adminNotificationCsrf) ?>">
             
-            <div class="form-group" style="display: grid; gap: 6px;">
-                <label for="newNotificationScope" style="font-weight: 750; font-size: 13px; color: var(--text);">Destinatarios</label>
-                <select id="newNotificationScope" name="scope" required style="min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); color: var(--text); font-family: inherit;">
-                    <option value="user">Una persona</option>
-                    <option value="role">Un rol</option>
-                    <option value="project">Participantes de un proyecto</option>
-                    <option value="all">Todos los usuarios</option>
-                </select>
-            </div>
-
-            <div class="form-group" id="groupScopeUser" style="display: grid; gap: 6px;">
-                <label for="newNotificationUser" style="font-weight: 750; font-size: 13px; color: var(--text);">Usuario</label>
-                <select id="newNotificationUser" name="user_id" style="min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); color: var(--text); font-family: inherit;">
-                    <option value="">Selecciona un usuario</option>
-                    <?php foreach ($adminUsers as $u): ?>
-                        <option value="<?= e($u['id']) ?>"><?= e($u['full_name'] . ' · ' . $u['email']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-
-            <div class="form-group" id="groupScopeRole" style="display: grid; gap: 6px;" hidden>
-                <label for="newNotificationRole" style="font-weight: 750; font-size: 13px; color: var(--text);">Rol</label>
-                <select id="newNotificationRole" name="role" style="min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); color: var(--text); font-family: inherit;">
-                    <option value="student">Estudiantes</option>
-                    <option value="teacher">Docentes</option>
-                    <option value="administrator">Administradores</option>
-                </select>
-            </div>
-
-            <div class="form-group" id="groupScopeProject" style="display: grid; gap: 6px;" hidden>
-                <label for="newNotificationProject" style="font-weight: 750; font-size: 13px; color: var(--text);">Proyecto</label>
-                <select id="newNotificationProject" name="project_id" style="min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); color: var(--text); font-family: inherit;">
-                    <option value="">Selecciona un proyecto</option>
-                    <?php foreach ($adminProjects as $p): ?>
-                        <option value="<?= e($p['id']) ?>"><?= e($p['code'] . ' · ' . $p['title']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-
-            <div class="form-group" id="groupScopeAll" style="display: grid; gap: 10px;" hidden>
+            <div class="form-group"><label for="newNotificationScope">Destinatarios</label><select id="newNotificationScope" name="scope" required><option value="student_one">Un estudiante</option><option value="student_many">Varios estudiantes</option><option value="teacher_one">Un docente</option><option value="teacher_many">Varios docentes</option><option value="semester_students">Estudiantes por semestre</option><option value="all_students">Todos los estudiantes</option><option value="all_teachers">Todos los docentes</option><option value="all">Todos los usuarios</option></select></div>
+            <div class="form-group" id="groupScopeRecipients"><label for="newNotificationRecipientSearch">Buscar por nombre, correo o cédula</label><input id="newNotificationRecipientSearch" type="search" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="Escribe al menos 2 caracteres"><div id="newNotificationRecipientResults" class="notification-recipient-results" role="listbox" hidden></div><div id="newNotificationRecipientChips" class="notification-recipient-chips"></div></div>
+            <div class="form-group" id="groupScopeSemester" hidden><label for="newNotificationSemester">Semestre</label><select id="newNotificationSemester" name="semester"><option value="">Selecciona un semestre</option></select></div>
+            <div class="form-group" id="groupScopeMass" hidden><p id="newNotificationMassSummary" class="notification-send-summary"></p><label class="checkbox-label notification-confirmation-check"><input type="checkbox" name="confirm_mass" id="confirmMassCheckbox" value="1"><span>Confirmo este envío masivo.</span></label></div>
+            <div class="form-group" id="groupScopeAll" hidden>
                 <div class="all-users-warning" style="background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 10px; color: #d97706; font-size: 13px;">
                     <i class="fa-solid fa-triangle-exclamation" style="font-size: 16px;"></i>
                     <span>Este comunicado será enviado a todos los usuarios activos del sistema.</span>
                 </div>
                 <label class="checkbox-label" style="display: flex; align-items: flex-start; gap: 9px; cursor: pointer; font-size: 13px; color: var(--text); font-weight: 600;">
-                    <input type="checkbox" name="confirm_all" id="confirmAllCheckbox" value="1" style="width: 16px; height: 16px; accent-color: var(--blue); margin-top: 2px;">
+                    <input type="checkbox" name="confirm_all" id="confirmAllCheckbox" value="1">
                     <span>Confirmo que este comunicado institucional debe llegar a todos los usuarios activos.</span>
                 </label>
             </div>
+
+            <p class="notification-send-summary" id="newNotificationSendSummary" aria-live="polite"></p>
+            <div class="form-group"><label for="newNotificationTemplate">Plantilla rápida</label><select id="newNotificationTemplate"><option value="">Ninguna</option><option value="institutional">Comunicado institucional</option><option value="maintenance">Mantenimiento programado</option><option value="period">Cambio de periodo académico</option><option value="deadline">Recordatorio de fecha límite</option><option value="call">Convocatoria</option><option value="platform">Actualización de plataforma</option><option value="academic">Asignación académica</option><option value="important">Aviso importante</option></select></div>
 
             <div class="form-group" style="display: grid; gap: 6px;">
                 <label for="newNotificationType" style="font-weight: 750; font-size: 13px; color: var(--text);">Tipo de notificación</label>
                 <select id="newNotificationType" name="type" required style="min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); color: var(--text); font-family: inherit;">
                     <option value="system">Comunicado institucional</option>
-                    <option value="reminder">Información académica</option>
+                    <option value="repository">Información académica</option>
                     <option value="reminder">Recordatorio</option>
                     <option value="status_change">Aviso importante</option>
-                    <option value="system">Sistema</option>
+                    <option value="other" data-custom-type="1">Otro</option>
                 </select>
             </div>
+            <div class="form-group" id="groupScopeCustomType" hidden><label for="newNotificationCustomType">Nombre del tipo</label><input id="newNotificationCustomType" name="custom_type_label" maxlength="80" placeholder="Ej. Aviso de secretaría"></div>
 
             <div class="form-group" style="display: grid; gap: 6px;">
                 <label for="newNotificationTitle" style="font-weight: 750; font-size: 13px; color: var(--text);">Título</label>
@@ -359,6 +266,18 @@
                 <button class="notification-action primary" type="submit" id="btnSubmitNewNotification">Enviar notificación</button>
             </div>
         </form>
+    </section>
+</div>
+<?php endif; ?>
+
+<?php if ($isAdmin): ?>
+<div class="notification-modal-overlay" id="notificationSendConfirmModal" hidden>
+    <section class="notification-detail-modal compact" role="dialog" aria-modal="true" aria-labelledby="notificationSendConfirmTitle">
+        <button class="notification-modal-close" type="button" id="closeNotificationSendConfirm" aria-label="Cerrar confirmación"><i class="fa-solid fa-xmark"></i></button>
+        <h2 id="notificationSendConfirmTitle">Confirmar envío</h2>
+        <p id="notificationSendConfirmText"></p>
+        <p class="notification-send-summary" id="notificationSendConfirmMeta"></p>
+        <div class="notification-modal-actions"><button class="notification-action secondary" id="cancelNotificationSendConfirm" type="button">Cancelar</button><button class="notification-action primary" id="confirmNotificationSend" type="button">Enviar notificación</button></div>
     </section>
 </div>
 <?php endif; ?>

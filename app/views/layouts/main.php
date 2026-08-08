@@ -101,9 +101,10 @@
                     <i class="fa-solid fa-moon"></i>
                 </button>
                 <div class="topbar-notifications">
-                    <button class="notification-icon" id="topbarNotificationsButton" type="button" aria-label="Mostrar notificaciones recientes" aria-haspopup="dialog" aria-expanded="false" aria-controls="topbarNotificationsPanel" data-list-endpoint="<?= e(route('notifications/list')) ?>" data-open-endpoint="<?= e($notificationOpenEndpoint ?? route('notifications/open')) ?>" data-csrf-token="<?= e($notificationCsrfToken ?? '') ?>">
+                    <button class="notification-icon" id="topbarNotificationsButton" type="button" aria-label="Mostrar notificaciones recientes" aria-haspopup="dialog" aria-expanded="false" aria-controls="topbarNotificationsPanel" data-list-endpoint="<?= e(route('notifications/list')) ?>" data-counters-endpoint="<?= e(route('notifications/counters')) ?>" data-open-endpoint="<?= e($notificationOpenEndpoint ?? route('notifications/open')) ?>" data-csrf-token="<?= e($notificationCsrfToken ?? '') ?>">
                         <i class="fa-solid fa-bell"></i>
-                        <span class="notification-count" <?= empty($notificationUnreadCount) ? 'hidden' : '' ?>><?= e((string) ($notificationUnreadCount ?? 0)) ?></span>
+                        <?php $topbarUnreadCount = max(0, (int) ($notificationUnreadCount ?? 0)); ?>
+                        <span class="notification-count" <?= $topbarUnreadCount === 0 ? 'hidden aria-hidden="true"' : 'aria-label="' . e($topbarUnreadCount . ($topbarUnreadCount === 1 ? ' notificación no leída' : ' notificaciones no leídas')) . '"' ?>><?= $topbarUnreadCount === 0 ? '' : e($topbarUnreadCount >= 10 ? '9+' : (string) $topbarUnreadCount) ?></span>
                     </button>
                     <section class="topbar-notifications-panel" id="topbarNotificationsPanel" aria-label="Notificaciones recientes" hidden>
                         <header><div><span>Actividad reciente</span><h2>Notificaciones</h2></div><i class="fa-regular fa-bell"></i></header>

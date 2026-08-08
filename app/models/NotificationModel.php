@@ -21,8 +21,9 @@ final class NotificationModel
     {
         [$conditions, $parameters] = $this->notificationQuery($userId, $filters);
         $statement = $this->connection()->prepare(
-            'SELECT id, user_id, project_id, type, title, message, action_url, action_label, metadata, is_read, read_at, created_at, archived_at, deleted_at
-             FROM notifications WHERE ' . implode(' AND ', $conditions) . ' ORDER BY created_at DESC, id DESC'
+            'SELECT n.id, n.user_id, n.project_id, n.type, n.title, n.message, n.action_url, n.action_label, n.metadata, n.is_read, n.read_at, n.created_at, n.archived_at, n.deleted_at,
+                    COALESCE(p.title, NULLIF(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.project_name")), ""), "Notificacion general") AS project_name
+             FROM notifications n LEFT JOIN projects p ON p.id = n.project_id WHERE ' . implode(' AND ', $conditions) . ' ORDER BY n.created_at DESC, n.id DESC'
         );
         $statement->execute($parameters);
 
@@ -32,11 +33,12 @@ final class NotificationModel
     public function getByUserPaginated(int $userId, array $filters = [], array $pagination = []): array
     {
         [$conditions, $parameters] = $this->notificationQuery($userId, $filters);
-        $where = ' FROM notifications WHERE ' . implode(' AND ', $conditions);
+        $where = ' FROM notifications n LEFT JOIN projects p ON p.id = n.project_id WHERE ' . implode(' AND ', $conditions);
         $result = PaginationService::run(
             $this->connection(),
             'SELECT COUNT(*)' . $where,
-            'SELECT id, user_id, project_id, type, title, message, action_url, action_label, metadata, is_read, read_at, created_at, archived_at, deleted_at' . $where . ' ORDER BY created_at DESC, id DESC',
+            'SELECT n.id, n.user_id, n.project_id, n.type, n.title, n.message, n.action_url, n.action_label, n.metadata, n.is_read, n.read_at, n.created_at, n.archived_at, n.deleted_at,
+                    COALESCE(p.title, NULLIF(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.project_name")), ""), "Notificacion general") AS project_name' . $where . ' ORDER BY n.created_at DESC, n.id DESC',
             $parameters,
             $pagination ?: PaginationService::request('notification_page', 'notifications_per_page')
         );
@@ -47,14 +49,14 @@ final class NotificationModel
     private function notificationQuery(int $userId, array $filters): array
     {
         $visibility = !empty($filters['trash'])
-            ? 'deleted_at IS NOT NULL'
-            : (!empty($filters['hidden']) ? 'archived_at IS NOT NULL AND deleted_at IS NULL' : 'archived_at IS NULL AND deleted_at IS NULL');
-        $conditions = ['user_id = :user_id', $visibility];
+            ? 'n.deleted_at IS NOT NULL'
+            : (!empty($filters['hidden']) ? 'n.archived_at IS NOT NULL AND n.deleted_at IS NULL' : 'n.archived_at IS NULL AND n.deleted_at IS NULL');
+        $conditions = ['n.user_id = :user_id', $visibility];
         $parameters = ['user_id' => $userId];
 
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
-            $conditions[] = '(title LIKE :search_title OR message LIKE :search_message OR JSON_UNQUOTE(JSON_EXTRACT(metadata, "$.project_name")) LIKE :search_project)';
+            $conditions[] = '(n.title LIKE :search_title OR n.message LIKE :search_message OR p.title LIKE :search_project OR JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.project_name")) LIKE :search_project)';
             $parameters['search_title'] = '%' . $search . '%';
             $parameters['search_message'] = '%' . $search . '%';
             $parameters['search_project'] = '%' . $search . '%';
@@ -62,26 +64,38 @@ final class NotificationModel
 
         $type = (string) ($filters['type'] ?? '');
         if (in_array($type, self::TYPES, true)) {
-            $conditions[] = 'type = :type';
+            $conditions[] = 'n.type = :type';
             $parameters['type'] = $type;
         }
 
         $projectId = (int) ($filters['project_id'] ?? 0);
         if ($projectId > 0) {
-            $conditions[] = 'project_id = :project_id';
+            $conditions[] = 'n.project_id = :project_id';
             $parameters['project_id'] = $projectId;
         }
 
         $date = (string) ($filters['date'] ?? '');
         if ($date !== '') {
-            $conditions[] = 'DATE(created_at) = :date';
+            $conditions[] = 'DATE(n.created_at) = :date';
             $parameters['date'] = $date;
         }
 
+        $dateFrom = (string) ($filters['date_from'] ?? '');
+        if ($dateFrom !== '') {
+            $conditions[] = 'DATE(n.created_at) >= :date_from';
+            $parameters['date_from'] = $dateFrom;
+        }
+
+        $dateTo = (string) ($filters['date_to'] ?? '');
+        if ($dateTo !== '') {
+            $conditions[] = 'DATE(n.created_at) <= :date_to';
+            $parameters['date_to'] = $dateTo;
+        }
+
         if (($filters['status'] ?? '') === 'read') {
-            $conditions[] = 'is_read = 1';
+            $conditions[] = 'n.is_read = 1';
         } elseif (($filters['status'] ?? '') === 'unread') {
-            $conditions[] = 'is_read = 0';
+            $conditions[] = 'n.is_read = 0';
         }
 
         return [$conditions, $parameters];
@@ -90,8 +104,9 @@ final class NotificationModel
     public function findForUser(int $notificationId, int $userId): ?array
     {
         $statement = $this->connection()->prepare(
-            'SELECT id, user_id, project_id, type, title, message, action_url, action_label, metadata, is_read, read_at, created_at
-             FROM notifications WHERE id = :id AND user_id = :user_id AND archived_at IS NULL AND deleted_at IS NULL LIMIT 1'
+            'SELECT n.id, n.user_id, n.project_id, n.type, n.title, n.message, n.action_url, n.action_label, n.metadata, n.is_read, n.read_at, n.created_at,
+                    COALESCE(p.title, NULLIF(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.project_name")), ""), "Notificacion general") AS project_name
+             FROM notifications n LEFT JOIN projects p ON p.id = n.project_id WHERE n.id = :id AND n.user_id = :user_id AND n.archived_at IS NULL AND n.deleted_at IS NULL LIMIT 1'
         );
         $statement->execute(['id' => $notificationId, 'user_id' => $userId]);
         $notification = $statement->fetch();
@@ -202,12 +217,13 @@ final class NotificationModel
         return $statement->rowCount() === 1;
     }
 
-    public function purgeExpiredTrash(int $days = 60): int
+    public function purgeExpiredTrashForUser(int $userId, int $days = 60): int
     {
         $days = max(1, min($days, 365));
         $statement = $this->connection()->prepare(
-            'DELETE FROM notifications WHERE deleted_at IS NOT NULL AND deleted_at < :cutoff'
+            'DELETE FROM notifications WHERE user_id = :user_id AND deleted_at IS NOT NULL AND deleted_at < :cutoff'
         );
+        $statement->bindValue('user_id', $userId, PDO::PARAM_INT);
         $statement->bindValue('cutoff', (new DateTimeImmutable())->modify("-{$days} days")->format('Y-m-d H:i:s'));
         $statement->execute();
 
@@ -362,7 +378,8 @@ final class NotificationModel
         $row['project_id'] = $row['project_id'] === null ? null : (int) $row['project_id'];
         $row['is_read'] = (bool) $row['is_read'];
         $row['metadata'] = $metadata;
-        $row['project_name'] = (string) ($metadata['project_name'] ?? 'Notificacion general');
+        $projectName = trim((string) ($row['project_name'] ?? ''));
+        $row['project_name'] = $projectName !== '' ? $projectName : (string) ($metadata['project_name'] ?? 'Notificacion general');
 
         return $row;
     }

@@ -17,8 +17,6 @@ final class NotificationsController
         $counters = ['unread' => 0, 'today' => 0, 'week' => 0, 'total' => 0];
         $archivedCount = 0;
         $sentCount = null;
-        $adminUsers = [];
-        $adminProjects = [];
 
         try {
             $model = new NotificationModel();
@@ -30,10 +28,7 @@ final class NotificationsController
 
             if ($isAdmin) {
                 $adminModel = new AdminNotificationModel();
-                $adminData = $adminModel->dashboard();
-                $adminUsers = $adminData['users'];
-                $adminProjects = $adminData['projects'];
-                $sentCount = $adminData['summary']['sent'] ?? 0;
+                $sentCount = $adminModel->summary()['sent'] ?? 0;
             }
         } catch (Throwable $exception) {
             error_log('Notifications index error: ' . $exception->getMessage());
@@ -45,13 +40,6 @@ final class NotificationsController
             if ($isAdmin) {
                 $sentCount = 0;
             }
-        }
-
-        try {
-            $db = Database::connection();
-            $activeProjects = $db->query("SELECT id, code, title FROM projects WHERE deleted_at IS NULL ORDER BY title ASC")->fetchAll();
-        } catch (Throwable $e) {
-            $activeProjects = [];
         }
 
         View::render('notifications/index', [
@@ -71,11 +59,9 @@ final class NotificationsController
             'notificationEndpoints' => $this->endpoints(),
             'loadError' => $error,
             'isAdmin' => $isAdmin,
-            'adminUsers' => $adminUsers,
-            'adminProjects' => $adminProjects,
-            'activeProjects' => $activeProjects,
             'adminNotificationCsrf' => $auth->csrfToken('admin_notifications'),
             'adminNotificationSendEndpoint' => route('admin-notification-send'),
+            'adminNotificationRecipientsEndpoint' => route('admin-notification-recipients'),
         ]);
     }
 
@@ -90,6 +76,8 @@ final class NotificationsController
         $status = (string) ($_GET['status'] ?? '');
         $projectId = (int) ($_GET['project_id'] ?? 0);
         $date = (string) ($_GET['date'] ?? '');
+        $dateFrom = (string) ($_GET['date_from'] ?? '');
+        $dateTo = (string) ($_GET['date_to'] ?? '');
         $page = max(1, (int) ($_GET['notification_page'] ?? 1));
         $perPage = (int) ($_GET['notifications_per_page'] ?? 10);
         if (!in_array($perPage, [10, 25, 50, 75, 100], true)) $perPage = 10;
@@ -105,16 +93,22 @@ final class NotificationsController
                     'search' => $search,
                     'type' => $type,
                     'project_id' => $projectId,
-                    'date' => $date
+                    'date' => $date,
+                    'date_from' => $dateFrom,
+                    'date_to' => $dateTo
                 ];
                 $result = $adminModel->getSentNotificationsPaginated($filters, ['page' => $page, 'size' => $perPage, 'pageKey' => 'notification_page', 'sizeKey' => 'notifications_per_page']);
                 $notifications = $result['items'];
                 $pagination = $result['pagination'];
                 $counters = $model->getCounters($this->currentUserId());
                 
-                $db = Database::connection();
-                $totalSent = (int)$db->query("SELECT COUNT(DISTINCT title, message, project_id, created_at, metadata) FROM notifications WHERE JSON_EXTRACT(metadata, '$.admin_sender_id') IS NOT NULL")->fetchColumn();
-                $sectionCounters = ['total' => $totalSent, 'unread' => 0, 'week' => 0, 'expiring' => 0];
+                $adminSummary = $adminModel->summary();
+                $sectionCounters = [
+                    'total' => $adminSummary['sent'] ?? 0,
+                    'unread' => $adminSummary['recipients'] ?? 0,
+                    'week' => $adminSummary['today'] ?? 0,
+                    'expiring' => 0
+                ];
             } catch (Throwable $e) {
                 error_log('Admin sent notifications listing error: ' . $e->getMessage());
                 $notifications = [];
@@ -123,7 +117,7 @@ final class NotificationsController
                 $sectionCounters = ['total' => 0, 'unread' => 0, 'week' => 0, 'expiring' => 0];
             }
 
-            $this->json(true, 'Notificaciones actualizadas.', [
+            $this->json(true, '✅ Notificaciones actualizadas.', [
                 'notifications' => $notifications,
                 'groups' => $this->groupNotifications($notifications),
                 'pagination' => $pagination,
@@ -141,9 +135,12 @@ final class NotificationsController
                 'hidden' => $hidden,
                 'trash' => $trash,
                 'project_id' => $projectId,
-                'date' => $date
+                'date' => $date,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo
             ];
-            $model->purgeExpiredTrash(60);
+            // La limpieza global programada queda pendiente como mejora posterior; aquí solo se depura la papelera del usuario actual.
+            $model->purgeExpiredTrashForUser($this->currentUserId(), 60);
             $result = $model->getByUserPaginated($this->currentUserId(), $filters, ['page' => $page, 'size' => $perPage, 'pageKey' => 'notification_page', 'sizeKey' => 'notifications_per_page']);
             $notifications = $result['items'];
             $pagination = $result['pagination'];
@@ -152,7 +149,7 @@ final class NotificationsController
         } catch (Throwable $exception) {
             error_log('Notifications list fallback: ' . $exception->getMessage());
             $allNotifications = $this->demoNotifications();
-            $notifications = array_values(array_filter($allNotifications, static function (array $item) use ($search, $type, $status, $hidden, $trash, $projectId, $date): bool {
+            $notifications = array_values(array_filter($allNotifications, static function (array $item) use ($search, $type, $status, $hidden, $trash, $projectId, $date, $dateFrom, $dateTo): bool {
                 $haystack = mb_strtolower($item['title'] . ' ' . $item['message'] . ' ' . $item['project_name']);
                 $matchesSearch = $search === '' || str_contains($haystack, $search);
                 $matchesType = $type === '' || $item['type'] === $type;
@@ -161,7 +158,8 @@ final class NotificationsController
                     ? !empty($item['deleted_at'])
                     : ($hidden ? !empty($item['archived_at']) && empty($item['deleted_at']) : empty($item['archived_at']) && empty($item['deleted_at']));
                 $matchesProject = $projectId === 0 || $item['project_id'] === $projectId;
-                $matchesDate = $date === '' || date('Y-m-d', strtotime($item['created_at'])) === $date;
+                $itemDate = date('Y-m-d', strtotime($item['created_at']));
+                $matchesDate = ($date === '' || $itemDate === $date) && ($dateFrom === '' || $itemDate >= $dateFrom) && ($dateTo === '' || $itemDate <= $dateTo);
                 return $matchesSearch && $matchesType && $matchesStatus && $matchesVisibility && $matchesProject && $matchesDate;
             }));
             $pagination = $this->demoPagination($notifications, $page, $perPage);
@@ -171,7 +169,7 @@ final class NotificationsController
             $sectionCounters = $this->sectionCounters($sectionNotifications, $counters, $hidden, $trash);
         }
 
-        $this->json(true, 'Notificaciones actualizadas.', [
+        $this->json(true, '✅ Notificaciones actualizadas.', [
             'notifications' => $notifications,
             'groups' => $this->groupNotifications($notifications),
             'pagination' => $pagination,
@@ -272,6 +270,7 @@ final class NotificationsController
             if ($index === null || (empty($notifications[$index]['archived_at']) && empty($notifications[$index]['deleted_at']))) {
                 $this->json(false, 'La notificacion oculta no existe.', [], 404);
             }
+            $notifications[$index]['archived_at'] = null;
             $notifications[$index]['deleted_at'] = null;
             $this->saveDemoNotifications($notifications);
             return ['notificationId' => $id, 'counters' => (new NotificationModel())->getDemoCounters($notifications)];
@@ -669,6 +668,8 @@ final class NotificationsController
         $names = ['list', 'read', 'unread', 'read-all', 'delete', 'restore', 'destroy', 'trash-empty', 'trash-bulk', 'counters', 'open'];
         $map = array_combine($names, array_map(static fn (string $name): string => route('notifications/' . $name), $names));
         $map['admin-send'] = route('admin-notification-send');
+        $map['admin-audience-send'] = route('admin-notification-audience-send');
+        $map['admin-recipients'] = route('admin-notification-recipients');
         return $map;
     }
     // Final de transformación para la interfaz

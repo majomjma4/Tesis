@@ -2,28 +2,11 @@ const shell = document.querySelector("#notificationsShell");
 const preloader = document.querySelector("#notificationsPreloader");
 const searchInput = document.querySelector("#notificationSearch");
 
-const statusFilter = {
-    get value() {
-        return document.querySelector(".ed-tab[aria-current='page']")?.dataset.tabStatus || "all";
-    },
-    set value(val) {
-        document.querySelectorAll(".ed-tab").forEach(tab => {
-            const active = tab.dataset.tabStatus === val;
-            tab.setAttribute("aria-selected", String(active));
-            if (active) {
-                tab.setAttribute("aria-current", "page");
-            } else {
-                tab.removeAttribute("aria-current");
-            }
-        });
-    }
-};
+const statusFilter = document.querySelector("#notificationStatusFilter");
 
 const typeFilter = document.querySelector("#notificationTypeFilter");
 const filterControls = [...document.querySelectorAll("[data-filter-control]")];
-const clearFiltersButton = document.querySelector("#clearNotificationFilters");
 const activeFilter = document.querySelector("#notificationActiveFilter");
-const activeFilterLabel = document.querySelector("#notificationActiveFilterLabel");
 const trashToolbar = document.querySelector("#notificationTrashToolbar");
 const selectAllTrash = document.querySelector("#selectAllTrashNotifications");
 const trashSelectionCount = document.querySelector("#trashSelectionCount");
@@ -39,6 +22,11 @@ const readAllButton = document.querySelector("#markAllNotificationsRead");
 const deleteModal = document.querySelector("#notificationDeleteModal");
 const detailModal = document.querySelector("#notificationDetailModal");
 const toast = document.querySelector("#notificationToast");
+if (toast?.parentElement !== document.body) document.body.append(toast);
+const dateTrigger = document.querySelector("#notificationDateTrigger");
+const datePopover = document.querySelector("#notificationDatePopover");
+const dateFromInput = document.querySelector("#notificationDateFrom");
+const dateToInput = document.querySelector("#notificationDateTo");
 const csrfToken = shell?.dataset.csrfToken || "";
 const endpoints = JSON.parse(shell?.dataset.endpoints || "{}");
 let requestController = null;
@@ -82,6 +70,14 @@ function highlight(element, query) {
     element.replaceChildren(fragment);
 }
 
+function hideToast() {
+    window.clearTimeout(showToast.timer);
+    if (!toast) return;
+    toast.hidden = true;
+    toast.classList.remove("is-error");
+    toast.replaceChildren();
+}
+
 function showToast(message, error = false, action = null) {
     if (!toast) return;
     toast.replaceChildren(document.createTextNode(message));
@@ -95,7 +91,7 @@ function showToast(message, error = false, action = null) {
     toast.classList.toggle("is-error", error);
     toast.hidden = false;
     window.clearTimeout(showToast.timer);
-    showToast.timer = window.setTimeout(() => { toast.hidden = true; }, 3200);
+    showToast.timer = window.setTimeout(hideToast, 3400);
 }
 
 async function request(url, options = {}) {
@@ -107,12 +103,11 @@ async function request(url, options = {}) {
 
 function updateCounters(counters) {
     Object.entries(counters).forEach(([key, value]) => {
-        document.querySelector(`[data-counter-card="${key}"] strong`)?.replaceChildren(document.createTextNode(String(value)));
+        document.querySelector(`[data-counter-card="${key}"] .notification-stat-value`)?.replaceChildren(document.createTextNode(String(value)));
     });
-    const bell = document.querySelector(".notification-count");
-    if (bell) { bell.textContent = String(counters.unread); bell.hidden = counters.unread === 0; }
-    if (readAllButton) readAllButton.disabled = counters.unread === 0;
+    if (typeof window.updateTopbarNotificationCount === "function") window.updateTopbarNotificationCount(counters.unread);
     const unread = Number(counters.unread || 0);
+    if (readAllButton) { readAllButton.disabled = unread === 0; readAllButton.hidden = unread === 0; }
     const total = Number(counters.total || 0);
     const read = Math.max(0, total - unread);
     const progress = total > 0 ? Math.round((read / total) * 100) : 0;
@@ -128,7 +123,11 @@ function updateCounters(counters) {
 }
 
 function iconFor(type) {
-    return { delivery: "fa-cloud-arrow-up", observation: "fa-comment-dots", status_change: "fa-circle-check", review: "fa-triangle-exclamation", reminder: "fa-clock", system: "fa-gear", tribunal: "fa-user-group", repository: "fa-database", comment: "fa-message" }[type] || "fa-bell";
+    return { delivery: "fa-cloud-arrow-up", observation: "fa-comment-dots", status_change: "fa-circle-check", review: "fa-triangle-exclamation", reminder: "fa-clock", system: "fa-gear", tribunal: "fa-user-group", repository: "fa-database", comment: "fa-message", adjustment: "fa-pen-to-square" }[type] || "fa-bell";
+}
+
+function notificationTypeLabel(type) {
+    return { delivery: "Entrega", observation: "Observación", status_change: "Cambio de estado", review: "Revisión", reminder: "Recordatorio", system: "Sistema", tribunal: "Tribunal", repository: "Repositorio", comment: "Comentario", adjustment: "Solicitud de cambios" }[type] || "Notificación";
 }
 
 function typeClass(type) {
@@ -198,7 +197,18 @@ function renderGroups(groups, sectionCounters = {}) {
         const list = document.createElement("div"); list.className = "notification-list"; notifications.forEach((item) => list.append(createRow(item))); section.append(heading, list);
         groupsContainer?.insertBefore(section, paginationContainer || emptyState);
     });
-    if (emptyState) { emptyState.hidden = total > 0; emptyState.querySelector("h2").textContent = searchInput?.value || statusFilter.value !== "all" || typeFilter?.value !== "all" ? "No se encontraron notificaciones con los filtros seleccionados." : "No tienes notificaciones por el momento."; }
+    if (emptyState) {
+        emptyState.hidden = total > 0;
+        const emptyH2 = emptyState.querySelector("h2");
+        if (emptyH2) {
+            let msg = "No tienes notificaciones por el momento.";
+            if (statusFilter.value === "trash") msg = "La papelera está vacía.";
+            else if (statusFilter.value === "hidden") msg = "No tienes notificaciones archivadas.";
+            else if (statusFilter.value === "sent") msg = "No has enviado notificaciones.";
+            else if (searchInput?.value || statusFilter.value !== "all" || typeFilter?.value !== "all") msg = "No se encontraron notificaciones con los filtros seleccionados.";
+            emptyH2.textContent = msg;
+        }
+    }
     updateContextualCards(sectionCounters);
     updateTrashSelection();
 }
@@ -260,35 +270,9 @@ function updateTrashSelection() {
     if (deleteSelectedButton) deleteSelectedButton.disabled = selected.length === 0;
     if (emptyTrashButton) emptyTrashButton.disabled = checkboxes.length === 0;
     if (selectAllTrash) { selectAllTrash.checked = checkboxes.length > 0 && selected.length === checkboxes.length; selectAllTrash.indeterminate = selected.length > 0 && selected.length < checkboxes.length; }
-    if (statusFilter.value === "trash") setSummaryCard("week", "Seleccionadas", selected.length);
 }
 
-function setSummaryCard(key, label, value) {
-    const card = document.querySelector(`[data-counter-card="${key}"]`);
-    if (!card) return;
-    card.querySelector("strong").textContent = String(value);
-    card.querySelector("div span").textContent = label;
-}
-
-function updateContextualCards(sectionCounters) {
-    const mode = statusFilter.value;
-    if (mode === "hidden") {
-        setSummaryCard("unread", "Archivadas", sectionCounters.total || 0);
-        setSummaryCard("today", "No leídas", sectionCounters.unread || 0);
-        setSummaryCard("week", "Esta semana", sectionCounters.week || 0);
-        setSummaryCard("total", "Total archivadas", sectionCounters.total || 0);
-    } else if (mode === "trash") {
-        setSummaryCard("unread", "En papelera", sectionCounters.total || 0);
-        setSummaryCard("today", "Próximas a eliminarse", sectionCounters.expiring || 0);
-        setSummaryCard("week", "Seleccionadas", selectedTrashIds().length);
-        setSummaryCard("total", "Total", sectionCounters.total || 0);
-    } else {
-        setSummaryCard("unread", "No leídas", document.querySelector('[data-counter-card="unread"] strong')?.textContent || 0);
-        document.querySelector('[data-counter-card="today"] div span').textContent = "Hoy";
-        document.querySelector('[data-counter-card="week"] div span').textContent = "Esta semana";
-        document.querySelector('[data-counter-card="total"] div span').textContent = "Total activas";
-    }
-}
+function updateContextualCards() {}
 
 async function loadNotifications(showMessage = false) {
     requestController?.abort(); requestController = new AbortController();
@@ -296,17 +280,14 @@ async function loadNotifications(showMessage = false) {
     const showingHidden = statusFilter.value === "hidden";
     const showingTrash = statusFilter.value === "trash";
     
-    const projectFilter = document.querySelector("#notificationProjectFilter");
-    const dateFilter = document.querySelector("#notificationDateFilter");
-    
     const params = new URLSearchParams({
         search: searchInput?.value || "",
         type: typeFilter?.value === "all" ? "" : typeFilter?.value || "",
         status: ["read", "unread", "sent"].includes(statusFilter.value) ? statusFilter.value : "",
         hidden: showingHidden ? "1" : "0",
         trash: showingTrash ? "1" : "0",
-        project_id: projectFilter?.value || "0",
-        date: dateFilter?.value || "",
+        date_from: dateFromInput?.value || "",
+        date_to: dateToInput?.value || "",
         notification_page: String(currentPage),
         notifications_per_page: String(notificationsPerPage)
     });
@@ -335,7 +316,6 @@ function closeFilterMenus(restoreFocus = false) {
         const menu = control.querySelector(".notification-filter-menu");
         const trigger = control.querySelector(".notification-filter-trigger");
         if (!menu || !trigger) {
-            console.warn("Filter control missing expected elements:", control);
             return;
         }
         menu.hidden = true;
@@ -368,15 +348,12 @@ function updateFilterState() {
             return;
         }
 
-        const selectedOption = control.querySelector(
-            `[data-filter-value="${CSS.escape(select.value)}"]`
-        );
+        const selectedOption = control.querySelector(`[data-filter-value="${CSS.escape(select.value)}"]`);
 
         const prefix = type === "project" ? "Proyecto" : "Tipo";
 
         const label =
-            selectedOption?.querySelector("span:nth-child(2)")?.textContent ||
-            "Todos";
+            selectedOption?.querySelector("span:nth-child(2)")?.textContent || select.options[select.selectedIndex]?.textContent || "Todos";
 
         if (triggerLabel) {
             triggerLabel.textContent = `${prefix}: ${label}`;
@@ -387,11 +364,7 @@ function updateFilterState() {
         }
     });
 
-    const dateFilter = document.querySelector("#notificationDateFilter");
-
-    if (dateFilter?.value) {
-        active.push(`Fecha: ${dateFilter.value}`);
-    }
+    if (dateFromInput?.value || dateToInput?.value) active.push(`Fecha: ${dateFromInput?.value || "…"} — ${dateToInput?.value || "…"}`);
 
     if (activeFilter && activeFilterLabel) {
         activeFilter.hidden = active.length === 0;
@@ -402,17 +375,21 @@ function updateFilterState() {
         trashToolbar.hidden = statusFilter.value !== "trash";
     }
 
-    if (clearFiltersButton) {
-        clearFiltersButton.hidden =
-            !searchInput?.value.trim() &&
-            active.length === 0;
-    }
+}
+
+function updateFilterState() {
+    const active = [];
+    if (statusFilter?.value !== "all") active.push({ label: `Mostrar: ${statusFilter.options[statusFilter.selectedIndex]?.textContent || "Todas"}`, clear: () => { statusFilter.value = "all"; } });
+    if (typeFilter?.value && typeFilter.value !== "all") active.push({ label: `Tipo: ${typeFilter.options[typeFilter.selectedIndex]?.textContent}`, clear: () => { typeFilter.value = "all"; } });
+    if (dateFromInput?.value || dateToInput?.value) active.push({ label: `Fecha: ${dateFromInput?.value || "…"} — ${dateToInput?.value || "…"}`, clear: () => { if (dateFromInput) dateFromInput.value = ""; if (dateToInput) dateToInput.value = ""; } });
+    if (activeFilter) { activeFilter.replaceChildren(); activeFilter.hidden = active.length === 0; active.forEach((item) => { const chip = document.createElement("button"); chip.type = "button"; chip.className = "notification-filter-chip"; chip.append(document.createTextNode(item.label)); const close = document.createElement("i"); close.className = "fa-solid fa-xmark"; close.setAttribute("aria-hidden", "true"); chip.append(close); chip.addEventListener("click", () => { item.clear(); currentPage = 1; updateFilterState(); loadNotifications(); }); activeFilter.append(chip); }); }
+    if (trashToolbar) trashToolbar.hidden = statusFilter?.value !== "trash";
 }
 
 function selectFilter(control, value, requestUpdate = true) {
     const select = control.querySelector("select"); const menu = control.querySelector(".notification-filter-menu");
     select.value = value;
-    menu.querySelectorAll("[data-filter-value]").forEach((option) => option.setAttribute("aria-selected", String(option.dataset.filterValue === value)));
+    menu?.querySelectorAll("[data-filter-value]").forEach((option) => option.setAttribute("aria-selected", String(option.dataset.filterValue === value)));
     closeFilterMenus(); updateFilterState();
     if (requestUpdate) { currentPage = 1; loadNotifications(); }
 }
@@ -420,23 +397,8 @@ function selectFilter(control, value, requestUpdate = true) {
 filterControls.forEach((control) => {
     const type = control.dataset.filterControl;
 
-    // El filtro de fecha usa un input, no un menú desplegable.
+    // El rango de fechas se gestiona desde su popover independiente.
     if (type === "date") {
-        const dateInput = control.querySelector(
-            "#notificationDateFilter, input[type='date']"
-        );
-
-        if (dateInput) {
-            dateInput.addEventListener("change", () => {
-                updateFilterState();
-
-                // Si tu archivo ya tiene una función para recargar
-                // la lista, déjala aquí.
-                // Ejemplo:
-                // loadNotifications();
-            });
-        }
-
         return;
     }
 
@@ -449,10 +411,7 @@ filterControls.forEach((control) => {
     );
 
     if (!trigger || !menu) {
-        console.warn(
-            "Dropdown filter missing trigger or menu element:",
-            control
-        );
+        control.querySelector("select")?.addEventListener("change", () => { hideToast(); currentPage = 1; updateFilterState(); loadNotifications(); });
         return;
     }
 
@@ -541,16 +500,15 @@ function clearAllFilters() {
     searchInput.value = "";
     currentPage = 1;
     filterControls.forEach((control) => {
-        const defaultValue = control.dataset.filterControl === "project" ? "0" : "all";
-        selectFilter(control, defaultValue, false);
+        const defaultValue = "all";
+        if (control.dataset.filterControl !== "date") selectFilter(control, defaultValue, false);
     });
-    const dateFilter = document.querySelector("#notificationDateFilter");
-    if (dateFilter) dateFilter.value = "";
+    if (dateFromInput) dateFromInput.value = "";
+    if (dateToInput) dateToInput.value = "";
     updateFilterState();
     loadNotifications();
     searchInput.focus();
 }
-clearFiltersButton?.addEventListener("click", clearAllFilters);
 document.querySelector("#clearActiveNotificationFilter")?.addEventListener("click", clearAllFilters);
 updateFilterState();
 renderPagination(paginationState);
@@ -558,6 +516,7 @@ selectAllTrash?.addEventListener("change", () => { document.querySelectorAll(".t
 groupsContainer?.addEventListener("change", (event) => { if (event.target.matches(".trash-notification-checkbox")) updateTrashSelection(); });
 refreshButton?.addEventListener("click", () => loadNotifications(true));
 document.querySelector("#retryNotifications")?.addEventListener("click", () => loadNotifications());
+window.addEventListener("resize", hideToast, { passive: true });
 
 async function postAction(endpoint, id, button, showSuccess = true) {
     button?.setAttribute("disabled", "");
@@ -594,28 +553,34 @@ deleteSelectedButton?.addEventListener("click", () => {
     pendingBulkIds = selectedTrashIds();
     if (!pendingBulkIds.length) return;
     pendingDeleteMode = "bulk-delete";
-    document.querySelector("#notificationDeleteTitle").textContent = "¿Eliminar definitivamente las notificaciones seleccionadas?";
-    document.querySelector("#notificationDeleteText").textContent = `Se eliminaran ${pendingBulkIds.length} notificaciones. Esta accion no se puede deshacer.`;
-    document.querySelector("#confirmDeleteNotification").textContent = "Eliminar seleccionadas";
+    const titleEl = document.querySelector("#notificationDeleteTitle");
+    if (titleEl) titleEl.textContent = "¿Eliminar definitivamente las notificaciones seleccionadas?";
+    const textEl = document.querySelector("#notificationDeleteText");
+    if (textEl) textEl.textContent = `Se eliminaran ${pendingBulkIds.length} notificaciones. Esta accion no se puede deshacer.`;
+    const confirmBtn = document.querySelector("#confirmDeleteNotification");
+    if (confirmBtn) confirmBtn.textContent = "Eliminar seleccionadas";
     openModal(deleteModal, deleteSelectedButton);
 });
 
 emptyTrashButton?.addEventListener("click", () => {
     pendingDeleteMode = "empty-trash";
-    document.querySelector("#notificationDeleteTitle").textContent = "¿Vaciar toda la papelera?";
-    document.querySelector("#notificationDeleteText").textContent = "Todas las notificaciones de la papelera se eliminaran definitivamente. Esta accion no se puede deshacer.";
-    document.querySelector("#confirmDeleteNotification").textContent = "Vaciar papelera";
+    const titleEl = document.querySelector("#notificationDeleteTitle");
+    if (titleEl) titleEl.textContent = "¿Vaciar toda la papelera?";
+    const textEl = document.querySelector("#notificationDeleteText");
+    if (textEl) textEl.textContent = "Todas las notificaciones de la papelera se eliminaran definitivamente. Esta accion no se puede deshacer.";
+    const confirmBtn = document.querySelector("#confirmDeleteNotification");
+    if (confirmBtn) confirmBtn.textContent = "Vaciar papelera";
     openModal(deleteModal, emptyTrashButton);
 });
 
 function closeMenus() { document.querySelectorAll(".notification-context-menu:not([hidden])").forEach((menu) => { menu.hidden = true; menu.previousElementSibling?.setAttribute("aria-expanded", "false"); }); }
-function openModal(modal, opener) { returnFocus = opener; modal.hidden = false; document.body.classList.add("modal-open"); modal.querySelector("button")?.focus(); }
-function closeModal(modal) { modal.hidden = true; document.body.classList.remove("modal-open"); returnFocus?.focus(); }
+function openModal(modal, opener) { if (!modal) return; returnFocus = opener; modal.hidden = false; document.body.classList.add("modal-open"); modal.querySelector("button")?.focus(); }
+function closeModal(modal) { if (!modal) return; modal.hidden = true; document.body.classList.remove("modal-open"); returnFocus?.focus(); }
 
 groupsContainer?.addEventListener("click", async (event) => {
     const row = event.target.closest(".notification-row"); if (!row) return;
     const actionButton = event.target.closest("[data-notification-action]"); const menuButton = event.target.closest("[data-menu-action]");
-    if (actionButton?.dataset.notificationAction === "menu") { const menu = row.querySelector(".notification-context-menu"); const opening = menu.hidden; closeMenus(); menu.hidden = !opening; actionButton.setAttribute("aria-expanded", String(opening)); return; }
+    if (actionButton?.dataset.notificationAction === "menu") { const menu = row.querySelector(".notification-context-menu"); const opening = menu ? menu.hidden : false; closeMenus(); if (menu) menu.hidden = !opening; actionButton.setAttribute("aria-expanded", String(opening)); return; }
     const action = menuButton?.dataset.menuAction || actionButton?.dataset.notificationAction; if (!action) return; closeMenus();
     if (action === "toggle-read") { const read = row.dataset.read === "true"; try { await postAction(read ? endpoints.unread : endpoints.read, row.dataset.notificationId, actionButton || menuButton); await loadNotifications(); } catch {} }
     if (action === "restore") { try { await postAction(endpoints.restore, row.dataset.notificationId, actionButton); await loadNotifications(); } catch {} }
@@ -623,9 +588,12 @@ groupsContainer?.addEventListener("click", async (event) => {
         pendingDeleteId = row.dataset.notificationId;
         pendingDeleteMode = action === "destroy" ? "destroy" : "archive";
         const moveToTrash = pendingDeleteMode === "destroy";
-        document.querySelector("#notificationDeleteTitle").textContent = moveToTrash ? "¿Mover esta notificacion a la papelera?" : "¿Deseas archivar esta notificacion?";
-        document.querySelector("#notificationDeleteText").textContent = moveToTrash ? "Podras restaurarla desde Papelera durante 60 dias. Despues se eliminara automaticamente." : "La notificacion saldra del listado principal, pero podras recuperarla desde el filtro Archivadas.";
-        document.querySelector("#confirmDeleteNotification").textContent = moveToTrash ? "Mover a la papelera" : "Archivar";
+        const titleEl = document.querySelector("#notificationDeleteTitle");
+        if (titleEl) titleEl.textContent = moveToTrash ? "¿Mover esta notificacion a la papelera?" : "¿Deseas archivar esta notificacion?";
+        const textEl = document.querySelector("#notificationDeleteText");
+        if (textEl) textEl.textContent = moveToTrash ? "Podras restaurarla desde Papelera durante 60 dias. Despues se eliminara automaticamente." : "La notificacion saldra del listado principal, pero podras recuperarla desde el filtro Archivadas.";
+        const confirmBtn = document.querySelector("#confirmDeleteNotification");
+        if (confirmBtn) confirmBtn.textContent = moveToTrash ? "Mover a la papelera" : "Archivar";
         openModal(deleteModal, menuButton);
     }
     if (action === "detail" || action === "open-detail") {
@@ -640,32 +608,53 @@ groupsContainer?.addEventListener("click", async (event) => {
 });
 
 function fillDetail(item, destinationUrl = null) {
+    if (!item) return;
     currentDetailId = item.id || null;
-    document.querySelector("#notificationModalType").textContent = item.type || "Notificacion";
-    document.querySelector("#notificationModalTitle").textContent = item.title || "";
-    document.querySelector("#notificationModalMessage").textContent = item.message || "";
-    document.querySelector("#notificationModalProject").textContent = item.project_name || item.project || "Notificacion general";
-    document.querySelector("#notificationModalDate").textContent = item.created_at || "";
-    document.querySelector("#notificationModalStatus").textContent = item.is_read ? "Leida" : "No leida";
+    const typeEl = document.querySelector("#notificationModalType");
+    if (typeEl) typeEl.textContent = notificationTypeLabel(item.type);
+    const titleEl = document.querySelector("#notificationModalTitle");
+    if (titleEl) titleEl.textContent = item.title || "";
+    const messageEl = document.querySelector("#notificationModalMessage");
+    if (messageEl) messageEl.textContent = item.message || "";
+    const projectEl = document.querySelector("#notificationModalProject");
+    if (projectEl) projectEl.textContent = item.project_name || item.project || "Notificacion general";
+    const dateEl = document.querySelector("#notificationModalDate");
+    if (dateEl) dateEl.textContent = item.created_at || "";
+    const statusEl = document.querySelector("#notificationModalStatus");
+    if (statusEl) {
+        statusEl.textContent = item.is_read ? "Leida" : "No leida";
+        statusEl.hidden = statusFilter.value === "sent";
+    }
     
-    const isSentTab = statusFilter.value === "sent";
-    document.querySelector("#notificationModalStatus").hidden = isSentTab;
     const markUnreadBtn = document.querySelector("#notificationModalMarkUnread");
-    if (markUnreadBtn) markUnreadBtn.hidden = isSentTab;
+    if (markUnreadBtn) markUnreadBtn.hidden = statusFilter.value === "sent";
 
     const destination = document.querySelector("#notificationModalDestination");
     if (destination) {
-        destination.hidden = !destinationUrl;
-        destination.href = destinationUrl || "#";
-        destination.querySelector("span").textContent = item.action_label || "Ir a la seccion relacionada";
+        const isContextualDestination = (() => {
+            if (!destinationUrl) return false;
+            try {
+                const url = new URL(destinationUrl, window.location.href);
+                return url.origin === window.location.origin && /\/index\.php$/i.test(url.pathname) && url.searchParams.get("page") !== "notifications";
+            } catch {
+                return false;
+            }
+        })();
+        destination.hidden = !isContextualDestination;
+        destination.href = isContextualDestination ? destinationUrl : "#";
+        const spanEl = destination.querySelector("span");
+        if (spanEl) spanEl.textContent = item.action_label || "Ir a la seccion relacionada";
     }
 }
+
+document.querySelector("#notificationModalDestination")?.addEventListener("click", () => closeModal(detailModal));
 
 document.querySelector("#notificationModalMarkUnread")?.addEventListener("click", async (event) => {
     if (!currentDetailId) return;
     try {
         await postAction(endpoints.unread, currentDetailId, event.currentTarget);
-        document.querySelector("#notificationModalStatus").textContent = "No leida";
+        const statusEl = document.querySelector("#notificationModalStatus");
+        if (statusEl) statusEl.textContent = "No leida";
         await loadNotifications();
     } catch {}
 });
@@ -705,7 +694,7 @@ document.querySelector("#confirmDeleteNotification")?.addEventListener("click", 
 
 document.querySelectorAll("[data-modal-close]").forEach((button) => button.addEventListener("click", () => closeModal(button.closest(".notification-modal-overlay"))));
 document.addEventListener("click", (event) => { if (!event.target.closest(".notification-row-actions")) closeMenus(); if (!event.target.closest(".notification-filter-custom")) closeFilterMenus(); });
-document.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchInput?.focus(); } if (event.key === "Escape") { closeMenus(); const hasOpenFilter = filterControls.some((control) => !control.querySelector(".notification-filter-menu").hidden); if (hasOpenFilter) closeFilterMenus(true); else if (detailModal && !detailModal.hidden) closeModal(detailModal); else if (deleteModal && !deleteModal.hidden) closeModal(deleteModal); else if (document.activeElement === searchInput) { searchInput.value = ""; searchInput.blur(); updateFilterState(); loadNotifications(); } } });
+document.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchInput?.focus(); } if (event.key === "Escape") { closeMenus(); const hasOpenFilter = filterControls.some((control) => { const menu = control.querySelector(".notification-filter-menu"); return menu && !menu.hidden; }); if (hasOpenFilter) closeFilterMenus(true); else if (detailModal && !detailModal.hidden) closeModal(detailModal); else if (deleteModal && !deleteModal.hidden) closeModal(deleteModal); else if (createModal && !createModal.hidden) closeModal(createModal); else if (document.activeElement === searchInput) { searchInput.value = ""; searchInput.blur(); updateFilterState(); loadNotifications(); } } });
 
 let notificationsRevealed = false;
 
@@ -722,32 +711,16 @@ function revealNotifications() {
 window.setTimeout(revealNotifications, 650);
 window.setTimeout(revealNotifications, 2500);
 
-// Bindings for tabs navigation
-document.querySelectorAll(".ed-tab").forEach(tab => {
-    tab.addEventListener("click", (e) => {
-        e.preventDefault();
-        statusFilter.value = tab.dataset.tabStatus;
-        currentPage = 1;
-        
-        // Hide/show trash toolbar depending on tab
-        if (trashToolbar) {
-            trashToolbar.hidden = tab.dataset.tabStatus !== "trash";
-        }
-        
-        // Manage active styling classes manually if necessary
-        document.querySelectorAll(".ed-tab").forEach(t => t.classList.remove("active"));
-        tab.classList.add("active");
-        
-        loadNotifications();
-    });
+dateTrigger?.addEventListener("click", () => {
+    const open = Boolean(datePopover?.hidden);
+    if (datePopover) datePopover.hidden = !open;
+    dateTrigger.setAttribute("aria-expanded", String(open));
+    if (open) dateFromInput?.focus();
 });
-
-// Date filter binding
-document.querySelector("#notificationDateFilter")?.addEventListener("change", () => {
-    currentPage = 1;
-    updateFilterState();
-    loadNotifications();
-});
+document.querySelector("#applyNotificationDate")?.addEventListener("click", () => { hideToast(); currentPage = 1; updateFilterState(); loadNotifications(); if (datePopover) datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); });
+document.querySelector("#clearNotificationDate")?.addEventListener("click", () => { hideToast(); if (dateFromInput) dateFromInput.value = ""; if (dateToInput) dateToInput.value = ""; currentPage = 1; updateFilterState(); loadNotifications(); if (datePopover) datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); });
+document.addEventListener("click", (event) => { if (!event.target.closest(".notification-date-filter") && datePopover && !datePopover.hidden) { datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); } });
+document.addEventListener("keydown", (event) => { if (event.key === "Escape" && datePopover && !datePopover.hidden) { datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); dateTrigger?.focus(); } });
 
 // Admin New Notification button and modal logic
 const btnNewNotification = document.querySelector("#btnNewNotification");
@@ -833,3 +806,61 @@ if (createForm) {
         }
     });
 }
+
+// Flujo administrativo escalable: no precarga personas ni proyectos en el HTML.
+const recipientSearch = document.querySelector("#newNotificationRecipientSearch");
+const recipientResults = document.querySelector("#newNotificationRecipientResults");
+const recipientChips = document.querySelector("#newNotificationRecipientChips");
+const semesterSelect = document.querySelector("#newNotificationSemester");
+const massGroup = document.querySelector("#groupScopeMass");
+const recipientsGroup = document.querySelector("#groupScopeRecipients");
+const semesterGroup = document.querySelector("#groupScopeSemester");
+const massSummary = document.querySelector("#newNotificationMassSummary");
+const sendSummary = document.querySelector("#newNotificationSendSummary");
+const templateSelect = document.querySelector("#newNotificationTemplate");
+const chosenRecipients = new Map();
+let recipientTimer = null;
+let recipientSearchVersion = 0;
+const templates = { institutional:["Comunicado institucional",""], maintenance:["Mantenimiento programado del sistema","El sistema estará temporalmente fuera de servicio el día [fecha], desde [hora inicial] hasta [hora final]."], period:["Cambio de periodo académico","Se informa el cambio de periodo académico. Revisa las fechas y actividades correspondientes."], deadline:["Recordatorio de fecha límite","Te recordamos que la fecha límite es [fecha]."], call:["Convocatoria","Se comunica la apertura de una nueva convocatoria."], platform:["Actualización de plataforma","La plataforma ha sido actualizada. Revisa las novedades disponibles."], academic:["Asignación académica","Se ha registrado una nueva asignación académica para tu revisión."], important:["Aviso importante","Por favor revisa esta información importante."] };
+function audienceKind(){return scopeSelect?.value.startsWith("teacher")?"teacher":"student";}
+function renderChosenRecipients(){ if(!recipientChips)return; recipientChips.replaceChildren(); chosenRecipients.forEach((person)=>{const chip=document.createElement("button");chip.type="button";chip.className="notification-recipient-chip";chip.textContent=person.full_name;chip.setAttribute("aria-label",`Quitar a ${person.full_name}`);chip.addEventListener("click",()=>{chosenRecipients.delete(person.id);renderChosenRecipients();updateSendSummary();});recipientChips.append(chip);}); }
+function updateSendSummary(){if(!sendSummary||!scopeSelect)return;const scope=scopeSelect.value;const n=chosenRecipients.size;if(scope.endsWith("_one"))sendSummary.textContent=n?`Se enviará esta notificación a ${[...chosenRecipients.values()][0].full_name}.`:"Selecciona un destinatario.";else if(scope.endsWith("_many"))sendSummary.textContent=n?`Se enviará esta notificación a ${n} destinatario${n===1?"":"s"} seleccionado${n===1?"":"s"}.`:"Selecciona destinatarios.";else if(scope==="semester_students")sendSummary.textContent=semesterSelect?.selectedOptions[0]?.dataset.total?`Se enviará esta notificación a ${semesterSelect.selectedOptions[0].dataset.total} estudiantes activos de ${semesterSelect.selectedOptions[0].textContent}.`:"Selecciona un semestre.";else if(scope==="all_students")sendSummary.textContent="Se enviará esta notificación a todos los estudiantes activos.";else if(scope==="all_teachers")sendSummary.textContent="Se enviará esta notificación a todos los docentes activos.";else if(scope==="all")sendSummary.textContent="Se enviará esta notificación a todos los usuarios activos.";}
+function updateAudienceScope(){if(!scopeSelect)return;const scope=scopeSelect.value;const individual=scope.endsWith("_one")||scope.endsWith("_many");const semester=scope==="semester_students";const mass=scope==="all_students"||scope==="all_teachers";if(recipientsGroup)recipientsGroup.hidden=!individual;if(semesterGroup)semesterGroup.hidden=!semester;if(massGroup)massGroup.hidden=!mass;const massText=scope==="all_students"?"Se enviará esta notificación a todos los estudiantes activos.":scope==="all_teachers"?"Se enviará esta notificación a todos los docentes activos.":"";if(massSummary)massSummary.textContent=massText;document.querySelector("#groupScopeAll").hidden=scope!=="all";chosenRecipients.clear();renderChosenRecipients();if(recipientResults)recipientResults.hidden=true;updateSendSummary();}
+async function loadSemesters(){if(!semesterSelect||semesterSelect.dataset.loaded)return;const url=new URL(endpoints["admin-recipients"]||"",window.location.href);url.searchParams.set("kind","semester");const payload=await request(url.toString());payload.data.semesters.forEach((row)=>{const option=document.createElement("option");option.value=row.semester;option.dataset.total=row.total;option.textContent=row.semester===1?"1.er semestre":`${row.semester}.º semestre`;semesterSelect.append(option);});semesterSelect.dataset.loaded="1";}
+function showRecipientResults(rows){if(!recipientResults)return;recipientResults.replaceChildren();if(!rows.length){const empty=document.createElement("p");empty.className="notification-recipient-empty";empty.textContent="No se encontraron coincidencias.";recipientResults.append(empty);recipientResults.hidden=false;return;}rows.forEach((person)=>{const button=document.createElement("button");button.type="button";button.role="option";const projects=(person.projects||[]).map(p=>`${p.code} · ${p.title} [${p.status}]`).join(" · ")||"Sin proyecto activo";button.innerHTML=`<strong></strong><span></span><small></small>`;button.querySelector("strong").textContent=person.full_name;button.querySelector("span").textContent=`${person.email}${person.semester?` · ${person.semester}.er semestre`:""}`;button.querySelector("small").textContent=projects;button.addEventListener("click",()=>{if(scopeSelect.value.endsWith("_one"))chosenRecipients.clear();chosenRecipients.set(person.id,person);renderChosenRecipients();updateSendSummary();recipientSearch.value="";recipientResults.hidden=true;});recipientResults.append(button);});recipientResults.hidden=false;}
+recipientSearch?.addEventListener("input",()=>{window.clearTimeout(recipientTimer);const q=recipientSearch.value.trim();const version=++recipientSearchVersion;if(q.length<2){if(recipientResults)recipientResults.hidden=true;return;}recipientTimer=window.setTimeout(async()=>{try{const url=new URL(endpoints["admin-recipients"]||"",window.location.href);url.searchParams.set("kind",audienceKind());url.searchParams.set("q",q);const payload=await request(url.toString());if(version===recipientSearchVersion)showRecipientResults(payload.data.recipients||[]);}catch(error){if(version===recipientSearchVersion)showToast(error.message,true);}},250);});
+scopeSelect?.addEventListener("change",async()=>{updateAudienceScope();if(scopeSelect.value==="semester_students")try{await loadSemesters();}catch(error){showToast(error.message,true);}});
+semesterSelect?.addEventListener("change",updateSendSummary);
+templateSelect?.addEventListener("change",()=>{const template=templates[templateSelect.value];if(template){document.querySelector("#newNotificationTitle").value=template[0];document.querySelector("#newNotificationMessage").value=template[1];}});
+const notificationTypeSelect=document.querySelector("#newNotificationType");const customTypeGroup=document.querySelector("#groupScopeCustomType");const customTypeInput=document.querySelector("#newNotificationCustomType");
+notificationTypeSelect?.addEventListener("change",()=>{const other=notificationTypeSelect.selectedOptions[0]?.dataset.customType==="1";if(customTypeGroup)customTypeGroup.hidden=!other;if(customTypeInput){customTypeInput.required=other;if(!other)customTypeInput.value="";}});
+btnNewNotification?.addEventListener("click",()=>notificationTypeSelect?.dispatchEvent(new Event("change")));
+btnNewNotification?.addEventListener("click",()=>{chosenRecipients.clear();renderChosenRecipients();updateAudienceScope();});
+document.addEventListener("click",(event)=>{if(!event.target.closest("#groupScopeRecipients")&&recipientResults)recipientResults.hidden=true;});
+const sendConfirmModal=document.querySelector("#notificationSendConfirmModal");const sendConfirmText=document.querySelector("#notificationSendConfirmText");const sendConfirmMeta=document.querySelector("#notificationSendConfirmMeta");const confirmSendButton=document.querySelector("#confirmNotificationSend");let pendingNotificationSend=null;
+function closeSendConfirmation(){if(!sendConfirmModal)return;sendConfirmModal.hidden=true;pendingNotificationSend=null;}
+function validateNotificationSend(){const scope=scopeSelect?.value||"";if(!createForm?.reportValidity())throw new Error("Completa los campos obligatorios.");if(scope.endsWith("_one")&&chosenRecipients.size!==1)throw new Error("Selecciona un destinatario.");if(scope.endsWith("_many")&&chosenRecipients.size<1)throw new Error("Selecciona al menos un destinatario.");if(scope==="semester_students"&&!semesterSelect?.value)throw new Error("Selecciona un semestre.");if((scope==="all_students"||scope==="all_teachers")&&!document.querySelector("#confirmMassCheckbox")?.checked)throw new Error("Confirma el envío masivo.");if(scope==="all"&&!document.querySelector("#confirmAllCheckbox")?.checked)throw new Error("Confirma el envío a todos los usuarios.");return scope;}
+function confirmationCopy(scope){const title=document.querySelector("#newNotificationTitle")?.value.trim()||"Sin título";const total=semesterSelect?.selectedOptions[0]?.dataset.total||"";if(scope.endsWith("_one")){const person=[...chosenRecipients.values()][0];return [`¿Deseas enviar esta notificación a ${person.full_name}?`,title];}if(scope.endsWith("_many")){const kind=scope.startsWith("student")?"estudiantes":"docentes";return [`¿Deseas enviar esta notificación a ${chosenRecipients.size} ${kind} seleccionados?`,title];}if(scope==="semester_students")return [`¿Deseas enviar esta notificación a los ${total||""} estudiantes activos de ${semesterSelect?.selectedOptions[0]?.textContent||"este semestre"}?`,title];if(scope==="all_students")return ["Esta notificación será enviada a todos los estudiantes activos. ¿Deseas continuar?",title];if(scope==="all_teachers")return ["Esta notificación será enviada a todos los docentes activos. ¿Deseas continuar?",title];return ["Este comunicado será enviado a todos los usuarios activos del sistema. Esta acción afectará a toda la comunidad de la plataforma. ¿Deseas continuar?",title];}
+async function persistNotificationSend(){if(!pendingNotificationSend||!createForm)return;const {scope,data}=pendingNotificationSend;if(data.get("type")==="other")data.set("type","system");const submit=document.querySelector("#btnSubmitNewNotification");try{confirmSendButton.disabled=true;confirmSendButton.textContent="Enviando…";submit.disabled=true;submit.textContent="Enviando…";const endpoint=scope==="all"?endpoints["admin-send"]:endpoints["admin-audience-send"];const response=await fetch(endpoint,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/x-www-form-urlencoded","X-Requested-With":"XMLHttpRequest"},body:new URLSearchParams(data)});const payload=await response.json().catch(()=>({success:false}));if(!response.ok||!payload.success)throw new Error(payload.message||"❌ No se pudo enviar la notificación. Inténtalo nuevamente.");closeSendConfirmation();createForm.reset();chosenRecipients.clear();renderChosenRecipients();updateAudienceScope();closeModal(createModal);showToast("✅ Notificación enviada correctamente.");if(statusFilter?.value==="sent")await loadNotifications();else loadNotifications();}catch(problem){console.error("Notification send failed",problem);const message="No se pudo enviar la notificación. Inténtalo nuevamente.";showToast(message,true);if(errorMsg){errorMsg.textContent=message;errorMsg.hidden=false;}closeSendConfirmation();}finally{confirmSendButton.disabled=false;confirmSendButton.textContent="Enviar notificación";submit.disabled=false;submit.textContent="Enviar notificación";}}
+createForm?.addEventListener("submit",(event)=>{event.preventDefault();event.stopImmediatePropagation();try{const scope=validateNotificationSend();if(errorMsg)errorMsg.hidden=true;const data=new FormData(createForm);chosenRecipients.forEach(person=>data.append("recipient_ids[]",person.id));const [text,title]=confirmationCopy(scope);pendingNotificationSend={scope,data};if(sendConfirmText)sendConfirmText.textContent=text;if(sendConfirmMeta)sendConfirmMeta.textContent=`Título: ${title}`;if(sendConfirmModal){sendConfirmModal.hidden=false;confirmSendButton?.focus();}}catch(problem){if(errorMsg){errorMsg.textContent=problem.message;errorMsg.hidden=false;}}},true);
+confirmSendButton?.addEventListener("click",persistNotificationSend);document.querySelector("#cancelNotificationSendConfirm")?.addEventListener("click",closeSendConfirmation);document.querySelector("#closeNotificationSendConfirm")?.addEventListener("click",closeSendConfirmation);sendConfirmModal?.addEventListener("click",(event)=>{if(event.target===sendConfirmModal&&pendingNotificationSend?.scope!=="all")closeSendConfirmation();});document.addEventListener("keydown",(event)=>{if(event.key==="Escape"&&sendConfirmModal&&!sendConfirmModal.hidden){event.stopImmediatePropagation();closeSendConfirmation();createForm?.querySelector("#btnSubmitNewNotification")?.focus();}},true);
+document.addEventListener("click",(event)=>{if(event.target===detailModal)closeModal(detailModal);if(event.target===createModal)closeModal(createModal);if(!event.target.closest("[data-filter-control]"))closeFilterMenus();if(!event.target.closest(".notification-date-filter")&&datePopover&&!datePopover.hidden){datePopover.hidden=true;dateTrigger?.setAttribute("aria-expanded","false");}if(!event.target.closest("#groupScopeRecipients")&&recipientResults)recipientResults.hidden=true;});
+
+async function openNotificationFromQuery() {
+    const url = new URL(window.location.href);
+    const rawId = url.searchParams.get("notification_id");
+    if (!/^[1-9]\d*$/.test(rawId || "")) return;
+    try {
+        const payload = await request(endpoints.open, { method: "POST", body: new URLSearchParams({ notification_id: rawId }) });
+        updateCounters(payload.data.counters || {});
+        fillDetail(payload.data.detail, payload.data.url);
+        openModal(detailModal, document.querySelector("#topbarNotificationsButton"));
+    } catch (error) {
+        console.warn("Notification detail was not available", error);
+    } finally {
+        url.searchParams.delete("notification_id");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+}
+
+openNotificationFromQuery();

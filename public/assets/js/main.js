@@ -348,8 +348,17 @@ function updateTopbarNotificationCount(unread) {
     const count = document.querySelector(".notification-count");
     const value = Math.max(0, Number(unread) || 0);
     if (!count) return;
-    count.textContent = String(value);
-    count.hidden = value === 0;
+    if (value === 0) {
+        count.textContent = "";
+        count.hidden = true;
+        count.setAttribute("aria-hidden", "true");
+        count.removeAttribute("aria-label");
+        return;
+    }
+    count.textContent = value >= 10 ? "9+" : String(value);
+    count.hidden = false;
+    count.removeAttribute("aria-hidden");
+    count.setAttribute("aria-label", `${value} ${value === 1 ? "notificación no leída" : "notificaciones no leídas"}`);
 }
 
 async function openRecentNotification(item) {
@@ -372,7 +381,9 @@ async function openRecentNotification(item) {
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || "No fue posible abrir la notificacion.");
     updateTopbarNotificationCount(payload.data.counters.unread);
-    window.location.assign(payload.data.url || fallbackUrl);
+    const notificationsUrl = new URL(topbarNotificationsPanel?.querySelector("footer a")?.href || fallbackUrl, window.location.href);
+    notificationsUrl.searchParams.set("notification_id", notificationId);
+    window.location.assign(notificationsUrl.href);
 }
 
 async function loadRecentNotifications() {
@@ -427,6 +438,20 @@ document.addEventListener("keydown", (event) => {
         topbarNotificationsButton?.focus();
     }
 });
+
+async function syncTopbarNotificationCount() {
+    const endpoint = topbarNotificationsButton?.dataset.countersEndpoint;
+    if (!endpoint || document.visibilityState === "hidden") return;
+    try {
+        const response = await fetch(endpoint, { credentials: "same-origin", headers: { "X-Requested-With": "XMLHttpRequest" } });
+        const payload = await response.json();
+        if (response.ok && payload.success) updateTopbarNotificationCount(payload.data?.counters?.unread);
+    } catch {}
+}
+
+updateTopbarNotificationCount(document.querySelector(".notification-count")?.textContent || 0);
+window.addEventListener("focus", syncTopbarNotificationCount);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncTopbarNotificationCount(); });
 // Final de panel de notificaciones recientes
 
 // Inicio de aviso descartable de contraseña temporal

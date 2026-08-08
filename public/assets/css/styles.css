@@ -286,6 +286,7 @@ a{
     align-items:center;
     border:2px solid var(--surface);
 }
+.notification-count[hidden]{display:none!important;}
 .avatar-menu{
     position:relative;
 }

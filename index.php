@@ -51,6 +51,8 @@ match ($page) {
     'admin-support-material-status' => (new AdminController())->changeSupportMaterialStatus(),
     'admin-support-material-file' => (new AdminController())->changeSupportMaterialFile(),
     'admin-notification-send' => (new AdminController())->sendNotification(),
+    'admin-notification-audience-send' => (new AdminController())->sendNotificationAudience(),
+    'admin-notification-recipients' => (new AdminController())->notificationRecipients(),
     'admin-trash-user' => (new AdminController())->trashUser(),
     'admin-trash-restore' => (new AdminController())->restoreTrash(),
     'admin-trash-purge' => (new AdminController())->purgeTrash(),
