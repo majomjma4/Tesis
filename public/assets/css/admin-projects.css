@@ -299,4 +299,30 @@ body.project-dialog-open{overflow:hidden!important}
 .ap-project-status-action:disabled{cursor:not-allowed;opacity:.52}
 .ap-project-status-complete{margin:7px 0 0;color:var(--muted);font-size:.69rem;line-height:1.45}
 @media(max-width:520px){.ap-project-status-actions{display:grid;grid-template-columns:1fr}.ap-project-status-action{width:100%}}
+/* El listado conserva una jerarquía legible incluso en anchos móviles extremos. */
+@media(max-width:400px){
+    .admin-projects-page .app-page-content{padding-right:12px;padding-left:12px}
+    .ap-head h1{font-size:clamp(1.5rem,8vw,1.8rem);line-height:1.18}
+    .ap-stats{grid-template-columns:1fr}
+    .ap-stats article{min-width:0;padding:15px}
+    .ap-stats strong{font-size:1.45rem}
+    .ap-filters{gap:9px;padding:12px}
+    .ap-filter-control select,.ap-search-field{height:44px}
+    .ap-list>article{gap:12px;padding:15px}
+    .ap-main h2{font-size:1rem;overflow-wrap:anywhere}
+    .ap-list article>div:nth-child(2){display:grid;gap:2px}
+    .ap-status-stack{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+    .ap-actions{width:100%}
+    .ap-actions a{width:100%;min-height:42px;display:inline-flex;align-items:center;justify-content:center}
+}
+@media(max-width:280px){
+    .admin-projects-page .app-page-content{padding-right:8px;padding-left:8px}
+    .ap-head{gap:9px;margin-bottom:14px}
+    .ap-head h1{font-size:1.4rem}
+    .ap-head p{font-size:.85rem;line-height:1.45}
+    .ap-stats,.ap-list{gap:8px}
+    .ap-stats article,.ap-list>article{padding:12px}
+    .ap-filters{padding:10px}
+}
 .ap-status-stack{display:grid;justify-items:start;gap:6px;min-width:0}.ap-review-situation{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid #fcd34d;border-radius:999px;background:#fffbeb;color:#92400e;font-size:10px;font-weight:800;white-space:nowrap}
+@media(max-width:400px){.ap-status-stack{display:flex;flex-wrap:wrap;gap:7px;align-items:center}}
