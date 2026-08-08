@@ -27,13 +27,12 @@ final class ArchiveService
         if (!is_readable($zipPath)) {
             return $this->error('unreadable', 'No fue posible abrir el contenido del proyecto.');
         }
+        if (!$this->hasZipReader()) {
+            return $this->error('zip_unavailable', 'El servidor no dispone de un lector ZIP habilitado.');
+        }
 
         try {
-            $entries = $this->isEmptyZip($zipPath)
-                ? []
-                : (class_exists('ZipArchive')
-                    ? $this->readEntriesWithZipArchive($zipPath)
-                    : $this->readEntriesWithPharData($zipPath));
+            $entries = $this->readEntries($zipPath);
             $this->validateArchiveLimits($entries);
         } catch (DomainException $exception) {
             error_log('ArchiveService unsafe: ' . $exception->getMessage());
@@ -82,12 +81,11 @@ final class ArchiveService
         if (!is_file($zipPath) || !is_readable($zipPath)) {
             return ['success' => false, 'status' => 'not_found', 'message' => 'El paquete no está disponible.', 'entries' => []];
         }
+        if (!$this->hasZipReader()) {
+            return ['success' => false, 'status' => 'zip_unavailable', 'message' => 'El servidor no dispone de un lector ZIP habilitado.', 'entries' => []];
+        }
         try {
-            $entries = $this->isEmptyZip($zipPath)
-                ? []
-                : (class_exists('ZipArchive')
-                    ? $this->readEntriesWithZipArchive($zipPath)
-                    : $this->readEntriesWithPharData($zipPath));
+            $entries = $this->readEntries($zipPath);
             $this->validateArchiveLimits($entries);
             return [
                 'success' => true,
@@ -116,11 +114,12 @@ final class ArchiveService
         if (!is_file($zipPath) || !is_readable($zipPath)) {
             return $this->downloadError('not_found', 'El archivo del proyecto no se encuentra disponible.');
         }
+        if (!$this->hasZipReader()) {
+            return $this->downloadError('zip_unavailable', 'El servidor no dispone de un lector ZIP habilitado.');
+        }
 
         try {
-            $entries = $this->isEmptyZip($zipPath)
-                ? []
-                : (class_exists('ZipArchive') ? $this->readEntriesWithZipArchive($zipPath) : $this->readEntriesWithPharData($zipPath));
+            $entries = $this->readEntries($zipPath);
             $this->validateArchiveLimits($entries);
             $entry = null;
             foreach ($entries as $candidate) {
@@ -243,6 +242,15 @@ final class ArchiveService
         } finally {
             fclose($handle);
         }
+    }
+
+    private function hasZipReader(): bool { return class_exists('ZipArchive') || class_exists('PharData'); }
+    private function readEntries(string $zipPath): array
+    {
+        if ($this->isEmptyZip($zipPath)) return [];
+        if (class_exists('ZipArchive')) return $this->readEntriesWithZipArchive($zipPath);
+        if (class_exists('PharData')) return $this->readEntriesWithPharData($zipPath);
+        throw new RuntimeException('No existe un lector ZIP habilitado.');
     }
 
     private function readEntriesWithZipArchive(string $zipPath): array

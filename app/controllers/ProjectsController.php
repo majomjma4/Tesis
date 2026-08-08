@@ -382,7 +382,7 @@ final class ProjectsController
         $file=($project && $fileId)?$model->findFile((int)$projectId,(int)$fileId):null;
         if(!$project||!$file){http_response_code(404);if($json)$this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);exit('El archivo solicitado no está disponible.');}
         try{$fileStorage=$admin||$repositoryScope?new ProjectDocumentFileService():new PrivateProjectFileService();$path=$fileStorage->resolveStoredFile((int)$projectId,(string)$file['storage_name']);$stream=fopen($path,'rb');}catch(Throwable){$stream=false;}
-        if($stream===false){http_response_code(404);exit('El archivo solicitado no está disponible.');}
+        if($stream===false){http_response_code(404);if($json)$this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);exit('El archivo solicitado no está disponible.');}
         return [$project,$file,$stream];
     }
 
