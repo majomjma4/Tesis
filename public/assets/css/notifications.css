@@ -1614,22 +1614,38 @@ html.theme-dark .notification-row.is-unread {
 .notification-context-menu button {
     width: 100%;
     height: auto;
-    padding: 10px;
+    padding: 9px 12px;
     border-radius: 9px;
     background: transparent;
     color: var(--text);
     display: flex;
     align-items: center;
-    gap: 9px;
-    cursor: pointer
+    justify-content: flex-start;
+    gap: 10px;
+    text-align: left;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.notification-context-menu button i {
+    font-size: 14px;
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.notification-context-menu button span {
+    text-align: left;
 }
 
 .notification-context-menu button:hover {
-    background: var(--surface-soft)
+    background: var(--surface-soft);
 }
 
 .notification-context-menu button.danger {
-    color: var(--danger)
+    color: var(--danger);
 }
 
 .notification-context-menu button.danger:hover {
