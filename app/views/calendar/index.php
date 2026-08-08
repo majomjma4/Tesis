@@ -4,8 +4,8 @@
 <section class="calendar-hero" aria-labelledby="calendarPageTitle">
     <div>
         <span class="calendar-kicker"><i class="fa-regular fa-calendar-check"></i> Agenda académica</span>
-        <h1 id="calendarPageTitle">Planifica, prioriza y cumple</h1>
-        <p>Gestiona entregas, tutorías y revisiones con una agenda clara y centralizada.</p>
+        <h1 id="calendarPageTitle">Organiza y consulta tu agenda académica</h1>
+        <p>Consulta y administra entregas, tutorías, revisiones y fechas importantes desde un solo lugar.</p>
     </div>
     <div class="calendar-hero-actions">
         <button class="calendar-secondary-btn" id="calendarTodayBtn" type="button"><i class="fa-solid fa-location-crosshairs"></i> Hoy</button>
@@ -19,7 +19,7 @@
 <section class="calendar-stats" aria-label="Resumen del calendario">
     <article><button class="calendar-stat-action" type="button" data-scope="month" aria-pressed="false" aria-label="Ver eventos del mes"><span class="calendar-stat-icon blue"><i class="fa-solid fa-calendar-day"></i></span><div><strong id="calendarMonthCount">0</strong><span>Eventos del mes</span></div><i class="fa-solid fa-chevron-right calendar-stat-arrow"></i></button></article>
     <article><button class="calendar-stat-action" type="button" data-scope="week" aria-pressed="false" aria-label="Ver próximos eventos"><span class="calendar-stat-icon orange"><i class="fa-solid fa-bolt"></i></span><div><strong id="calendarUpcomingCount">0</strong><span>Próximos 7 días</span></div><i class="fa-solid fa-chevron-right calendar-stat-arrow"></i></button></article>
-    <article><button class="calendar-stat-action" type="button" data-scope="completed" aria-pressed="false" aria-label="Ver eventos completados del mes"><span class="calendar-stat-icon green"><i class="fa-solid fa-circle-check"></i></span><div><strong id="calendarCompletedCount">0%</strong><span>Progreso del mes</span><small class="calendar-stat-detail" id="calendarCompletedDetail">0 de 0 completados</small><span class="calendar-progress-track" aria-hidden="true"><i id="calendarProgressBar"></i></span></div><i class="fa-solid fa-chevron-right calendar-stat-arrow"></i></button></article>
+    <article><button class="calendar-stat-action" type="button" data-scope="completed" aria-pressed="false" aria-label="Ver eventos completados del mes"><span class="calendar-stat-icon green"><i class="fa-solid fa-circle-check"></i></span><div><strong id="calendarCompletedCount">0%</strong><span>Eventos completados</span><small class="calendar-stat-detail" id="calendarCompletedDetail">0 de 0 completados</small><span class="calendar-progress-track" aria-hidden="true"><i id="calendarProgressBar"></i></span></div><i class="fa-solid fa-chevron-right calendar-stat-arrow"></i></button></article>
 </section>
 <!-- Final de indicadores de planificación -->
 
@@ -72,7 +72,7 @@
     <div class="calendar-agenda-backdrop" id="calendarAgendaBackdrop" hidden></div>
     <aside class="calendar-agenda" id="calendarAgenda" aria-labelledby="calendarAgendaTitle">
         <header><div><span class="calendar-kicker">Agenda del día</span><h2 id="calendarAgendaTitle"></h2><span class="calendar-agenda-date" id="calendarAgendaDate"></span></div><button class="calendar-agenda-close" id="calendarAgendaClose" type="button" aria-label="Cerrar agenda"><i class="fa-solid fa-xmark"></i></button></header>
-        <button class="calendar-agenda-add" id="calendarAgendaAdd" type="button"><i class="fa-solid fa-plus"></i> Agregar a este día</button>
+        <button class="calendar-agenda-add" id="calendarAgendaAdd" type="button"><i class="fa-solid fa-plus"></i> Agregar evento</button>
         <div class="calendar-agenda-list" id="calendarAgendaList"></div>
         <section class="calendar-upcoming"><header><div><span class="calendar-kicker">Planificación</span><h3>Próximos eventos</h3></div><span id="calendarUpcomingBadge">0</span></header><div id="calendarUpcomingList"></div></section>
         <div class="calendar-legend"><strong>Categorías</strong><span><i class="delivery"></i> Entrega</span><span><i class="meeting"></i> Reunión</span><span><i class="review"></i> Revisión</span><span><i class="deadline"></i> Fecha límite</span></div>

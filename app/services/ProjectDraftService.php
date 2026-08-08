@@ -7,7 +7,7 @@ final class ProjectDraftService
     private const TYPES = [
         'thesis' => ['label' => 'Titulación', 'prefix' => 'TIT', 'additional' => 'research_line'],
         'thesis_profile' => ['label' => 'Perfil de tesis', 'prefix' => 'PFT', 'additional' => 'research_line'],
-        'pis' => ['label' => 'Proyecto integrador de saberes (PIS)', 'prefix' => 'PIS', 'additional' => 'academic_subject'],
+        'pis' => ['label' => 'Proyecto integrador de saberes (PIS)', 'prefix' => 'PIS', 'additional' => null],
         'practice' => ['label' => 'Prácticas preprofesionales', 'prefix' => 'PRA', 'additional' => null],
         'community' => ['label' => 'Proyecto de vinculación', 'prefix' => 'VIN', 'additional' => null],
     ];
@@ -16,7 +16,6 @@ final class ProjectDraftService
     {
         return ['types' => self::TYPES, 'periods' => ['2026-I', '2026-II', '2027-I'], 'modalities' => ['individual' => 'Individual', 'group' => 'Grupal'],
             'research_lines' => ['Sistemas de información', 'Innovación tecnológica', 'Transformación digital'],
-            'subjects' => ['Integración curricular', 'Proyecto integrador', 'Nivel académico por definir'],
             'community_programs' => ['Alfabetización digital', 'Innovación comunitaria', 'Programa por definir'],
             'teachers' => [
                 ['id' => 'teacher-1', 'name' => 'Msc. Maribel Fierro Montero'],
@@ -35,7 +34,7 @@ final class ProjectDraftService
         return [
             'thesis' => ['required' => ['title','description','period','modality','research_line','tutor_id'], 'additional' => ['research_line'], 'uses_description' => true],
             'thesis_profile' => ['required' => ['title','description','period','research_line','tutor_id'], 'additional' => ['research_line'], 'uses_description' => true],
-            'pis' => ['required' => ['title','description','period','academic_subject','tutor_id'], 'additional' => ['academic_subject'], 'uses_description' => true],
+            'pis' => ['required' => ['title','description','period','tutor_id'], 'additional' => [], 'uses_description' => true],
             'practice' => ['required' => ['title','period','tutor_id'], 'additional' => [], 'uses_description' => false, 'institution_scope' => 'Instituto Superior Tecnológico El Libertador'],
             'community' => ['required' => ['title','period','tutor_id'], 'additional' => [], 'uses_description' => false],
         ];
@@ -47,7 +46,7 @@ final class ProjectDraftService
         $members = array_values(array_unique(array_filter(array_map('strval', (array) ($payload['members'] ?? [])))));
         if ($policy['auto_leader'] && !in_array('student-1', $members, true)) array_unshift($members, 'student-1');
         return ['type'=>$value('type'),'title'=>$value('title'),'description'=>$value('description'),'period'=>$value('period'),'modality'=>$value('modality'),
-            'research_line'=>$value('research_line'),'academic_subject'=>$value('academic_subject'),'receiving_institution'=>$value('receiving_institution'),
+            'research_line'=>$value('research_line'),'receiving_institution'=>$value('receiving_institution'),
             'community_program'=>$value('community_program'),'tutor_id'=>$value('tutor_id'),'leader_id'=>$policy['auto_leader']?'student-1':$value('leader_id'),
             'members'=>$members,'tags'=>array_slice(array_values(array_unique(array_filter(array_map(static fn($v)=>trim((string)$v),(array)($payload['tags']??[]))))),0,8)];
     }

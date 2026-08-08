@@ -30,27 +30,163 @@ final class SupportMaterialController
     public function detail(): void
     {
         $this->ensureSession();
+        $session = new AuthSessionService();
+        $isAdministrator = $session->hasAdminAccess();
         $materialId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
-        $material = $materialId === false || $materialId === null ? null : (new SupportMaterialModel())->findById((int) $materialId);
+        $materialModel = new SupportMaterialModel();
+        $material = $materialId === false || $materialId === null ? null : $materialModel->findById((int) $materialId, $isAdministrator);
+        $materialCategories = [];
+        $restorableFiles = [];
+        $documentEvolution = [];
+        $documentEvolutionEvents = [];
+        $hasUnreadAdministrativeActivity = false;
         if ($material === null) {
             http_response_code(404);
         } else {
             $material['downloads'] = (new SupportMaterialDownloadModel())->getTotal($material['id'], $material['downloads']);
+            $material['information_updated_at'] = $materialModel->lastInformationUpdateAt((int) $material['id']);
+            $material['editable_keywords'] = $materialModel->normalizeExistingKeywords((array) ($material['keywords'] ?? []));
+            $packageService = new SupportMaterialPackageService();
+            $material['package_descriptor'] = $packageService->describe($material);
+            if (!empty($material['package_descriptor']['available'])) {
+                $preparedPackage = null;
+                try {
+                    $preparedPackage = $packageService->prepare($material);
+                    $material['package_descriptor']['size_bytes'] = (int) ($preparedPackage['size_bytes']
+                        ?? filesize((string) $preparedPackage['path'])
+                        ?: 0);
+                    $material['package_descriptor']['size'] = ArchiveService::formatBytes(
+                        (int) $material['package_descriptor']['size_bytes']
+                    );
+                    $material['package_descriptor']['source'] = (string) $preparedPackage['source'];
+                } catch (Throwable $exception) {
+                    error_log('Support material package prewarm: ' . $exception->getMessage());
+                    $material['package_descriptor']['available'] = false;
+                } finally {
+                    if (is_array($preparedPackage) && !empty($preparedPackage['temporary'])
+                        && is_file((string) ($preparedPackage['path'] ?? ''))) {
+                        @unlink((string) $preparedPackage['path']);
+                    }
+                }
+            }
+            $documentEvolutionTotal = $materialModel->documentEvolutionEventCount((int) $material['id']);
+            $documentEvolutionEvents = $materialModel->documentEvolutionEvents((int) $material['id'], 16, 0);
+            $documentEvolutionEvents = array_slice($documentEvolutionEvents, 0, 15);
+            $evolutionFileIds = array_values(array_unique(array_filter(array_map(
+                static fn (array $event): int => (string) ($event['type'] ?? '') === 'file-replaced' ? (int) ($event['file_id'] ?? 0) : 0,
+                $documentEvolutionEvents
+            ))));
+            $documentEvolution = $evolutionFileIds
+                ? $materialModel->documentEvolution((int) $material['id'], $evolutionFileIds)
+                : [];
+            $initialGroups=[];foreach($documentEvolution as $group)$initialGroups[(int)$group['file_id']]=$this->evolutionGroupUrls((int)$material['id'],$group);
+            $documentEvolution=array_values($initialGroups);
+            foreach($documentEvolutionEvents as &$event){$event['preview_url']='';$event['download_url']='';if(($event['file_state']??'')==='available'&&(int)($event['file_id']??0)>0){$query='&material_id='.(int)$material['id'].'&file_id='.(int)$event['file_id'];$event['download_url']=route('support-material-download').$query;if(in_array((string)($event['extension']??''),['pdf','docx','txt','png','jpg','jpeg','webp'],true))$event['preview_url']=route('support-material-preview').$query;}}unset($event);
+            if ($isAdministrator) {
+                $materialCategories = $materialModel->categories();
+                $restorableFiles = $materialModel->restorableFiles((int) $material['id']);
+                $hasUnreadAdministrativeActivity = (new AdminActivityModel())->hasUnreadSupportMaterialEvents(
+                    (int) $session->userId(), (int) $material['id']
+                );
+            }
         }
 
         View::render('repository/material-detalle', [
             'currentPage' => 'repository',
             'title' => $material === null ? 'Material no encontrado | Repositorio' : $material['title'] . ' | Material de apoyo',
-            'pageScript' => asset('js/repository-detail.js'),
+            'pageScript' => asset('js/material-admin-actions.js'),
+            'pageScripts' => [asset('js/repository-detail.js')],
             'material' => $material,
             'repositoryUrl' => route('repository'),
             'materialsUrl' => route('support-materials'),
             'previewActionUrl' => route('support-material-preview'),
             'previewContentActionUrl' => route('support-material-preview-content'),
             'downloadActionUrl' => route('support-material-download'),
+            'zipListActionUrl' => route('support-material-zip-list'),
+            'zipEntryPreviewActionUrl' => route('support-material-zip-entry-preview'),
+            'zipEntryDownloadActionUrl' => route('support-material-zip-entry-download'),
+            'packageDownloadActionUrl' => route('support-material-package-download'),
+            'isAdministrator' => $isAdministrator,
+            'materialEditUrl' => $material === null ? '' : route('support-material-detail') . '&id=' . (int) $material['id'] . '&mode=edit&tab=information',
+            'materialSaveEndpoint' => route('admin-support-material-save'),
+            'materialFileEndpoint' => $isAdministrator ? route('admin-support-material-file') : '',
+            'materialStatusEndpoint' => $isAdministrator ? route('admin-support-material-status') : '',
+            'materialHistoryEndpoint' => $isAdministrator ? route('admin-support-material-history') . '&id=' . (int) ($material['id'] ?? 0) : '',
+            'materialHistoryCleanupEndpoint' => $isAdministrator ? route('admin-support-material-history-cleanup') : '',
+            'materialCsrfToken' => $isAdministrator ? $session->csrfToken('admin_repository') : '',
+            'materialCategories' => $materialCategories,
+            'materialFileLimits' => $isAdministrator ? (new SupportMaterialFileService())->limits() : [],
+            'restorableFiles' => $restorableFiles,
+            'documentEvolution' => $documentEvolution,
+            'documentEvolutionEvents' => $documentEvolutionEvents,
+            'documentEvolutionTotal' => $documentEvolutionTotal ?? 0,
+            'hasUnreadAdministrativeActivity' => $hasUnreadAdministrativeActivity,
+            'versionPreviewActionUrl' => route('support-material-version-preview'),
+            'versionDownloadActionUrl' => route('support-material-version-download'),
         ]);
     }
     // Final de presentación de materiales
+
+    public function evolutionEvents(): void
+    {
+        $this->ensureSession();
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') $this->sendJson(false, 'Método no permitido.');
+        $materialId = filter_var($_GET['material_id'] ?? null, FILTER_VALIDATE_INT);
+        $offset = max(0, (int) ($_GET['offset'] ?? 0));
+        $administrator = (new AuthSessionService())->hasAdminAccess();
+        $model = new SupportMaterialModel();
+        $material = $materialId ? $model->findById((int) $materialId, $administrator) : null;
+        if (!$material) { http_response_code(404); $this->sendJson(false, 'El material solicitado no está disponible.'); }
+        $events = $model->documentEvolutionEvents((int) $materialId, 16, $offset);
+        $hasMore = count($events) > 15;
+        $events = array_slice($events, 0, 15);
+        $fileIds = array_values(array_unique(array_filter(array_map(
+            static fn (array $event): int => (string) ($event['type'] ?? '') === 'file-replaced' ? (int) ($event['file_id'] ?? 0) : 0,
+            $events
+        ))));
+        $groups = $fileIds ? $model->documentEvolution((int) $materialId, $fileIds) : [];
+        $groupByFile = [];
+        foreach ($groups as $group) {
+            $auditIds=array_values(array_filter(array_map(static fn(array $version):int=>(int)($version['replacement_audit_id']??0),(array)$group['versions'])));
+            $groupByFile[(int)$group['file_id']]=['latest_audit_id'=>$auditIds?max($auditIds):0,'group'=>$this->evolutionGroupUrls((int)$materialId,$group)];
+        }
+        foreach ($events as &$event) {
+            $candidate=$groupByFile[(int)($event['file_id']??0)]??null;
+            $event['version_group']=$candidate&&($candidate['latest_audit_id']===0||$candidate['latest_audit_id']===(int)$event['id'])?$candidate['group']:null;
+            $event['preview_url'] = '';
+            $event['download_url'] = '';
+            if (($event['file_state'] ?? '') === 'available' && (int) ($event['file_id'] ?? 0) > 0) {
+                $query = '&material_id=' . (int) $materialId . '&file_id=' . (int) $event['file_id'];
+                $event['download_url'] = route('support-material-download') . $query;
+                if (in_array((string) ($event['extension'] ?? ''), ['pdf','docx','txt','png','jpg','jpeg','webp'], true)) {
+                    $event['preview_url'] = route('support-material-preview') . $query;
+                }
+            }
+        }
+        unset($event);
+        $total = $model->documentEvolutionEventCount((int) $materialId);
+        $this->sendJson(true, 'Evolución documental cargada.', [
+            'events' => $events, 'total' => $total, 'loaded' => count($events),
+            'has_more' => $hasMore, 'next_offset' => $offset + count($events),
+        ]);
+    }
+
+    private function evolutionGroupUrls(int $materialId, array $group): array
+    {
+        foreach ($group['versions'] as &$version) {
+            $version['preview_url'] = '';
+            $version['download_url'] = '';
+            if (($version['state'] ?? '') !== 'available') continue;
+            $query = '&material_id=' . $materialId . '&file_id=' . (int) $version['file_id'];
+            if (empty($version['current'])) $query .= '&version_id=' . (int) $version['id'];
+            $version['download_url'] = (empty($version['current']) ? route('support-material-version-download') : route('support-material-download')) . $query;
+            if (!empty($version['preview_supported'])) {
+                $version['preview_url'] = (empty($version['current']) ? route('support-material-version-preview') : route('support-material-preview')) . $query;
+            }
+        }
+        unset($version);
+        return $group;
+    }
 
     // Inicio de vistas previas seguras
     // Clasifica el archivo y transmite en línea únicamente los formatos autorizados.
@@ -94,6 +230,196 @@ final class SupportMaterialController
         fclose($stream);
         exit;
     }
+
+    public function versionPreview(): void
+    {
+        $this->ensureGetJson();
+        [$material, $version, $stream] = $this->resolveHistoricalVersionRequest(true);
+        $fileData = $this->buildPreviewFile($version, $stream);
+        $query = '&material_id=' . rawurlencode((string) $material['id'])
+            . '&file_id=' . rawurlencode((string) $version['file_id'])
+            . '&version_id=' . rawurlencode((string) $version['id']);
+        $preview = (new FilePreviewService())->prepare(
+            $fileData,
+            base_url('index.php?page=support-material-version-content' . $query),
+            base_url('index.php?page=support-material-version-download' . $query)
+        );
+        fclose($stream);
+        $this->sendJson(true, $preview['message'], ['preview' => $preview]);
+    }
+
+    public function versionContent(): void
+    {
+        $this->ensureSession();
+        $this->ensureGet();
+        [, $version, $stream] = $this->resolveHistoricalVersionRequest();
+        $fileData = $this->buildPreviewFile($version, $stream);
+        if (!(new FilePreviewService())->canStreamInline($fileData)) {
+            fclose($stream);
+            http_response_code(415);
+            $this->renderError('Este formato debe descargarse para consultarlo.');
+        }
+        session_write_close();
+        header('Content-Type: ' . $this->mimeFor($version['extension']));
+        header('Content-Length: ' . $version['size_bytes']);
+        header('Content-Disposition: inline; filename*=UTF-8\'\'' . rawurlencode($version['name']));
+        header('X-Content-Type-Options: nosniff');
+        header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
+        header('Cache-Control: private, no-store, max-age=0');
+        fpassthru($stream);
+        fclose($stream);
+        exit;
+    }
+
+    public function versionDownload(): void
+    {
+        $this->ensureSession();
+        $this->ensureGet();
+        [, $version, $stream] = $this->resolveHistoricalVersionRequest();
+        session_write_close();
+        $fallbackName = preg_replace('/[^A-Za-z0-9._-]/', '_', $version['name']) ?: 'version';
+        header('Content-Type: ' . $this->mimeFor($version['extension']));
+        header('Content-Length: ' . $version['size_bytes']);
+        header('Content-Disposition: attachment; filename="' . $fallbackName . '"; filename*=UTF-8\'\'' . rawurlencode($version['name']));
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store, max-age=0');
+        fpassthru($stream);
+        fclose($stream);
+        exit;
+    }
+
+    public function zipList(): void
+    {
+        $this->ensureGetJson();
+        [$material, $file, $stream] = $this->resolveFileRequest(true);
+        fclose($stream);
+        if ($file['extension'] !== 'zip') {
+            http_response_code(422);
+            $this->sendJson(false, 'El archivo seleccionado no es un paquete navegable.');
+        }
+        $packageDescription = (new SupportMaterialPackageService())->describe($material);
+        if (!empty($file['package']) && empty($packageDescription['browsable'])) {
+            http_response_code(404);
+            $this->sendJson(false, 'Este paquete no contiene recursos adicionales navegables.');
+        }
+        $archive = (new ArchiveService())->listDirectory($file['path'], (string) ($_GET['path'] ?? ''));
+        if (!$archive['success']) {
+            $status = match ($archive['status']) {
+                'not_found' => 404,
+                'invalid_path' => 400,
+                'unsafe' => 422,
+                default => 422,
+            };
+            http_response_code($status);
+            $this->sendJson(false, $archive['message'], ['archive' => $archive]);
+        }
+        $this->sendJson(true, $archive['message'], ['archive' => $archive]);
+    }
+
+    public function zipEntryPreview(): void
+    {
+        $this->ensureGetJson();
+        [$material, $zipFile, $entry] = $this->resolveZipEntryRequest(true);
+        $query = '&material_id=' . rawurlencode((string) $material['id'])
+            . '&file_id=' . rawurlencode((string) $zipFile['id'])
+            . '&path=' . rawurlencode((string) $entry['path']);
+        $preview = (new FilePreviewService())->prepare(
+            $entry,
+            base_url('index.php?page=support-material-zip-entry-content' . $query),
+            base_url('index.php?page=support-material-zip-entry-download' . $query)
+        );
+        $this->closeArchiveEntry($entry);
+        $this->sendJson(true, $preview['message'], ['preview' => $preview]);
+    }
+
+    public function zipEntryContent(): void
+    {
+        $this->ensureSession();
+        $this->ensureGet();
+        [, , $entry] = $this->resolveZipEntryRequest();
+        if (!(new FilePreviewService())->canStreamInline($entry)) {
+            $this->closeArchiveEntry($entry);
+            http_response_code(415);
+            $this->renderError('Este formato no puede visualizarse dentro de la plataforma.');
+        }
+        session_write_close();
+        header('Content-Type: ' . $entry['mime']);
+        header('Content-Length: ' . $entry['size']);
+        header('Content-Disposition: inline; filename*=UTF-8\'\'' . rawurlencode($entry['name']));
+        header('X-Content-Type-Options: nosniff');
+        header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
+        header('Cache-Control: private, no-store, max-age=0');
+        fpassthru($entry['stream']);
+        $this->closeArchiveEntry($entry);
+        exit;
+    }
+
+    public function zipEntryDownload(): void
+    {
+        $this->ensureSession();
+        $this->ensureGet();
+        [, , $entry] = $this->resolveZipEntryRequest();
+        session_write_close();
+        $originalName = basename(str_replace('\\', '/', (string) $entry['name']));
+        $quotedName = str_replace(['\\', '"'], ['\\\\', '\\"'], preg_replace('/[\x00-\x1F\x7F]/u', '', $originalName) ?: 'archivo');
+        header('Content-Type: ' . $entry['mime']);
+        header('Content-Length: ' . $entry['size']);
+        header('Content-Disposition: attachment; filename="' . $quotedName . '"; filename*=UTF-8\'\'' . rawurlencode($originalName));
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store, max-age=0');
+        fpassthru($entry['stream']);
+        $this->closeArchiveEntry($entry);
+        exit;
+    }
+
+    public function downloadPackage(): void
+    {
+        $this->ensureSession();
+        $this->ensureGet();
+        $materialId = filter_var($_GET['material_id'] ?? $_GET['id'] ?? null, FILTER_VALIDATE_INT);
+        $material = $materialId === false || $materialId === null
+            ? null
+            : (new SupportMaterialModel())->findById((int) $materialId);
+        if ($material === null) {
+            http_response_code(404);
+            $this->renderError('El material solicitado no está disponible.');
+        }
+        if (empty($material['is_available'])) {
+            http_response_code(404);
+            $this->renderError('El material está publicado, pero temporalmente no está disponible para consulta o descarga.');
+        }
+        try {
+            $package = (new SupportMaterialPackageService())->prepare($material);
+            $stream = fopen($package['path'], 'rb');
+            $size = filesize($package['path']);
+            if ($stream === false || $size === false) throw new RuntimeException('No fue posible abrir el paquete.');
+            if (!empty($package['temporary'])) {
+                $temporaryPath = $package['path'];
+                register_shutdown_function(static function () use ($temporaryPath): void {
+                    if (is_file($temporaryPath)) @unlink($temporaryPath);
+                });
+            }
+            (new SupportMaterialDownloadModel())->increment((int) $material['id']);
+            session_write_close();
+            $name = 'material_' . (int) $material['id'] . '.zip';
+            header('Content-Type: application/zip');
+            header('Content-Length: ' . $size);
+            header('Content-Disposition: attachment; filename="' . $name . '"');
+            header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: private, no-store, max-age=0');
+            fpassthru($stream);
+            fclose($stream);
+            if (!empty($package['temporary']) && is_file($package['path'])) @unlink($package['path']);
+            exit;
+        } catch (InvalidArgumentException $exception) {
+            http_response_code(404);
+            $this->renderError($exception->getMessage());
+        } catch (Throwable $exception) {
+            error_log('Support material package: ' . $exception->getMessage());
+            http_response_code(422);
+            $this->renderError('No fue posible generar el paquete completo porque uno o más archivos no están disponibles. No se descargó un paquete incompleto.');
+        }
+    }
     // Final de vistas previas seguras
 
     // Inicio de descarga de materiales
@@ -103,7 +429,7 @@ final class SupportMaterialController
         $this->ensureSession();
         $this->ensureGet();
         [$material, $file, $stream] = $this->resolveFileRequest();
-        if ($file['primary'] || ($file['package'] ?? false)) {
+        if ($file['presentation'] || ($file['package'] ?? false)) {
             (new SupportMaterialDownloadModel())->increment($material['id']);
         }
         session_write_close();
@@ -130,6 +456,9 @@ final class SupportMaterialController
         if ($material === null) {
             $this->failFileRequest(404, 'El material solicitado no está disponible.', $jsonResponse);
         }
+        if (empty($material['is_available'])) {
+            $this->failFileRequest(404, 'El material está publicado, pero temporalmente no está disponible para consulta o descarga.', $jsonResponse);
+        }
         $file = $fileId === false || $fileId === null ? null : $model->findFile($material, (int) $fileId);
         if ($file === null || !in_array($file['extension'], self::ALLOWED_EXTENSIONS, true)) {
             $this->failFileRequest(404, 'El archivo solicitado no está disponible.', $jsonResponse);
@@ -138,6 +467,7 @@ final class SupportMaterialController
         $basePath = realpath(ROOT_PATH . '/storage/support-materials');
         $realPath = realpath($file['path']);
         if ($basePath === false || $realPath === false || !str_starts_with(strtolower($realPath), strtolower($basePath . DIRECTORY_SEPARATOR)) || !is_readable($realPath)) {
+            error_log('Support material file unavailable material=' . (int) $material['id'] . ' file=' . (int) $file['id']);
             $this->failFileRequest(404, 'El archivo solicitado no está disponible.', $jsonResponse);
         }
         $stream = fopen($realPath, 'rb');
@@ -150,6 +480,60 @@ final class SupportMaterialController
     private function buildPreviewFile(array $file, $stream): array
     {
         return ['name' => $file['name'], 'path' => (string) $file['id'], 'size' => $file['size_bytes'], 'mime' => $this->mimeFor($file['extension']), 'stream' => $stream, 'archive' => null];
+    }
+
+    private function resolveZipEntryRequest(bool $jsonResponse = false): array
+    {
+        [$material, $zipFile, $zipStream] = $this->resolveFileRequest($jsonResponse);
+        fclose($zipStream);
+        if (($zipFile['extension'] ?? '') !== 'zip') {
+            $this->failFileRequest(422, 'El archivo seleccionado no es un paquete navegable.', $jsonResponse);
+        }
+        $entry = (new ArchiveService())->openFileStream($zipFile['path'], (string) ($_GET['path'] ?? ''));
+        if (empty($entry['success'])) {
+            $status = match ($entry['status'] ?? '') {
+                'invalid_path' => 400,
+                'not_found' => 404,
+                default => 422,
+            };
+            $this->failFileRequest($status, (string) ($entry['message'] ?? 'No fue posible abrir el archivo interno.'), $jsonResponse);
+        }
+        return [$material, $zipFile, $entry];
+    }
+
+    private function resolveHistoricalVersionRequest(bool $jsonResponse = false): array
+    {
+        $materialId = filter_var($_GET['material_id'] ?? null, FILTER_VALIDATE_INT);
+        $fileId = filter_var($_GET['file_id'] ?? null, FILTER_VALIDATE_INT);
+        $versionId = filter_var($_GET['version_id'] ?? null, FILTER_VALIDATE_INT);
+        if ($materialId === false || $fileId === false || $versionId === false
+            || $materialId === null || $fileId === null || $versionId === null) {
+            $this->failFileRequest(400, 'La versión solicitada no es válida.', $jsonResponse);
+        }
+        $model = new SupportMaterialModel();
+        $material = $model->findById((int) $materialId);
+        if ($material === null) {
+            $this->failFileRequest(404, 'El material solicitado no está disponible.', $jsonResponse);
+        }
+        $version = $model->findHistoricalVersion((int) $materialId, (int) $fileId, (int) $versionId);
+        if ($version === null) {
+            $this->failFileRequest(
+                404,
+                'Esta versión ya no se encuentra disponible en el sistema.',
+                $jsonResponse
+            );
+        }
+        $stream = fopen($version['path'], 'rb');
+        if ($stream === false) {
+            $this->failFileRequest(404, 'Esta versión ya no se encuentra disponible en el sistema.', $jsonResponse);
+        }
+        return [$material, $version, $stream];
+    }
+
+    private function closeArchiveEntry(array $entry): void
+    {
+        if (isset($entry['stream']) && is_resource($entry['stream'])) fclose($entry['stream']);
+        if (isset($entry['archive']) && $entry['archive'] instanceof ZipArchive) $entry['archive']->close();
     }
 
     private function mimeFor(string $extension): string

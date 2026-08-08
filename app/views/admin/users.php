@@ -17,11 +17,11 @@ $career=$catalogs['career']??null;$period=$catalogs['period']??null;
     <article class="users-summary-admins"><strong><?= (int)$userSummary['administrators']?></strong><span>Administradores</span></article>
 </section>
 
-<form class="users-filters" method="get" role="search">
+<form class="users-filters admin-filter-bar" method="get" role="search">
     <input type="hidden" name="page" value="admin-users">
-    <label class="users-search-field"><span class="sr-only">Buscar usuarios</span><i class="fa-solid fa-magnifying-glass"></i><input type="search" name="search" value="<?=e($filters['search'])?>" placeholder="Buscar por usuario, nombre, correo o cédula" autocomplete="off" data-no-search-history><button type="button" class="users-search-clear" aria-label="Limpiar búsqueda" hidden><i class="fa-solid fa-xmark"></i></button></label>
-    <select name="role" aria-label="Filtrar por rol"><option value="">Todos los roles</option><option value="student" <?=$filters['role']==='student'?'selected':''?>>Estudiantes</option><option value="teacher" <?=$filters['role']==='teacher'?'selected':''?>>Docentes</option><option value="administrator" <?=$filters['role']==='administrator'?'selected':''?>>Administradores</option></select>
-    <select name="status" aria-label="Filtrar por estado"><option value="">Todos los estados</option><option value="active" <?=$filters['status']==='active'?'selected':''?>>Activos</option><option value="inactive" <?=$filters['status']==='inactive'?'selected':''?>>Inactivos</option><option value="blocked" <?=$filters['status']==='blocked'?'selected':''?>>Bloqueados</option></select>
+    <label class="users-search-field admin-filter-search admin-filter-item-search"><span class="sr-only">Buscar usuarios</span><i class="fa-solid fa-magnifying-glass"></i><input type="search" name="search" value="<?=e($filters['search'])?>" placeholder="Buscar por usuario, nombre, correo o cédula" autocomplete="off" data-no-search-history><button type="button" class="users-search-clear" aria-label="Limpiar búsqueda" hidden><i class="fa-solid fa-xmark"></i></button></label>
+    <label class="admin-filter-control"><span>Rol</span><select name="role" aria-label="Filtrar por rol"><option value="">Todos</option><option value="student" <?=$filters['role']==='student'?'selected':''?>>Estudiantes</option><option value="teacher" <?=$filters['role']==='teacher'?'selected':''?>>Docentes</option><option value="administrator" <?=$filters['role']==='administrator'?'selected':''?>>Administradores</option></select></label>
+    <label class="admin-filter-control"><span>Estado</span><select name="status" aria-label="Filtrar por estado"><option value="">Todos</option><option value="active" <?=$filters['status']==='active'?'selected':''?>>Activos</option><option value="inactive" <?=$filters['status']==='inactive'?'selected':''?>>Inactivos</option><option value="blocked" <?=$filters['status']==='blocked'?'selected':''?>>Bloqueados</option></select></label>
 </form>
 
 <section class="users-table-card">

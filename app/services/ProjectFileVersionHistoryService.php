@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+/** Lectura histórica segura; nunca expone rutas ni habilita descargas antiguas. */
+final class ProjectFileVersionHistoryService
+{
+    public function __construct(private readonly ?PDO $db=null) {}
+
+    public function forFile(int $projectId,int $fileId,int $actorId,string $context):array
+    {
+        $db=$this->db??Database::connection();if(!$this->canView($db,$projectId,$actorId,$context))throw new InvalidArgumentException('No tienes autorización para consultar estas versiones.');$file=$db->prepare('SELECT id,project_id,original_name,checksum_sha256,storage_name,deleted_at,purged_at FROM project_files WHERE id=:file AND project_id=:project');$file->execute(['file'=>$fileId,'project'=>$projectId]);$current=$file->fetch();if(!$current)throw new InvalidArgumentException('El archivo solicitado no existe.');
+        $query=$db->prepare("SELECT v.id version_id,v.version_number,v.checksum_sha256,v.storage_name,v.replaced_at,v.physical_status,v.unavailable_reason,c.id change_id,c.new_version_number,c.declared_summary,c.sections_json,c.previous_document_status,c.new_document_status,c.changed_at
+            FROM project_file_versions v LEFT JOIN project_file_version_changes c ON c.previous_version_id=v.id WHERE v.project_id=:project AND v.file_id=:file ORDER BY v.version_number");$query->execute(['project'=>$projectId,'file'=>$fileId]);$versions=[];
+        foreach($query->fetchAll() as $row)$versions[]=$this->historical($db,$projectId,$row);
+        $change=$db->prepare('SELECT * FROM project_file_version_changes WHERE project_id=:project AND file_id=:file AND new_checksum=:checksum LIMIT 1');$change->execute(['project'=>$projectId,'file'=>$fileId,'checksum'=>$current['checksum_sha256']]);$currentChange=$change->fetch()?:null;
+        $max=$versions===[]?0:max(array_column($versions,'version_number'));$versions[]=['version_number'=>$currentChange?(int)$currentChange['new_version_number']:$max+1,'checksum'=>(string)$current['checksum_sha256'],'summary'=>$currentChange?(string)$currentChange['declared_summary']:'Resumen de cambios no disponible para esta versión histórica.','sections'=>$currentChange?$this->sections($currentChange['sections_json']):[],'addressed_observations'=>$currentChange?$this->observations($db,(int)$currentChange['id']):[],'previous_document_status'=>$currentChange['previous_document_status']??null,'new_document_status'=>$currentChange['new_document_status']??null,'physical_status'=>!empty($current['purged_at'])?'unavailable':'active','is_download_available'=>false,'changed_at'=>$currentChange['changed_at']??null];
+        return ['project_id'=>$projectId,'file_id'=>$fileId,'file_name'=>$current['original_name'],'versions'=>$versions];
+    }
+    private function historical(PDO $db,int $project,array $row):array{$structured=!empty($row['change_id']);$status=in_array((string)($row['physical_status']??''),['active','archived','unavailable'],true)?(string)$row['physical_status']:'active';return ['version_number'=>(int)$row['version_number'],'checksum'=>(string)$row['checksum_sha256'],'summary'=>$structured?(string)$row['declared_summary']:'Resumen de cambios no disponible para esta versión histórica.','sections'=>$structured?$this->sections($row['sections_json']):[],'addressed_observations'=>$structured?$this->observations($db,(int)$row['change_id']):[],'previous_document_status'=>$row['previous_document_status']??null,'new_document_status'=>$row['new_document_status']??null,'physical_status'=>$status,'unavailable_reason'=>$row['unavailable_reason']??null,'is_download_available'=>false,'changed_at'=>$row['changed_at']??$row['replaced_at']];}
+    private function observations(PDO $db,int $change):array{$q=$db->prepare('SELECT o.id,o.category,o.location_reference,o.body,o.status FROM project_file_version_addressed_observations link JOIN project_observations o ON o.id=link.observation_id WHERE link.change_id=:change ORDER BY o.id');$q->execute(['change'=>$change]);return array_map(static function(array $row):array{$row['id']=(int)$row['id'];return $row;},$q->fetchAll());}
+    private function sections(mixed $json):array{$decoded=is_string($json)?json_decode($json,true):[];return is_array($decoded)?array_values(array_map('strval',$decoded)):[];}
+    private function canView(PDO $db,int $project,int $actor,string $context):bool
+    {
+        if(!in_array($context,['academic','academic_management'],true)||$actor<1)return false;$identity=$db->prepare("SELECT u.is_admin,GROUP_CONCAT(DISTINCT r.code) roles FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.id=:actor AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL GROUP BY u.id");$identity->execute(['actor'=>$actor]);$user=$identity->fetch();if(!$user)return false;if($context==='academic_management')return !empty($user['is_admin']);$roles=explode(',',(string)$user['roles']);
+        $assignment=$db->prepare("SELECT LOWER(role_code) FROM project_participants WHERE project_id=:project AND user_id=:actor AND status='active' AND removed_at IS NULL");$assignment->execute(['project'=>$project,'actor'=>$actor]);$projectRoles=array_map('strval',$assignment->fetchAll(PDO::FETCH_COLUMN));$tutor=$db->prepare('SELECT tutor_id FROM projects WHERE id=:project AND deleted_at IS NULL');$tutor->execute(['project'=>$project]);$tutorId=(int)$tutor->fetchColumn();return (in_array('student',$roles,true)&&in_array('student',$projectRoles,true))||(in_array('teacher',$roles,true)&&($tutorId===$actor||array_intersect($projectRoles,['tutor','co_tutor','cotutor','co-tutor'])!==[]));
+    }
+}

@@ -1,0 +1,24 @@
+.digital-record[data-entity-type="project"] .ed-academic-event[data-event-type="adjustment"]{--event-tone:#b45309}
+.digital-record[data-entity-type="project"] .ed-academic-event[data-event-type="document-review"]{--event-tone:#2563eb}
+.digital-record[data-entity-type="project"] .ed-academic-event[data-event-type="file"]{--event-tone:#0f766e}
+.digital-record[data-entity-type="project"] .ed-academic-meta li{max-width:100%;overflow-wrap:anywhere}
+.project-adjustment-list blockquote{margin:9px 0 0;padding:8px 10px;border-left:3px solid #93c5fd;border-radius:0 8px 8px 0;background:#eff6ff;color:#1e3a8a;font-size:10px;line-height:1.5}
+.ed-contextual-notices{grid-column:1/-1;display:grid;gap:10px}.ed-contextual-notices .project-adjustment-banner{margin:0}
+#projectAdjustmentDialog{position:fixed;inset:0;width:100vw;height:100dvh;z-index:99999;display:grid;place-items:center;margin:0;padding:24px;border:0;background:rgba(15,23,42,.52);overflow:hidden;overscroll-behavior:contain;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+#projectAdjustmentDialog[hidden]{display:none!important}
+#projectAdjustmentDialog>section{width:min(620px,calc(100vw - 32px));max-width:100%;max-height:calc(100dvh - 48px);display:flex;flex-direction:column;margin:0;border:0;border-radius:16px;background:var(--surface);box-shadow:0 24px 70px rgba(15,23,42,.3);overflow:hidden;transform:translateX(140px)}
+#projectAdjustmentDialog>section>header{flex:none}
+#projectAdjustmentDialog form{min-height:0;padding:0;display:flex;flex:1 1 auto;flex-direction:column;gap:0;overflow:hidden}
+#projectAdjustmentDialog .modal-body{min-height:0;padding:18px 19px;display:grid;flex:1 1 auto;gap:14px;overflow-y:auto;overscroll-behavior:contain}
+#projectAdjustmentDialog .modal-body>p{margin:0;color:var(--muted);font-size:11px;line-height:1.5}
+#projectAdjustmentDialog footer{margin:0;padding:12px 19px 18px;border-top:1px solid var(--line);flex:none}
+body.project-adjustment-dialog-open .custom-select-panel{z-index:100000}
+body.project-adjustment-dialog-open{overflow:hidden;overscroll-behavior:none}
+@media(max-width:1000px){#projectAdjustmentDialog>section{transform:none}}
+@media(max-width:520px){#projectAdjustmentDialog{padding:8px}#projectAdjustmentDialog>section{max-height:calc(100dvh - 16px);border-radius:13px}#projectAdjustmentDialog .modal-body{padding:14px}#projectAdjustmentDialog footer{padding:10px 14px 14px}}
+@media(max-width:330px){#projectAdjustmentDialog{padding:6px}#projectAdjustmentDialog>section{max-height:calc(100dvh - 12px)}}
+/* Aligns the scrollable adjustment modal body with existing dialog spacing. */
+#projectAdjustmentDialog .modal-body{padding:20px 22px;gap:16px}
+#projectAdjustmentDialog .modal-body>p{font-size:12px;line-height:1.5}
+#projectAdjustmentDialog footer{padding:12px 22px 20px}
+@media(max-width:520px){#projectAdjustmentDialog .modal-body{padding:16px}#projectAdjustmentDialog footer{padding:11px 16px 16px}}

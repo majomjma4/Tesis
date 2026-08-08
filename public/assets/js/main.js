@@ -53,18 +53,12 @@ document.addEventListener("click", (event) => {
     if (!menuLink || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     if (!window.matchMedia("(max-width: 900px)").matches) return;
 
-    if (menuLink.classList.contains("active")) {
-        event.preventDefault();
-        closeSidebar();
-        return;
-    }
-
     saveSidebarScroll();
 });
 document.addEventListener("click", (event) => {
     if (!appGlobalSkeleton) return;
     const link = event.target.closest("a[href]");
-    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target === "_blank" || link.hasAttribute("download")) return;
+    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target === "_blank" || link.hasAttribute("download") || link.hasAttribute("data-record-download")) return;
     if (link.closest(".data-pagination")) return;
     const destination = new URL(link.href, window.location.href);
     if (destination.origin !== window.location.origin || !destination.pathname.toLowerCase().endsWith("index.php")) return;
@@ -454,7 +448,7 @@ if (temporaryPasswordWarning) {
     const instances = [];
     let active = null;
     let ignoreScrollUntil = 0;
-    const close = (focus = false) => { if (!active) return; const { button, panel } = active; panel.remove(); button.setAttribute("aria-expanded", "false"); button.closest(".custom-select")?.classList.remove("is-open"); active = null; if (focus) button.focus(); };
+    const close = (focus = false) => { if (!active) return; const { button, panel, customSection, customHome } = active; if (customSection && customHome) { customSection.hidden = true; customHome.append(customSection); } panel.remove(); button.setAttribute("aria-expanded", "false"); button.closest(".custom-select")?.classList.remove("is-open"); active = null; if (focus) button.focus(); };
     const position = (button, panel) => {
         const rect = button.getBoundingClientRect(), margin = 8, gap = 6;
         const viewportHeight = window.visualViewport?.height || window.innerHeight;
@@ -463,25 +457,38 @@ if (temporaryPasswordWarning) {
         panel.style.left = `${Math.min(Math.max(margin, rect.left), window.innerWidth - panel.offsetWidth - margin)}px`;
         const availableBelow = Math.max(40, opensAbove ? rect.top - gap - margin : viewportHeight - rect.bottom - gap - margin);
         const visibleOptions = [...panel.querySelectorAll(".custom-select-option:not([hidden])")];
-        panel.style.overflowY = visibleOptions.length > 4 ? "auto" : "hidden";
-        const options = visibleOptions.slice(0, 4);
+        const configuredLimit = Number(button.closest(".custom-select")?.querySelector("select")?.dataset.dropdownVisibleOptions || 4);
+        const visibleOptionLimit = Number.isFinite(configuredLimit) ? Math.max(1, Math.floor(configuredLimit)) : 4;
+        const hasEmbeddedCustom = panel.classList.contains("has-embedded-custom");
+        panel.style.overflowY = hasEmbeddedCustom ? "hidden" : (visibleOptions.length > visibleOptionLimit ? "auto" : "hidden");
+        const options = visibleOptions.slice(0, visibleOptionLimit);
         const panelStyle = getComputedStyle(panel);
         const bottomInset = parseFloat(panelStyle.paddingBottom) + parseFloat(panelStyle.borderBottomWidth);
         const completeOptionHeights = options.map(option => Math.ceil(option.offsetTop + option.offsetHeight + bottomInset));
         const fittingHeights = completeOptionHeights.filter(height => height <= availableBelow);
-        const completeHeight = fittingHeights.at(-1) || Math.min(completeOptionHeights[0] || panel.scrollHeight, availableBelow);
+        const completeHeight = hasEmbeddedCustom
+            ? Math.min(panel.scrollHeight, availableBelow)
+            : (fittingHeights.at(-1) || Math.min(completeOptionHeights[0] || panel.scrollHeight, availableBelow));
         panel.style.setProperty("max-height", `${Math.min(completeHeight, availableBelow)}px`, "important");
+        if (hasEmbeddedCustom) panel.style.overflowY = panel.scrollHeight > availableBelow ? "auto" : "hidden";
         panel.style.top = `${opensAbove ? Math.max(margin, rect.top - gap - Math.min(completeHeight, availableBelow)) : rect.bottom + gap}px`;
     };
     document.querySelectorAll(".app-shell select:not([multiple]):not([data-native-select])").forEach((select, index) => {
         if (select.closest(".calendar-select-wrap")) return;
         const wrapper = document.createElement("span"); wrapper.className = "custom-select"; select.parentNode.insertBefore(wrapper, select); wrapper.append(select); select.classList.add("custom-select-native"); select.dataset.enhanced = "true";
         const button = document.createElement("button"); button.type = "button"; button.className = "custom-select-trigger"; button.setAttribute("aria-haspopup", "listbox"); button.setAttribute("aria-expanded", "false"); button.setAttribute("aria-controls", `customSelectPanel${index}`); button.innerHTML = '<span></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>'; wrapper.append(button);
-        const sync = () => { const option = select.options[select.selectedIndex]; button.querySelector("span").textContent = option?.textContent.trim() || "Selecciona una opción"; button.disabled = select.disabled; button.classList.toggle("is-placeholder", !select.value); };
+        const embeddedInput = select.dataset.embeddedCustom ? document.getElementById(select.dataset.embeddedCustom) : null;
+        const embeddedSection = embeddedInput?.closest("[data-custom-select-content]") || null;
+        const embeddedHome = embeddedSection?.parentElement || null;
+        if (embeddedSection) button.setAttribute("aria-label", select.labels?.[0]?.textContent.trim() || "Tipo de material");
+        const sync = () => { const option = select.options[select.selectedIndex]; const customLabel = select.value === "Otros" ? embeddedInput?.value.trim() : ""; button.querySelector("span").textContent = customLabel || option?.textContent.trim() || "Selecciona una opción"; button.disabled = select.disabled; button.classList.toggle("is-placeholder", !select.value); };
+        embeddedInput?.addEventListener("input", sync);
         const open = () => {
             if (button.disabled) return; if (active?.select === select) return close(true); close(); sync();
             document.dispatchEvent(new CustomEvent("app:dropdown-open", { detail: { trigger: button } }));
-            const panel = document.createElement("div"); panel.id = `customSelectPanel${index}`; panel.className = "custom-select-panel"; panel.setAttribute("role", "listbox"); panel.setAttribute("aria-label", select.getAttribute("aria-label") || "Opciones");
+            const panel = document.createElement("div"); panel.id = `customSelectPanel${index}`; panel.className = "custom-select-panel"; panel.setAttribute("role", embeddedSection ? "dialog" : "listbox"); panel.setAttribute("aria-label", select.getAttribute("aria-label") || "Opciones");
+            const optionHost = embeddedSection ? document.createElement("div") : panel;
+            if (embeddedSection) { optionHost.setAttribute("role", "listbox"); optionHost.setAttribute("aria-label", "Tipos de material"); panel.append(optionHost); }
             const searchable = select.dataset.searchable === "true" || select.options.length > 8;
             if (searchable) panel.classList.add("is-searchable");
             let searchInput = null, emptyMessage = null;
@@ -489,14 +496,21 @@ if (temporaryPasswordWarning) {
                 const search = document.createElement("label"); search.className = "custom-select-search"; search.innerHTML = '<i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span class="sr-only">Buscar una opción</span>';
                 searchInput = document.createElement("input"); searchInput.type = "search"; searchInput.placeholder = select.dataset.searchPlaceholder || "Buscar en la lista..."; searchInput.autocomplete = "off"; search.append(searchInput); panel.append(search);
             }
-            [...select.options].forEach(option => { const item = document.createElement("button"); item.type = "button"; item.className = "custom-select-option"; item.disabled = option.disabled; item.dataset.searchText = option.textContent.trim().toLocaleLowerCase("es"); item.setAttribute("role", "option"); item.setAttribute("aria-selected", String(option.selected)); item.innerHTML = '<span></span><i class="fa-solid fa-check" aria-hidden="true"></i>'; item.querySelector("span").textContent = option.textContent.trim(); item.addEventListener("click", () => { select.value = option.value; select.dispatchEvent(new Event("input", { bubbles: true })); select.dispatchEvent(new Event("change", { bubbles: true })); sync(); close(true); }); panel.append(item); });
+            [...select.options].filter(option => !option.hidden).forEach(option => { const item = document.createElement("button"); item.type = "button"; item.className = "custom-select-option"; item.disabled = option.disabled; item.dataset.searchText = option.textContent.trim().toLocaleLowerCase("es"); item.setAttribute("role", "option"); item.setAttribute("aria-selected", String(option.selected)); item.innerHTML = '<span></span><i class="fa-solid fa-check" aria-hidden="true"></i>'; item.querySelector("span").textContent = option.textContent.trim(); item.addEventListener("click", () => { select.value = option.value; select.dispatchEvent(new Event("input", { bubbles: true })); select.dispatchEvent(new Event("change", { bubbles: true })); sync(); if (option.value === "Otros" && embeddedSection && embeddedInput) { panel.querySelectorAll(".custom-select-option").forEach(panelOption => panelOption.setAttribute("aria-selected", String(panelOption === item))); embeddedSection.hidden = false; position(button, panel); embeddedInput.focus(); return; } close(true); }); optionHost.append(item); });
+            if (embeddedSection) {
+                panel.classList.add("has-embedded-custom");
+                panel.append(embeddedSection);
+                embeddedSection.hidden = select.value !== "Otros";
+            }
             if (searchInput) {
                 emptyMessage = document.createElement("p"); emptyMessage.className = "custom-select-empty"; emptyMessage.textContent = "No hay coincidencias."; emptyMessage.hidden = true; panel.append(emptyMessage);
                 searchInput.addEventListener("input", () => { const query = searchInput.value.trim().toLocaleLowerCase("es"); let visible = 0; panel.querySelectorAll(".custom-select-option").forEach(item => { item.hidden = query !== "" && !item.dataset.searchText.includes(query); if (!item.hidden) visible++; }); emptyMessage.hidden = visible > 0; position(button, panel); });
                 searchInput.addEventListener("keydown", event => { if (event.key === "ArrowDown") { event.preventDefault(); panel.querySelector(".custom-select-option:not(:disabled):not([hidden])")?.focus(); } });
             }
             document.body.append(panel);
-            const firstOptions = [...panel.querySelectorAll(".custom-select-option:not([hidden])")].slice(0, 4);
+            const configuredLimit = Number(select.dataset.dropdownVisibleOptions || 4);
+            const initialOptionLimit = Number.isFinite(configuredLimit) ? Math.max(1, Math.floor(configuredLimit)) : 4;
+            const firstOptions = [...panel.querySelectorAll(".custom-select-option:not([hidden])")].slice(0, initialOptionLimit);
             const lastInitialOption = firstOptions.at(-1);
             const desiredHeight = lastInitialOption ? lastInitialOption.offsetTop + lastInitialOption.offsetHeight + 8 : panel.scrollHeight;
             const viewportHeight = window.visualViewport?.height || window.innerHeight;
@@ -504,12 +518,12 @@ if (temporaryPasswordWarning) {
                 ignoreScrollUntil = performance.now() + 300;
                 button.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
             }
-            wrapper.classList.add("is-open"); button.setAttribute("aria-expanded", "true"); active = { select, button, panel }; position(button, panel); panel.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
-            searchInput?.focus();
+            wrapper.classList.add("is-open"); button.setAttribute("aria-expanded", "true"); active = { select, button, panel, customSection: embeddedSection, customHome: embeddedHome }; position(button, panel); panel.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+            if (select.value === "Otros" && embeddedInput) embeddedInput.focus(); else searchInput?.focus();
         };
         button.addEventListener("click", open);
         button.addEventListener("keydown", event => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); open(); return; } if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); if (active?.select !== select) open(); const options = [...(active?.panel.querySelectorAll(".custom-select-option:not(:disabled):not([hidden])") || [])]; options[Math.max(0, options.findIndex(option => option.getAttribute("aria-selected") === "true"))]?.focus(); } });
-        select.addEventListener("change", sync); select.form?.addEventListener("reset", () => setTimeout(sync)); sync(); instances.push({ sync });
+        select.addEventListener("change", sync); select.form?.addEventListener("reset", () => setTimeout(sync)); sync(); instances.push({ select, sync });
     });
     document.addEventListener("click", event => { if (active && !event.target.closest(".custom-select-panel") && !event.target.closest(".custom-select-trigger")) close(); });
     document.addEventListener("app:dropdown-open", event => { if (active && active.button !== event.detail?.trigger) close(); });
@@ -519,7 +533,18 @@ if (temporaryPasswordWarning) {
         if (active && performance.now() < ignoreScrollUntil) { requestAnimationFrame(() => active && position(active.button, active.panel)); return; }
         close();
     }, true);
-    new MutationObserver(() => instances.forEach(({ sync }) => sync())).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden", "disabled", "selected"] });
+    new MutationObserver(records => {
+        const changedSelects = new Set();
+        records.forEach(record => {
+            const target = record.target;
+            const select = target instanceof HTMLSelectElement
+                ? target
+                : (target instanceof HTMLOptionElement ? target.closest("select") : null);
+            if (select?.dataset.enhanced === "true") changedSelects.add(select);
+        });
+        if (!changedSelects.size) return;
+        instances.forEach(instance => { if (changedSelects.has(instance.select)) instance.sync(); });
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden", "disabled", "selected"] });
 })();
 
 // Mantiene los diálogos fuera de contenedores animados o desplazables.

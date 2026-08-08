@@ -21,6 +21,10 @@ CREATE TABLE system_settings (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT INTO system_settings(setting_key,setting_value) VALUES
+('support_material_types','[{"id":1,"name":"Normativa","is_active":true,"aliases":[]},{"id":2,"name":"Formato","is_active":true,"aliases":[]},{"id":3,"name":"Guía documental","is_active":true,"aliases":[]},{"id":4,"name":"Plantilla","is_active":true,"aliases":[]},{"id":5,"name":"Instructivo","is_active":true,"aliases":[]},{"id":6,"name":"Reglamento","is_active":true,"aliases":[]}]'),
+('support_material_keywords','[{"id":1,"name":"Tesis","is_active":true,"aliases":[]},{"id":2,"name":"Perfil de tesis","is_active":true,"aliases":[]},{"id":3,"name":"Titulación","is_active":true,"aliases":[]},{"id":4,"name":"Investigación","is_active":true,"aliases":[]},{"id":5,"name":"Metodología","is_active":true,"aliases":[]},{"id":6,"name":"Normativa","is_active":true,"aliases":[]},{"id":7,"name":"Reglamento","is_active":true,"aliases":[]},{"id":8,"name":"Formato","is_active":true,"aliases":[]},{"id":9,"name":"Plantilla","is_active":true,"aliases":[]},{"id":10,"name":"Guía documental","is_active":true,"aliases":[]},{"id":11,"name":"Vinculación","is_active":true,"aliases":[]},{"id":12,"name":"Proyecto PIS","is_active":true,"aliases":[]},{"id":13,"name":"Prácticas preprofesionales","is_active":true,"aliases":[]}]');
+
 CREATE TABLE users (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   email VARCHAR(190) NOT NULL UNIQUE,
@@ -70,6 +74,7 @@ CREATE TABLE admin_audit_log (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_admin_audit_date (created_at),
   INDEX idx_admin_audit_entity (entity_type, entity_id),
+  INDEX idx_admin_audit_entity_date (entity_type, entity_id, created_at),
   INDEX idx_admin_activity_filters (module, action, result, created_at),
   INDEX idx_admin_activity_actor_date (actor_user_id, created_at),
   CONSTRAINT fk_admin_audit_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
@@ -90,6 +95,27 @@ CREATE TABLE academic_periods (
   ends_on DATE NOT NULL,
   status ENUM('planned','active','closed') NOT NULL DEFAULT 'planned',
   CONSTRAINT chk_period_dates CHECK (ends_on >= starts_on)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE academic_period_transitions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  closed_period_id SMALLINT UNSIGNED NOT NULL,
+  activated_period_id SMALLINT UNSIGNED NOT NULL,
+  performed_by BIGINT UNSIGNED NOT NULL,
+  performed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reverted_by BIGINT UNSIGNED NULL,
+  reverted_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_period_transition_event (closed_period_id, activated_period_id, performed_at),
+  INDEX idx_period_transition_latest (performed_at, id),
+  INDEX idx_period_transition_actor (performed_by, performed_at),
+  INDEX idx_period_transition_reverted (reverted_at),
+  CONSTRAINT chk_period_transition_distinct CHECK (closed_period_id <> activated_period_id),
+  CONSTRAINT chk_period_transition_reversal CHECK ((reverted_by IS NULL AND reverted_at IS NULL) OR (reverted_by IS NOT NULL AND reverted_at IS NOT NULL)),
+  CONSTRAINT fk_period_transition_closed FOREIGN KEY (closed_period_id) REFERENCES academic_periods(id),
+  CONSTRAINT fk_period_transition_activated FOREIGN KEY (activated_period_id) REFERENCES academic_periods(id),
+  CONSTRAINT fk_period_transition_performer FOREIGN KEY (performed_by) REFERENCES users(id),
+  CONSTRAINT fk_period_transition_reverter FOREIGN KEY (reverted_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE student_profiles (
@@ -172,6 +198,7 @@ CREATE TABLE projects (
   defense_at DATETIME NULL,
   closed_at DATETIME NULL,
   published_at DATETIME NULL,
+  is_available TINYINT(1) NOT NULL DEFAULT 1,
   created_by BIGINT UNSIGNED NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -197,6 +224,27 @@ CREATE TABLE project_code_sequences (
   next_number INT UNSIGNED NOT NULL DEFAULT 1,
   PRIMARY KEY (project_type_id, code_year),
   CONSTRAINT fk_code_sequence_type FOREIGN KEY (project_type_id) REFERENCES project_types(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE keywords (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  normalized_name VARCHAR(120) NOT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_keywords_normalized_name (normalized_name),
+  INDEX idx_keywords_active_name (is_active, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_keywords (
+  project_id BIGINT UNSIGNED NOT NULL,
+  keyword_id BIGINT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (project_id, keyword_id),
+  INDEX idx_project_keywords_keyword (keyword_id),
+  CONSTRAINT fk_project_keywords_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_project_keywords_keyword FOREIGN KEY (keyword_id) REFERENCES keywords(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE project_participants (
@@ -234,7 +282,7 @@ CREATE TABLE project_deliveries (
   version_number INT UNSIGNED NOT NULL,
   title VARCHAR(220) NOT NULL,
   comment TEXT NULL,
-  status ENUM('submitted','under_review','changes_required','approved') NOT NULL DEFAULT 'submitted',
+  status ENUM('submitted','under_review','corrections_requested','approved') NOT NULL DEFAULT 'submitted',
   submitted_by BIGINT UNSIGNED NOT NULL,
   submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_delivery_version (project_id, version_number),
@@ -255,13 +303,99 @@ CREATE TABLE project_files (
   extension VARCHAR(12) NOT NULL,
   size_bytes BIGINT UNSIGNED NOT NULL,
   checksum_sha256 CHAR(64) NOT NULL,
+  sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
   uploaded_by BIGINT UNSIGNED NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted_at DATETIME NULL,
+  deleted_by BIGINT UNSIGNED NULL,
+  purged_at DATETIME NULL,
+  purged_by BIGINT UNSIGNED NULL,
   INDEX idx_files_project (project_id, category),
+  INDEX idx_project_file_restore_window (project_id, deleted_at, purged_at),
   CONSTRAINT fk_files_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
   CONSTRAINT fk_files_delivery FOREIGN KEY (delivery_id) REFERENCES project_deliveries(id),
-  CONSTRAINT fk_files_user FOREIGN KEY (uploaded_by) REFERENCES users(id)
+  CONSTRAINT fk_files_user FOREIGN KEY (uploaded_by) REFERENCES users(id),
+  CONSTRAINT fk_project_file_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id),
+  CONSTRAINT fk_project_file_purged_by FOREIGN KEY (purged_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_file_versions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  file_id BIGINT UNSIGNED NOT NULL,
+  project_id BIGINT UNSIGNED NOT NULL,
+  version_number INT UNSIGNED NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  storage_name VARCHAR(190) NOT NULL,
+  storage_path VARCHAR(500) NOT NULL,
+  extension VARCHAR(12) NOT NULL,
+  mime_type VARCHAR(120) NOT NULL,
+  size_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  checksum_sha256 CHAR(64) NOT NULL,
+  replaced_by BIGINT UNSIGNED NULL,
+  replaced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  replacement_reason VARCHAR(500) NULL,
+  physical_status ENUM('active','archived','unavailable') NOT NULL DEFAULT 'active',
+  archived_at DATETIME NULL,
+  archived_by BIGINT UNSIGNED NULL,
+  verified_at DATETIME NULL,
+  checksum_verified TINYINT(1) NOT NULL DEFAULT 0,
+  storage_tier VARCHAR(40) NOT NULL DEFAULT 'active',
+  retention_until DATE NULL,
+  legal_hold TINYINT(1) NOT NULL DEFAULT 0,
+  unavailable_reason VARCHAR(500) NULL,
+  archive_reason VARCHAR(500) NULL,
+  UNIQUE KEY uq_project_file_version_number(file_id, version_number),
+  INDEX idx_project_file_version_project(project_id, replaced_at),
+  CONSTRAINT fk_project_file_version_file FOREIGN KEY(file_id) REFERENCES project_files(id) ON DELETE CASCADE,
+  CONSTRAINT fk_project_file_version_project FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_project_file_version_actor FOREIGN KEY(replaced_by) REFERENCES users(id),
+  CONSTRAINT fk_project_file_version_archived_by FOREIGN KEY(archived_by) REFERENCES users(id),
+  CONSTRAINT chk_project_file_version_positive CHECK(version_number > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_file_review_states (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT UNSIGNED NOT NULL,
+  file_id BIGINT UNSIGNED NOT NULL,
+  checksum_sha256 CHAR(64) NOT NULL,
+  status ENUM('development','under_review','approved','corrections_requested') NOT NULL DEFAULT 'development',
+  reviewed_by BIGINT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_project_file_review_version(file_id,checksum_sha256),
+  INDEX idx_project_file_review_summary(project_id,status),
+  CONSTRAINT fk_project_file_review_project FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_project_file_review_file FOREIGN KEY(file_id) REFERENCES project_files(id) ON DELETE CASCADE,
+  CONSTRAINT fk_project_file_review_actor FOREIGN KEY(reviewed_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_file_version_changes (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT UNSIGNED NOT NULL,
+  file_id BIGINT UNSIGNED NOT NULL,
+  previous_version_id BIGINT UNSIGNED NULL,
+  previous_checksum CHAR(64) NOT NULL,
+  new_checksum CHAR(64) NOT NULL,
+  previous_version_number INT UNSIGNED NOT NULL,
+  new_version_number INT UNSIGNED NOT NULL,
+  changed_by BIGINT UNSIGNED NOT NULL,
+  changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reason VARCHAR(500) NOT NULL,
+  declared_summary VARCHAR(2000) NOT NULL,
+  sections_json JSON NULL,
+  previous_document_status ENUM('development','under_review','approved','corrections_requested') NOT NULL,
+  new_document_status ENUM('development','under_review','approved','corrections_requested') NOT NULL DEFAULT 'development',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_project_file_version_change_new(file_id,new_checksum),
+  UNIQUE KEY uq_project_file_version_change_number(file_id,new_version_number),
+  INDEX idx_file_version_change_project_date(project_id,changed_at,id),
+  CONSTRAINT fk_file_version_change_project FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_file_version_change_file FOREIGN KEY(file_id) REFERENCES project_files(id) ON DELETE CASCADE,
+  CONSTRAINT fk_file_version_change_previous FOREIGN KEY(previous_version_id) REFERENCES project_file_versions(id) ON DELETE SET NULL,
+  CONSTRAINT fk_file_version_change_actor FOREIGN KEY(changed_by) REFERENCES users(id),
+  CONSTRAINT chk_file_version_change_checksums CHECK(previous_checksum<>new_checksum),
+  CONSTRAINT chk_file_version_change_numbers CHECK(new_version_number=previous_version_number+1),
+  CONSTRAINT chk_file_version_change_sections CHECK(sections_json IS NULL OR JSON_VALID(sections_json))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE project_observations (
@@ -290,6 +424,86 @@ CREATE TABLE observation_responses (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_responses_observation FOREIGN KEY (observation_id) REFERENCES project_observations(id) ON DELETE CASCADE,
   CONSTRAINT fk_responses_author FOREIGN KEY (author_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_file_version_addressed_observations (
+  change_id BIGINT UNSIGNED NOT NULL,
+  observation_id BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY(change_id,observation_id),
+  INDEX idx_version_addressed_observation(observation_id,change_id),
+  CONSTRAINT fk_version_addressed_change FOREIGN KEY(change_id) REFERENCES project_file_version_changes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_version_addressed_observation FOREIGN KEY(observation_id) REFERENCES project_observations(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_file_version_archive_manifests (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT UNSIGNED NOT NULL,
+  file_id BIGINT UNSIGNED NOT NULL,
+  version_id BIGINT UNSIGNED NOT NULL,
+  checksum_sha256 CHAR(64) NOT NULL,
+  size_bytes BIGINT UNSIGNED NOT NULL,
+  mime_type VARCHAR(120) NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  version_number INT UNSIGNED NOT NULL,
+  replaced_at DATETIME NOT NULL,
+  replaced_by BIGINT UNSIGNED NULL,
+  historical_document_status VARCHAR(40) NOT NULL,
+  declared_summary VARCHAR(2000) NULL,
+  sections_json JSON NULL,
+  addressed_observations_json JSON NULL,
+  storage_tier VARCHAR(40) NOT NULL,
+  archived_reason VARCHAR(500) NOT NULL,
+  verified_at DATETIME NOT NULL,
+  checksum_verified TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_archive_manifest_version(version_id),
+  INDEX idx_archive_manifest_project(project_id,version_number),
+  CONSTRAINT fk_archive_manifest_project FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_archive_manifest_file FOREIGN KEY(file_id) REFERENCES project_files(id) ON DELETE CASCADE,
+  CONSTRAINT fk_archive_manifest_version FOREIGN KEY(version_id) REFERENCES project_file_versions(id) ON DELETE CASCADE,
+  CONSTRAINT fk_archive_manifest_actor FOREIGN KEY(replaced_by) REFERENCES users(id),
+  CONSTRAINT chk_archive_manifest_sections CHECK(sections_json IS NULL OR JSON_VALID(sections_json)),
+  CONSTRAINT chk_archive_manifest_observations CHECK(addressed_observations_json IS NULL OR JSON_VALID(addressed_observations_json))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_adjustment_requests (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  project_id BIGINT UNSIGNED NOT NULL,
+  requested_by BIGINT UNSIGNED NOT NULL,
+  request_type VARCHAR(60) NOT NULL,
+  message TEXT NOT NULL,
+  related_section VARCHAR(100) NULL,
+  related_field VARCHAR(100) NULL,
+  file_id BIGINT UNSIGNED NULL,
+  status ENUM('pending','addressed','closed') NOT NULL DEFAULT 'pending',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  addressed_at DATETIME NULL,
+  closed_at DATETIME NULL,
+  closed_by BIGINT UNSIGNED NULL,
+  lock_version INT UNSIGNED NOT NULL DEFAULT 1,
+  INDEX idx_adjustment_project_status_date(project_id,status,created_at,id),
+  INDEX idx_adjustment_requester(requested_by),
+  INDEX idx_adjustment_file(file_id),
+  INDEX idx_adjustment_closed_by(closed_by),
+  CONSTRAINT fk_adjustment_project FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  CONSTRAINT fk_adjustment_requester FOREIGN KEY(requested_by) REFERENCES users(id),
+  CONSTRAINT fk_adjustment_file FOREIGN KEY(file_id) REFERENCES project_files(id),
+  CONSTRAINT fk_adjustment_closed_by FOREIGN KEY(closed_by) REFERENCES users(id),
+  CONSTRAINT chk_adjustment_lock_version CHECK(lock_version>0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_adjustment_request_responses (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  request_id BIGINT UNSIGNED NOT NULL,
+  author_id BIGINT UNSIGNED NOT NULL,
+  message TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_adjustment_response_request_date(request_id,created_at,id),
+  INDEX idx_adjustment_response_author(author_id),
+  CONSTRAINT fk_adjustment_response_request FOREIGN KEY(request_id) REFERENCES project_adjustment_requests(id) ON DELETE CASCADE,
+  CONSTRAINT fk_adjustment_response_author FOREIGN KEY(author_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE project_comments (
@@ -351,7 +565,7 @@ CREATE TABLE notifications (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NOT NULL,
   project_id BIGINT UNSIGNED NULL,
-  type ENUM('delivery','observation','status_change','review','reminder','system','tribunal','repository','comment') NOT NULL,
+  type ENUM('delivery','observation','status_change','review','reminder','system','tribunal','repository','comment','adjustment') NOT NULL,
   title VARCHAR(180) NOT NULL,
   message TEXT NOT NULL,
   action_url VARCHAR(500) NULL,
@@ -391,6 +605,126 @@ CREATE TABLE project_downloads (
   CONSTRAINT fk_download_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE support_material_categories (
+  id SMALLINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  slug VARCHAR(80) NOT NULL UNIQUE,
+  name VARCHAR(120) NOT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE support_materials (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  category_id SMALLINT UNSIGNED NOT NULL,
+  academic_period_id SMALLINT UNSIGNED NULL,
+  title VARCHAR(220) NOT NULL,
+  material_type VARCHAR(100) NOT NULL,
+  description VARCHAR(500) NOT NULL,
+  full_description TEXT NOT NULL,
+  publisher VARCHAR(180) NOT NULL,
+  publication_date DATE NULL,
+  published_at DATETIME NULL,
+  status ENUM('published','withdrawn') NOT NULL DEFAULT 'published',
+  is_available TINYINT(1) NOT NULL DEFAULT 1,
+  download_count INT UNSIGNED NOT NULL DEFAULT 0,
+  keywords_json LONGTEXT NULL,
+  withdrawn_at DATETIME NULL,
+  withdrawn_by BIGINT UNSIGNED NULL,
+  deleted_at DATETIME NULL,
+  deleted_by BIGINT UNSIGNED NULL,
+  deletion_reason VARCHAR(500) NULL,
+  purged_at DATETIME NULL,
+  purged_by BIGINT UNSIGNED NULL,
+  created_by BIGINT UNSIGNED NULL,
+  updated_by BIGINT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_support_material_category FOREIGN KEY (category_id) REFERENCES support_material_categories(id),
+  CONSTRAINT fk_support_material_period FOREIGN KEY (academic_period_id) REFERENCES academic_periods(id),
+  CONSTRAINT fk_support_material_withdrawn_by FOREIGN KEY (withdrawn_by) REFERENCES users(id),
+  CONSTRAINT fk_support_material_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id),
+  CONSTRAINT fk_support_material_purged_by FOREIGN KEY (purged_by) REFERENCES users(id),
+  CONSTRAINT fk_support_material_created_by FOREIGN KEY (created_by) REFERENCES users(id),
+  CONSTRAINT fk_support_material_updated_by FOREIGN KEY (updated_by) REFERENCES users(id),
+  INDEX idx_support_material_status_date (status, publication_date),
+  INDEX idx_support_material_category (category_id)
+  ,INDEX idx_support_material_visibility (status,is_available,deleted_at,purged_at)
+  ,INDEX idx_support_material_trash (deleted_at,purged_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE support_material_files (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  material_id BIGINT UNSIGNED NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  storage_name VARCHAR(255) NOT NULL,
+  relative_path VARCHAR(500) NOT NULL,
+  extension VARCHAR(15) NOT NULL,
+  mime_type VARCHAR(150) NOT NULL,
+  size_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  sha256 CHAR(64) NULL,
+  is_package TINYINT(1) NOT NULL DEFAULT 0,
+  sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  created_by BIGINT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at DATETIME NULL,
+  deleted_by BIGINT UNSIGNED NULL,
+  purged_at DATETIME NULL,
+  purged_by BIGINT UNSIGNED NULL,
+  CONSTRAINT fk_support_file_material FOREIGN KEY (material_id) REFERENCES support_materials(id),
+  CONSTRAINT fk_support_file_created_by FOREIGN KEY (created_by) REFERENCES users(id),
+  CONSTRAINT fk_support_file_deleted_by FOREIGN KEY (deleted_by) REFERENCES users(id),
+  CONSTRAINT fk_support_file_purged_by FOREIGN KEY (purged_by) REFERENCES users(id),
+  UNIQUE KEY uq_support_material_path (material_id, relative_path),
+  INDEX idx_support_file_material_active (material_id, deleted_at),
+  INDEX idx_support_file_restore_window (material_id, deleted_at, purged_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE support_material_file_versions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  file_id BIGINT UNSIGNED NOT NULL,
+  material_id BIGINT UNSIGNED NOT NULL,
+  version_number INT UNSIGNED NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  storage_name VARCHAR(255) NOT NULL,
+  relative_path VARCHAR(500) NOT NULL,
+  extension VARCHAR(15) NOT NULL,
+  mime_type VARCHAR(150) NOT NULL,
+  size_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  sha256 CHAR(64) NULL,
+  replaced_by BIGINT UNSIGNED NULL,
+  replaced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_support_file_version_file FOREIGN KEY (file_id) REFERENCES support_material_files(id),
+  CONSTRAINT fk_support_file_version_material FOREIGN KEY (material_id) REFERENCES support_materials(id),
+  CONSTRAINT fk_support_file_version_actor FOREIGN KEY (replaced_by) REFERENCES users(id),
+  CONSTRAINT chk_support_file_version_positive CHECK (version_number > 0),
+  UNIQUE KEY uq_support_file_version_number (file_id, version_number),
+  INDEX idx_support_file_version_history (file_id, replaced_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DELIMITER $$
+CREATE TRIGGER trg_support_file_version_number_immutable
+BEFORE UPDATE ON support_material_file_versions
+FOR EACH ROW
+BEGIN
+  IF NOT (NEW.version_number <=> OLD.version_number) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT='El número de una versión documental es inmutable';
+  END IF;
+END$$
+DELIMITER ;
+
+CREATE TABLE support_material_audit_reads (
+  user_id BIGINT UNSIGNED NOT NULL,
+  material_id BIGINT UNSIGNED NOT NULL,
+  last_seen_audit_id BIGINT UNSIGNED NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id,material_id),
+  CONSTRAINT fk_support_material_audit_read_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_support_material_audit_read_material FOREIGN KEY (material_id) REFERENCES support_materials(id) ON DELETE CASCADE,
+  INDEX idx_support_material_audit_read_event (last_seen_audit_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT INTO roles (code, name) VALUES
 ('student','Estudiante'),('teacher','Docente'),('administrator','Administrador');
 
@@ -403,3 +737,24 @@ INSERT INTO careers (code, name) VALUES
 
 INSERT INTO academic_periods (code, name, starts_on, ends_on, status) VALUES
 ('2026-I','I PAO 2026','2026-04-01','2026-09-30','active');
+
+INSERT INTO support_material_categories (id,slug,name) VALUES
+(1,'tesis','Tesis'),(2,'practicas','Prácticas'),(3,'proyecto-pis','Proyectos PIS'),(4,'vinculacion','Vinculación');
+
+INSERT INTO support_materials
+(id,category_id,academic_period_id,title,material_type,description,full_description,publisher,publication_date,status,download_count,keywords_json) VALUES
+(1,1,1,'Guía para la elaboración del perfil de tesis','Guía','Orientaciones para estructurar correctamente el perfil y preparar el proceso de titulación.','Esta guía reúne los criterios institucionales para elaborar el perfil de tesis.\n\nIncluye recomendaciones para delimitar el tema, formular objetivos, organizar antecedentes y presentar la propuesta académica.','Instituto Superior Tecnológico "El Libertador"','2026-07-08','published',86,'["Perfil de tesis","Titulación","Metodología"]'),
+(2,2,1,'Formato de seguimiento de prácticas preprofesionales','Formato','Formato institucional para registrar actividades, horas cumplidas y evidencias de prácticas.','Documento editable destinado al seguimiento periódico de las prácticas preprofesionales.\n\nPermite registrar actividades, resultados, evidencias y validaciones del responsable institucional.','Instituto Superior Tecnológico "El Libertador"','2026-06-20','published',63,'["Prácticas","Seguimiento","Evidencias"]'),
+(3,3,1,'Instructivo para proyectos PIS','Instructivo','Pasos y criterios para organizar entregables, evidencias y presentación de proyectos integradores.','Este instructivo explica el flujo recomendado para desarrollar proyectos PIS.\n\nDetalla la organización de equipos, entregables mínimos, evidencias y criterios generales de presentación.','Instituto Superior Tecnológico "El Libertador"','2025-12-12','published',49,'["PIS","Entregables","Proyectos"]'),
+(4,4,1,'Formato de informe de vinculación','Plantilla','Plantilla editable para documentar actividades, beneficiarios, resultados e impacto comunitario.','Plantilla institucional para presentar el informe de las actividades de vinculación.\n\nOrganiza objetivos, participantes, resultados, evidencias e indicadores de impacto comunitario.','Instituto Superior Tecnológico "El Libertador"','2025-11-30','published',38,'["Vinculación","Informe","Impacto"]'),
+(5,1,1,'Reglamento de uso del material académico','Reglamento','Disposiciones generales para consultar y utilizar responsablemente los recursos institucionales.','Documento informativo sobre el uso responsable del material académico institucional.\n\nResume las condiciones de consulta, atribución y distribución de los recursos disponibles.','Instituto Superior Tecnológico "El Libertador"','2025-05-14','published',21,'["Reglamento","Recursos","Uso académico"]');
+
+INSERT INTO support_material_files
+(id,material_id,original_name,storage_name,relative_path,extension,mime_type,size_bytes,is_package,sort_order) VALUES
+(1,1,'guia_perfil_tesis.pdf','guia_perfil_tesis.pdf','guia_perfil_tesis.pdf','pdf','application/pdf',689,0,1),
+(2,1,'lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt','lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt','lista_de_verificacion_para_elaboracion_del_perfil_de_tesis.txt','txt','text/plain',87,0,2),
+(3,1,'material_tesis_completo.zip','material_tesis_completo.zip','material_tesis_completo.zip','zip','application/zip',777,1,3),
+(4,2,'seguimiento_practicas.docx','seguimiento_practicas.docx','seguimiento_practicas.docx','docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document',1029,0,1),
+(5,3,'instructivo_proyectos_pis.pdf','instructivo_proyectos_pis.pdf','instructivo_proyectos_pis.pdf','pdf','application/pdf',688,0,1),
+(6,4,'informe_vinculacion.docx','informe_vinculacion.docx','informe_vinculacion.docx','docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document',1023,0,1),
+(7,5,'reglamento_material_apoyo.txt','reglamento_material_apoyo.txt','reglamento_material_apoyo.txt','txt','text/plain',110,0,1);

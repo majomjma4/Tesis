@@ -51,9 +51,8 @@
                 <label for="user">Correo electrónico</label>
                 <div class="input-wrap">
                     <i class="fa-solid fa-user"></i>
-                    <input type="email" id="user" name="user" autocomplete="off" inputmode="email" placeholder="nombre@correo.com" list="recentLoginUsers" value="<?= e($loginValue ?? '') ?>">
-                    <datalist id="recentLoginUsers"></datalist>
-                    <button class="login-history-clear" id="loginHistoryClear" type="button" aria-label="Borrar correos recientes" title="Borrar correos recientes" hidden><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                    <input type="email" id="user" name="user" autocomplete="username" inputmode="email" placeholder="nombre@correo.com" value="<?= e($loginValue ?? '') ?>">
+                    <button class="login-user-clear" id="loginUserClear" type="button" aria-label="Limpiar usuario o correo" title="Limpiar usuario o correo" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                 </div>
                 <span class="field-error">Este campo es obligatorio.</span>
             </div>

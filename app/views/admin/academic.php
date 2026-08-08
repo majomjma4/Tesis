@@ -4,7 +4,52 @@ $activePeriod = $academic['promotion']['source'] ?? null;
 $plannedPeriod = $academic['promotion']['target'] ?? null;
 $closedPeriods = array_values(array_filter($periods, static fn(array $period): bool => ($period['status'] ?? '') === 'closed'));
 $suggestedPeriod = $academic['promotion']['suggested'] ?? null;
-$activeTypeCount = count(array_filter($academic['types'] ?? [], static fn(array $type): bool => (int) ($type['is_active'] ?? 0) === 1));
+$reversal = $academic['reversal'] ?? null;
+$typeCount = count($academic['types'] ?? []);
+$materialTypeCount = count($academic['material_types'] ?? []);
+$keywordCount = count($academic['keywords'] ?? []);
+$catalogActions = static function (string $entity, array $item): void {
+    $active = (int) ($item['is_active'] ?? 0) === 1;
+    $associated = (int) ($item['references_count'] ?? $item['materials'] ?? $item['projects'] ?? 0);
+    $name = (string) ($item['name'] ?? '');
+    ?>
+    <div class="aa-type-actions">
+        <button type="button" class="aa-secondary" data-catalog-edit data-entity="<?= e($entity) ?>" data-id="<?= (int) $item['id'] ?>" data-name="<?= e($name) ?>">Editar</button>
+        <?php if ($active): ?>
+            <button type="button" class="aa-icon-action is-deactivate" data-catalog-state data-aa-tooltip="Desactivar" data-entity="<?= e($entity) ?>" data-action="deactivate" data-id="<?= (int) $item['id'] ?>" data-name="<?= e($name) ?>" aria-label="Desactivar <?= e($name) ?>"><i class="fa-solid fa-ban" aria-hidden="true"></i></button>
+        <?php else: ?>
+            <button type="button" class="aa-activate" data-catalog-state data-aa-tooltip="Activar" data-entity="<?= e($entity) ?>" data-action="activate" data-id="<?= (int) $item['id'] ?>" data-name="<?= e($name) ?>"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Activar</button>
+        <?php endif; ?>
+        <span class="aa-action-tooltip"<?= $associated > 0 ? ' tabindex="0" role="note" data-aa-tooltip="No puede eliminarse porque tiene elementos asociados." aria-label="No puede eliminarse porque tiene elementos asociados."' : '' ?>>
+            <button type="button" class="aa-icon-action is-delete" data-catalog-delete<?= $associated === 0 ? ' data-aa-tooltip="Eliminar"' : '' ?> data-entity="<?= e($entity) ?>" data-id="<?= (int) $item['id'] ?>" data-name="<?= e($name) ?>" aria-label="Eliminar <?= e($name) ?>"<?= $associated > 0 ? ' disabled aria-disabled="true"' : '' ?>><i class="fa-regular fa-trash-can" aria-hidden="true"></i></button>
+        </span>
+    </div>
+    <?php
+};
+$catalogHeader = static function (
+    string $panelId,
+    string $category,
+    string $title,
+    string $description,
+    int $count
+): void {
+    ?>
+    <header class="aa-accordion-header">
+        <button type="button" class="aa-accordion-toggle" data-aa-accordion-toggle
+            aria-expanded="false" aria-controls="<?= e($panelId) ?>">
+            <span class="aa-accordion-copy">
+                <span class="aa-accordion-category"><?= e($category) ?></span>
+                <strong><?= e($title) ?></strong>
+                <span><?= e($description) ?></span>
+            </span>
+            <span class="aa-accordion-meta">
+                <span class="aa-accordion-count" aria-label="<?= $count ?> registros"><?= $count ?></span>
+                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+            </span>
+        </button>
+    </header>
+    <?php
+};
 $minimumPlanningStart = $activePeriod
     ? (new DateTimeImmutable($activePeriod['ends_on']))->modify('+1 day')->format('Y-m-d')
     : '';
@@ -15,6 +60,10 @@ $activePeriodEnded = $activePeriod
 $activePeriodClosesEarly = $activePeriod
     ? new DateTimeImmutable($activePeriod['ends_on']) > $today
     : false;
+$periodProjectsUrl = static fn(array $period): string =>
+    route('projects') . '&period_id=' . (int) $period['id'];
+$repositoryPeriodUrl = static fn(array $period): string =>
+    route('admin-repository') . '&period=' . rawurlencode((string) $period['name']);
 $monthNames = [1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril', 5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto', 9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre'];
 $friendlyRange = static function (?string $start, ?string $end) use ($monthNames): string {
     if (!$start || !$end) return 'Fechas pendientes';
@@ -27,7 +76,7 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
 <header class="aa-head">
     <span>Administración</span>
     <h1>Gestión académica</h1>
-    <p>Configura los períodos institucionales y los tipos disponibles para los proyectos.</p>
+    <p>Administra los períodos académicos y los catálogos institucionales utilizados en proyectos y materiales de apoyo.
 </header>
 
 <?php if ($academicError): ?>
@@ -66,7 +115,15 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
                 </div>
                 <div class="aa-period-summary">
                     <span class="aa-status active"><i class="fa-solid fa-circle" aria-hidden="true"></i> Activo</span>
-                    <div><strong><?= (int) ($activePeriod['projects'] ?? 0) ?></strong><small>Proyectos del período</small></div>
+                    <div>
+                        <strong><?= (int) ($activePeriod['projects'] ?? 0) ?></strong>
+                        <small>Proyectos del período</small>
+                        <?php if ((int) ($activePeriod['projects'] ?? 0) > 0): ?>
+                            <a class="aa-active-projects-link" href="<?= e($periodProjectsUrl($activePeriod)) ?>">
+                                Ver proyectos <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
                 </div>
                 <footer>
                     <?php if (!$plannedPeriod): ?>
@@ -101,52 +158,131 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
             </article>
         <?php endif; ?>
 
+        <?php if ($reversal): ?>
+            <aside class="aa-reversal" aria-label="Reversión del cierre académico">
+                <span class="aa-reversal-icon"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></span>
+                <div>
+                    <small>Acción temporal</small>
+                    <strong>Revertir cierre de <?= e($reversal['closed_period_name']) ?></strong>
+                    <?php if ($reversal['available']): ?>
+                        <p>Disponible hasta el <?= e($reversal['expires_label']) ?>. Solo procede si no existe actividad académica en <?= e($reversal['activated_period_name']) ?>.</p>
+                    <?php else: ?>
+                        <p><?= e($reversal['reason'] ?? 'La reversión ya no está disponible.') ?></p>
+                    <?php endif; ?>
+                </div>
+                <button type="button" class="aa-secondary" data-revert-period
+                    data-transition-id="<?= (int) $reversal['id'] ?>"
+                    data-closed-name="<?= e($reversal['closed_period_name']) ?>"
+                    <?= !$reversal['available'] ? 'disabled aria-disabled="true"' : '' ?>>
+                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Revertir cierre
+                </button>
+            </aside>
+        <?php endif; ?>
+
         <?php if ($closedPeriods): ?>
             <div class="aa-history">
-                <header><div><small>Registro institucional</small><h3>Historial de períodos</h3></div><span><?= count($closedPeriods) ?></span></header>
-                <div class="aa-history-list" role="table" aria-label="Historial de períodos cerrados">
+                <header>
+                    <div><small>Registro institucional</small><h3>Historial de períodos académicos</h3></div>
+                    <span><?= count($closedPeriods) ?></span>
+                </header>
+                <div class="aa-history-list">
                     <?php foreach ($closedPeriods as $period): ?>
-                        <div class="aa-history-row" role="row">
-                            <strong role="cell"><?= e($period['name']) ?></strong>
-                            <span role="cell"><?= e($friendlyRange($period['starts_on'], $period['ends_on'])) ?></span>
-                            <span role="cell" class="aa-status closed">Cerrado</span>
-                        </div>
+                        <details class="aa-history-period">
+                            <summary>
+                                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                                <strong><?= e($period['name']) ?></strong>
+                                <span><small>Finalizado:</small> <?= e((new DateTimeImmutable($period['ends_on']))->format('d/m/Y')) ?></span>
+                                <span><?= (int) $period['projects'] ?> proyecto<?= (int) $period['projects'] === 1 ? '' : 's' ?> publicado<?= (int) $period['projects'] === 1 ? '' : 's' ?></span>
+                            </summary>
+                            <div class="aa-history-period-content">
+                                <?php if (!empty($period['project_preview'])): ?>
+                                    <ul>
+                                        <?php foreach ($period['project_preview'] as $project): ?>
+                                            <li><a href="<?= e($repositoryPeriodUrl($period)) ?>"><?= e($project['title']) ?></a></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                    <a class="aa-history-all" href="<?= e($repositoryPeriodUrl($period)) ?>">
+                                        Ver todos los proyectos del <?= e($period['name']) ?> <span aria-hidden="true">→</span>
+                                    </a>
+                                <?php else: ?>
+                                    <p>Este período no registra proyectos publicados.</p>
+                                <?php endif; ?>
+                            </div>
+                        </details>
                     <?php endforeach; ?>
                 </div>
             </div>
         <?php endif; ?>
     </section>
 
-    <section class="aa-section" aria-labelledby="aaProjectTypesTitle">
-        <header class="aa-section-heading">
-            <div>
-                <span>Catálogo de proyectos</span>
-                <h2 id="aaProjectTypesTitle">Tipos de proyecto</h2>
-                <small><?= $activeTypeCount ?> tipo<?= $activeTypeCount === 1 ? '' : 's' ?> registrado<?= $activeTypeCount === 1 ? '' : 's' ?></small>
-                <p>Define las categorías disponibles sin mostrar códigos internos del sistema.</p>
+    <section class="aa-section aa-catalog-accordion" data-aa-accordion data-catalog="type">
+        <?php $catalogHeader('aaProjectTypesPanel', 'Catálogo de proyectos', 'Tipos de proyecto', 'Define las categorías disponibles para los proyectos.', $typeCount); ?>
+        <div class="aa-accordion-panel" id="aaProjectTypesPanel" data-aa-accordion-panel aria-hidden="true" inert>
+            <div class="aa-accordion-inner">
+                <div class="aa-catalog-toolbar"><button type="button" data-form="type"><i class="fa-solid fa-plus" aria-hidden="true"></i> Agregar tipo</button></div>
+                <div class="aa-type-list">
+                    <?php foreach ($academic['types'] as $type): ?>
+                        <article class="<?= (int) $type['is_active'] === 1 ? '' : 'is-inactive' ?>">
+                            <span class="aa-type-icon"><i class="fa-regular fa-folder" aria-hidden="true"></i></span>
+                            <div>
+                                <strong><?= e($type['name']) ?></strong>
+                                <small><?= (int) $type['projects'] ?> proyecto<?= (int) $type['projects'] === 1 ? '' : 's' ?> asociado<?= (int) $type['projects'] === 1 ? '' : 's' ?></small>
+                            </div>
+                            <span class="aa-status <?= (int) $type['is_active'] === 1 ? 'active' : 'closed' ?>"><?= (int) $type['is_active'] === 1 ? 'Activo' : 'Inactivo' ?></span>
+                            <?php $catalogActions('type', $type); ?>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
             </div>
-            <button type="button" data-form="type"><i class="fa-solid fa-plus" aria-hidden="true"></i> Agregar tipo</button>
-        </header>
+        </div>
+    </section>
 
-        <div class="aa-type-list">
-            <?php foreach ($academic['types'] as $type): ?>
-                <article class="<?= (int) $type['is_active'] === 1 ? '' : 'is-inactive' ?>">
-                    <span class="aa-type-icon"><i class="fa-regular fa-folder" aria-hidden="true"></i></span>
-                    <div>
-                        <strong><?= e($type['name']) ?></strong>
-                        <small><?= (int) $type['projects'] ?> proyecto<?= (int) $type['projects'] === 1 ? '' : 's' ?> asociado<?= (int) $type['projects'] === 1 ? '' : 's' ?></small>
+    <section class="aa-section aa-catalog-accordion" data-aa-accordion data-catalog="material_type">
+        <?php $catalogHeader('aaMaterialTypesPanel', 'Materiales de apoyo', 'Tipos de material', 'Administra los tipos de documentos utilizados por Materiales de apoyo.', $materialTypeCount); ?>
+        <div class="aa-accordion-panel" id="aaMaterialTypesPanel" data-aa-accordion-panel aria-hidden="true" inert>
+            <div class="aa-accordion-inner">
+                <div class="aa-catalog-toolbar"><button type="button" data-form="material_type"><i class="fa-solid fa-plus" aria-hidden="true"></i> Agregar tipo de material</button></div>
+                <?php if (empty($academic['material_types'])): ?>
+                    <div class="aa-empty-state"><i class="fa-regular fa-file-lines" aria-hidden="true"></i><strong>No existen tipos de material registrados.</strong></div>
+                <?php else: ?>
+                    <div class="aa-type-list">
+                        <?php foreach ($academic['material_types'] as $materialType): ?>
+                            <article class="<?= (int) $materialType['is_active'] === 1 ? '' : 'is-inactive' ?>">
+                                <span class="aa-type-icon"><i class="fa-regular fa-file-lines" aria-hidden="true"></i></span>
+                                <div>
+                                    <strong><?= e($materialType['name']) ?></strong>
+                                    <small><?= (int) $materialType['materials'] ?> material<?= (int) $materialType['materials'] === 1 ? '' : 'es' ?> asociado<?= (int) $materialType['materials'] === 1 ? '' : 's' ?></small>
+                                </div>
+                                <span class="aa-status <?= (int) $materialType['is_active'] === 1 ? 'active' : 'closed' ?>"><?= (int) $materialType['is_active'] === 1 ? 'Activo' : 'Inactivo' ?></span>
+                                <?php $catalogActions('material_type', $materialType); ?>
+                            </article>
+                        <?php endforeach; ?>
                     </div>
-                    <span class="aa-status <?= (int) $type['is_active'] === 1 ? 'active' : 'closed' ?>">
-                        <?= (int) $type['is_active'] === 1 ? 'Activo' : 'Inactivo' ?>
-                    </span>
-                    <div class="aa-type-actions">
-                        <button type="button" class="aa-secondary" data-edit-type data-id="<?= (int) $type['id'] ?>" data-name="<?= e($type['name']) ?>">Editar</button>
-                        <?php if ((int) $type['is_active'] === 1): ?>
-                            <button type="button" class="aa-danger-text" data-deactivate-type data-id="<?= (int) $type['id'] ?>" data-name="<?= e($type['name']) ?>">Desactivar</button>
-                        <?php endif; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+    </section>
+
+    <section class="aa-section aa-catalog-accordion" data-aa-accordion data-catalog="keyword">
+        <?php $catalogHeader('aaKeywordsPanel', 'Clasificación institucional', 'Palabras clave', 'Administra las palabras clave disponibles para clasificar Materiales de apoyo.', $keywordCount); ?>
+        <div class="aa-accordion-panel" id="aaKeywordsPanel" data-aa-accordion-panel aria-hidden="true" inert>
+            <div class="aa-accordion-inner">
+                <div class="aa-catalog-toolbar"><button type="button" data-form="keyword"><i class="fa-solid fa-plus" aria-hidden="true"></i> Agregar palabra clave</button></div>
+                <?php if (empty($academic['keywords'])): ?>
+                    <div class="aa-empty-state"><i class="fa-solid fa-tags" aria-hidden="true"></i><strong>No existen palabras clave registradas.</strong></div>
+                <?php else: ?>
+                    <div class="aa-type-list">
+                        <?php foreach ($academic['keywords'] as $keyword): ?>
+                            <article class="<?= (int) $keyword['is_active'] === 1 ? '' : 'is-inactive' ?>">
+                                <span class="aa-type-icon"><i class="fa-solid fa-tag" aria-hidden="true"></i></span>
+                                <div><strong><?= e($keyword['name']) ?></strong><small><?= (int) $keyword['materials'] ?> material<?= (int) $keyword['materials'] === 1 ? '' : 'es' ?> asociado<?= (int) $keyword['materials'] === 1 ? '' : 's' ?></small></div>
+                                <span class="aa-status <?= (int) $keyword['is_active'] === 1 ? 'active' : 'closed' ?>"><?= (int) $keyword['is_active'] === 1 ? 'Activo' : 'Inactivo' ?></span>
+                                <?php $catalogActions('keyword', $keyword); ?>
+                            </article>
+                        <?php endforeach; ?>
                     </div>
-                </article>
-            <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
         </div>
     </section>
 </div>
@@ -194,6 +330,12 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
         <div data-fields="type">
             <label>Nombre del tipo de proyecto<input name="name" maxlength="120" required></label>
         </div>
+        <div data-fields="keyword">
+            <label>Nombre de la palabra clave<input name="name" maxlength="120" required></label>
+        </div>
+        <div data-fields="material_type">
+            <label>Nombre del tipo de material<input name="name" maxlength="100" required></label>
+        </div>
 
         <p id="aaMessage" class="aa-form-message" hidden></p>
         <footer><button type="button" class="aa-secondary" data-close>Cancelar</button><button type="submit" id="aaSubmit">Guardar</button></footer>
@@ -214,7 +356,10 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
         <span><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>
         <h2 id="aaConfirmTitle">Confirmar acción</h2>
         <p id="aaConfirmText"></p>
-        <div><button type="button" class="aa-secondary" data-cancel-confirm>Cancelar</button><button type="button" class="aa-warning" data-accept-confirm>Confirmar</button></div>
+        <section class="aa-closure-pending" data-closure-pending hidden>
+            <ul data-closure-pending-list></ul>
+        </section>
+        <div class="aa-confirm-actions"><button type="button" class="aa-secondary" data-cancel-confirm>Cancelar</button><button type="button" class="aa-warning" data-accept-confirm>Confirmar</button></div>
     </div>
 </div>
 
@@ -222,6 +367,7 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
     id="aaConfig"
     data-save="<?= e($academicEndpoints['save']) ?>"
     data-promote="<?= e($academicEndpoints['promote']) ?>"
+    data-revert="<?= e($academicEndpoints['revert']) ?>"
     data-csrf="<?= e($academicCsrf) ?>"
     data-target-period="<?= (int) ($plannedPeriod['id'] ?? 0) ?>"
     data-close-early="<?= $activePeriodClosesEarly ? '1' : '0' ?>"
@@ -232,3 +378,5 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
     data-suggested-year="<?= (int) ($suggestedPeriod['year'] ?? date('Y')) ?>"
     data-suggested-name="<?= e($suggestedPeriod['name'] ?? 'siguiente período') ?>"
 ></div>
+<div class="aa-toast" id="aaToast" role="status" aria-live="polite" hidden></div>
+<div class="aa-tooltip" id="aaTooltip" role="tooltip" hidden></div>

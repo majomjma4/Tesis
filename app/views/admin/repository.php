@@ -1,1 +1,365 @@
-<header class="ar-head"><span>Administración</span><h1>Publicación en repositorio</h1><p>Publica únicamente expedientes aprobados con documentos finales disponibles.</p></header><?php if($repositoryError):?><p class="ar-error"><?=e($repositoryError)?></p><?php endif;?><section class="ar-stats"><a href="<?=e(route('repository').'&status=eligible')?>"><strong><?=$repositorySummary['eligible']?></strong><span>Listos para publicar</span></a><a href="<?=e(route('repository').'&status=published')?>"><strong><?=$repositorySummary['published']?></strong><span>Publicados</span></a><a href="<?=e(route('repository').'&status=incomplete')?>"><strong><?=$repositorySummary['incomplete']?></strong><span>Sin documentos finales</span></a></section><nav class="ar-filter"><a href="<?=e(route('repository'))?>" class="<?=$repositoryFilter===''?'active':''?>">Todos</a><a href="<?=e(route('repository').'&status=eligible')?>" class="<?=$repositoryFilter==='eligible'?'active':''?>">Elegibles</a><a href="<?=e(route('repository').'&status=published')?>" class="<?=$repositoryFilter==='published'?'active':''?>">Publicados</a><a href="<?=e(route('repository').'&status=incomplete')?>" class="<?=$repositoryFilter==='incomplete'?'active':''?>">Incompletos</a></nav><section class="ar-list"><?php if(!$repositoryProjects):?><div class="ar-empty"><i class="fa-solid fa-book-open"></i><h2>No hay proyectos en esta categoría</h2><p>Los expedientes aparecerán cuando alcancen un estado elegible.</p></div><?php else:foreach($repositoryProjects as $p):?><article><div><span><?=e($p['code'])?> · <?=e($p['type_name'])?></span><h2><?=e($p['title'])?></h2><p><?=e($p['career_name'])?> · <?=e($p['period_name'])?> · Tutor: <?=e($p['tutor_name']?:'Sin asignar')?></p></div><div class="ar-files"><strong><?=$p['file_count']?> archivos</strong><small><?=e($p['formats']?:'Sin formatos')?></small></div><span class="ar-status"><?= $p['status']==='published'?'Publicado':($p['file_count']?'Listo':'Incompleto')?></span><?php if($p['status']==='published'):?><button data-publish="unpublish" data-id="<?=$p['id']?>" class="secondary">Retirar</button><?php elseif($p['file_count']):?><button data-publish="publish" data-id="<?=$p['id']?>">Publicar</button><?php else:?><button disabled>Faltan documentos</button><?php endif;?></article><?php endforeach;endif;?></section><div id="arConfig" data-endpoint="<?=e($repositoryPublishEndpoint)?>" data-csrf="<?=e($repositoryCsrf)?>"></div>
+<?php
+$publishedProjects = array_values(array_filter(
+    $repositoryProjects,
+    static fn (array $project): bool => $project['status'] === 'published'
+));
+$activeSupportMaterials = array_values(array_filter(
+    $supportMaterials,
+    static fn (array $material): bool => ($material['status_key'] ?? '') === 'published'
+));
+$catalogSupportMaterials = array_values(array_merge($activeSupportMaterials, $withdrawnMaterials));
+$categoryBySlug = [];
+foreach ($materialCategories as $category) $categoryBySlug[(string)$category['slug']] = $category;
+$functionalMaterialCategories = [
+    ['slug'=>(string)($categoryBySlug['tesis']['slug']??'tesis'),'name'=>'Tesis'],
+    ['slug'=>(string)($categoryBySlug['perfil-tesis']['slug']??'perfil-tesis'),'name'=>'Perfil de tesis'],
+    ['slug'=>(string)($categoryBySlug['proyecto-pis']['slug']??'proyecto-pis'),'name'=>'Proyectos PIS'],
+    ['slug'=>(string)($categoryBySlug['practicas']['slug']??'practicas'),'name'=>'Prácticas preprofesionales'],
+    ['slug'=>(string)($categoryBySlug['vinculacion']['slug']??'vinculacion'),'name'=>'Vinculación'],
+];
+$formatDate = static function (?string $date): string {
+    if (!$date) return 'Sin fecha registrada';
+    return (new DateTimeImmutable($date))->format('d/m/Y');
+};
+?>
+
+<div class="ar-page" id="arPage">
+    <header class="ar-head">
+        <div>
+            <span class="ar-eyebrow">Biblioteca digital institucional</span>
+            <h1>Repositorio institucional</h1>
+            <p>Administra el contenido publicado que estará disponible para estudiantes y docentes.</p>
+        </div>
+    </header>
+
+    <?php if ($repositoryError): ?>
+        <p class="ar-error" role="alert"><?= e($repositoryError) ?></p>
+    <?php endif; ?>
+
+    <section class="ar-stats" aria-label="Resumen del repositorio">
+        <article class="ar-stat ar-stat-projects">
+            <span class="ar-stat-icon"><i class="fa-solid fa-book-open"></i></span>
+            <div><strong><?= (int) $repositorySummary['published'] ?></strong><span>Proyectos publicados</span></div>
+        </article>
+        <article class="ar-stat ar-stat-materials">
+            <span class="ar-stat-icon"><i class="fa-solid fa-file-lines"></i></span>
+            <div><strong><?= count($catalogSupportMaterials) ?></strong><span>Materiales de apoyo</span></div>
+        </article>
+        <a class="ar-stat ar-stat-pending" data-pending-publication-card data-base-url="<?= e(route('projects')) ?>" aria-disabled="true" tabindex="-1" aria-label="No hay proyectos pendientes de publicación">
+            <span class="ar-stat-icon"><i class="fa-regular fa-clock"></i></span>
+            <div><strong data-pending-publication-count><?= (int) ($repositorySummary['pending'] ?? 0) ?></strong><span>Pendientes de publicación</span></div>
+        </a>
+        <script id="arPendingByPeriod" type="application/json"><?= json_encode($repositorySummary['pending_by_period'] ?? [], JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
+    </section>
+
+    <section class="ar-catalog">
+        <nav class="ar-tabs" aria-label="Contenido del repositorio">
+            <button class="active" type="button" data-repository-tab="projects" aria-selected="true">
+                <i class="fa-solid fa-diagram-project"></i>
+                <span class="ar-tab-label">Proyectos publicados</span>
+                <span class="ar-tab-count"><?= (int) $repositorySummary['published'] ?></span>
+            </button>
+            <button type="button" data-repository-tab="materials" aria-selected="false">
+                <i class="fa-solid fa-folder-open"></i>
+                <span class="ar-tab-label">Material de apoyo</span>
+                <span class="ar-tab-count"><?= count($catalogSupportMaterials) ?></span>
+            </button>
+        </nav>
+
+        <div class="ar-tools admin-filter-bar">
+            <label class="ar-search admin-filter-search admin-filter-item-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input id="arSearch" type="search" placeholder="Buscar en el repositorio..." autocomplete="off">
+                <button id="arClearSearch" type="button" aria-label="Limpiar búsqueda" hidden>
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </label>
+            <label class="ar-filter-control admin-filter-control" data-filter-for="projects">
+                <span>Tipo</span>
+                <select id="arTypeFilter">
+                    <option value="">Todos</option>
+                    <?php foreach ($repositoryCatalogs['types'] as $type): ?>
+                        <option value="<?= e(mb_strtolower($type['name'], 'UTF-8')) ?>"><?= e($type['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <?php if (count($repositoryCatalogs['periods']) === 0): ?>
+                <div class="ar-filter-control ar-fixed-filter admin-filter-control admin-filter-fixed" data-filter-for="projects">
+                    <span>Período académico</span>
+                    <div><i class="fa-regular fa-calendar"></i><strong>Sin períodos disponibles</strong></div>
+                    <input id="arPeriodFilter" type="hidden" value="" data-fixed-filter data-period-id="">
+                </div>
+            <?php elseif (count($repositoryCatalogs['periods']) === 1): ?>
+                <div class="ar-filter-control ar-fixed-filter admin-filter-control admin-filter-fixed" data-filter-for="projects">
+                    <span>Período académico</span>
+                    <div><i class="fa-regular fa-calendar"></i><strong><?= e($repositoryCatalogs['periods'][0]['name']) ?></strong></div>
+                    <input id="arPeriodFilter" type="hidden" value="<?= e(mb_strtolower($repositoryCatalogs['periods'][0]['name'], 'UTF-8')) ?>" data-fixed-filter data-period-id="<?= (int) $repositoryCatalogs['periods'][0]['id'] ?>">
+                </div>
+            <?php else: ?>
+                <label class="ar-filter-control admin-filter-control" data-filter-for="projects">
+                    <span>Período académico</span>
+                    <select id="arPeriodFilter">
+                        <option value="">Todos</option>
+                        <?php foreach ($repositoryCatalogs['periods'] as $period): ?>
+                            <option value="<?= e(mb_strtolower($period['name'], 'UTF-8')) ?>" data-period-id="<?= (int) $period['id'] ?>"><?= e($period['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+            <?php endif; ?>
+            <label class="ar-filter-control admin-filter-control" data-filter-for="materials" hidden>
+                <span>Categoría</span>
+                <select id="arCategoryFilter">
+                    <option value="">Todos</option>
+                    <?php foreach ($functionalMaterialCategories as $category): ?>
+                        <option value="<?= e($category['slug']) ?>"><?= e($category['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label class="ar-filter-control admin-filter-control" data-filter-for="materials" hidden>
+                <span>Estado</span>
+                <select id="arMaterialStatusFilter">
+                    <option value="all">Todos</option>
+                    <option value="available">Disponibles</option>
+                    <option value="unavailable">No disponibles</option>
+                    <option value="withdrawn">Retirados</option>
+                </select>
+            </label>
+            <button
+                class="ar-clear-material-filters"
+                id="arClearMaterialFilters"
+                type="button"
+                aria-label="Limpiar filtros de material de apoyo"
+                hidden
+            >
+                <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
+                <span>Limpiar</span>
+            </button>
+        </div>
+
+        <section class="ar-panel" data-repository-panel="projects">
+            <header class="ar-section-head">
+                <div><span>Catálogo institucional</span><h2>Proyectos publicados</h2></div>
+                <p><strong id="arProjectCount"><?= count($publishedProjects) ?></strong> resultados visibles</p>
+            </header>
+
+            <div class="ar-grid" id="arProjectGrid">
+                <?php foreach ($publishedProjects as $project): ?>
+                    <?php $projectSearch = implode(' ', [
+                        $project['code'], $project['type_name'], $project['title'],
+                        $project['authors'] ?: '', $project['tutor_name'] ?: '',
+                        $project['period_name'],
+                    ]); ?>
+                    <article class="ar-project-card"
+                        data-repository-item="projects"
+                        data-project-available="<?= !empty($project['is_available']) ? '1' : '0' ?>"
+                        data-type-code="<?= e($project['type_code']) ?>"
+                        data-search="<?= e(mb_strtolower($projectSearch, 'UTF-8')) ?>"
+                        data-type="<?= e(mb_strtolower($project['type_name'], 'UTF-8')) ?>"
+                        data-period="<?= e(mb_strtolower($project['period_name'], 'UTF-8')) ?>">
+                        <header>
+                            <span class="ar-code"><?= e($project['code']) ?></span>
+                            <span class="ar-project-type"><?= e($project['type_name']) ?></span>
+                        </header>
+                        <div class="ar-card-copy">
+                            <h3 title="<?= e($project['title']) ?>"><?= e($project['title']) ?></h3>
+                            <dl>
+                                <div><dt><i class="fa-solid fa-users"></i> Autores</dt><dd><?= e($project['authors'] ?: 'Sin autores registrados') ?></dd></div>
+                                <div><dt><i class="fa-solid fa-user-tie"></i> Tutor</dt><dd><?= e($project['tutor_name'] ?: 'Sin asignar') ?></dd></div>
+                                <div><dt><i class="fa-regular fa-calendar"></i> Período</dt><dd><?= e($project['period_name']) ?></dd></div>
+                            </dl>
+                        </div>
+                        <div class="ar-card-meta">
+                            <span><i class="fa-regular fa-file-lines"></i> <?= (int) $project['file_count'] ?> documentos</span>
+                            <span><i class="fa-solid fa-globe"></i> <?= e($formatDate($project['published_at'])) ?></span>
+                        </div>
+                        <footer>
+                            <a class="ar-primary-action" href="<?= e(route('repository-detail') . '&id=' . (int) $project['id'] . '&tab=information&return=' . rawurlencode((string)($_SERVER['REQUEST_URI'] ?? route('admin-repository')))) ?>">
+                                <i class="fa-solid fa-diagram-project"></i> Abrir expediente
+                            </a>
+                            <button class="ar-icon-action ar-availability-action" data-project-availability data-id="<?= (int) $project['id'] ?>" data-available="<?= !empty($project['is_available']) ? '1' : '0' ?>" data-tooltip="<?= !empty($project['is_available']) ? 'Marcar como no disponible' : 'Marcar como disponible' ?>" type="button" aria-label="<?= !empty($project['is_available']) ? 'Marcar proyecto como no disponible' : 'Marcar proyecto como disponible' ?>">
+                                <i class="fa-solid <?= !empty($project['is_available']) ? 'fa-ban' : 'fa-circle-check' ?>"></i>
+                            </button>
+                            <button class="ar-icon-action ar-danger-action" data-publish="unpublish" data-id="<?= (int) $project['id'] ?>" data-tooltip="Retirar del repositorio" type="button" aria-label="Retirar del repositorio">
+                                <i class="fa-solid fa-box-archive"></i>
+                            </button>
+                        </footer>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="ar-empty" id="arProjectsEmpty" <?= $publishedProjects ? 'hidden' : '' ?>>
+                <span><i class="fa-solid fa-book-open"></i></span>
+                <h2>Aún no existen proyectos publicados.</h2>
+                <p>Los proyectos aprobados aparecerán aquí después de completar su publicación.</p>
+            </div>
+            <footer class="ar-pagination" data-pagination-for="projects" hidden>
+                <span data-pagination-summary>Mostrando 0 de 0</span>
+                <label>Mostrar
+                    <select data-page-size>
+                        <option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="75">75</option><option value="100">100</option>
+                    </select>
+                </label>
+                <nav data-pagination-pages aria-label="Paginación de proyectos publicados"></nav>
+            </footer>
+        </section>
+
+        <section class="ar-panel" data-repository-panel="materials" hidden>
+            <header class="ar-section-head">
+                <div><span>Recursos académicos</span><h2>Material de apoyo</h2></div>
+                <p id="arMaterialCountText"><?= count($catalogSupportMaterials) ?> <?= count($catalogSupportMaterials) === 1 ? 'resultado visible' : 'resultados visibles' ?></p>
+            </header>
+
+            <div class="ar-grid ar-material-grid" id="arMaterialGrid">
+                <?php foreach ($catalogSupportMaterials as $material): ?>
+                    <?php
+                    $materialState = ($material['status_key'] ?? '') === 'withdrawn'
+                        ? 'withdrawn'
+                        : (!empty($material['is_available']) ? 'available' : 'unavailable');
+                    $materialStateLabel = match ($materialState) {
+                        'withdrawn' => 'Retirado',
+                        'unavailable' => 'No disponible',
+                        default => 'Disponible',
+                    };
+                    $materialSearch = implode(' ', [
+                        $material['title'], $material['category_label'], $material['description'],
+                        $material['type'], $material['publisher'] ?? '', implode(' ', $material['keywords']),
+                        $material['pao_label'] ?? '',
+                    ]); ?>
+                    <article class="ar-material-card"
+                        data-repository-item="materials"
+                        data-material-state="<?= e($materialState) ?>"
+                        data-category-slug="<?= e($material['category_slug']) ?>"
+                        data-search="<?= e(mb_strtolower($materialSearch, 'UTF-8')) ?>"
+                        data-category="<?= e($material['category_slug']) ?>"
+                        data-period="<?= e(mb_strtolower($material['pao_label'], 'UTF-8')) ?>">
+                        <header>
+                            <span class="ar-material-icon"><i class="fa-regular fa-file-lines"></i></span>
+                            <div><span><?= e($material['type']) ?></span><strong><?= e($material['category_label']) ?></strong></div>
+                            <span class="ar-available is-<?= e($materialState) ?>"><?= e($materialStateLabel) ?></span>
+                        </header>
+                        <div class="ar-card-copy">
+                            <h3 title="<?= e($material['title']) ?>"><?= e($material['title']) ?></h3>
+                            <p><?= e($material['description']) ?></p>
+                        </div>
+                        <?php if ($materialState === 'withdrawn'): ?>
+                            <div class="ar-withdrawn-catalog-details">
+                                <div class="ar-withdrawn-catalog-meta">
+                                    <span><i class="fa-regular fa-calendar"></i> Retirado el <?= e($formatDate($material['withdrawn_event_at'] ?? $material['withdrawn_at'])) ?></span>
+                                    <span><i class="fa-regular fa-user"></i> Por <?= e($material['withdrawn_by_name'] ?: 'Sistema') ?></span>
+                                </div>
+                                <div><strong>Motivo</strong><span><?= e($material['withdrawal_reason'] ?: 'Sin motivo registrado') ?></span></div>
+                                <?php if (!empty($material['withdrawal_reason_detail'])): ?>
+                                    <div><strong>Detalle</strong><span><?= e($material['withdrawal_reason_detail']) ?></span></div>
+                                <?php endif; ?>
+                            </div>
+                        <?php else: ?>
+                            <div class="ar-card-meta">
+                                <span><i class="fa-regular fa-calendar"></i> <?= e($material['publication_date']) ?></span>
+                                <span><i class="fa-solid fa-download"></i> <?= number_format((int) $material['downloads'], 0, ',', '.') ?> descargas</span>
+                            </div>
+                        <?php endif; ?>
+                        <footer>
+                            <a class="ar-primary-action" href="<?= e(route('support-material-detail') . '&id=' . (int) $material['id']) ?>"><i class="fa-regular fa-eye"></i> Ver detalle</a>
+                            <?php if ($materialState === 'withdrawn'): ?>
+                                <button class="ar-primary-action ar-restore-catalog-action" type="button" data-restore-material data-id="<?= (int) $material['id'] ?>"><i class="fa-solid fa-rotate-left"></i> Restaurar material</button>
+                            <?php else: ?>
+                                <button class="ar-icon-action ar-availability-action" type="button" data-material-availability data-available="<?= !empty($material['is_available']) ? '1' : '0' ?>" aria-label="<?= !empty($material['is_available']) ? 'Marcar material como no disponible' : 'Marcar material como disponible' ?>" data-tooltip="<?= !empty($material['is_available']) ? 'Marcar como no disponible' : 'Marcar como disponible' ?>"><i class="fa-solid <?= !empty($material['is_available']) ? 'fa-ban' : 'fa-circle-check' ?>"></i></button>
+                                <button class="ar-icon-action ar-danger-action" type="button" data-withdraw-material aria-label="Retirar material" data-tooltip="Retirar del repositorio"><i class="fa-solid fa-box-archive"></i></button>
+                            <?php endif; ?>
+                        </footer>
+                        <script type="application/json" data-material-json><?= json_encode([
+                            'id'=>$material['id'],'title'=>$material['title'],'category_id'=>(int)$material['category_id'],
+                            'material_type'=>$material['material_type'],'description'=>$material['description'],
+                            'full_description'=>$material['full_description'],'publisher'=>$material['publisher'],
+                            'publication_date'=>$material['publication_date_iso'],'keywords'=>implode(', ',$material['keywords']),
+                            'status_key'=>$material['status_key'],'is_available'=>!empty($material['is_available']),'presentation_file_id'=>(int)($material['presentation_file']['id']??0),
+                            'files'=>array_map(static fn(array $file):array=>[
+                                'id'=>$file['id'],'name'=>$file['name'],'format'=>$file['format'],
+                                'size'=>$file['size'],'presentation'=>$file['presentation'],
+                                'extension'=>$file['extension'],
+                            ],$material['files']),
+                        ], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?></script>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="ar-empty" id="arMaterialsEmpty" <?= $catalogSupportMaterials ? 'hidden' : '' ?>>
+                <span><i class="fa-solid fa-folder-open"></i></span>
+                <h2>Aún no existen materiales de apoyo.</h2>
+                <p>Los recursos institucionales publicados aparecerán en esta sección.</p>
+            </div>
+            <footer class="ar-pagination" data-pagination-for="materials" hidden>
+                <span data-pagination-summary>Mostrando 0 de 0</span>
+                <label>Mostrar
+                    <select data-page-size>
+                        <option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="75">75</option><option value="100">100</option>
+                    </select>
+                </label>
+                <nav data-pagination-pages aria-label="Paginación de materiales de apoyo"></nav>
+            </footer>
+        </section>
+    </section>
+
+    <div class="ar-material-modal" id="arMaterialEditModal" hidden>
+        <section role="dialog" aria-modal="true" aria-labelledby="arMaterialEditTitle">
+            <header><div><span>Material de apoyo</span><h2 id="arMaterialEditTitle">Editar material</h2><p>Actualiza la información visible en el repositorio.</p></div><button type="button" data-close-material-edit aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button></header>
+            <form id="arMaterialEditForm">
+                <input type="hidden" name="_csrf" value="<?= e($repositoryCsrf) ?>">
+                <input type="hidden" name="id">
+                <div class="ar-material-form-grid">
+                    <label class="wide">Título<input name="title" maxlength="220" required></label>
+                    <label>Categoría<select name="category_id" required><?php foreach($materialCategories as $category):?><option value="<?= (int)$category['id'] ?>"><?= e($category['name']) ?></option><?php endforeach;?></select></label>
+                    <label>Tipo de material<input name="material_type" maxlength="100" required></label>
+                    <label class="wide">Descripción corta<textarea name="description" maxlength="500" rows="2" required></textarea></label>
+                    <label class="wide">Descripción completa<textarea name="full_description" rows="5" required></textarea></label>
+                    <label>Responsable<input name="publisher" maxlength="180" required></label>
+                    <label>Fecha de publicación<span class="ar-readonly-value" data-material-publication-date>Se asigna al publicar</span><small>Solo lectura</small></label>
+                    <label class="wide">Palabras clave<input name="keywords" placeholder="Separadas por comas"></label>
+                </div>
+                <footer><button type="button" data-close-material-edit>Cancelar</button><button type="submit">Guardar cambios</button></footer>
+            </form>
+        </section>
+    </div>
+
+    <div class="ar-material-modal" id="arMaterialFilesModal" hidden>
+        <section role="dialog" aria-modal="true" aria-labelledby="arMaterialFilesTitle">
+            <header><div><span>Documentos</span><h2 id="arMaterialFilesTitle">Gestionar archivos</h2><p id="arMaterialFilesSubtitle"></p></div><button type="button" data-close-material-files aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button></header>
+            <div class="ar-material-files-list" id="arMaterialFilesList"></div>
+            <form id="arMaterialFileForm" enctype="multipart/form-data">
+                <input type="hidden" name="_csrf" value="<?= e($repositoryCsrf) ?>">
+                <input type="hidden" name="material_id">
+                <input type="hidden" name="action" value="add">
+                <label>Agregar archivo<input name="file" type="file" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.webp,.txt,.zip" required></label>
+                <footer><button type="button" data-close-material-files>Cerrar</button><button type="submit">Agregar archivo</button></footer>
+            </form>
+        </section>
+    </div>
+
+    <div class="ar-material-modal" id="arPresentationModal" hidden>
+        <section role="dialog" aria-modal="true" aria-labelledby="arPresentationTitle">
+            <header><div><span>Vista inicial</span><h2 id="arPresentationTitle">Elegir archivo de presentación</h2><p>Selecciona el archivo que se mostrará automáticamente cuando una persona ingrese a este expediente. Esta elección no indica que el archivo sea más importante que los demás.</p></div><button type="button" data-close-presentation aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button></header>
+            <form id="arPresentationForm">
+                <div class="ar-presentation-options" data-presentation-options></div>
+                <p class="ar-file-error" data-presentation-error hidden></p>
+                <footer><button type="button" data-close-presentation>Cancelar</button><button type="submit" disabled>Continuar con la publicación</button></footer>
+            </form>
+        </section>
+    </div>
+
+    <div class="ar-confirm" id="arConfirm" hidden>
+        <div role="alertdialog" aria-modal="true" aria-labelledby="arConfirmTitle" aria-describedby="arConfirmText">
+            <span><i class="fa-solid fa-triangle-exclamation"></i></span>
+            <h2 id="arConfirmTitle">Confirmar acción</h2>
+            <p id="arConfirmText"></p>
+            <div>
+                <button type="button" data-confirm-cancel>Cancelar</button>
+                <button type="button" class="danger" data-confirm-accept>Retirar proyecto</button>
+            </div>
+        </div>
+    </div>
+    <div class="ar-toast-stack" id="arToastStack" role="region" aria-label="Notificaciones" aria-live="polite" aria-atomic="false"></div>
+    <div class="ar-tooltip" id="arTooltip" role="tooltip" hidden></div>
+    <div id="arConfig" data-endpoint="<?= e($repositoryPublishEndpoint) ?>" data-material-save="<?= e($materialSaveEndpoint) ?>" data-material-status="<?= e($materialStatusEndpoint) ?>" data-material-file="<?= e($materialFileEndpoint) ?>" data-csrf="<?= e($repositoryCsrf) ?>"></div>
+</div>
+<?php require APP_PATH . '/views/repository/_material-admin-action-dialog.php'; ?>
+<script src="<?= e(asset('js/material-admin-actions.js')) ?>"></script>

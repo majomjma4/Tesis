@@ -25,6 +25,7 @@ try {
         "--port=$Port" `
         "--user=$User" `
         '--default-character-set=utf8mb4' `
+        '--binary-mode' `
         "--execute=SOURCE $snapshot"
 
     if ($LASTEXITCODE -ne 0) { throw "mysql termino con codigo $LASTEXITCODE" }

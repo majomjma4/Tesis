@@ -34,4 +34,45 @@ function route(string $page = 'dashboard'): string
 {
     return base_url('index.php?page=' . urlencode($page));
 }
+
+/**
+ * Etiquetas institucionales del estado y del momento del ciclo académico.
+ *
+ * @return array{status:string,stage:string}
+ */
+function project_academic_labels(string $status): array
+{
+    static $labels = [
+        'development' => ['status' => 'En desarrollo', 'stage' => 'En proceso'],
+        'under_review' => ['status' => 'En revisión', 'stage' => 'En proceso'],
+        'corrections_requested' => ['status' => 'Correcciones solicitadas', 'stage' => 'En proceso'],
+        'changes_required' => ['status' => 'Correcciones solicitadas', 'stage' => 'En proceso'],
+        'approved' => ['status' => 'Aprobado', 'stage' => 'Por publicar'],
+        'defense' => ['status' => 'En tribunal', 'stage' => 'Por finalizar'],
+        'tribunal_approved' => ['status' => 'Aprobado por el Tribunal', 'stage' => 'Por publicar'],
+        'published' => ['status' => 'Publicado', 'stage' => 'Finalizado'],
+    ];
+
+    return $labels[$status] ?? [
+        'status' => $status !== '' ? $status : 'Estado no disponible',
+        'stage' => 'Etapa no disponible',
+    ];
+}
+
+/** Traduce resultados de entregas; conserva el token anterior solo para lectura histórica. */
+function project_delivery_status_label(string $status): string
+{
+    return match ($status) {
+        'submitted' => 'Enviada',
+        'under_review' => 'En revisión',
+        'corrections_requested', 'changes_required' => 'Correcciones solicitadas',
+        'approved' => 'Aprobada',
+        default => $status !== '' ? $status : 'Sin resultado',
+    };
+}
+function app_is_development(): bool
+{
+    $config = $GLOBALS['config'] ?? [];
+    return ($config['environment'] ?? 'production') === 'development';
+}
 // Final de construcción de URL internas

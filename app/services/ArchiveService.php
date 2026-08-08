@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 final class ArchiveService
 {
+    private const MAX_ENTRIES = 2000;
+    private const MAX_DEPTH = 12;
+    private const MAX_PATH_LENGTH = 512;
+    private const MAX_ENTRY_SIZE = 104857600;
+    private const MAX_UNCOMPRESSED_SIZE = 524288000;
+    private const MAX_COMPRESSION_RATIO = 200;
+
     // Inicio de acceso público al archivo ZIP
     // Lista directorios o abre archivos internos después de validar el contenedor y la ruta solicitada.
     public function listDirectory(string $zipPath, string $requestedPath = ''): array
@@ -20,13 +27,16 @@ final class ArchiveService
         if (!is_readable($zipPath)) {
             return $this->error('unreadable', 'No fue posible abrir el contenido del proyecto.');
         }
+        if (!$this->hasZipReader()) {
+            return $this->error('zip_unavailable', 'El servidor no dispone de un lector ZIP habilitado.');
+        }
 
         try {
-            $entries = $this->isEmptyZip($zipPath)
-                ? []
-                : (class_exists('ZipArchive')
-                    ? $this->readEntriesWithZipArchive($zipPath)
-                    : $this->readEntriesWithPharData($zipPath));
+            $entries = $this->readEntries($zipPath);
+            $this->validateArchiveLimits($entries);
+        } catch (DomainException $exception) {
+            error_log('ArchiveService unsafe: ' . $exception->getMessage());
+            return $this->error('unsafe', 'El paquete contiene una estructura no permitida.');
         } catch (Throwable $exception) {
             error_log('ArchiveService: ' . $exception->getMessage());
             return $this->error('unreadable', 'No fue posible abrir el contenido del proyecto.');
@@ -66,6 +76,35 @@ final class ArchiveService
         return $bytes . ' B';
     }
 
+    public function inspectPackage(string $zipPath): array
+    {
+        if (!is_file($zipPath) || !is_readable($zipPath)) {
+            return ['success' => false, 'status' => 'not_found', 'message' => 'El paquete no está disponible.', 'entries' => []];
+        }
+        if (!$this->hasZipReader()) {
+            return ['success' => false, 'status' => 'zip_unavailable', 'message' => 'El servidor no dispone de un lector ZIP habilitado.', 'entries' => []];
+        }
+        try {
+            $entries = $this->readEntries($zipPath);
+            $this->validateArchiveLimits($entries);
+            return [
+                'success' => true,
+                'status' => 'ready',
+                'message' => '',
+                'entries' => array_map(static fn (array $entry): array => [
+                    'name' => (string) $entry['name'],
+                    'is_dir' => (bool) $entry['is_dir'],
+                    'size' => (int) $entry['size'],
+                ], $entries),
+            ];
+        } catch (DomainException) {
+            return ['success' => false, 'status' => 'unsafe', 'message' => 'El paquete contiene una estructura no permitida.', 'entries' => []];
+        } catch (Throwable $exception) {
+            error_log('ArchiveService inspect: ' . $exception->getMessage());
+            return ['success' => false, 'status' => 'unreadable', 'message' => 'No fue posible abrir el paquete.', 'entries' => []];
+        }
+    }
+
     public function openFileStream(string $zipPath, string $requestedPath): array
     {
         $normalizedPath = $this->normalizeInternalPath($requestedPath);
@@ -75,11 +114,13 @@ final class ArchiveService
         if (!is_file($zipPath) || !is_readable($zipPath)) {
             return $this->downloadError('not_found', 'El archivo del proyecto no se encuentra disponible.');
         }
+        if (!$this->hasZipReader()) {
+            return $this->downloadError('zip_unavailable', 'El servidor no dispone de un lector ZIP habilitado.');
+        }
 
         try {
-            $entries = $this->isEmptyZip($zipPath)
-                ? []
-                : (class_exists('ZipArchive') ? $this->readEntriesWithZipArchive($zipPath) : $this->readEntriesWithPharData($zipPath));
+            $entries = $this->readEntries($zipPath);
+            $this->validateArchiveLimits($entries);
             $entry = null;
             foreach ($entries as $candidate) {
                 if (!$candidate['is_dir'] && $candidate['name'] === $normalizedPath) {
@@ -108,6 +149,8 @@ final class ArchiveService
                     return $this->downloadError('unreadable', 'No fue posible leer el archivo solicitado.');
                 }
             }
+            $stream = $this->bufferSeekableStream($stream, $archive, (int) $entry['size']);
+            $archive = null;
 
             return [
                 'success' => true,
@@ -120,6 +163,9 @@ final class ArchiveService
                 'stream' => $stream,
                 'archive' => $archive,
             ];
+        } catch (DomainException $exception) {
+            error_log('ArchiveService unsafe download: ' . $exception->getMessage());
+            return $this->downloadError('unsafe', 'El archivo interno supera los límites permitidos.');
         } catch (Throwable $exception) {
             error_log('ArchiveService download: ' . $exception->getMessage());
             return $this->downloadError('unreadable', 'No fue posible abrir el contenido del proyecto.');
@@ -129,6 +175,32 @@ final class ArchiveService
 
     // Inicio de validación y lectura del contenedor
     // Normaliza rutas e intercambia entre ZipArchive y PharData sin permitir recorridos inseguros.
+    private function bufferSeekableStream($source, ?ZipArchive $archive, int $expectedSize)
+    {
+        $buffer = fopen('php://temp/maxmemory:2097152', 'w+b');
+        if ($buffer === false) {
+            if (is_resource($source)) fclose($source);
+            if ($archive instanceof ZipArchive) $archive->close();
+            throw new RuntimeException('No fue posible preparar el archivo interno.');
+        }
+        try {
+            $copied = stream_copy_to_stream($source, $buffer, self::MAX_ENTRY_SIZE + 1);
+            if ($copied === false || $copied > self::MAX_ENTRY_SIZE || $copied !== $expectedSize) {
+                throw new RuntimeException('El contenido extraído no coincide con el tamaño esperado.');
+            }
+            if (!rewind($buffer)) {
+                throw new RuntimeException('No fue posible reposicionar el archivo interno.');
+            }
+            return $buffer;
+        } catch (Throwable $exception) {
+            fclose($buffer);
+            throw $exception;
+        } finally {
+            if (is_resource($source)) fclose($source);
+            if ($archive instanceof ZipArchive) $archive->close();
+        }
+    }
+
     private function normalizeInternalPath(string $path): ?string
     {
         if (str_contains($path, "\0")) {
@@ -172,6 +244,15 @@ final class ArchiveService
         }
     }
 
+    private function hasZipReader(): bool { return class_exists('ZipArchive') || class_exists('PharData'); }
+    private function readEntries(string $zipPath): array
+    {
+        if ($this->isEmptyZip($zipPath)) return [];
+        if (class_exists('ZipArchive')) return $this->readEntriesWithZipArchive($zipPath);
+        if (class_exists('PharData')) return $this->readEntriesWithPharData($zipPath);
+        throw new RuntimeException('No existe un lector ZIP habilitado.');
+    }
+
     private function readEntriesWithZipArchive(string $zipPath): array
     {
         $zip = new ZipArchive();
@@ -182,18 +263,27 @@ final class ArchiveService
         $entries = [];
         try {
             for ($index = 0; $index < $zip->numFiles; $index++) {
+                if ($index >= self::MAX_ENTRIES) {
+                    throw new DomainException('El ZIP supera el límite de entradas.');
+                }
                 $stat = $zip->statIndex($index);
                 if ($stat === false) {
                     continue;
                 }
                 $name = str_replace('\\', '/', (string) $stat['name']);
                 if ($this->normalizeArchiveEntry($name) === null) {
-                    continue;
+                    throw new DomainException('Entrada ZIP con ruta no permitida.');
                 }
+                $attributes = 0;
+                $operations = 0;
+                $isLink = $zip->getExternalAttributesIndex($index, $operations, $attributes)
+                    && (($attributes >> 16) & 0170000) === 0120000;
+                if ($isLink) throw new DomainException('El ZIP contiene enlaces simbólicos.');
                 $entries[] = [
                     'name' => rtrim($name, '/'),
                     'is_dir' => str_ends_with($name, '/'),
                     'size' => (int) ($stat['size'] ?? 0),
+                    'compressed_size' => (int) ($stat['comp_size'] ?? 0),
                 ];
             }
         } finally {
@@ -216,6 +306,9 @@ final class ArchiveService
         $entries = [];
 
         foreach ($iterator as $key => $fileInfo) {
+            if (count($entries) >= self::MAX_ENTRIES) {
+                throw new DomainException('El ZIP supera el límite de entradas.');
+            }
             $entryPath = str_replace('\\', '/', (string) $key);
             if (str_starts_with($entryPath, $prefix)) {
                 $entryPath = substr($entryPath, strlen($prefix));
@@ -225,12 +318,14 @@ final class ArchiveService
             }
 
             if ($this->normalizeArchiveEntry($entryPath) === null) {
-                continue;
+                throw new DomainException('Entrada ZIP con ruta no permitida.');
             }
+            if ($fileInfo->isLink()) throw new DomainException('El ZIP contiene enlaces simbólicos.');
             $entries[] = [
                 'name' => rtrim($entryPath, '/'),
                 'is_dir' => $fileInfo->isDir(),
                 'size' => $fileInfo->isDir() ? 0 : (int) $fileInfo->getSize(),
+                'compressed_size' => 0,
             ];
         }
 
@@ -240,7 +335,31 @@ final class ArchiveService
     private function normalizeArchiveEntry(string $entryPath): ?string
     {
         $trimmed = rtrim($entryPath, '/');
+        if ($trimmed === '' || strlen($trimmed) > self::MAX_PATH_LENGTH) return null;
+        if (substr_count(str_replace('\\', '/', $trimmed), '/') + 1 > self::MAX_DEPTH) return null;
         return $this->normalizeInternalPath($trimmed);
+    }
+
+    private function validateArchiveLimits(array $entries): void
+    {
+        if (count($entries) > self::MAX_ENTRIES) {
+            throw new DomainException('El ZIP supera el límite de entradas.');
+        }
+        $totalSize = 0;
+        foreach ($entries as $entry) {
+            $size = (int) ($entry['size'] ?? 0);
+            $compressedSize = (int) ($entry['compressed_size'] ?? 0);
+            if ($size > self::MAX_ENTRY_SIZE) {
+                throw new DomainException('Una entrada supera el tamaño permitido.');
+            }
+            $totalSize += $size;
+            if ($totalSize > self::MAX_UNCOMPRESSED_SIZE) {
+                throw new DomainException('El contenido descomprimido supera el límite permitido.');
+            }
+            if ($size > 1048576 && $compressedSize > 0 && ($size / $compressedSize) > self::MAX_COMPRESSION_RATIO) {
+                throw new DomainException('El ZIP supera la proporción de compresión permitida.');
+            }
+        }
     }
     // Final de validación y lectura del contenedor
 
@@ -277,6 +396,7 @@ final class ArchiveService
                     'name' => $itemName,
                     'path' => $itemPath,
                     'kind' => $isDirectory ? 'folder' : 'file',
+                    'extension' => $extension,
                     'type' => $isDirectory ? 'Carpeta' : $this->describeFileType($extension),
                     'size' => $isDirectory ? '—' : self::formatBytes((int) $entry['size']),
                     'size_bytes' => $isDirectory ? 0 : (int) $entry['size'],
@@ -342,12 +462,12 @@ final class ArchiveService
         return match ($extension) {
             'pdf' => 'Documento PDF',
             'doc', 'docx' => 'Documento de Word',
-            'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg' => 'Imagen',
+            'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg' => strtoupper($extension),
             'php', 'js', 'css', 'html', 'htm', 'ts', 'java', 'py', 'cs', 'cpp', 'c', 'sql' => 'Código fuente',
             'md', 'markdown' => 'Markdown',
             'json' => 'JSON',
             'txt', 'log', 'ini' => 'Archivo de texto',
-            'zip', 'rar', '7z', 'tar', 'gz' => 'Archivo comprimido',
+            'zip', 'rar', '7z', 'tar', 'gz' => strtoupper($extension),
             default => $extension === '' ? 'Archivo' : strtoupper($extension),
         };
     }
@@ -359,12 +479,15 @@ final class ArchiveService
         }
 
         return match ($extension) {
-            'pdf' => 'fa-file-pdf',
-            'doc', 'docx' => 'fa-file-word',
-            'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg' => 'fa-file-image',
-            'zip', 'rar', '7z', 'tar', 'gz' => 'fa-file-zipper',
-            'php', 'js', 'css', 'html', 'htm', 'ts', 'java', 'py', 'cs', 'cpp', 'c', 'sql', 'md', 'json' => 'fa-file-code',
-            default => 'fa-file-lines',
+            'pdf' => 'fa-file-lines',
+            'doc', 'docx' => 'fa-file-pen',
+            'xls', 'xlsx' => 'fa-table',
+            'ppt', 'pptx' => 'fa-display',
+            'txt' => 'fa-align-left',
+            'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg' => 'fa-image',
+            'zip', 'rar', '7z', 'tar', 'gz' => 'fa-box-archive',
+            'php', 'js', 'css', 'html', 'htm', 'ts', 'java', 'py', 'cs', 'cpp', 'c', 'sql', 'md', 'json' => 'fa-code',
+            default => 'fa-file',
         };
     }
 

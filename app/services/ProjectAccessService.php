@@ -13,7 +13,7 @@ final class ProjectAccessService
 
     public function currentUserId(): int
     {
-        return (new AuthSessionService())->userId() ?? 1;
+        return (new AuthSessionService())->userId() ?? 0;
     }
 
     public function currentRole(): string

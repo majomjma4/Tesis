@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 final class NotificationModel
 {
-    private const TYPES = ['delivery', 'observation', 'status_change', 'review', 'reminder', 'system', 'tribunal', 'repository', 'comment'];
+    private const TYPES = ['delivery', 'observation', 'status_change', 'review', 'reminder', 'system', 'tribunal', 'repository', 'comment', 'adjustment'];
 
     public function __construct(private readonly ?PDO $db = null)
     {
@@ -66,6 +66,18 @@ final class NotificationModel
             $parameters['type'] = $type;
         }
 
+        $projectId = (int) ($filters['project_id'] ?? 0);
+        if ($projectId > 0) {
+            $conditions[] = 'project_id = :project_id';
+            $parameters['project_id'] = $projectId;
+        }
+
+        $date = (string) ($filters['date'] ?? '');
+        if ($date !== '') {
+            $conditions[] = 'DATE(created_at) = :date';
+            $parameters['date'] = $date;
+        }
+
         if (($filters['status'] ?? '') === 'read') {
             $conditions[] = 'is_read = 1';
         } elseif (($filters['status'] ?? '') === 'unread') {
@@ -115,7 +127,7 @@ final class NotificationModel
             "SELECT COUNT(*) total,
                     COALESCE(SUM(is_read = 0), 0) unread,
                     COALESCE(SUM(YEARWEEK(created_at, 1) = YEARWEEK(CURRENT_DATE(), 1)), 0) week,
-                    COALESCE(SUM(deleted_at IS NOT NULL AND deleted_at <= DATE_SUB(NOW(), INTERVAL 23 DAY)), 0) expiring
+                    COALESCE(SUM(deleted_at IS NOT NULL AND deleted_at <= DATE_SUB(NOW(), INTERVAL 53 DAY)), 0) expiring
              FROM notifications WHERE user_id = :user_id AND $visibility"
         );
         $statement->execute(['user_id' => $userId]);
@@ -190,7 +202,7 @@ final class NotificationModel
         return $statement->rowCount() === 1;
     }
 
-    public function purgeExpiredTrash(int $days = 30): int
+    public function purgeExpiredTrash(int $days = 60): int
     {
         $days = max(1, min($days, 365));
         $statement = $this->connection()->prepare(

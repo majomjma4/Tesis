@@ -1,0 +1,48 @@
+<?php
+
+declare(strict_types=1);
+
+/** Única política operativa de conservación de versiones documentales. */
+final class ProjectDocumentArchiveService
+{
+    public function archiveHistoricalVersionsForProject(int $projectId,int $actor,string $reason='Publicación institucional'):array
+    { return Database::transaction(fn(PDO $db):array=>$this->archiveHistoricalVersionsForProjectInTransaction($db,$projectId,$actor,$reason)); }
+
+    public function archiveHistoricalVersionsForProjectInTransaction(PDO $db,int $projectId,int $actor,string $reason='Publicación institucional'):array
+    {
+        $reason=trim($reason);if($projectId<1||$actor<1||mb_strlen($reason)<5||mb_strlen($reason)>500)throw new ProjectDocumentArchiveException('Los datos de archivado documental son incompletos.');
+        $project=$db->prepare('SELECT id,status FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE');$project->execute(['id'=>$projectId]);if(!$project->fetch())throw new ProjectDocumentArchiveException('El proyecto no existe.');
+        $holds=$this->projectHoldReasons($db,$projectId);$query=$db->prepare("SELECT v.*,c.declared_summary,c.sections_json,c.previous_document_status,
+            (SELECT CONCAT('[',GROUP_CONCAT(link.observation_id ORDER BY link.observation_id SEPARATOR ','),']') FROM project_file_version_addressed_observations link WHERE link.change_id=c.id) addressed_observations_json
+            FROM project_file_versions v LEFT JOIN project_file_version_changes c ON c.previous_version_id=v.id WHERE v.project_id=:project ORDER BY v.file_id,v.version_number,v.id FOR UPDATE");$query->execute(['project'=>$projectId]);$versions=$query->fetchAll();
+        $archived=[];$unavailable=[];$held=[];$storage=new ProjectDocumentStorageService();
+        foreach($versions as $version){$id=(int)$version['id'];if(in_array((string)$version['physical_status'],['archived','unavailable'],true)){continue;}$decision=$this->canArchiveRow($version,$holds);if(!$decision['allowed']){$held[]=['version_id'=>$id,'reasons'=>$decision['reasons']];continue;}
+            $verification=$storage->verifyHistoricalBinary($version);if(!$verification['exists']){$update=$db->prepare("UPDATE project_file_versions SET physical_status='unavailable',verified_at=UTC_TIMESTAMP(),checksum_verified=0,unavailable_reason=:reason WHERE id=:id AND physical_status<>'archived'");$update->execute(['reason'=>$verification['reason'],'id'=>$id]);$unavailable[]=['file_id'=>(int)$version['file_id'],'version_id'=>$id,'version_number'=>(int)$version['version_number'],'reason'=>$verification['reason']];continue;}
+            if(!$verification['verified'])throw new ProjectDocumentArchiveException('La versión histórica '.(int)$version['version_number'].' no superó la verificación de integridad. No se archivó ninguna versión.');
+            $update=$db->prepare("UPDATE project_file_versions SET physical_status='archived',archived_at=UTC_TIMESTAMP(),archived_by=:actor,verified_at=UTC_TIMESTAMP(),checksum_verified=1,storage_tier='archive',unavailable_reason=NULL,archive_reason=:reason WHERE id=:id AND physical_status<>'archived'");$update->execute(['actor'=>$actor,'reason'=>$reason,'id'=>$id]);
+            $manifest=$db->prepare("INSERT INTO project_file_version_archive_manifests(project_id,file_id,version_id,checksum_sha256,size_bytes,mime_type,original_name,version_number,replaced_at,replaced_by,historical_document_status,declared_summary,sections_json,addressed_observations_json,storage_tier,archived_reason,verified_at,checksum_verified)
+                VALUES(:project,:file,:version,:checksum,:size,:mime,:name,:number,:replaced_at,:replaced_by,:document_status,:summary,:sections,:observations,'archive',:reason,UTC_TIMESTAMP(),1)
+                ON DUPLICATE KEY UPDATE verified_at=VALUES(verified_at),checksum_verified=1,archived_reason=VALUES(archived_reason),updated_at=UTC_TIMESTAMP()");
+            $manifest->execute(['project'=>$projectId,'file'=>(int)$version['file_id'],'version'=>$id,'checksum'=>$version['checksum_sha256'],'size'=>(int)$version['size_bytes'],'mime'=>$version['mime_type'],'name'=>$version['original_name'],'number'=>(int)$version['version_number'],'replaced_at'=>$version['replaced_at'],'replaced_by'=>$version['replaced_by'],'document_status'=>$version['previous_document_status']?:$this->historicalStatus($db,$projectId,(int)$version['file_id'],(string)$version['checksum_sha256']),'summary'=>$version['declared_summary']?:null,'sections'=>$version['sections_json']?:null,'observations'=>$version['addressed_observations_json']?:null,'reason'=>$reason]);
+            $archived[]=['file_id'=>(int)$version['file_id'],'version_id'=>$id,'version_number'=>(int)$version['version_number'],'checksum'=>(string)$version['checksum_sha256'],'previous_status'=>(string)$version['physical_status'],'new_status'=>'archived','checksum_verified'=>true];
+        }
+        if($archived!==[]||$unavailable!==[]){(new ProjectAuditService($db))->record($projectId,$actor,'project_document_versions_archived','project_document_archive',$projectId,null,['archived_count'=>count($archived),'unavailable_count'=>count($unavailable),'held_count'=>count($held),'versions'=>$archived,'unavailable'=>$unavailable],$reason);}
+        return ['project_id'=>$projectId,'archived_count'=>count($archived),'unavailable_count'=>count($unavailable),'held_count'=>count($held),'archived'=>$archived,'unavailable'=>$unavailable,'held'=>$held,'current_versions_status'=>'active','physical_files_moved'=>false,'message'=>$archived===[]?'No se encontraron versiones históricas elegibles para archivar.':'Se archivaron '.count($archived).' versiones históricas.'];
+    }
+
+    public function verifyArchivedVersion(int $versionId):array
+    { $db=Database::connection();return $db->inTransaction()?$this->verifyArchivedVersionInTransaction($db,$versionId):Database::transaction(fn(PDO $transaction):array=>$this->verifyArchivedVersionInTransaction($transaction,$versionId)); }
+
+    public function verifyArchivedVersionInTransaction(PDO $db,int $versionId):array
+    { $query=$db->prepare("SELECT * FROM project_file_versions WHERE id=:id FOR UPDATE");$query->execute(['id'=>$versionId]);$version=$query->fetch();if(!$version)throw new ProjectDocumentArchiveException('La versión no existe.');$verification=(new ProjectDocumentStorageService())->verifyHistoricalBinary($version);if(!$verification['exists']){$db->prepare("UPDATE project_file_versions SET physical_status='unavailable',verified_at=UTC_TIMESTAMP(),checksum_verified=0,unavailable_reason=:reason WHERE id=:id")->execute(['reason'=>$verification['reason'],'id'=>$versionId]);return $verification+['physical_status'=>'unavailable'];}if(!$verification['verified'])throw new ProjectDocumentArchiveException('La versión no superó la verificación de integridad.');$db->prepare('UPDATE project_file_versions SET verified_at=UTC_TIMESTAMP(),checksum_verified=1,unavailable_reason=NULL WHERE id=:id')->execute(['id'=>$versionId]);return $verification+['physical_status'=>(string)$version['physical_status']]; }
+
+    public function statusForVersion(int $versionId):array
+    { $q=Database::connection()->prepare('SELECT id,physical_status,archived_at,verified_at,checksum_verified,storage_tier,retention_until,legal_hold,unavailable_reason FROM project_file_versions WHERE id=:id');$q->execute(['id'=>$versionId]);$row=$q->fetch();if(!$row)throw new ProjectDocumentArchiveException('La versión no existe.');$row['id']=(int)$row['id'];$row['checksum_verified']=(bool)$row['checksum_verified'];$row['legal_hold']=(bool)$row['legal_hold'];$row['is_download_available']=false;return $row; }
+
+    public function canArchiveVersion(int $versionId):array
+    { $db=Database::connection();$q=$db->prepare('SELECT * FROM project_file_versions WHERE id=:id');$q->execute(['id'=>$versionId]);$row=$q->fetch();if(!$row)throw new ProjectDocumentArchiveException('La versión no existe.');return $this->canArchiveRow($row,$this->projectHoldReasons($db,(int)$row['project_id'])); }
+
+    private function canArchiveRow(array $version,array $projectHolds):array{$reasons=$projectHolds;if(!empty($version['legal_hold']))$reasons[]='Retención manual activa.';if((string)$version['physical_status']==='archived')$reasons[]='La versión ya está archivada.';return ['allowed'=>$reasons===[],'reasons'=>array_values(array_unique($reasons)),'version_id'=>(int)$version['id']];}
+    private function projectHoldReasons(PDO $db,int $project):array{$q=$db->prepare("SELECT (SELECT COUNT(*) FROM project_observations WHERE project_id=:p1 AND status='pending') pending_observations,(SELECT COUNT(*) FROM project_adjustment_requests WHERE project_id=:p2 AND status='pending') pending_adjustments,(SELECT COUNT(*) FROM projects WHERE id=:p3 AND status IN ('under_review','defense')) open_process");$q->execute(['p1'=>$project,'p2'=>$project,'p3'=>$project]);$row=$q->fetch()?:[];$reasons=[];if((int)($row['pending_observations']??0)>0)$reasons[]='Existen observaciones académicas pendientes.';if((int)($row['pending_adjustments']??0)>0)$reasons[]='Existen solicitudes administrativas pendientes.';if((int)($row['open_process']??0)>0)$reasons[]='El proyecto mantiene un proceso académico abierto.';return $reasons;}
+    private function historicalStatus(PDO $db,int $project,int $file,string $checksum):string{$q=$db->prepare('SELECT status FROM project_file_review_states WHERE project_id=:project AND file_id=:file AND checksum_sha256=:checksum');$q->execute(['project'=>$project,'file'=>$file,'checksum'=>$checksum]);$status=$q->fetchColumn();return is_string($status)?$status:'development';}
+}
