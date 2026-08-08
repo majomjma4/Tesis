@@ -2,6 +2,16 @@
 <?php if(empty($projectEditorOnly)): ?>
 <section class="ap-head"><div><span>Administración</span><h1>Proyectos activos</h1><p>Consulta y actualiza los expedientes académicos que aún no han sido publicados.</p></div></section>
 <?php if(($filters['group']??'')==='finished'):?><div class="ap-active-filter"><i class="fa-solid fa-filter"></i><span>Proyectos activos en etapas finales</span><a href="<?=e(route('projects'))?>">Quitar filtro</a></div><?php endif;?>
+<?php if(!empty($filters['review_situation'])):
+    $sitLabel = match($filters['review_situation']){
+        'pending' => 'Con observaciones pendientes',
+        'addressed' => 'Observaciones atendidas',
+        'none' => 'Sin observaciones registradas',
+        default => 'Situación de revisión'
+    };
+?>
+<div class="ap-active-filter"><i class="fa-solid fa-filter"></i><span>Filtrado por situación de revisión: <strong><?=e($sitLabel)?></strong></span><a href="<?=e(route('projects'))?>">Quitar filtro</a></div>
+<?php endif;?>
 <section class="ap-stats"><article><strong><?=$projectSummary['total']?></strong><span>Total activos</span></article><article><strong><?=$projectSummary['development']?></strong><span>En desarrollo</span></article><article><strong><?=$projectSummary['review']?></strong><span>En revisión</span></article><article><strong><?=$projectSummary['approved']?></strong><span>Aprobados</span></article><article><strong><?=$projectSummary['defense']?></strong><span>En tribunal</span></article></section>
 <form class="ap-filters admin-filter-bar" role="search">
     <input type="hidden" name="page" value="projects">

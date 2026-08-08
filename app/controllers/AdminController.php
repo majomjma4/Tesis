@@ -5,8 +5,86 @@ final class AdminController
 {
     public function settings():void{$model=new SystemSettingModel();$error=null;try{$settings=$model->all();}catch(Throwable $e){error_log('Admin settings: '.$e->getMessage());$error='No fue posible consultar la configuración.';$settings=$model->defaults();}$s=new AuthSessionService();View::render('admin/settings',['currentPage'=>'admin-settings','title'=>'Configuración | Administración','bodyClass'=>'admin-settings-page','pageStyles'=>[asset('css/admin-settings.css')],'pageScript'=>asset('js/admin-settings.js'),'settings'=>$settings,'settingsError'=>$error,'settingsCsrf'=>$s->csrfToken('admin_settings'),'settingsSaveEndpoint'=>route('admin-settings-save')]);}
     public function saveSettings():void{$this->requirePost();$s=new AuthSessionService();if(!$s->validateCsrf('admin_settings',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);try{(new SystemSettingModel())->save($_POST,(int)$s->userId());$this->json(true,'Configuración guardada y aplicada.');}catch(InvalidArgumentException $e){$this->activityFailure($s,'settings_updated','Intentó actualizar la configuración institucional','Configuración','settings',null,'Configuración del sistema',$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,'settings_updated','Intentó actualizar la configuración institucional','Configuración','settings',null,'Configuración del sistema',$e);error_log('Save settings: '.$e->getMessage());$this->json(false,'No fue posible guardar la configuración.',[],500);}}
-    public function reports():void{$from=$this->reportDate('from',date('Y-m-01'));$to=$this->reportDate('to',date('Y-m-d'));$model=new AdminReportModel();$error=null;try{$data=$model->dashboard($from,$to,PaginationService::request());}catch(Throwable $e){error_log('Admin reports: '.$e->getMessage());$error='No fue posible generar los reportes.';$data=['summary'=>['users'=>0,'projects'=>0,'deliveries'=>0,'actions'=>0],'roles'=>[],'statuses'=>[],'reviewSituations'=>[],'activity'=>[],'pagination'=>['total'=>0]];}View::render('admin/reports',['currentPage'=>'admin-reports','title'=>'Reportes | Administración','bodyClass'=>'admin-reports-page','pageStyles'=>[asset('css/admin-reports.css')],'reportData'=>$data,'pagePagination'=>$data['pagination'],'reportFrom'=>$from,'reportTo'=>$to,'reportError'=>$error]);}
-    public function exportReport():never{$type=(string)($_GET['type']??'');$from=$this->reportDate('from',date('Y-m-01'));$to=$this->reportDate('to',date('Y-m-d'));if(!in_array($type,['users','projects','audit'],true)){http_response_code(422);exit('Reporte no válido.');}try{$report=(new AdminReportModel())->export($type,$from,$to);header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="reporte-'.$type.'-'.$from.'-'.$to.'.csv"');echo "\xEF\xBB\xBF";$out=fopen('php://output','wb');fputcsv($out,$report['headers'],';');foreach($report['rows'] as $row){$safe=array_map(static fn($cell):string=>preg_match('/^[=+\-@]/u',(string)$cell)?"'".(string)$cell:(string)$cell,array_values($row));fputcsv($out,$safe,';');}fclose($out);exit;}catch(Throwable $e){error_log('Export report: '.$e->getMessage());http_response_code(500);exit('No fue posible generar el reporte.');}}
+    public function reports():void{$from=$this->reportDate('from',date('Y-m-01'));$to=$this->reportDate('to',date('Y-m-d'));$model=new AdminReportModel();$error=null;$paginationRequest=['page'=>(int)($_GET['report_page']??PaginationService::request()['page']??1),'size'=>(int)($_GET['reports_per_page']??PaginationService::request()['size']??10)];try{$data=$model->dashboard($from,$to,$paginationRequest);}catch(Throwable $e){error_log('Admin reports: '.$e->getMessage());$error='No fue posible generar los reportes.';$data=['summary'=>['users'=>0,'projects'=>0,'deliveries'=>0,'actions'=>0],'roles'=>[],'statuses'=>[],'reviewSituations'=>[],'activity'=>[],'pagination'=>['total'=>0]];}View::render('admin/reports',['currentPage'=>'admin-reports','title'=>'Reportes | Administración','bodyClass'=>'admin-reports-page','pageStyles'=>[asset('css/admin-reports.css')],'reportData'=>$data,'pagePaginationData'=>$data['pagination'],'reportFrom'=>$from,'reportTo'=>$to,'reportError'=>$error]);}
+    public function exportReport():never{
+        $type=(string)($_GET['type']??'');
+        $format=(string)($_GET['format']??'pdf');
+        $scope=(string)($_GET['scope']??'');
+        $from=$this->reportDate('from',date('Y-m-01'));
+        $to=$this->reportDate('to',date('Y-m-d'));
+        if(!in_array($type,['users','projects','audit'],true)){http_response_code(422);exit('Reporte no válido.');}
+        try{
+            $model=new AdminReportModel();
+            $report=$model->export($type,$from,$to);
+            $titleMap=['users'=>'Reporte de Usuarios','projects'=>'Reporte de Proyectos Académicos','audit'=>'Reporte de Auditoría y Trazabilidad'];
+            $reportTitle=$titleMap[$type]??'Reporte Institucional';
+            $formattedFrom=date('d/m/Y',strtotime($from));
+            $formattedTo=date('d/m/Y',strtotime($to));
+            $generatedAt=date('d/m/Y H:i');
+            $subtitle="Período: $formattedFrom - $formattedTo | Generado: $generatedAt";
+
+            // Nombres de meses sin tildes para archivos de SO
+            $monthsMap = [1=>'Enero', 2=>'Febrero', 3=>'Marzo', 4=>'Abril', 5=>'Mayo', 6=>'Junio', 7=>'Julio', 8=>'Agosto', 9=>'Septiembre', 10=>'Octubre', 11=>'Noviembre', 12=>'Diciembre'];
+            $fromTs = strtotime($from);
+            $toTs = strtotime($to);
+
+            $firstThisMonth = date('Y-m-01');
+            $firstLastMonth = date('Y-m-01', strtotime('first day of last month'));
+            $lastLastMonth = date('Y-m-t', strtotime('last month'));
+            $sevenDaysAgo = date('Y-m-d', strtotime('-6 days'));
+
+            if ($scope === 'this_month' || ($from === $firstThisMonth && $to === date('Y-m-d') && $scope !== 'custom' && $scope !== '7days')) {
+                $mNum = (int)date('n', $fromTs);
+                $yNum = date('Y', $fromTs);
+                $suffix = ($monthsMap[$mNum] ?? 'Mes') . '-' . $yNum;
+            } elseif ($scope === 'last_month' || ($from === $firstLastMonth && $to === $lastLastMonth)) {
+                $mNum = (int)date('n', $fromTs);
+                $yNum = date('Y', $fromTs);
+                $suffix = ($monthsMap[$mNum] ?? 'Mes') . '-' . $yNum;
+            } elseif ($scope === '7days' || ($from === $sevenDaysAgo && $to === date('Y-m-d'))) {
+                $suffix = 'Ultimos-7-dias';
+            } elseif ($scope === 'academic_period' || ($from === '2026-04-01' && $to === '2026-09-30')) {
+                $suffix = 'I-PAO-2026';
+            } else {
+                $suffix = date('d-m-Y', $fromTs) . '-al-' . date('d-m-Y', $toTs);
+            }
+
+            $exportFilename = 'reporte-' . $type . '-' . $suffix . '.' . ($format === 'pdf' ? 'pdf' : 'csv');
+
+            if($format==='pdf'){
+                $orientation=$type==='users'?'P':'L';
+                $colWidths=['users'=>[40,55,30,25,25,35,35],'projects'=>[24,55,32,32,25,25,32,38,35,26,26],'audit'=>[28,40,65,35,28]];
+                $widths=$colWidths[$type]??array_fill(0,count($report['headers']),30);
+                $pdf=new AppPdfReportService($orientation,$reportTitle,$subtitle,$report['headers'],$widths);
+                $pdf->SetTitle($reportTitle);
+                $pdf->buildReport($report['rows']);
+                $pdf->Output('D',$exportFilename);
+                exit;
+            }
+
+            // Formato CSV con Encabezado Contextual
+            header('Content-Type: text/csv; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="' . $exportFilename . '"');
+            echo "\xEF\xBB\xBF";
+            $out=fopen('php://output','wb');
+            fputcsv($out,['Instituto Superior Tecnológico "El Libertador"'],';');
+            fputcsv($out,[$reportTitle],';');
+            fputcsv($out,["Período: $formattedFrom al $formattedTo"],';');
+            fputcsv($out,["Generado: $generatedAt"],';');
+            fputcsv($out,[],';'); // Fila en blanco
+            fputcsv($out,$report['headers'],';');
+            foreach($report['rows'] as $row){
+                $safe=array_map(static fn($cell):string=>preg_match('/^[=+\-@]/u',(string)$cell)?"'".(string)$cell:(string)$cell,array_values($row));
+                fputcsv($out,$safe,';');
+            }
+            fclose($out);
+            exit;
+        }catch(Throwable $e){
+            error_log('Export report: '.$e->getMessage());
+            http_response_code(500);
+            exit('No fue posible generar el reporte.');
+        }
+    }
     private function reportDate(string $key,string $fallback):string{$value=(string)($_GET[$key]??$fallback);$date=DateTimeImmutable::createFromFormat('Y-m-d',$value);return $date&&$date->format('Y-m-d')===$value?$value:$fallback;}
     public function trash():void
     {
@@ -653,7 +731,7 @@ final class AdminController
     public function projects(): void
     {
         $requestedStatus=(string)($_GET['status']??'');
-        $filters=['search'=>mb_substr(trim((string)($_GET['search']??'')),0,100),'status'=>$requestedStatus==='changes_required'?'':$requestedStatus,'type_id'=>(int)($_GET['type_id']??0),'period_id'=>(int)($_GET['period_id']??0),'group'=>(string)($_GET['group']??'')];
+        $filters=['search'=>mb_substr(trim((string)($_GET['search']??'')),0,100),'status'=>$requestedStatus==='changes_required'?'':$requestedStatus,'type_id'=>(int)($_GET['type_id']??0),'period_id'=>(int)($_GET['period_id']??0),'group'=>(string)($_GET['group']??''),'review_situation'=>(string)($_GET['review_situation']??'')];
         $model=new AdminProjectModel();$error=null;
         try{$catalogs=$model->catalogs();if(count($catalogs['periods'])===1)$filters['period_id']=(int)$catalogs['periods'][0]['id'];$result=$model->listing($filters,PaginationService::request());$projects=$result['items'];$pagination=$result['pagination'];$summary=$model->summary($filters);}catch(Throwable $exception){error_log('Admin projects: '.$exception->getMessage());$error='No fue posible consultar los proyectos.';$projects=[];$pagination=['total'=>0];$summary=['total'=>0,'development'=>0,'review'=>0,'approved'=>0,'defense'=>0];$catalogs=['types'=>[],'careers'=>[],'periods'=>[],'teachers'=>[]];}
         $session=new AuthSessionService();

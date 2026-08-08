@@ -105,11 +105,16 @@ final class AdminProjectModel
         }
         $status=(string)($filters['status']??'');
         if(in_array($status,self::STATUSES,true)){$where[]='p.status=:s';$params['s']=$status;}
-        if(($filters['group']??'')==='finished')$where[]="p.status IN ('approved','defense','tribunal_approved','published')";
-        $typeId=(int)($filters['type_id']??0);
-        if($typeId>0){$where[]='p.project_type_id=:t';$params['t']=$typeId;}
-        $periodId=(int)($filters['period_id']??0);
-        if($periodId>0){$where[]='p.academic_period_id=:a';$params['a']=$periodId;}
+        $reviewSituation=(string)($filters['review_situation']??'');
+        if(in_array($reviewSituation,['pending','addressed','none'],true)){
+            if($reviewSituation==='pending'){
+                $where[]='EXISTS (SELECT 1 FROM project_observations po WHERE po.project_id=p.id AND po.status=\'pending\')';
+            }elseif($reviewSituation==='addressed'){
+                $where[]='NOT EXISTS (SELECT 1 FROM project_observations po WHERE po.project_id=p.id AND po.status=\'pending\') AND EXISTS (SELECT 1 FROM project_observations po WHERE po.project_id=p.id AND po.status IN (\'addressed\',\'resolved\'))';
+            }elseif($reviewSituation==='none'){
+                $where[]='NOT EXISTS (SELECT 1 FROM project_observations po WHERE po.project_id=p.id)';
+            }
+        }
         $from=" FROM projects p JOIN project_types pt ON pt.id=p.project_type_id JOIN careers c ON c.id=p.career_id JOIN academic_periods ap ON ap.id=p.academic_period_id LEFT JOIN users u ON u.id=p.tutor_id WHERE ".implode(' AND ',$where);
         return [$from,$params];
     }
