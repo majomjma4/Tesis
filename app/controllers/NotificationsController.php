@@ -355,23 +355,49 @@ final class NotificationsController
             $notification = $model->findForUser($id, $userId);
             if ($notification === null && (new AuthSessionService())->hasAdminAccess()) {
                 $db = Database::connection();
-                $q = $db->prepare("SELECT id, type, title, message, project_id, action_url, action_label, metadata, created_at FROM notifications WHERE id = :id");
+                $q = $db->prepare(
+                    "SELECT n.id, n.type, n.title, n.message, n.project_id, n.action_url, n.action_label, n.metadata, n.created_at,
+                            p.code AS project_code, p.status AS project_status,
+                            COALESCE(p.title, NULLIF(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, '$.project_name')), ''), 'Notificación general') AS project_name,
+                            u.full_name AS sender_name
+                     FROM notifications n
+                     LEFT JOIN projects p ON p.id = n.project_id
+                     LEFT JOIN users u ON u.id = JSON_UNQUOTE(JSON_EXTRACT(n.metadata, '$.admin_sender_id'))
+                     WHERE n.id = :id"
+                );
                 $q->execute(['id' => $id]);
                 $row = $q->fetch();
                 if ($row) {
-                    $decoded = json_decode((string) $row['metadata'], true);
+                    $decoded = json_decode((string) ($row['metadata'] ?? ''), true);
                     $meta = is_array($decoded) ? $decoded : [];
-                    if ((int)($meta['admin_sender_id'] ?? 0) === $userId) {
-                        $pQ = $db->prepare("SELECT title FROM projects WHERE id = :id");
-                        $pQ->execute(['id' => $row['project_id']]);
-                        $pTitle = $pQ->fetchColumn() ?: 'Notificacion general';
-                        $row['project_name'] = $pTitle;
+                    $adminSenderId = (int) ($meta['admin_sender_id'] ?? 0);
+
+                    // Si no tiene admin_sender_id directo en metadata, verificar admin_audit_log
+                    if ($adminSenderId === 0) {
+                        $auditQ = $db->prepare(
+                            "SELECT actor_user_id FROM admin_audit_log
+                             WHERE action = 'notification_sent' AND details LIKE :title_match AND actor_user_id = :actor
+                             LIMIT 1"
+                        );
+                        $auditQ->execute([
+                            'title_match' => '%' . $row['title'] . '%',
+                            'actor' => $userId
+                        ]);
+                        if ($auditQ->fetchColumn()) {
+                            $adminSenderId = $userId;
+                        }
+                    }
+
+                    if ($adminSenderId === $userId) {
+                        $row['id'] = (int) $row['id'];
+                        $row['project_id'] = $row['project_id'] === null ? null : (int) $row['project_id'];
                         $row['is_read'] = true;
                         $row['metadata'] = $meta;
-                        
+                        $row['sender_name'] = $row['sender_name'] ?: 'Administración';
+
                         return [
                             'notificationId' => $id,
-                            'url' => $this->safeInternalUrl($row['action_url']),
+                            'url' => $this->safeInternalUrl($row['action_url']) ?? $this->contextualNotificationUrl($row),
                             'detail' => $row,
                             'counters' => $model->getCounters($userId),
                         ];
@@ -382,7 +408,7 @@ final class NotificationsController
                 $this->json(false, 'La notificacion no existe.', [], 404);
             }
             $model->markAsRead($id, $userId);
-            $url = $this->safeInternalUrl($notification['action_url']);
+            $url = $this->safeInternalUrl($notification['action_url']) ?? $this->contextualNotificationUrl($notification);
 
             return [
                 'notificationId' => $id,
@@ -555,11 +581,35 @@ final class NotificationsController
         if ($parts === false || isset($parts['scheme']) || isset($parts['host']) || str_starts_with($url, '//')) {
             return null;
         }
-        $path = ltrim((string) ($parts['path'] ?? ''), '/');
-        if ($path !== 'index.php') {
+        $path = '/' . trim((string) ($parts['path'] ?? ''), '/');
+        $basePath = rtrim((string) (parse_url(base_url(), PHP_URL_PATH) ?: ''), '/');
+        $allowedPaths = ['/index.php', ($basePath === '' ? '' : $basePath) . '/index.php'];
+        if (!in_array($path, $allowedPaths, true)) {
             return null;
         }
-        return base_url($url);
+        $relative = 'index.php' . (isset($parts['query']) ? '?' . $parts['query'] : '') . (isset($parts['fragment']) ? '#' . $parts['fragment'] : '');
+        return base_url($relative);
+    }
+
+    private function contextualNotificationUrl(array $notification): ?string
+    {
+        $metadata = is_array($notification['metadata'] ?? null) ? $notification['metadata'] : [];
+        $eventId = (int) ($metadata['event_id'] ?? 0);
+        if ($eventId > 0) return route('calendar') . '&event_id=' . $eventId;
+
+        $projectId = (int) ($notification['project_id'] ?? 0);
+        if ($projectId < 1) return null;
+        $tab = match ((string) ($notification['type'] ?? '')) {
+            'delivery' => 'deliveries',
+            'observation', 'review' => 'review',
+            'repository' => 'files',
+            'tribunal' => 'participants',
+            'comment' => 'comments',
+            'status_change' => 'summary',
+            default => null,
+        };
+        $url = route('project-detail') . '&id=' . $projectId;
+        return $tab === null ? $url : $url . '&tab=' . $tab;
     }
     // Final de validación de solicitudes
 

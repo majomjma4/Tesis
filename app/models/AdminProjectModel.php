@@ -204,6 +204,9 @@ final class AdminProjectModel
                 }
                 $next['_history_changes']=$history;
                 $auditId=(new ProjectAuditService($d))->record($id,$actor,'project_updated','project',$id,$previous,$next);
+                $academicNotifications=new ProjectAcademicNotificationService();
+                if(!empty($tutoringChange['added']))$academicNotifications->tutorAssigned($d,$id,$code,(string)$v['title'],(array)$tutoringChange['added'],$actor);
+                if($recordAcademicCompletion)$academicNotifications->finalApproval($d,$id,$code,(string)$v['title'],(string)$v['status'],self::STATUS_LABELS[(string)$v['status']]??(string)$v['status'],$auditId);
                 if(isset($changed['status'])){
                     (new ProjectDescriptionService($d))->registerStatusReminder($id,$auditId);
                     $from=self::STATUS_LABELS[(string)$changed['status'][0]]??(string)$changed['status'][0];

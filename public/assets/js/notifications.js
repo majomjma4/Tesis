@@ -126,8 +126,10 @@ function iconFor(type) {
     return { delivery: "fa-cloud-arrow-up", observation: "fa-comment-dots", status_change: "fa-circle-check", review: "fa-triangle-exclamation", reminder: "fa-clock", system: "fa-gear", tribunal: "fa-user-group", repository: "fa-database", comment: "fa-message", adjustment: "fa-pen-to-square" }[type] || "fa-bell";
 }
 
-function notificationTypeLabel(type) {
-    return { delivery: "Entrega", observation: "Observación", status_change: "Cambio de estado", review: "Revisión", reminder: "Recordatorio", system: "Sistema", tribunal: "Tribunal", repository: "Repositorio", comment: "Comentario", adjustment: "Solicitud de cambios" }[type] || "Notificación";
+function notificationTypeLabel(type, item = null) {
+    const custom = item?.metadata?.custom_type_label || item?.custom_type_label;
+    if (custom && String(custom).trim() !== "") return String(custom).trim();
+    return { delivery: "Entrega", observation: "Observación", status_change: "Cambio de estado", review: "Revisión", reminder: "Recordatorio", system: "Comunicado institucional", tribunal: "Tribunal", repository: "Información académica", comment: "Comentario", adjustment: "Solicitud de cambios" }[type] || "Notificación";
 }
 
 function typeClass(type) {
@@ -152,7 +154,7 @@ function createRow(notification) {
     const iconGlyph = document.createElement("i"); iconGlyph.className = `fa-solid ${iconFor(notification.type)}`; icon.append(iconGlyph);
     const copy = document.createElement("div"); copy.className = "notification-copy";
     const head = document.createElement("div"); head.className = "notification-copy-heading";
-    const category = document.createElement("span"); category.className = "notification-category"; category.textContent = notification.filter;
+    const category = document.createElement("span"); category.className = "notification-category"; category.textContent = notificationTypeLabel(notification.type, notification);
     const mobileTime = document.createElement("span"); mobileTime.className = "notification-date-mobile"; mobileTime.textContent = notification.time; head.append(category, mobileTime);
     const title = document.createElement("h3"); title.textContent = notification.title;
     const message = document.createElement("p"); message.textContent = notification.description;
@@ -163,22 +165,24 @@ function createRow(notification) {
     const time = document.createElement("time"); time.append(document.createTextNode(notification.date)); const strong = document.createElement("strong"); strong.textContent = notification.time; time.append(strong);
     const actions = document.createElement("div"); actions.className = "notification-row-actions";
     const view = createButton("view-notification", "Detalle", "", "open-detail");
-    const toggleLabel = notification.is_read ? "Marcar como no leida" : "Marcar como leida";
-    const toggle = createButton("mark-notification", toggleLabel, notification.is_read ? "fa-eye" : "fa-eye-slash", "toggle-read"); toggle.setAttribute("aria-pressed", String(notification.is_read));
     const more = createButton("more-notification", "Mas opciones", "fa-ellipsis-vertical", "menu"); more.setAttribute("aria-haspopup", "menu"); more.setAttribute("aria-expanded", "false");
     const menu = document.createElement("div"); menu.className = "notification-context-menu"; menu.role = "menu"; menu.hidden = true;
-    [["delete", "Archivar", "Ocultar de la bandeja sin eliminar"], ["destroy", "Mover a la papelera", "Se eliminara automaticamente en 60 dias"]].forEach(([action, label, description]) => { const b = document.createElement("button"); b.type = "button"; b.role = "menuitem"; b.dataset.menuAction = action; if (action === "destroy") b.className = "danger"; const text = document.createElement("span"); const strong = document.createElement("strong"); strong.textContent = label; const small = document.createElement("small"); small.textContent = description; text.append(strong, small); b.append(text); menu.append(b); });
-    
-    const isSentTab = statusFilter.value === "sent";
-    if (notification.deleted_at && statusFilter.value === "trash") {
-        const restore = createButton("view-notification", "Restaurar", "", "restore");
-        actions.append(restore);
+    const addMenuItem = (action, label, description, danger = false) => { const b = document.createElement("button"); b.type = "button"; b.role = "menuitem"; b.dataset.menuAction = action; if (danger) b.className = "danger"; const text = document.createElement("span"); const strong = document.createElement("strong"); strong.textContent = label; const small = document.createElement("small"); small.textContent = description; text.append(strong, small); b.append(text); menu.append(b); };
+    const isTrash = Boolean(notification.deleted_at);
+    const isArchived = Boolean(notification.archived_at && !notification.deleted_at);
+    if (isTrash) {
+        addMenuItem("restore", "Restaurar", "Devolver a la bandeja");
+        addMenuItem("purge", "Eliminar definitivamente", "Esta acción no se puede deshacer", true);
         row.classList.add("is-hidden-notification");
-    } else if (isSentTab) {
-        actions.append(view);
+    } else if (isArchived) {
+        addMenuItem("restore", "Desarchivar", "Devolver a la bandeja");
+        addMenuItem("destroy", "Mover a la papelera", "Se eliminará automáticamente en 60 días", true);
     } else {
-        actions.append(view, toggle, more, menu);
+        addMenuItem("toggle-read", notification.is_read ? "Marcar como no leída" : "Marcar como leída", "Cambiar estado de lectura");
+        addMenuItem("delete", "Archivar", "Ocultar de la bandeja sin eliminar");
+        addMenuItem("destroy", "Mover a la papelera", "Se eliminará automáticamente en 60 días", true);
     }
+    actions.append(view, more, menu);
     meta.append(time, actions); row.append(dot, icon, copy, meta);
     [title, message, projectName].forEach((el) => highlight(el, searchInput?.value || ""));
     return row;
@@ -584,6 +588,13 @@ groupsContainer?.addEventListener("click", async (event) => {
     const action = menuButton?.dataset.menuAction || actionButton?.dataset.notificationAction; if (!action) return; closeMenus();
     if (action === "toggle-read") { const read = row.dataset.read === "true"; try { await postAction(read ? endpoints.unread : endpoints.read, row.dataset.notificationId, actionButton || menuButton); await loadNotifications(); } catch {} }
     if (action === "restore") { try { await postAction(endpoints.restore, row.dataset.notificationId, actionButton); await loadNotifications(); } catch {} }
+    if (action === "purge") {
+        pendingDeleteId = row.dataset.notificationId; pendingDeleteMode = "bulk-delete"; pendingBulkIds = [pendingDeleteId];
+        const titleEl = document.querySelector("#notificationDeleteTitle"); if (titleEl) titleEl.textContent = "¿Eliminar definitivamente esta notificación?";
+        const textEl = document.querySelector("#notificationDeleteText"); if (textEl) textEl.textContent = "Esta acción no se puede deshacer.";
+        const confirmBtn = document.querySelector("#confirmDeleteNotification"); if (confirmBtn) confirmBtn.textContent = "Eliminar definitivamente";
+        openModal(deleteModal, menuButton); return;
+    }
     if (action === "delete" || action === "destroy") {
         pendingDeleteId = row.dataset.notificationId;
         pendingDeleteMode = action === "destroy" ? "destroy" : "archive";
@@ -610,53 +621,194 @@ groupsContainer?.addEventListener("click", async (event) => {
 function fillDetail(item, destinationUrl = null) {
     if (!item) return;
     currentDetailId = item.id || null;
+    currentItemState = item;
+
     const typeEl = document.querySelector("#notificationModalType");
-    if (typeEl) typeEl.textContent = notificationTypeLabel(item.type);
+    if (typeEl) typeEl.textContent = notificationTypeLabel(item.type, item);
     const titleEl = document.querySelector("#notificationModalTitle");
     if (titleEl) titleEl.textContent = item.title || "";
     const messageEl = document.querySelector("#notificationModalMessage");
     if (messageEl) messageEl.textContent = item.message || "";
-    const projectEl = document.querySelector("#notificationModalProject");
-    if (projectEl) projectEl.textContent = item.project_name || item.project || "Notificacion general";
     const dateEl = document.querySelector("#notificationModalDate");
     if (dateEl) dateEl.textContent = item.created_at || "";
     const statusEl = document.querySelector("#notificationModalStatus");
     if (statusEl) {
-        statusEl.textContent = item.is_read ? "Leida" : "No leida";
-        statusEl.hidden = statusFilter.value === "sent";
+        statusEl.textContent = item.is_read ? "Leída" : "No leída";
+        statusEl.hidden = statusFilter?.value === "sent";
     }
-    
-    const markUnreadBtn = document.querySelector("#notificationModalMarkUnread");
-    if (markUnreadBtn) markUnreadBtn.hidden = statusFilter.value === "sent";
 
+    // Remitente si existe
+    const senderBlock = document.querySelector("#notificationModalSenderBlock");
+    const senderEl = document.querySelector("#notificationModalSender");
+    const senderName = item.sender_name || item.metadata?.sender_name || (item.metadata?.admin_sender_id ? "Administración" : null);
+    if (senderBlock && senderEl) {
+        senderBlock.hidden = !senderName;
+        senderEl.textContent = senderName || "";
+    }
+
+    // Bloque contextual: solo recursos concretos realmente asociados.
+    const contextBlock = document.querySelector("#notificationModalContextBlock");
+    const contextTitleEl = document.querySelector("#notificationModalContextTitle");
+    const contextSubEl = document.querySelector("#notificationModalContextSub");
+    const metadata = item.metadata || {};
+    const validProjectName = Number(item.project_id) > 0 && item.project_name && item.project_name !== "Notificacion general" && item.project_name !== "General" ? item.project_name : null;
+    const resourceContext = validProjectName
+        ? { title: `${item.project_code ? `${item.project_code} · ` : ""}${validProjectName}`, sub: item.project_status ? `Estado: ${item.project_status}` : "" }
+        : [["document_title", "Documento"], ["document_name", "Documento"], ["review_title", "Revisión"], ["delivery_title", "Entrega"], ["event_title", "Evento"], ["tribunal_name", "Tribunal"], ["repository_name", "Repositorio"], ["observation_title", "Observación"], ["resource_title", "Recurso"]]
+            .map(([key, label]) => metadata[key] ? { title: String(metadata[key]), sub: label } : null)
+            .find(Boolean);
+    if (contextBlock && contextTitleEl && contextSubEl) {
+        if (resourceContext) {
+            contextBlock.hidden = false;
+            contextTitleEl.textContent = resourceContext.title;
+            contextSubEl.textContent = resourceContext.sub;
+            contextSubEl.hidden = !resourceContext.sub;
+        } else {
+            contextBlock.hidden = true;
+            contextTitleEl.textContent = "";
+            contextSubEl.textContent = "";
+        }
+    }
+
+    // Acción contextual: solo rutas registradas y recursos concretos.
     const destination = document.querySelector("#notificationModalDestination");
+    const destinationLabelEl = document.querySelector("#notificationModalDestinationLabel");
+
     if (destination) {
-        const isContextualDestination = (() => {
-            if (!destinationUrl) return false;
-            try {
-                const url = new URL(destinationUrl, window.location.href);
-                return url.origin === window.location.origin && /\/index\.php$/i.test(url.pathname) && url.searchParams.get("page") !== "notifications";
-            } catch {
-                return false;
-            }
-        })();
-        destination.hidden = !isContextualDestination;
-        destination.href = isContextualDestination ? destinationUrl : "#";
-        const spanEl = destination.querySelector("span");
-        if (spanEl) spanEl.textContent = item.action_label || "Ir a la seccion relacionada";
+        const contextualDestination = resolveContextualDestination(destinationUrl || item.action_url, item);
+
+        destination.hidden = !contextualDestination;
+        destination.href = contextualDestination?.href || "#";
+
+        if (contextualDestination && destinationLabelEl) destinationLabelEl.textContent = contextualDestination.label;
+    }
+
+    // Menú de opciones de tres puntos
+    updateModalContextMenu(item);
+}
+
+function resolveContextualDestination(destinationUrl, item) {
+    if (!destinationUrl) return null;
+    try {
+        const url = new URL(destinationUrl, window.location.href);
+        if (url.origin !== window.location.origin || !/\/index\.php$/i.test(url.pathname)) return null;
+        const page = url.searchParams.get("page");
+        const hasPositive = (name) => /^\d+$/.test(url.searchParams.get(name) || "") && Number(url.searchParams.get(name)) > 0;
+        const sectionLabels = { calendar: "Abrir calendario", repository: "Abrir repositorio", projects: "Ver proyectos", "support-materials": "Abrir materiales" };
+        if (sectionLabels[page]) return { href: url.href, label: sectionLabels[page] };
+        if (page === "project-detail" && hasPositive("id")) {
+            const tab = url.searchParams.get("tab");
+            const label = tab === "review" || tab === "reviews" ? "Ver revisión" : tab === "deliveries" ? "Ver entrega" : tab === "files" || tab === "documents" ? "Abrir documento" : tab === "observations" ? "Ver observación" : tab === "participants" || tab === "information" || item.type === "tribunal" ? "Ver tribunal" : "Abrir proyecto";
+            return { href: url.href, label };
+        }
+        if (page === "repository-detail" && hasPositive("id")) return { href: url.href, label: "Abrir repositorio" };
+        if (page === "support-material-detail" && hasPositive("id")) return { href: url.href, label: "Abrir material" };
+    } catch {}
+    return null;
+}
+
+let currentItemState = null;
+
+function updateModalContextMenu(item) {
+    const toggleReadBtn = document.querySelector("#notificationModalToggleReadBtn");
+    const archiveBtn = document.querySelector("#notificationModalArchiveBtn");
+    const trashBtn = document.querySelector("#notificationModalTrashBtn");
+    const menu = document.querySelector("#notificationModalContextMenu");
+    if (menu) menu.hidden = true;
+    modalMenuBtn?.setAttribute("aria-expanded", "false");
+
+    const isTrash = Boolean(item.deleted_at);
+    const isArchived = Boolean(item.archived_at && !item.deleted_at);
+    const isActive = !isTrash && !isArchived;
+
+    // ESTADO 1: NOTIFICACIÓN ACTIVA (Principal)
+    if (isActive) {
+        if (toggleReadBtn) {
+            toggleReadBtn.hidden = false;
+            const span = toggleReadBtn.querySelector("span");
+            const icon = toggleReadBtn.querySelector("i");
+            if (span) span.textContent = item.is_read ? "Marcar como no leída" : "Marcar como leída";
+            if (icon) icon.className = item.is_read ? "fa-regular fa-eye-slash" : "fa-regular fa-envelope-open";
+        }
+        if (archiveBtn) archiveBtn.hidden = false;
+        if (trashBtn) trashBtn.hidden = false;
+        if (modalMenuBtn) modalMenuBtn.hidden = false;
+        return;
+    }
+
+    // ESTADO 2: NOTIFICACIÓN ARCHIVADA
+    if (isArchived) {
+        if (toggleReadBtn) toggleReadBtn.hidden = true;
+        if (archiveBtn) archiveBtn.hidden = true;
+        if (trashBtn) trashBtn.hidden = false;
+        if (modalMenuBtn) modalMenuBtn.hidden = false;
+        return;
+    }
+
+    // ESTADO 3: PAPELERA
+    if (isTrash) {
+        if (toggleReadBtn) toggleReadBtn.hidden = true;
+        if (archiveBtn) archiveBtn.hidden = true;
+        if (trashBtn) trashBtn.hidden = true;
+        if (modalMenuBtn) modalMenuBtn.hidden = true;
+        return;
     }
 }
 
-document.querySelector("#notificationModalDestination")?.addEventListener("click", () => closeModal(detailModal));
+// Eventos del menú de tres puntos del modal de detalle
+const modalMenuBtn = document.querySelector("#notificationModalMenuBtn");
+const modalContextMenu = document.querySelector("#notificationModalContextMenu");
 
-document.querySelector("#notificationModalMarkUnread")?.addEventListener("click", async (event) => {
-    if (!currentDetailId) return;
+modalMenuBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!modalContextMenu) return;
+    const isHidden = modalContextMenu.hidden;
+    modalContextMenu.hidden = !isHidden;
+    modalMenuBtn.setAttribute("aria-expanded", String(isHidden));
+});
+
+document.querySelector("#notificationModalToggleReadBtn")?.addEventListener("click", async () => {
+    if (!currentDetailId || !currentItemState) return;
+    if (modalContextMenu) modalContextMenu.hidden = true;
     try {
-        await postAction(endpoints.unread, currentDetailId, event.currentTarget);
+        const isRead = currentItemState.is_read;
+        await postAction(isRead ? endpoints.unread : endpoints.read, currentDetailId);
+        currentItemState.is_read = !isRead;
         const statusEl = document.querySelector("#notificationModalStatus");
-        if (statusEl) statusEl.textContent = "No leida";
+        if (statusEl) statusEl.textContent = currentItemState.is_read ? "Leída" : "No leída";
+        updateModalContextMenu(currentItemState);
         await loadNotifications();
     } catch {}
+});
+
+document.querySelector("#notificationModalArchiveBtn")?.addEventListener("click", async () => {
+    if (!currentDetailId) return;
+    if (modalContextMenu) modalContextMenu.hidden = true;
+    closeModal(detailModal);
+    pendingDeleteId = currentDetailId;
+    pendingDeleteMode = "archive";
+    const titleEl = document.querySelector("#notificationDeleteTitle");
+    if (titleEl) titleEl.textContent = "¿Deseas archivar esta notificación?";
+    const textEl = document.querySelector("#notificationDeleteText");
+    if (textEl) textEl.textContent = "La notificación saldrá del listado principal, pero podrás recuperarla desde el filtro Archivadas.";
+    const confirmBtn = document.querySelector("#confirmDeleteNotification");
+    if (confirmBtn) confirmBtn.textContent = "Archivar";
+    openModal(deleteModal);
+});
+
+document.querySelector("#notificationModalTrashBtn")?.addEventListener("click", async () => {
+    if (!currentDetailId) return;
+    if (modalContextMenu) modalContextMenu.hidden = true;
+    closeModal(detailModal);
+    pendingDeleteId = currentDetailId;
+    pendingDeleteMode = "destroy";
+    const titleEl = document.querySelector("#notificationDeleteTitle");
+    if (titleEl) titleEl.textContent = "¿Mover esta notificación a la papelera?";
+    const textEl = document.querySelector("#notificationDeleteText");
+    if (textEl) textEl.textContent = "Podrás restaurarla desde Papelera durante 60 días. Después se eliminará automáticamente.";
+    const confirmBtn = document.querySelector("#confirmDeleteNotification");
+    if (confirmBtn) confirmBtn.textContent = "Mover a la papelera";
+    openModal(deleteModal);
 });
 
 document.querySelector("#confirmDeleteNotification")?.addEventListener("click", async (event) => {
@@ -692,9 +844,32 @@ document.querySelector("#confirmDeleteNotification")?.addEventListener("click", 
     } catch {}
 });
 
+document.querySelector("#notificationModalDestination")?.addEventListener("click", (event) => {
+    if (event.currentTarget.hidden || !resolveContextualDestination(event.currentTarget.href, currentItemState || {})) {
+        event.preventDefault();
+        return;
+    }
+    closeModal(detailModal);
+});
+
+document.querySelectorAll(".notification-modal-overlay").forEach((overlay) => {
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) {
+            closeModal(overlay);
+        }
+    });
+});
+
 document.querySelectorAll("[data-modal-close]").forEach((button) => button.addEventListener("click", () => closeModal(button.closest(".notification-modal-overlay"))));
-document.addEventListener("click", (event) => { if (!event.target.closest(".notification-row-actions")) closeMenus(); if (!event.target.closest(".notification-filter-custom")) closeFilterMenus(); });
-document.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchInput?.focus(); } if (event.key === "Escape") { closeMenus(); const hasOpenFilter = filterControls.some((control) => { const menu = control.querySelector(".notification-filter-menu"); return menu && !menu.hidden; }); if (hasOpenFilter) closeFilterMenus(true); else if (detailModal && !detailModal.hidden) closeModal(detailModal); else if (deleteModal && !deleteModal.hidden) closeModal(deleteModal); else if (createModal && !createModal.hidden) closeModal(createModal); else if (document.activeElement === searchInput) { searchInput.value = ""; searchInput.blur(); updateFilterState(); loadNotifications(); } } });
+document.addEventListener("click", (event) => {
+    if (!event.target.closest(".notification-row-actions")) closeMenus();
+    if (!event.target.closest(".notification-filter-custom")) closeFilterMenus();
+    if (!event.target.closest(".notification-modal-menu-container") && modalContextMenu) {
+        modalContextMenu.hidden = true;
+        modalMenuBtn?.setAttribute("aria-expanded", "false");
+    }
+});
+document.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchInput?.focus(); } if (event.key === "Escape") { closeMenus(); if (modalContextMenu) modalContextMenu.hidden = true; const hasOpenFilter = filterControls.some((control) => { const menu = control.querySelector(".notification-filter-menu"); return menu && !menu.hidden; }); if (hasOpenFilter) closeFilterMenus(true); else if (detailModal && !detailModal.hidden) closeModal(detailModal); else if (deleteModal && !deleteModal.hidden) closeModal(deleteModal); else if (createModal && !createModal.hidden) closeModal(createModal); else if (document.activeElement === searchInput) { searchInput.value = ""; searchInput.blur(); updateFilterState(); loadNotifications(); } } });
 
 let notificationsRevealed = false;
 

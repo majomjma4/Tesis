@@ -133,9 +133,9 @@
                                     <time datetime="2026-07-15T<?= e($notification['time']) ?>:00"><?= e($notification['date']) ?><strong><?= e($notification['time']) ?></strong></time>
                                     <div class="notification-row-actions">
                                         <button class="view-notification" data-notification-action="open-detail" type="button"><i class="fa-regular fa-file-lines"></i> Detalle</button>
-                                        <button class="mark-notification" data-notification-action="toggle-read" type="button" aria-pressed="<?= $notification['is_read'] ? 'true' : 'false' ?>" aria-label="<?= $notification['is_read'] ? 'Marcar como no leida' : 'Marcar como leida' ?>" title="<?= $notification['is_read'] ? 'Marcar como no leida' : 'Marcar como leida' ?>"><i class="fa-regular <?= $notification['is_read'] ? 'fa-eye' : 'fa-eye-slash' ?>"></i></button>
                                         <button class="more-notification" data-notification-action="menu" type="button" aria-label="Mas opciones" aria-haspopup="menu" aria-expanded="false" title="Mas opciones"><i class="fa-solid fa-ellipsis-vertical"></i></button>
                                         <div class="notification-context-menu" role="menu" hidden>
+                                            <button type="button" role="menuitem" data-menu-action="toggle-read"><i class="fa-regular <?= $notification['is_read'] ? 'fa-eye-slash' : 'fa-envelope-open' ?>"></i><span><strong><?= $notification['is_read'] ? 'Marcar como no leída' : 'Marcar como leída' ?></strong><small>Cambiar estado de lectura</small></span></button>
                                             <button type="button" role="menuitem" data-menu-action="delete"><i class="fa-solid fa-box-archive"></i><span><strong>Archivar</strong><small>Ocultar de la bandeja sin eliminar</small></span></button>
                                             <button type="button" role="menuitem" class="danger" data-menu-action="destroy"><i class="fa-regular fa-trash-can"></i><span><strong>Mover a la papelera</strong><small>Se eliminará automáticamente en 60 días</small></span></button>
                                         </div>
@@ -182,17 +182,61 @@
     </div>
 </section>
 
-<!-- Reutilización del modal detallado existente -->
+<!-- Modal de detalle rediseñado -->
 <div class="notification-modal-overlay" id="notificationDetailModal" hidden>
     <section class="notification-detail-modal" role="dialog" aria-modal="true" aria-labelledby="notificationModalTitle">
         <button class="notification-modal-close" type="button" data-modal-close aria-label="Cerrar detalle"><i class="fa-solid fa-xmark"></i></button>
         <header class="notification-message-header">
             <span class="notifications-eyebrow" id="notificationModalType">Notificación</span>
             <h2 id="notificationModalTitle"></h2>
-            <div class="notification-message-context"><span id="notificationModalProject"></span><span id="notificationModalDate"></span><span id="notificationModalStatus"></span></div>
+            <div class="notification-message-context">
+                <span id="notificationModalDate"></span>
+                <span id="notificationModalStatus"></span>
+            </div>
         </header>
-        <div class="notification-message-body"><p id="notificationModalMessage"></p></div>
-        <div class="notification-modal-actions"><button class="notification-action secondary" type="button" data-modal-close>Cerrar</button><button class="notification-action secondary" id="notificationModalMarkUnread" type="button"><i class="fa-regular fa-eye-slash"></i>Marcar como no leída</button><a class="notification-action primary" id="notificationModalDestination" href="#" hidden><span>Ir a la sección relacionada</span><i class="fa-solid fa-arrow-up-right-from-square"></i></a></div>
+
+        <div class="notification-message-body">
+            <div class="notification-detail-sender" id="notificationModalSenderBlock" hidden>
+                <small class="notification-detail-label">Enviado por</small>
+                <strong id="notificationModalSender"></strong>
+            </div>
+
+            <p id="notificationModalMessage"></p>
+
+            <div class="notification-detail-context-box" id="notificationModalContextBlock" hidden>
+                <small class="notification-detail-label">Relacionado con</small>
+                <strong id="notificationModalContextTitle"></strong>
+                <span id="notificationModalContextSub" class="notification-detail-sub"></span>
+            </div>
+        </div>
+
+        <footer class="notification-modal-actions">
+            <div class="notification-modal-menu-container">
+                <button class="notification-action secondary notification-three-dots-btn" type="button" id="notificationModalMenuBtn" aria-label="Más opciones" aria-expanded="false">
+                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                </button>
+                <div class="notification-context-menu" id="notificationModalContextMenu" hidden>
+                    <button type="button" id="notificationModalToggleReadBtn">
+                        <i class="fa-regular fa-envelope"></i>
+                        <span>Marcar como no leída</span>
+                    </button>
+                    <button type="button" id="notificationModalArchiveBtn">
+                        <i class="fa-solid fa-box-archive"></i>
+                        <span>Archivar</span>
+                    </button>
+                    <button type="button" class="danger" id="notificationModalTrashBtn">
+                        <i class="fa-regular fa-trash-can"></i>
+                        <span>Mover a papelera</span>
+                    </button>
+                </div>
+            </div>
+
+            <button class="notification-action secondary" type="button" data-modal-close>Cerrar</button>
+            <a class="notification-action primary" id="notificationModalDestination" href="#" hidden>
+                <span id="notificationModalDestinationLabel"></span>
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            </a>
+        </footer>
     </section>
 </div>
 

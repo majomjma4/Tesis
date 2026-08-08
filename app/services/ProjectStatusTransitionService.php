@@ -94,7 +94,7 @@ final class ProjectStatusTransitionService
         if ($projectId < 1 || $actor < 1) throw new ProjectStatusTransitionException('La solicitud de cambio de estado no es válida.');
         $reason = trim($reason);
             $query = $db->prepare(
-                "SELECT p.id,p.title,p.status,p.project_type_id,p.presentation_file_id,p.published_at,p.is_available,pt.code type_code
+                "SELECT p.id,p.code,p.title,p.status,p.project_type_id,p.presentation_file_id,p.published_at,p.is_available,pt.code type_code
                  FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id
                  WHERE p.id=:id AND p.deleted_at IS NULL FOR UPDATE"
             );
@@ -153,6 +153,7 @@ final class ProjectStatusTransitionService
             (new ProjectDescriptionService($db))->registerStatusReminder($projectId, $auditId);
 
             $labels = project_academic_labels($targetStatus);
+            if ($recordCompletion) (new ProjectAcademicNotificationService())->finalApproval($db,$projectId,(string)$project['code'],(string)$project['title'],$targetStatus,(string)$labels['status'],$auditId);
             return [
                 'id' => $projectId, 'previous_status' => $expectedStatus, 'status' => $targetStatus,
                 'status_label' => $labels['status'], 'stage_label' => $labels['stage'],

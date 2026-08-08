@@ -104,9 +104,14 @@ final class NotificationModel
     public function findForUser(int $notificationId, int $userId): ?array
     {
         $statement = $this->connection()->prepare(
-            'SELECT n.id, n.user_id, n.project_id, n.type, n.title, n.message, n.action_url, n.action_label, n.metadata, n.is_read, n.read_at, n.created_at,
-                    COALESCE(p.title, NULLIF(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.project_name")), ""), "Notificacion general") AS project_name
-             FROM notifications n LEFT JOIN projects p ON p.id = n.project_id WHERE n.id = :id AND n.user_id = :user_id AND n.archived_at IS NULL AND n.deleted_at IS NULL LIMIT 1'
+            'SELECT n.id, n.user_id, n.project_id, n.type, n.title, n.message, n.action_url, n.action_label, n.metadata, n.is_read, n.read_at, n.created_at, n.archived_at, n.deleted_at,
+                    p.code AS project_code, p.status AS project_status,
+                    COALESCE(p.title, NULLIF(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.project_name")), ""), "Notificacion general") AS project_name,
+                    u.full_name AS sender_name
+             FROM notifications n
+             LEFT JOIN projects p ON p.id = n.project_id
+             LEFT JOIN users u ON u.id = JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.admin_sender_id"))
+             WHERE n.id = :id AND n.user_id = :user_id LIMIT 1'
         );
         $statement->execute(['id' => $notificationId, 'user_id' => $userId]);
         $notification = $statement->fetch();

@@ -46,7 +46,7 @@ final class CalendarEventReminderService
                 'project' => $event['project_id'] === null ? null : (int)$event['project_id'],
                 'title' => $title,
                 'message' => $message,
-                'url' => route('calendar'),
+                'url' => route('calendar') . '&event_id=' . (int)$event['id'],
                 'metadata' => json_encode([
                     'source' => 'calendar_event_reminder',
                     'event_id' => (int)$event['id'],
