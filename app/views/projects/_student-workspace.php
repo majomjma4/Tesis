@@ -14,9 +14,16 @@ $statusLabel = (string) ($project['status'] ?? 'En desarrollo');
 $situation = (string) ($project['review_situation_label'] ?? 'Preparando primera entrega');
 
 // Control visual de simulaciones en entorno DEV
-$isDevEnv = function_exists('app_is_development') ? app_is_development() : true;
+$isDevEnv = app_is_development();
 ?>
 <div class="student-workspace">
+
+    <?php if (!empty($_GET['demo']) && $isDevEnv): ?>
+        <div style="background: #e0f2fe; border: 1px solid #7dd3fc; border-radius: 10px; padding: 0.75rem 1.25rem; color: #0369a1; font-size: 0.85rem; font-weight: 700; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+            <span><i class="fa-solid fa-vial-circle-check" style="font-size: 1rem;"></i> <strong>Simulación visual de demostración (Entorno Desarrollo):</strong> Estás revisando la maqueta interactiva frontend de "Mi proyecto". Ningún dato real ha sido creado o modificado en MariaDB.</span>
+            <a href="<?= e(route('projects')) ?>" style="color: #0284c7; text-decoration: underline; white-space: nowrap;">Volver a Mis proyectos</a>
+        </div>
+    <?php endif; ?>
 
     <!-- 1. Encabezado del proyecto -->
     <header class="sw-header-card">

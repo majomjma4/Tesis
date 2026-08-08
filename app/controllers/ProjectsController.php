@@ -44,9 +44,31 @@ final class ProjectsController
         $access = new ProjectAccessService();
         $session = new AuthSessionService();
         $isAdministrator = $session->hasAdminAccess();
+        $isDevDemo = !empty($_GET['demo']) && app_is_development();
         $project = $id && $access->can('project.view')
             ? (new ProjectRecordModel())->find((int)$id, $access->currentUserId(), $isAdministrator)
             : null;
+
+        if ($project === null && $isDevDemo) {
+            $project = [
+                'id' => 999,
+                'code' => 'PRA-2026-001',
+                'type_code' => 'thesis',
+                'type_name' => 'Titulación',
+                'type' => 'Titulación',
+                'title' => 'Sistema de Gestión Documental Académica (Simulación visual)',
+                'description' => 'Proyecto de demostración visual para revisión de la maqueta de interfaz del estudiante.',
+                'status' => 'En desarrollo',
+                'status_key' => 'development',
+                'period' => '2026-I',
+                'tutor' => 'Lic. Diana Alegría',
+                'last_activity' => date('d/m/Y H:i'),
+                'participants' => [],
+                'files' => [],
+                'deliveries' => [],
+                'review_situation_label' => 'Preparando primera entrega',
+            ];
+        }
 
         if ($project === null) {
             (new ErrorController())->notFound();

@@ -70,4 +70,9 @@ function project_delivery_status_label(string $status): string
         default => $status !== '' ? $status : 'Sin resultado',
     };
 }
+function app_is_development(): bool
+{
+    $config = $GLOBALS['config'] ?? [];
+    return ($config['environment'] ?? 'production') === 'development';
+}
 // Final de construcción de URL internas

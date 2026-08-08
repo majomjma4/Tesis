@@ -7,7 +7,14 @@
         <section class="projects-empty projects-empty-primary">
             <span><i class="fa-regular fa-folder-open"></i></span><h2>Aún no tienes proyectos</h2>
             <p>Cuando registres tu primer proyecto académico, su seguimiento aparecerá aquí.</p>
-            <a href="<?= e(route('new-project')) ?>"><i class="fa-solid fa-plus"></i> Crear mi primer proyecto</a>
+            <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem;">
+                <a href="<?= e(route('new-project')) ?>"><i class="fa-solid fa-plus"></i> Crear mi primer proyecto</a>
+                <?php if (app_is_development() && !(new AuthSessionService())->hasAdminAccess()): ?>
+                    <a href="<?= e(route('project-detail')) ?>&demo=1" style="background: var(--surface-soft, #f1f5f9); color: var(--text, #334155); border: 1px solid var(--line, #cbd5e1); border-radius: 8px; padding: 0.55rem 1rem; text-decoration: none; font-weight: 700; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-vial-circle-check" style="color: #0284c7;"></i> Ver proyecto de demostración (Simulación visual)
+                    </a>
+                <?php endif; ?>
+            </div>
         </section>
     <?php else: ?>
         <section class="projects-toolbar" aria-label="Buscar y filtrar proyectos">
