@@ -106,8 +106,6 @@ final class AdminProjectModel
         $status=(string)($filters['status']??'');
         if(in_array($status,self::STATUSES,true)){$where[]='p.status=:s';$params['s']=$status;}
         if(($filters['group']??'')==='finished')$where[]="p.status IN ('approved','defense','tribunal_approved','published')";
-        $situation=ProjectReviewSituationService::normalizeFilter((string)($filters['situation']??''));
-        if($situation!=='')$where[]=(new ProjectReviewSituationService())->filterCondition($situation,'p');
         $typeId=(int)($filters['type_id']??0);
         if($typeId>0){$where[]='p.project_type_id=:t';$params['t']=$typeId;}
         $periodId=(int)($filters['period_id']??0);

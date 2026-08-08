@@ -17,6 +17,9 @@
   const responseDialog = document.querySelector("[data-adjustment-response-dialog]");
   // El diálogo de creación debe escapar de cualquier contenedor con transform u overflow.
   if (createDialog && createDialog.parentElement !== document.body) document.body.appendChild(createDialog);
+  if (createDialog) createDialog.hidden = true;
+  document.body.classList.remove("project-adjustment-dialog-open");
+  const createForm = createDialog?.querySelector("[data-adjustment-create-form]");
   let returnFocus = null;
   let responseRequest = null;
   let lockedScrollX = 0;
@@ -75,6 +78,6 @@
     action.disabled=true;
     try{await request(config.dataset[operation],{...common(),request_id:action.dataset.requestId,lock_version:action.dataset.lockVersion});window.location.reload();}catch(error){action.disabled=false;window.alert(error.message);}
   });
-  createDialog?.querySelector("form")?.addEventListener("submit", event => { event.preventDefault();const form=event.currentTarget;const values=Object.fromEntries(new FormData(form));submit(form,config.dataset.create,{...values,project_id:Number(values.project_id),file_id:values.file_id?Number(values.file_id):null}); });
+  createForm?.addEventListener("submit", event => { event.preventDefault();const form=event.currentTarget;const values=Object.fromEntries(new FormData(form));submit(form,config.dataset.create,{...values,project_id:Number(values.project_id),file_id:values.file_id?Number(values.file_id):null}); });
   responseDialog?.querySelector("form")?.addEventListener("submit", event => { event.preventDefault();const form=event.currentTarget;const message=String(new FormData(form).get("message")||"").trim();submit(form,config.dataset.respond,{...common(),...responseRequest,message}); });
 })();

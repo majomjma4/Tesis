@@ -1,4 +1,6 @@
 <?php
+/** @var array<string, mixed> $project */
+
 $adjustmentItems = (array)($adjustmentData['items'] ?? []);
 $adjustmentSummary = (array)($adjustmentData['summary'] ?? []);
 $pendingAdjustments = array_values(array_filter($adjustmentItems, static fn(array $item): bool => ($item['status'] ?? '') === 'pending'));
@@ -39,9 +41,8 @@ $adjustmentDate = static function (?string $value): string {
   <form data-adjustment-create-form><div class="modal-body"><input type="hidden" name="_csrf" value="<?=e((string)$adjustmentCsrf)?>"><input type="hidden" name="project_id" value="<?=(int)$projectId?>"><input type="hidden" name="expected_project_status" value="<?=e((string)$project['status'])?>"><input type="hidden" name="context" value="<?=e($projectContext)?>">
    <p id="projectAdjustmentHelp">Describe el cambio administrativo requerido. No se creará una observación académica.</p>
    <div class="project-adjustment-fields"><label>Tipo de ajuste<select name="request_type" required><option value="">Selecciona</option><?php foreach($typeLabels as $value=>$label):?><option value="<?=e($value)?>"><?=e($label)?></option><?php endforeach;?></select></label>
-   <label>Sección<select name="related_section"><option value="">Sin sección específica</option><option>Información general</option><option>Participantes</option><option>Documentos</option><option>Estado académico</option><option>Publicación</option><option>Otro</option></select></label>
-   <label>Campo específico (opcional)<input name="related_field" maxlength="100"></label>
-   <label>Documento relacionado (opcional)<select name="file_id"><option value="">Ninguno</option><?php foreach((array)$project['files'] as $file):?><option value="<?=(int)$file['id']?>"><?=e((string)$file['original_name'])?></option><?php endforeach;?></select></label></div>
+   <label>Sección<select name="related_section"><option value="">Sin sección específica</option><option>Descripción del proyecto</option><option>Información académica</option><option>Participantes</option><option>Clasificación</option><option>Documentación</option></select></label>
+   <label class="project-adjustment-document-field">Documento relacionado (opcional)<select name="file_id"><option value="">Ninguno</option><?php foreach((array)$project['files'] as $file):?><option value="<?=(int)$file['id']?>"><?=e((string)$file['original_name'])?></option><?php endforeach;?></select></label></div>
    <label>Mensaje<textarea name="message" maxlength="2000" rows="5" required></textarea></label>
    <p class="project-adjustment-recipients"><strong>Destinatarios:</strong> <?=e($studentNames ? implode(', ',$studentNames) : 'estudiantes relacionados con el proyecto')?>. Se determinan automáticamente.</p>
    <p data-adjustment-message role="status" aria-live="polite" hidden></p></div>

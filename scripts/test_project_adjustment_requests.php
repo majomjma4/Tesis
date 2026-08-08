@@ -50,10 +50,11 @@ try {
     $member=$db->prepare("INSERT INTO project_participants(project_id,user_id,role_code,permission_level,status) VALUES(:project,:user,'tribunal','review','active')");$member->execute(['project'=>$project,'user'=>$tribunal]);
     try{$service->listForProject($project,$status,$tribunal,'academic');$assert(false,'tribunal consulta');}
     catch(ProjectAdjustmentRequestException $e){$assert($e->httpStatus()===403,'tribunal sin acceso');}
-    $created=$service->createInTransaction($db,$project,$status,$admin,'academic_management',['request_type'=>'inconsistency','message'=>'Corregir la información administrativa de prueba.']);
+    $created=$service->createInTransaction($db,$project,$status,$admin,'academic_management',['request_type'=>'inconsistency','related_section'=>'Información académica','related_field'=>'Valor ignorado','message'=>'Corregir la información administrativa de prueba.']);
     $id=(int)$created['request']['id'];$version=(int)$created['request']['lock_version'];
     $assert($created['request']['status']==='pending','creación pendiente');
     $assert($created['summary']['pending_count']>=1,'resumen agregado');
+    $assert(($created['request']['related_section']??null)==='Información académica'&&($created['request']['related_field']??null)===null,'sección guardada sin campo específico');
     $dedup='adjustment:'.$id.':'.$student;
     $q=$db->prepare('SELECT COUNT(*) FROM notifications WHERE user_id=:user AND deduplication_key=:dedup');$q->execute(['user'=>$student,'dedup'=>$dedup]);
     $assert((int)$q->fetchColumn()===1,'notificación consolidada y deduplicada');

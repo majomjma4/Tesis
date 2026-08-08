@@ -17,3 +17,8 @@ body.project-adjustment-dialog-open{overflow:hidden;overscroll-behavior:none}
 @media(max-width:1000px){#projectAdjustmentDialog>section{transform:none}}
 @media(max-width:520px){#projectAdjustmentDialog{padding:8px}#projectAdjustmentDialog>section{max-height:calc(100dvh - 16px);border-radius:13px}#projectAdjustmentDialog .modal-body{padding:14px}#projectAdjustmentDialog footer{padding:10px 14px 14px}}
 @media(max-width:330px){#projectAdjustmentDialog{padding:6px}#projectAdjustmentDialog>section{max-height:calc(100dvh - 12px)}}
+/* Aligns the scrollable adjustment modal body with existing dialog spacing. */
+#projectAdjustmentDialog .modal-body{padding:20px 22px;gap:16px}
+#projectAdjustmentDialog .modal-body>p{font-size:12px;line-height:1.5}
+#projectAdjustmentDialog footer{padding:12px 22px 20px}
+@media(max-width:520px){#projectAdjustmentDialog .modal-body{padding:16px}#projectAdjustmentDialog footer{padding:11px 16px 16px}}

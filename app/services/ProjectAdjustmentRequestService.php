@@ -35,7 +35,7 @@ final class ProjectAdjustmentRequestService
         if (!in_array($type, self::TYPES, true)) throw new ProjectAdjustmentRequestException('El tipo de solicitud administrativa no es válido.');
         $message = $this->message((string)($data['message'] ?? ''));
         $section = $this->optionalText($data['related_section'] ?? null, 100);
-        $field = $this->optionalText($data['related_field'] ?? null, 100);
+        $field = null;
         $fileId = empty($data['file_id']) ? null : (int)$data['file_id'];
         if ($fileId !== null) {
             $file = $db->prepare('SELECT id FROM project_files WHERE id=:file AND project_id=:project AND deleted_at IS NULL AND purged_at IS NULL FOR UPDATE');

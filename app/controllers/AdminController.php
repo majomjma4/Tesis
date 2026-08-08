@@ -651,8 +651,7 @@ final class AdminController
     public function projects(): void
     {
         $requestedStatus=(string)($_GET['status']??'');
-        $legacyAttention=(string)($_GET['attention']??'');
-        $filters=['search'=>mb_substr(trim((string)($_GET['search']??'')),0,100),'status'=>$requestedStatus==='changes_required'?'':$requestedStatus,'type_id'=>(int)($_GET['type_id']??0),'period_id'=>(int)($_GET['period_id']??0),'group'=>(string)($_GET['group']??''),'situation'=>ProjectReviewSituationService::normalizeFilter((string)($_GET['situation']??$_GET['review_situation']??($legacyAttention==='observations'?'pending':'')))];
+        $filters=['search'=>mb_substr(trim((string)($_GET['search']??'')),0,100),'status'=>$requestedStatus==='changes_required'?'':$requestedStatus,'type_id'=>(int)($_GET['type_id']??0),'period_id'=>(int)($_GET['period_id']??0),'group'=>(string)($_GET['group']??'')];
         $model=new AdminProjectModel();$error=null;
         try{$catalogs=$model->catalogs();if(count($catalogs['periods'])===1)$filters['period_id']=(int)$catalogs['periods'][0]['id'];$result=$model->listing($filters,PaginationService::request());$projects=$result['items'];$pagination=$result['pagination'];$summary=$model->summary($filters);}catch(Throwable $exception){error_log('Admin projects: '.$exception->getMessage());$error='No fue posible consultar los proyectos.';$projects=[];$pagination=['total'=>0];$summary=['total'=>0,'development'=>0,'review'=>0,'approved'=>0,'defense'=>0];$catalogs=['types'=>[],'careers'=>[],'periods'=>[],'teachers'=>[]];}
         $session=new AuthSessionService();

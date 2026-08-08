@@ -25,9 +25,9 @@ final class AdminReportModel
         }, self::OPERATIONAL_STATUSES);
         $reviewCounts = (new ProjectReviewSituationService())->aggregate($db,false);
         $reviewSituations = [
-            ['code'=>'pending','label'=>'Con observaciones pendientes','total'=>$reviewCounts['pending'],'url'=>route('projects').'&review_situation=pending'],
-            ['code'=>'addressed','label'=>'Observaciones atendidas','total'=>$reviewCounts['addressed'],'url'=>route('projects').'&review_situation=addressed'],
-            ['code'=>'none','label'=>'Sin observaciones registradas','total'=>$reviewCounts['none'],'url'=>route('projects').'&review_situation=none'],
+            ['code'=>'pending','label'=>'Con observaciones pendientes','total'=>$reviewCounts['pending'],'url'=>route('projects')],
+            ['code'=>'addressed','label'=>'Observaciones atendidas','total'=>$reviewCounts['addressed'],'url'=>route('projects')],
+            ['code'=>'none','label'=>'Sin observaciones registradas','total'=>$reviewCounts['none'],'url'=>route('projects')],
         ];
         $params=['from1'=>$range['from'],'to1'=>$range['to'],'from2'=>$range['from'],'to2'=>$range['to']];
         $union=" FROM (SELECT a.action,a.entity_type,a.created_at,u.full_name actor FROM admin_audit_log a LEFT JOIN users u ON u.id=a.actor_user_id WHERE a.created_at BETWEEN :from1 AND :to1 UNION ALL SELECT p.action,p.entity_type,p.created_at,u.full_name actor FROM project_audit_log p LEFT JOIN users u ON u.id=p.user_id WHERE p.created_at BETWEEN :from2 AND :to2) events";

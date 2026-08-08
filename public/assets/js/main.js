@@ -523,7 +523,7 @@ if (temporaryPasswordWarning) {
         };
         button.addEventListener("click", open);
         button.addEventListener("keydown", event => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); open(); return; } if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); if (active?.select !== select) open(); const options = [...(active?.panel.querySelectorAll(".custom-select-option:not(:disabled):not([hidden])") || [])]; options[Math.max(0, options.findIndex(option => option.getAttribute("aria-selected") === "true"))]?.focus(); } });
-        select.addEventListener("change", sync); select.form?.addEventListener("reset", () => setTimeout(sync)); sync(); instances.push({ sync });
+        select.addEventListener("change", sync); select.form?.addEventListener("reset", () => setTimeout(sync)); sync(); instances.push({ select, sync });
     });
     document.addEventListener("click", event => { if (active && !event.target.closest(".custom-select-panel") && !event.target.closest(".custom-select-trigger")) close(); });
     document.addEventListener("app:dropdown-open", event => { if (active && active.button !== event.detail?.trigger) close(); });
@@ -533,7 +533,18 @@ if (temporaryPasswordWarning) {
         if (active && performance.now() < ignoreScrollUntil) { requestAnimationFrame(() => active && position(active.button, active.panel)); return; }
         close();
     }, true);
-    new MutationObserver(() => instances.forEach(({ sync }) => sync())).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden", "disabled", "selected"] });
+    new MutationObserver(records => {
+        const changedSelects = new Set();
+        records.forEach(record => {
+            const target = record.target;
+            const select = target instanceof HTMLSelectElement
+                ? target
+                : (target instanceof HTMLOptionElement ? target.closest("select") : null);
+            if (select?.dataset.enhanced === "true") changedSelects.add(select);
+        });
+        if (!changedSelects.size) return;
+        instances.forEach(instance => { if (changedSelects.has(instance.select)) instance.sync(); });
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden", "disabled", "selected"] });
 })();
 
 // Mantiene los diálogos fuera de contenedores animados o desplazables.

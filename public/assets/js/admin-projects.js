@@ -657,17 +657,6 @@
     };
     window.AdminProjectEditor = { open };
     document.querySelector('#apNew')?.addEventListener('click', () => open());
-    document.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => open(JSON.parse(button.closest('article').querySelector('script').textContent))));
-    const requestedProjectEdit = new URLSearchParams(location.search).get('edit');
-    if (requestedProjectEdit) {
-        const requestedCard = [...document.querySelectorAll('.ap-list article')].find(card => {
-            const data = card.querySelector('script');
-            if (!data) return false;
-            try { return String(JSON.parse(data.textContent).id) === requestedProjectEdit; }
-            catch { return false; }
-        });
-        requestedCard?.querySelector('[data-edit]')?.click();
-    }
     const resetTutoringPanels = () => {
         closeTutoringEditor();
         tutoring?.querySelectorAll('.ap-tutor-contact').forEach(contact => { contact.hidden = true; });
@@ -847,24 +836,6 @@
     });
     descriptionDialog?.addEventListener('click', event => { if (event.target === descriptionDialog) cancelDescription(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape' && !descriptionDialog?.hidden) cancelDescription(); });
-    document.querySelectorAll('[data-trash]').forEach(button => button.addEventListener('click', () => {
-        trashForm.reset();
-        trashQuickReason?.dispatchEvent(new Event('change', { bubbles: true }));
-        syncTrashReasonField();
-        trashForm.id.value = JSON.parse(button.closest('article').querySelector('script').textContent).id;
-        showProjectDialog(trash);
-    }));
-    document.querySelectorAll('[data-close-trash]').forEach(button => button.addEventListener('click', () => trash.hidden = true));
-    trash?.addEventListener('click', event => { if (event.target === trash) trash.hidden = true; });
-    trashForm?.addEventListener('submit', async event => {
-        event.preventDefault();
-        const data = new FormData(trashForm);
-        const customReason = trashForm.elements.reason?.value.trim() || '';
-        const selectedReason = trashQuickReason?.value?.trim() || '';
-        data.set('reason', selectedReason === 'Otro motivo' ? customReason : selectedReason);
-        try { await request(cfg.dataset.trash, data); location.reload(); }
-        catch (error) { alert(error.message); }
-    });
 })();
 
 (() => {
@@ -927,15 +898,42 @@
         list.append(noResults);
     }
     const serverQuery = new URLSearchParams(location.search).get('search') || '';
-    let refreshTimer;
+    const filterInteractionKey = 'admin-projects-filter-interaction';
+    let submitAuthorized = false;
+    const submitFilters = () => {
+        submitAuthorized = true;
+        filters.requestSubmit();
+    };
+    try {
+        const pendingInteraction = JSON.parse(sessionStorage.getItem(filterInteractionKey) || 'null');
+        sessionStorage.removeItem(filterInteractionKey);
+        if (pendingInteraction && Number.isFinite(pendingInteraction.scrollY)) {
+            requestAnimationFrame(() => {
+                window.scrollTo(pendingInteraction.scrollX || 0, pendingInteraction.scrollY);
+                if (pendingInteraction.searchFocused) {
+                    search.focus({ preventScroll: true });
+                    const position = Math.max(0, Math.min(Number(pendingInteraction.selectionStart) || search.value.length, search.value.length));
+                    search.setSelectionRange(position, position);
+                }
+            });
+        }
+    } catch {
+        // La búsqueda continúa funcionando si el almacenamiento de sesión no está disponible.
+    }
     const apply = () => {
         restore();
         const query = fold(search.value).trim();
         const terms = query.split(/\s+/).filter(Boolean);
+        const selectedStatus = statusFilter?.value || '';
+        const selectedType = typeFilter?.value || '';
+        const selectedPeriod = periodFilter?.value || '';
         let visible = 0;
         rows.forEach(row => {
             const haystack = fold(row.innerText);
-            const matches = !query || terms.every(term => haystack.includes(term));
+            const matches = (!query || terms.every(term => haystack.includes(term)))
+                && (!selectedStatus || row.dataset.projectStatus === selectedStatus)
+                && (!selectedType || row.dataset.projectTypeId === selectedType)
+                && (!selectedPeriod || row.dataset.projectPeriodId === selectedPeriod);
             row.hidden = !matches;
             if (matches) {
                 visible++;
@@ -944,17 +942,27 @@
         });
         if (clear) clear.hidden = !search.value;
         if (noResults) noResults.hidden = visible !== 0 || !query;
-        if (fold(search.value).trim() !== fold(serverQuery).trim()) {
-            clearTimeout(refreshTimer);
-            refreshTimer = setTimeout(() => filters.requestSubmit(), 450);
-        }
     };
     const typeFilter = filters.querySelector('select[name="type_id"]');
     const statusFilter = filters.querySelector('select[name="status"]');
     const periodFilter = filters.querySelector('select[name="period_id"]');
-    filters.addEventListener('submit', () => {
+    filters.addEventListener('submit', event => {
+        if (!submitAuthorized) {
+            event.preventDefault();
+            return;
+        }
         if (periodFilter && !periodFilter.value) periodFilter.disabled = true;
-    });
+        try {
+            sessionStorage.setItem(filterInteractionKey, JSON.stringify({
+                scrollX: window.scrollX,
+                scrollY: window.scrollY,
+                searchFocused: document.activeElement === search,
+                selectionStart: search.selectionStart,
+            }));
+        } catch {
+            // El formulario se envía normalmente si el almacenamiento no está disponible.
+        }
+    }, true);
     const thesisOnlyFilters = [...(statusFilter?.options || [])].filter(option => ['defense', 'tribunal_approved'].includes(option.value));
     const syncFilterWorkflow = () => {
         if (!typeFilter || !thesisOnlyFilters.length) return;
@@ -964,18 +972,48 @@
         thesisOnlyFilters.forEach(option => { option.disabled = !isGeneral && !isThesis; option.hidden = !isGeneral && !isThesis; });
         if (!isGeneral && !isThesis && ['defense', 'tribunal_approved'].includes(statusFilter.value)) statusFilter.value = '';
     };
-    typeFilter?.addEventListener('change', () => { syncFilterWorkflow(); filters.requestSubmit(); });
-    statusFilter?.addEventListener('change', () => filters.requestSubmit());
-    periodFilter?.addEventListener('change', () => filters.requestSubmit());
-    search.addEventListener('input', apply);
+    const syncPaginationFilters = () => {
+        const values = new FormData(filters);
+        const keys = ['search', 'status', 'type_id', 'period_id'];
+        const updateUrl = url => {
+            keys.forEach(key => {
+                const value = String(values.get(key) || '');
+                if (value) url.searchParams.set(key, value); else url.searchParams.delete(key);
+            });
+            return url;
+        };
+        document.querySelectorAll('.data-pagination-pages a[href]').forEach(link => {
+            link.href = updateUrl(new URL(link.href, location.href)).toString();
+        });
+        const sizeForm = document.querySelector('.data-pagination-size');
+        if (!sizeForm) return;
+        keys.forEach(key => {
+            const value = String(values.get(key) || '');
+            let field = sizeForm.querySelector(`input[name="${key}"]`);
+            if (!value) { field?.remove(); return; }
+            if (!field) { field = document.createElement('input'); field.type = 'hidden'; field.name = key; sizeForm.append(field); }
+            field.value = value;
+        });
+    };
+    const applyFilters = () => { apply(); syncPaginationFilters(); };
+    typeFilter?.addEventListener('change', () => { syncFilterWorkflow(); applyFilters(); });
+    statusFilter?.addEventListener('change', applyFilters);
+    periodFilter?.addEventListener('change', applyFilters);
+    search.addEventListener('input', event => {
+        event.stopPropagation();
+        applyFilters();
+    });
+    search.addEventListener('keydown', event => {
+        if (event.key === 'Enter') submitAuthorized = true;
+    });
     clear?.addEventListener('click', () => {
         search.value = '';
-        apply();
+        applyFilters();
         search.focus();
-        if (fold(serverQuery).trim() !== '') filters.requestSubmit();
+        if (fold(serverQuery).trim() !== '') submitFilters();
     });
     syncFilterWorkflow();
-    apply();
+    applyFilters();
 })();
 
 (() => {

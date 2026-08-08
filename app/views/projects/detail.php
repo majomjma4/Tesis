@@ -183,7 +183,6 @@ if ($project === null): ?>
         ],static fn(?array $section):bool=>$section!==null));
     }
     $actions=[];
-    if (!$isAcademicManagement && !empty($projectCapabilities['edit_information'])) $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
     if ($isAcademicManagement && !empty($projectCapabilities['create_adjustment_request'])) $actions[]=['id'=>'adjustment','label'=>'Solicitar ajuste','kind'=>'secondary','icon'=>'fa-comment-dots','enabled'=>true,'url'=>'#projectAdjustmentDialog'];
     elseif (!$publicContext && !empty($projectCapabilities['register_delivery']) && $canDeliver) $actions[]=['id'=>'delivery','label'=>'Registrar entrega','kind'=>'primary','icon'=>'fa-upload','url'=>$detailUrl.'&tab=review','enabled'=>true];
     if (!$isAcademicManagement&&!empty($projectCapabilities['download_files'])&&!empty($headerPackage['available'])) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'].($publicContext?'&scope=repository':''),'enabled'=>true,'download'=>true];
