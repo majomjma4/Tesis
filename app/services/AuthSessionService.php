@@ -30,6 +30,7 @@ final class AuthSessionService
         $_SESSION['must_change_password'] = (bool) ($user['must_change_password'] ?? false);
         $_SESSION['password_warning_count'] = (int) ($user['password_warning_count'] ?? 0);
         $_SESSION['temporary_password_expires_at'] = $user['temporary_password_expires_at'] ?? null;
+        $_SESSION['temporary_password_last_warning_at'] = $user['temporary_password_last_warning_at'] ?? null;
     }
 
     public function logout(): void
@@ -48,9 +49,37 @@ final class AuthSessionService
     public function email(): string { $this->start(); return (string)($_SESSION['user_email']??''); }
     public function passwordWarningCount(): int { $this->start(); return (int)($_SESSION['password_warning_count']??0); }
     public function mustChangePassword(): bool { $this->start(); return (bool)($_SESSION['must_change_password']??false); }
+    public function temporaryPasswordExpiresAt(): ?string { $this->start(); return isset($_SESSION['temporary_password_expires_at']) ? (string)$_SESSION['temporary_password_expires_at'] : null; }
+    public function temporaryPasswordRemainingDays(): ?int
+    {
+        $expires = $this->temporaryPasswordExpiresAt();
+        if (!$expires) return null;
+        $diff = strtotime($expires) - time();
+        if ($diff <= 0) return 0;
+        return (int) ceil($diff / 86400);
+    }
+    public function isTemporaryPasswordWarningDismissedToday(): bool
+    {
+        $this->start();
+        $today = date('Y-m-d');
+        $dbDate = $_SESSION['temporary_password_last_warning_at'] ?? null;
+        $sessDate = $_SESSION['temp_pass_dismissed_date'] ?? null;
+        return $dbDate === $today || $sessDate === $today;
+    }
+    public function dismissTemporaryPasswordWarningToday(): void
+    {
+        $this->start();
+        $today = date('Y-m-d');
+        $_SESSION['temp_pass_dismissed_date'] = $today;
+        $_SESSION['temporary_password_last_warning_at'] = $today;
+        $userId = $this->userId();
+        if ($userId) {
+            (new AuthModel())->recordWarningDismissedToday($userId);
+        }
+    }
     public function refresh(array $identity): void
     {
-        $this->start(); $_SESSION['user_name']=(string)$identity['full_name'];$_SESSION['user_email']=(string)$identity['email'];$_SESSION['roles']=$identity['roles'];$_SESSION['role']=(string)($identity['roles'][0]??'student');$_SESSION['is_admin']=(bool)($identity['is_admin']??false);$_SESSION['is_initial_admin']=(bool)($identity['is_initial_admin']??false);$_SESSION['session_version']=(int)$identity['session_version'];$_SESSION['must_change_password']=(bool)$identity['must_change_password'];$_SESSION['password_warning_count']=(int)$identity['password_warning_count'];$_SESSION['temporary_password_expires_at']=$identity['temporary_password_expires_at'];
+        $this->start(); $_SESSION['user_name']=(string)$identity['full_name'];$_SESSION['user_email']=(string)$identity['email'];$_SESSION['roles']=$identity['roles'];$_SESSION['role']=(string)($identity['roles'][0]??'student');$_SESSION['is_admin']=(bool)($identity['is_admin']??false);$_SESSION['is_initial_admin']=(bool)($identity['is_initial_admin']??false);$_SESSION['session_version']=(int)$identity['session_version'];$_SESSION['must_change_password']=(bool)$identity['must_change_password'];$_SESSION['password_warning_count']=(int)$identity['password_warning_count'];$_SESSION['temporary_password_expires_at']=$identity['temporary_password_expires_at'];$_SESSION['temporary_password_last_warning_at']=$identity['temporary_password_last_warning_at']??$_SESSION['temporary_password_last_warning_at']??null;
     }
 
     public function csrfToken(string $scope): string

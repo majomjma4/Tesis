@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 final class RouteAccessService
 {
-    private const PUBLIC_ROUTES = ['login', 'logout', 'dev-reload'];
+    private const PUBLIC_ROUTES = ['login', 'logout', 'dev-reload', 'dismiss-temp-password-warning'];
     private const ADMIN_ROUTES = ['admin-users','admin-user-save','admin-user-status','admin-user-password','admin-users-import','admin-project-save','admin-project-trash','admin-project-history','admin-project-file','admin-academic','admin-academic-save','admin-academic-promote','admin-academic-revert','admin-repository','admin-repository-publish','admin-support-material-save','admin-support-material-history','admin-support-material-history-cleanup','admin-support-material-status','admin-support-material-file','admin-notification-send','admin-notification-audience-send','admin-notification-recipients','admin-reports','admin-report-export','admin-settings','admin-settings-save','admin-trash','admin-trash-user','admin-trash-restore','admin-trash-purge'];
     public function enforce(string $page): void
     {
@@ -25,7 +25,7 @@ final class RouteAccessService
         catch(Throwable $exception){error_log('Calendar event reminders: '.$exception->getMessage());}
         $expired=!empty($identity['temporary_password_expires_at'])&&strtotime((string)$identity['temporary_password_expires_at'])<=time();
         $requiresTemporaryPasswordChange=(bool)$identity['must_change_password']&&!(bool)$identity['is_admin'];
-        if($requiresTemporaryPasswordChange&&((int)$identity['password_warning_count']>=3||$expired)&&!in_array($page,['change-password','logout'],true)){header('Location: '.route('change-password'));exit;}
+        if($requiresTemporaryPasswordChange&&$expired&&!in_array($page,['change-password','logout'],true)){header('Location: '.route('change-password'));exit;}
         if(in_array($page,self::ADMIN_ROUTES,true)&&!(bool)$identity['is_admin']){
             if($this->isSupportMaterialFileJsonRequest($page))$this->denyJson('No tienes permiso para administrar archivos.');
             header('Location: '.route('forbidden'));exit;

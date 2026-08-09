@@ -1,4 +1,13 @@
-<header class="at-head"><span>Administración</span><h1>Papelera</h1><p>Los elementos pueden restaurarse durante 60 días antes de su purga.</p></header>
+<?php
+    $activeType = $trashData['active_type'] ?? 'users';
+    $retentionDaysKey = match($activeType) {
+        'projects' => 'retention_projects_days',
+        'materials' => 'retention_materials_days',
+        default => 'retention_users_days'
+    };
+    $retentionDays = (new SystemSettingModel())->retentionDays($retentionDaysKey);
+?>
+<header class="at-head"><span>Administración</span><h1>Papelera</h1><p>Los elementos pueden restaurarse durante <?= $retentionDays ?> días antes de su purga.</p></header>
 <?php if($trashError):?><p class="at-error"><?=e($trashError)?></p><?php endif;?>
 <section class="at-stats"><article><strong><?=$trashData['summary']['users']?></strong><span>Usuarios</span></article><article><strong><?=$trashData['summary']['projects']?></strong><span>Proyectos</span></article><article><strong><?=$trashData['summary']['materials']??0?></strong><span>Materiales</span></article><article><strong><?=$trashData['summary']['expired']?></strong><span>Listos para purgar</span></article></section>
 <section class="at-remove"><h2>Retirar acceso de un usuario</h2><form id="atUserForm"><input type="hidden" name="_csrf" value="<?=e($trashCsrf)?>"><select name="id" required><option value="">Selecciona una cuenta</option><?php foreach($trashData['candidates']??[] as $u):?><option value="<?=$u['id']?>"><?=e($u['full_name'].' · '.$u['email'])?></option><?php endforeach;?></select><input name="reason" minlength="5" required placeholder="Motivo de eliminación"><button>Enviar a Papelera</button></form></section>

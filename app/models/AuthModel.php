@@ -18,7 +18,7 @@ final class AuthModel
     public function findActiveUserByLogin(string $login): ?array
     {
         $statement = Database::connection()->prepare(
-            "SELECT id, email, username, password_hash, full_name, is_admin, is_initial_admin, must_change_password, password_warning_count, temporary_password_expires_at, session_version FROM users WHERE status = 'active' AND deleted_at IS NULL AND purged_at IS NULL AND email = :email_login LIMIT 1"
+            "SELECT id, email, username, password_hash, full_name, is_admin, is_initial_admin, must_change_password, password_warning_count, temporary_password_expires_at, temporary_password_last_warning_at, session_version FROM users WHERE status = 'active' AND deleted_at IS NULL AND purged_at IS NULL AND email = :email_login LIMIT 1"
         );
         $normalizedLogin = mb_strtolower(trim($login));
         $statement->execute(['email_login' => $normalizedLogin]);
@@ -36,19 +36,76 @@ final class AuthModel
 
     public function registerTemporaryPasswordWarning(int $userId): int
     {
-        $statement = Database::connection()->prepare('UPDATE users SET password_warning_count=LEAST(password_warning_count+1,3) WHERE id=:id AND must_change_password=1');
-        $statement->execute(['id'=>$userId]);
+        // Compatibilidad: la vigencia ahora se rige 100% por fecha (temporary_password_expires_at).
         $read = Database::connection()->prepare('SELECT password_warning_count FROM users WHERE id=:id'); $read->execute(['id'=>$userId]);
-        return (int)$read->fetchColumn();
+        return (int)($read->fetchColumn() ?: 0);
+    }
+
+    public function checkLoginLockout(string $login, string $ip): array
+    {
+        $db = Database::connection();
+        $key = 'lockout:' . md5(mb_strtolower(trim($login)) . ':' . $ip);
+        $q = $db->prepare('SELECT attempts, locked_until FROM login_security_locks WHERE lock_key = :key');
+        $q->execute(['key' => $key]);
+        $row = $q->fetch();
+        if (!$row) return ['is_locked' => false, 'remaining_seconds' => 0];
+
+        $lockedUntil = $row['locked_until'] ? strtotime((string)$row['locked_until']) : 0;
+        $now = time();
+        if ($lockedUntil > $now) {
+            return ['is_locked' => true, 'remaining_seconds' => $lockedUntil - $now];
+        }
+
+        // Si ya pasó el tiempo de bloqueo, limpiar el registro si estaba bloqueado
+        if ($lockedUntil > 0) {
+            $db->prepare('DELETE FROM login_security_locks WHERE lock_key = :key')->execute(['key' => $key]);
+        }
+        return ['is_locked' => false, 'remaining_seconds' => 0];
+    }
+
+    public function recordFailedLogin(string $login, string $ip): array
+    {
+        $db = Database::connection();
+        $key = 'lockout:' . md5(mb_strtolower(trim($login)) . ':' . $ip);
+        $db->prepare(
+            'INSERT INTO login_security_locks (lock_key, attempts, updated_at)
+             VALUES (:key, 1, CURRENT_TIMESTAMP)
+             ON DUPLICATE KEY UPDATE attempts = attempts + 1, updated_at = CURRENT_TIMESTAMP'
+        )->execute(['key' => $key]);
+
+        $q = $db->prepare('SELECT attempts FROM login_security_locks WHERE lock_key = :key');
+        $q->execute(['key' => $key]);
+        $attempts = (int) $q->fetchColumn();
+
+        if ($attempts >= 11) {
+            $lockedUntil = date('Y-m-d H:i:s', time() + 60);
+            $db->prepare('UPDATE login_security_locks SET locked_until = :until WHERE lock_key = :key')
+               ->execute(['until' => $lockedUntil, 'key' => $key]);
+            return ['is_locked' => true, 'remaining_seconds' => 60, 'attempts' => $attempts];
+        }
+
+        return ['is_locked' => false, 'remaining_seconds' => 0, 'attempts' => $attempts];
+    }
+
+    public function clearFailedLogins(string $login, string $ip): void
+    {
+        $key = 'lockout:' . md5(mb_strtolower(trim($login)) . ':' . $ip);
+        Database::connection()->prepare('DELETE FROM login_security_locks WHERE lock_key = :key')->execute(['key' => $key]);
     }
 
     public function sessionIdentity(int $userId): ?array
     {
-        $statement=Database::connection()->prepare("SELECT id,email,full_name,status,is_admin,is_initial_admin,must_change_password,password_warning_count,temporary_password_expires_at,session_version FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL LIMIT 1");
+        $statement=Database::connection()->prepare("SELECT id,email,full_name,status,is_admin,is_initial_admin,must_change_password,password_warning_count,temporary_password_expires_at,temporary_password_last_warning_at,session_version FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL LIMIT 1");
         $statement->execute(['id'=>$userId]); $user=$statement->fetch();
         if(!$user)return null;
         $user['roles']=$this->effectiveRoles($userId,(bool)$user['is_admin']);
         return $user;
+    }
+
+    public function recordWarningDismissedToday(int $userId): void
+    {
+        $statement = Database::connection()->prepare('UPDATE users SET temporary_password_last_warning_at = CURRENT_DATE WHERE id = :id');
+        $statement->execute(['id' => $userId]);
     }
 
     private function effectiveRoles(int $userId,bool $isAdmin):array
@@ -63,7 +120,7 @@ final class AuthModel
     {
         $read=Database::connection()->prepare('SELECT password_hash FROM users WHERE id=:id AND status=\'active\'');$read->execute(['id'=>$userId]);$hash=$read->fetchColumn();
         if(!$hash||!password_verify($current,(string)$hash))return false;
-        $update=Database::connection()->prepare('UPDATE users SET password_hash=:hash,must_change_password=0,password_warning_count=0,temporary_password_expires_at=NULL,password_changed_at=CURRENT_TIMESTAMP,session_version=session_version+1 WHERE id=:id');
+        $update=Database::connection()->prepare('UPDATE users SET password_hash=:hash,must_change_password=0,password_warning_count=0,temporary_password_expires_at=NULL,temporary_password_last_warning_at=NULL,password_changed_at=CURRENT_TIMESTAMP,session_version=session_version+1 WHERE id=:id');
         $update->execute(['hash'=>password_hash($new,PASSWORD_DEFAULT),'id'=>$userId]);return true;
     }
 

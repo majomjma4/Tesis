@@ -143,87 +143,27 @@ final class NotificationModel
     {
         if (!$hidden && !$trash) return $this->getCounters($userId);
         $visibility = $trash ? 'deleted_at IS NOT NULL' : 'archived_at IS NOT NULL AND deleted_at IS NULL';
+        $settings = (new SystemSettingModel())->all();
+        $retentionDays = max(1, (int)($settings['notification_trash_retention_days'] ?? 60));
+        $expiringCutoff = max(0, $retentionDays - 7);
         $statement = $this->connection()->prepare(
             "SELECT COUNT(*) total,
                     COALESCE(SUM(is_read = 0), 0) unread,
                     COALESCE(SUM(YEARWEEK(created_at, 1) = YEARWEEK(CURRENT_DATE(), 1)), 0) week,
-                    COALESCE(SUM(deleted_at IS NOT NULL AND deleted_at <= DATE_SUB(NOW(), INTERVAL 53 DAY)), 0) expiring
+                    COALESCE(SUM(deleted_at IS NOT NULL AND deleted_at <= DATE_SUB(NOW(), INTERVAL :exp_cutoff DAY)), 0) expiring
              FROM notifications WHERE user_id = :user_id AND $visibility"
         );
-        $statement->execute(['user_id' => $userId]);
+        $statement->execute(['user_id' => $userId, 'exp_cutoff' => $expiringCutoff]);
         $row = $statement->fetch() ?: [];
         return ['total' => (int) ($row['total'] ?? 0), 'unread' => (int) ($row['unread'] ?? 0), 'week' => (int) ($row['week'] ?? 0), 'expiring' => (int) ($row['expiring'] ?? 0)];
     }
-    // Final de acceso y consulta de notificaciones
 
-    // Inicio de cambios de estado y ciclo de eliminación
-    // Gestiona lectura, archivado, papelera, restauración y eliminación individual o masiva.
-    public function markAsRead(int $notificationId, int $userId): bool
+    public function purgeExpiredTrashForUser(int $userId, ?int $days = null): int
     {
-        return $this->updateReadState($notificationId, $userId, true);
-    }
-
-    public function markAsUnread(int $notificationId, int $userId): bool
-    {
-        return $this->updateReadState($notificationId, $userId, false);
-    }
-
-    public function markAllAsRead(int $userId): int
-    {
-        $statement = $this->connection()->prepare(
-            'UPDATE notifications SET is_read = 1, read_at = NOW(), updated_at = NOW()
-             WHERE user_id = :user_id AND archived_at IS NULL AND deleted_at IS NULL AND is_read = 0'
-        );
-        $statement->execute(['user_id' => $userId]);
-
-        return $statement->rowCount();
-    }
-
-    public function softDelete(int $notificationId, int $userId): bool
-    {
-        $statement = $this->connection()->prepare(
-            'UPDATE notifications SET archived_at = NOW(), updated_at = NOW()
-             WHERE id = :id AND user_id = :user_id AND archived_at IS NULL AND deleted_at IS NULL'
-        );
-        $statement->execute(['id' => $notificationId, 'user_id' => $userId]);
-
-        return $statement->rowCount() === 1;
-    }
-
-    public function restore(int $notificationId, int $userId): bool
-    {
-        $statement = $this->connection()->prepare(
-            'UPDATE notifications SET archived_at = NULL, deleted_at = NULL, updated_at = NOW()
-             WHERE id = :id AND user_id = :user_id AND (archived_at IS NOT NULL OR deleted_at IS NOT NULL)'
-        );
-        $statement->execute(['id' => $notificationId, 'user_id' => $userId]);
-
-        return $statement->rowCount() === 1;
-    }
-
-    public function deletePermanently(int $notificationId, int $userId): bool
-    {
-        $statement = $this->connection()->prepare(
-            'DELETE FROM notifications WHERE id = :id AND user_id = :user_id'
-        );
-        $statement->execute(['id' => $notificationId, 'user_id' => $userId]);
-
-        return $statement->rowCount() === 1;
-    }
-
-    public function moveToTrash(int $notificationId, int $userId): bool
-    {
-        $statement = $this->connection()->prepare(
-            'UPDATE notifications SET archived_at = NULL, deleted_at = NOW(), updated_at = NOW()
-             WHERE id = :id AND user_id = :user_id AND deleted_at IS NULL'
-        );
-        $statement->execute(['id' => $notificationId, 'user_id' => $userId]);
-
-        return $statement->rowCount() === 1;
-    }
-
-    public function purgeExpiredTrashForUser(int $userId, int $days = 60): int
-    {
+        if ($days === null) {
+            $settings = (new SystemSettingModel())->all();
+            $days = (int)($settings['notification_trash_retention_days'] ?? 60);
+        }
         $days = max(1, min($days, 365));
         $statement = $this->connection()->prepare(
             'DELETE FROM notifications WHERE user_id = :user_id AND deleted_at IS NOT NULL AND deleted_at < :cutoff'

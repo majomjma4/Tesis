@@ -13,7 +13,8 @@
         <div class="ed-file-restore-body">
             <p class="ed-file-restore-notice" data-file-restore-notice>
                 <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-                <span><strong>Restauración disponible durante 24 horas.</strong> Después de 24 horas el archivo será eliminado definitivamente. Solo permanecerá la evidencia de su existencia en el historial y la auditoría.</span>
+                <?php $restoreHours = (new SystemSettingModel())->retentionDays('withdrawn_file_restore_hours'); ?>
+                <span><strong>Restauración disponible durante <?= $restoreHours ?> horas.</strong> Después de <?= $restoreHours ?> horas el archivo será eliminado definitivamente. Solo permanecerá la evidencia de su existencia en el historial y la auditoría.</span>
             </p>
             <div class="ed-file-restore-list" data-file-restore-list></div>
             <p class="ed-file-restore-empty" data-file-restore-empty hidden>No existen archivos disponibles para restaurar.</p>

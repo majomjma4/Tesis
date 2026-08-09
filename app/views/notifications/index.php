@@ -93,7 +93,7 @@
     <div class="notification-active-filter" id="notificationActiveFilter" aria-live="polite" hidden></div>
 
     <section class="notification-trash-toolbar" id="notificationTrashToolbar" aria-label="Acciones de papelera" hidden>
-        <div class="notification-trash-notice"><span><i class="fa-regular fa-clock"></i></span><div><strong>La papelera se vacía automáticamente después de 60 días</strong><p>Puedes restaurar o eliminar definitivamente las notificaciones antes de ese plazo.</p></div></div>
+        <div class="notification-trash-notice"><span><i class="fa-regular fa-clock"></i></span><div><strong>La papelera se vacía automáticamente después de <?= (int)($notificationTrashRetentionDays ?? 60) ?> días</strong><p>Puedes restaurar o eliminar definitivamente las notificaciones antes de ese plazo.</p></div></div>
         <div class="notification-trash-selection">
             <label><input type="checkbox" id="selectAllTrashNotifications"><span>Seleccionar todas</span></label>
             <span id="trashSelectionCount">0 seleccionadas</span>
@@ -137,7 +137,7 @@
                                         <div class="notification-context-menu" role="menu" hidden>
                                             <button type="button" role="menuitem" data-menu-action="toggle-read"><i class="fa-regular <?= $notification['is_read'] ? 'fa-eye-slash' : 'fa-envelope-open' ?>"></i><span><strong><?= $notification['is_read'] ? 'Marcar como no leída' : 'Marcar como leída' ?></strong><small>Cambiar estado de lectura</small></span></button>
                                             <button type="button" role="menuitem" data-menu-action="delete"><i class="fa-solid fa-box-archive"></i><span><strong>Archivar</strong><small>Ocultar de la bandeja sin eliminar</small></span></button>
-                                            <button type="button" role="menuitem" class="danger" data-menu-action="destroy"><i class="fa-regular fa-trash-can"></i><span><strong>Mover a la papelera</strong><small>Se eliminará automáticamente en 60 días</small></span></button>
+                                            <button type="button" role="menuitem" class="danger" data-menu-action="destroy"><i class="fa-regular fa-trash-can"></i><span><strong>Mover a la papelera</strong><small>Se eliminará automáticamente en <?= (int)($notificationTrashRetentionDays ?? 60) ?> días</small></span></button>
                                         </div>
                                     </div>
                                 </div>

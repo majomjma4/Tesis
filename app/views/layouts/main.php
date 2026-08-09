@@ -127,16 +127,38 @@
                 </div>
             </div>
         </header>
-        <?php if (!empty($layoutMustChangePassword) && !$isAdministratorLayout && (int)($layoutPasswordWarningCount ?? 0) < 3): ?>
-        <aside class="password-warning-banner" role="status" data-password-warning data-warning-key="<?= e(hash('sha256', ($layoutUserEmail ?? '') . ':' . (int)$layoutPasswordWarningCount)) ?>">
-            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
-            <div><strong>Tu contraseña sigue siendo temporal</strong><span>Aviso <?= (int)$layoutPasswordWarningCount ?> de 3</span></div>
-            <div class="password-warning-actions">
-                <a href="<?= e(route('change-password')) ?>">Cambiar ahora</a>
-                <button type="button" data-password-warning-dismiss>Recordármelo más tarde</button>
+        <?php
+            $daysLeft = $layoutTemporaryPasswordRemainingDays ?? null;
+            $showWarning = !empty($layoutMustChangePassword) && !$isAdministratorLayout && $daysLeft !== null && $daysLeft > 0 && empty($layoutIsTemporaryPasswordDismissedToday);
+        ?>
+        <?php if ($showWarning): ?>
+        <?php
+            $daysText = match(true) {
+                $daysLeft > 1 => "Tu contraseña temporal vence en {$daysLeft} días.",
+                $daysLeft === 1 => "Tu contraseña temporal vence mañana.",
+                default => "Tu contraseña temporal vence hoy."
+            };
+        ?>
+        <aside class="password-warning-banner" role="status" data-password-warning>
+            <i class="fa-solid fa-clock" aria-hidden="true"></i>
+            <div>
+                <strong>Contraseña temporal</strong>
+                <span><?= e($daysText) ?> Por seguridad, crea una contraseña personal antes de que finalice el plazo.</span>
             </div>
-            <button type="button" class="password-warning-close" data-password-warning-dismiss aria-label="Cerrar aviso"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            <div class="password-warning-actions">
+                <a href="<?= e(route('change-password')) ?>" class="as-btn-change">Cambiar ahora</a>
+                <button type="button" class="as-btn-dismiss" data-password-warning-dismiss>Omitir por hoy</button>
+            </div>
         </aside>
+        <script>
+            document.addEventListener('click', function(e) {
+                var btn = e.target.closest('[data-password-warning-dismiss]');
+                if (!btn) return;
+                var banner = btn.closest('[data-password-warning]');
+                if (banner) banner.remove();
+                fetch('index.php?page=dismiss-temp-password-warning', { method: 'POST' }).catch(function(){});
+            });
+        </script>
         <?php endif; ?>
         <!-- Final de barra superior -->
 

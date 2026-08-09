@@ -14,7 +14,8 @@
             <p class="ed-file-remove-warning" data-file-remove-presentation-warning hidden></p>
             <p class="ed-dialog-info-note" data-file-remove-history-note>
                 <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-                <span><?= !empty($recordIsProject) ? 'El archivo podrá recuperarse durante 24 horas. El retiro quedará registrado en el historial y los autores activos recibirán una notificación.' : 'El retiro de este archivo quedará registrado en el historial del expediente y podrá reflejarse en los reportes administrativos.' ?></span>
+                <?php $restoreHours = (new SystemSettingModel())->retentionDays('withdrawn_file_restore_hours'); ?>
+                <span><?= !empty($recordIsProject) ? 'El archivo podrá recuperarse durante ' . $restoreHours . ' horas. El retiro quedará registrado en el historial y los autores activos recibirán una notificación.' : 'El retiro de este archivo quedará registrado en el historial del expediente y podrá reflejarse en los reportes administrativos.' ?></span>
             </p>
             <p class="ed-file-remove-error" data-file-remove-error role="alert" hidden></p>
         </div>

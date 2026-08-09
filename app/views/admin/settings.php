@@ -138,48 +138,169 @@
             </section>
         </div>
 
-        <!-- Seguridad y políticas -->
+        <!-- Acceso inicial -->
         <div class="as-settings-section" id="tab-security">
-            <section class="as-card as-security-card">
+            <section class="as-card">
                 <header>
-                    <i class="fa-solid fa-shield-halved"></i>
+                    <i class="fa-solid fa-key"></i>
                     <div>
-                        <h2>Seguridad y políticas
-                            <button type="button" class="as-help-btn" data-tooltip="Estas políticas existen para proteger el funcionamiento y la seguridad del sistema. Algunas no podrán modificarse desde la interfaz." aria-label="Ayuda sobre seguridad">
-                                <i class="fa-solid fa-circle-info"></i>
-                            </button>
-                        </h2>
-                        <p>Configura las políticas administrativas disponibles y consulta las reglas de protección permanentes.</p>
+                        <h2>Acceso inicial</h2>
+                        <p>Credenciales utilizadas en nuevos accesos y restablecimientos.</p>
                     </div>
                 </header>
-                <div class="as-security-block">
-                    <div class="as-security-block-heading"><h3>Contraseña temporal</h3><p>Esta contraseña se utilizará únicamente en nuevos accesos o restablecimientos.</p></div>
-                    <div class="as-grid">
-                        <div class="as-field-group"><label for="input_temporary_password"><span>Contraseña temporal por defecto</span><button type="button" class="as-help-btn" data-tooltip="Contraseña utilizada en nuevos accesos o restablecimientos que requieran cambio obligatorio."><i class="fa-solid fa-circle-info"></i></button></label><div class="as-password-control"><input type="password" id="input_temporary_password" name="temporary_password" minlength="10" maxlength="128" autocomplete="new-password" placeholder="Dejar vacío para no modificar"><button type="button" data-toggle-temporary-password aria-label="Mostrar contraseña"><i class="fa-solid fa-eye"></i></button></div></div>
-                        <div class="as-field-group"><label for="input_temporary_password_days"><span>Vigencia (días)</span><button type="button" class="as-help-btn" data-tooltip="Tiempo máximo durante el cual una contraseña temporal puede utilizarse."><i class="fa-solid fa-circle-info"></i></button></label><input type="number" id="input_temporary_password_days" name="temporary_password_days" min="1" max="30" value="<?= (int)$settings['temporary_password_days'] ?>" class="as-input" required><label class="as-checkbox-label"><input type="checkbox" name="temporary_password_force_change" value="1" <?= !empty($settings['temporary_password_force_change'])?'checked':'' ?>><span>Exigir cambio en el siguiente inicio</span></label></div>
+                <div class="as-grid">
+                    <div class="as-field-group">
+                        <label for="input_temporary_password">
+                            <span>Nueva contraseña temporal (opcional)</span>
+                            <span class="as-status-badge is-active" title="Hay una contraseña temporal activa almacenada de forma segura."><i class="fa-solid fa-shield-halved"></i> Configurada</span>
+                        </label>
+                        <input type="text" id="input_temporary_password" name="temporary_password" minlength="10" maxlength="128" autocomplete="off" placeholder="Escribe una nueva contraseña para reemplazar la actual" class="as-input">
+                        <span class="as-field-help">Si no deseas cambiarla, deja este campo vacío.</span>
+                    </div>
+                    <div class="as-field-group">
+                        <label for="input_temporary_password_days">
+                            <span>Vigencia (días)</span>
+                        </label>
+                        <input type="number" id="input_temporary_password_days" name="temporary_password_days" min="1" max="30" value="<?= (int)$settings['temporary_password_days'] ?>" class="as-input" required>
+                        <span class="as-field-help">Tiempo máximo durante el cual una contraseña temporal puede utilizarse antes de expirar.</span>
                     </div>
                 </div>
-                <div class="as-security-block">
-                    <div class="as-security-block-heading"><h3>Retención y papelera</h3><p>Define durante cuántos días un elemento eliminado puede restaurarse antes de eliminarse definitivamente.</p></div>
+                <div class="as-checkbox-compact-group">
+                    <label class="as-checkbox-compact">
+                        <input type="checkbox" name="temporary_password_force_change" value="1" <?= !empty($settings['temporary_password_force_change'])?'checked':'' ?>>
+                        <div class="as-checkbox-text">
+                            <strong>Exigir cambio en el siguiente inicio de sesión</strong>
+                            <span>El usuario deberá crear una nueva contraseña al acceder.</span>
+                        </div>
+                    </label>
+                </div>
+            </section>
+        </div>
+
+        <!-- Plazos y conservación -->
+        <div class="as-settings-section" id="tab-retention">
+            <section class="as-card">
+                <header>
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <div>
+                        <h2>Plazos y conservación</h2>
+                        <p>Gestión de tiempos de retención, ventanas de recuperación y alertas en toda la plataforma.</p>
+                    </div>
+                </header>
+
+                <div class="as-retention-group">
+                    <div class="as-retention-header">
+                        <h3><i class="fa-solid fa-trash-can"></i> Papelera general</h3>
+                        <p>Define cuándo los elementos eliminados pasan a estar disponibles para eliminación definitiva.</p>
+                    </div>
                     <div class="as-grid">
-                        <div class="as-field-group"><label for="input_retention_users_days"><span>Retención de usuarios (días)</span><button type="button" class="as-help-btn" data-tooltip="Define durante cuántos días un elemento eliminado puede restaurarse antes de eliminarse definitivamente."><i class="fa-solid fa-circle-info"></i></button></label><input type="number" id="input_retention_users_days" name="retention_users_days" min="1" max="365" value="<?= (int)$settings['retention_users_days'] ?>" class="as-input" required></div>
-                        <div class="as-field-group"><label for="input_retention_projects_days"><span>Retención de proyectos (días)</span></label><input type="number" id="input_retention_projects_days" name="retention_projects_days" min="1" max="365" value="<?= (int)$settings['retention_projects_days'] ?>" class="as-input" required></div>
-                        <div class="as-field-group"><label for="input_retention_materials_days"><span>Retención de materiales (días)</span></label><input type="number" id="input_retention_materials_days" name="retention_materials_days" min="1" max="365" value="<?= (int)$settings['retention_materials_days'] ?>" class="as-input" required></div>
-                        <div class="as-policy-pending"><strong>Retención de notificaciones</strong><span>Pendiente de conexión</span></div>
-                        <div class="as-policy-pending"><strong>Retención de archivos retirados</strong><span>Pendiente de conexión</span></div>
-                        <div class="as-policy-pending"><strong>Retención de archivos temporales</strong><span>Pendiente de conexión</span></div>
+                        <div class="as-field-group">
+                            <label for="input_retention_users_days">
+                                <span>Usuarios (días)</span>
+                                <button type="button" class="as-help-btn" data-tooltip="Transcurrido este plazo, el usuario podrá eliminarse definitivamente." aria-label="Ayuda retención usuarios">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </button>
+                            </label>
+                            <input type="number" id="input_retention_users_days" name="retention_users_days" min="1" max="365" value="<?= (int)$settings['retention_users_days'] ?>" class="as-input" required>
+                        </div>
+                        <div class="as-field-group">
+                            <label for="input_retention_projects_days">
+                                <span>Proyectos (días)</span>
+                                <button type="button" class="as-help-btn" data-tooltip="Transcurrido este plazo, el proyecto podrá eliminarse definitivamente." aria-label="Ayuda retención proyectos">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </button>
+                            </label>
+                            <input type="number" id="input_retention_projects_days" name="retention_projects_days" min="1" max="365" value="<?= (int)$settings['retention_projects_days'] ?>" class="as-input" required>
+                        </div>
+                        <div class="as-field-group">
+                            <label for="input_retention_materials_days">
+                                <span>Materiales (días)</span>
+                                <button type="button" class="as-help-btn" data-tooltip="Transcurrido este plazo, el material podrá eliminarse definitivamente." aria-label="Ayuda retención materiales">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </button>
+                            </label>
+                            <input type="number" id="input_retention_materials_days" name="retention_materials_days" min="1" max="365" value="<?= (int)$settings['retention_materials_days'] ?>" class="as-input" required>
+                        </div>
                     </div>
                 </div>
-                <div class="as-security-block as-storage-protected">
-                    <h3>Almacenamiento protegido</h3>
-                    <p>Los archivos privados se almacenan fuera del acceso público directo y solo se sirven mediante controles de autorización.</p>
+
+                <div class="as-retention-group">
+                    <div class="as-retention-header">
+                        <h3><i class="fa-solid fa-bell"></i> Notificaciones</h3>
+                        <p>Las notificaciones en papelera se eliminan automáticamente al cumplir el plazo.</p>
+                    </div>
+                    <div class="as-grid">
+                        <div class="as-field-group">
+                            <label for="input_notification_trash_retention_days">
+                                <span>Notificaciones en papelera (días)</span>
+                                <button type="button" class="as-help-btn" data-tooltip="Transcurrido este plazo, el sistema eliminará automáticamente la notificación. El aviso de 'Expira pronto' se muestra 7 días antes." aria-label="Ayuda retención notificaciones">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </button>
+                            </label>
+                            <input type="number" id="input_notification_trash_retention_days" name="notification_trash_retention_days" min="1" max="365" value="<?= (int)$settings['notification_trash_retention_days'] ?>" class="as-input" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="as-retention-group">
+                    <div class="as-retention-header">
+                        <h3><i class="fa-solid fa-file-arrow-up"></i> Recuperación de archivos</h3>
+                        <p>Ventana de tiempo para restaurar archivos individuales retirados de expedientes.</p>
+                    </div>
+                    <div class="as-grid">
+                        <div class="as-field-group">
+                            <label for="input_withdrawn_file_restore_hours">
+                                <span>Archivos retirados (horas)</span>
+                                <button type="button" class="as-help-btn" data-tooltip="Una vez vencido el plazo, el archivo deja de estar disponible para restauración." aria-label="Ayuda recuperación archivos">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </button>
+                            </label>
+                            <input type="number" id="input_withdrawn_file_restore_hours" name="withdrawn_file_restore_hours" min="1" max="72" value="<?= (int)$settings['withdrawn_file_restore_hours'] ?>" class="as-input" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="as-retention-group">
+                    <div class="as-retention-header">
+                        <h3><i class="fa-solid fa-graduation-cap"></i> Gestión académica y calendario</h3>
+                        <p>Ventanas temporales y generación previa de alertas institucionales.</p>
+                    </div>
+                    <div class="as-grid">
+                        <div class="as-field-group">
+                            <label for="input_academic_period_reversal_hours">
+                                <span>Revertir cierre de período (horas)</span>
+                                <button type="button" class="as-help-btn" data-tooltip="Después de este plazo ya no podrá deshacerse el cierre mediante la interfaz." aria-label="Ayuda reversión período">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </button>
+                            </label>
+                            <input type="number" id="input_academic_period_reversal_hours" name="academic_period_reversal_hours" min="1" max="72" value="<?= (int)$settings['academic_period_reversal_hours'] ?>" class="as-input" required>
+                        </div>
+                        <div class="as-field-group">
+                            <label for="input_academic_period_reminder_days">
+                                <span>Avisar sobre período académico (días antes)</span>
+                                <button type="button" class="as-help-btn" data-tooltip="Define con cuántos días de anticipación se generan avisos sobre el inicio o cierre de un período." aria-label="Ayuda avisos período">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </button>
+                            </label>
+                            <input type="number" id="input_academic_period_reminder_days" name="academic_period_reminder_days" min="1" max="30" value="<?= (int)$settings['academic_period_reminder_days'] ?>" class="as-input" required>
+                        </div>
+                        <div class="as-field-group">
+                            <label for="input_calendar_reminder_days">
+                                <span>Recordar eventos (días antes)</span>
+                                <button type="button" class="as-help-btn" data-tooltip="Define con cuántos días de anticipación se generan recordatorios de eventos del calendario." aria-label="Ayuda recordatorios calendario">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </button>
+                            </label>
+                            <input type="number" id="input_calendar_reminder_days" name="calendar_reminder_days" min="0" max="30" value="<?= (int)$settings['calendar_reminder_days'] ?>" class="as-input" required>
+                        </div>
+                    </div>
                 </div>
             </section>
         </div>
 
         <!-- Acciones del Formulario -->
         <div class="as-form-actions">
-            <button type="submit" class="as-submit-btn" id="asSubmitBtn">
+            <button type="submit" class="as-submit-btn" id="asSubmitBtn" disabled aria-disabled="true">
                 <i class="fa-solid fa-floppy-disk" id="asSubmitIcon"></i>
                 <span class="as-spinner" id="asSubmitSpinner" hidden></span>
                 <span id="asSubmitText">Guardar configuración</span>

@@ -35,9 +35,11 @@ final class AcademicPeriodReminderService
 
     private function activeEvents(array $period,DateTimeImmutable $today):array
     {
+        $settings=(new SystemSettingModel())->all();
+        $reminderDays=max(1,(int)($settings['academic_period_reminder_days']??7));
         $end=new DateTimeImmutable((string)$period['ends_on']);
         $days=(int)$today->diff($end)->format('%r%a');
-        if($days>=1&&$days<=7)return [$this->event($period,'active_end_upcoming',(string)$period['ends_on'],'El período finaliza pronto',$period['name'].' finalizará en '.$days.' '.($days===1?'día':'días').'. Revisa o planifica el siguiente período; el cierre seguirá siendo manual.')];
+        if($days>=1&&$days<=$reminderDays)return [$this->event($period,'active_end_upcoming',(string)$period['ends_on'],'El período finaliza pronto',$period['name'].' finalizará en '.$days.' '.($days===1?'día':'días').'. Revisa o planifica el siguiente período; el cierre seguirá siendo manual.')];
         if($days===0)return [$this->event($period,'active_end_today',(string)$period['ends_on'],'El período académico finaliza hoy',$period['name'].' finaliza hoy. Confirma la planificación antes de realizar el cierre manual.')];
         if($days<0)return [$this->event($period,'active_end_overdue',(string)$period['ends_on'],'El período académico está pendiente de cierre',$period['name'].' superó su fecha de finalización. Revisa la planificación y realiza el cierre manual cuando corresponda.')];
         return [];
@@ -45,9 +47,11 @@ final class AcademicPeriodReminderService
 
     private function plannedEvents(array $period,DateTimeImmutable $today):array
     {
+        $settings=(new SystemSettingModel())->all();
+        $reminderDays=max(1,(int)($settings['academic_period_reminder_days']??7));
         $start=new DateTimeImmutable((string)$period['starts_on']);
         $days=(int)$today->diff($start)->format('%r%a');
-        if($days>=1&&$days<=7)return [$this->event($period,'planned_start_upcoming',(string)$period['starts_on'],'El siguiente período inicia pronto',$period['name'].' comenzará en '.$days.' '.($days===1?'día':'días').'. Revisa si corresponde cerrar el período actual.')];
+        if($days>=1&&$days<=$reminderDays)return [$this->event($period,'planned_start_upcoming',(string)$period['starts_on'],'El siguiente período inicia pronto',$period['name'].' comenzará en '.$days.' '.($days===1?'día':'días').'. Revisa si corresponde cerrar el período actual.')];
         if($days===0)return [$this->event($period,'planned_start_today',(string)$period['starts_on'],'El período planificado inicia hoy',$period['name'].' inicia hoy. El cambio de período debe confirmarse manualmente desde Gestión académica.')];
         if($days<0)return [$this->event($period,'planned_start_overdue',(string)$period['starts_on'],'El período planificado está pendiente de activación',$period['name'].' ya alcanzó su fecha de inicio y continúa planificado. Revisa el cierre manual del período actual.')];
         return [];

@@ -31,6 +31,7 @@ match ($page) {
     'login' => (new AuthController())->login(),
     'logout' => (new AuthController())->logout(),
     'change-password' => (new AccountController())->changePassword(),
+    'dismiss-temp-password-warning' => (new AccountController())->dismissTemporaryPasswordWarning(),
     'profile' => (new AccountController())->profile(),
     'forbidden' => (new AccountController())->forbidden(),
     'admin-users' => (new AdminController())->users(),

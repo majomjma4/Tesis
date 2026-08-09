@@ -36,9 +36,9 @@
         <!-- Final de encabezado del formulario -->
 
         <!-- Inicio de alerta de validacion -->
-        <div class="login-alert<?= !empty($loginError) ? ' show' : '' ?>" id="loginAlert" role="alert" aria-live="polite">
+        <div class="login-alert<?= !empty($loginError) ? ' show' : '' ?>" id="loginAlert" role="alert" aria-live="polite" data-lockout-seconds="<?= (int)($lockoutSeconds ?? 0) ?>">
             <i class="fa-solid fa-circle-exclamation"></i>
-            <span><?= e($loginError ?? 'Revisa los campos indicados.') ?></span>
+            <span id="loginAlertText"><?= e($loginError ?? 'Revisa los campos indicados.') ?></span>
         </div>
         <!-- Final de alerta de validacion -->
 

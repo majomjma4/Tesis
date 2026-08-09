@@ -14,15 +14,17 @@ final class CalendarEventReminderService
         if ($ownerId < 1) return 0;
         $db = $this->db ?? Database::connection();
         $today = $this->today ?? new DateTimeImmutable('today');
+        $settings = (new SystemSettingModel())->all();
+        $reminderDays = max(0, (int)($settings['calendar_reminder_days'] ?? 3));
         $todayKey = $today->format('Y-m-d');
-        $threeDaysKey = $today->modify('+3 days')->format('Y-m-d');
+        $advanceKey = $today->modify("+{$reminderDays} days")->format('Y-m-d');
 
         $events = $db->prepare(
             'SELECT id, project_id, title, event_type, event_date, event_time
              FROM project_events
-             WHERE created_by = :owner AND is_completed = 0 AND event_date IN (:today, :three_days)'
+             WHERE created_by = :owner AND is_completed = 0 AND event_date IN (:today, :advance_date)'
         );
-        $events->execute(['owner' => $ownerId, 'today' => $todayKey, 'three_days' => $threeDaysKey]);
+        $events->execute(['owner' => $ownerId, 'today' => $todayKey, 'advance_date' => $advanceKey]);
 
         $insert = $db->prepare(
             "INSERT IGNORE INTO notifications
@@ -32,12 +34,13 @@ final class CalendarEventReminderService
         $created = 0;
         foreach ($events->fetchAll(PDO::FETCH_ASSOC) as $event) {
             $eventDate = (string)$event['event_date'];
-            $kind = $eventDate === $todayKey ? 'today' : 'three_days';
+            $isToday = $eventDate === $todayKey;
+            $kind = $isToday ? 'today' : 'advance';
             $eventTitle = (string)$event['title'];
             $time = empty($event['event_time']) ? null : substr((string)$event['event_time'], 0, 5);
             $when = $time === null ? '' : ' a las ' . $time;
-            $title = $kind === 'today' ? 'Hoy: ' . $eventTitle : 'Recordatorio: ' . $eventTitle . ' en 3 días';
-            $message = $kind === 'today'
+            $title = $isToday ? 'Hoy: ' . $eventTitle : 'Recordatorio: ' . $eventTitle . ($reminderDays > 0 ? ' en ' . $reminderDays . ' ' . ($reminderDays === 1 ? 'día' : 'días') : '');
+            $message = $isToday
                 ? 'Tienes pendiente “' . $eventTitle . '” para hoy' . $when . '.'
                 : 'Tienes pendiente “' . $eventTitle . '” para el ' . $this->formatDate($eventDate) . $when . '.';
             $deduplication = 'calendar-event:' . (int)$event['id'] . ':' . $kind . ':' . $eventDate;

@@ -263,10 +263,12 @@ final class AdminAcademicModel
             if ((int) $transition['performed_by'] !== $actor) {
                 throw new InvalidArgumentException('Solo el administrador que realizó el cierre puede revertirlo.');
             }
-            $validWindow = $db->prepare('SELECT performed_at>=UTC_TIMESTAMP()-INTERVAL 24 HOUR FROM academic_period_transitions WHERE id=:id');
+            $settings = (new SystemSettingModel())->all();
+            $hours = max(1, (int)($settings['academic_period_reversal_hours'] ?? 24));
+            $validWindow = $db->prepare('SELECT performed_at>=UTC_TIMESTAMP()-INTERVAL ' . $hours . ' HOUR FROM academic_period_transitions WHERE id=:id');
             $validWindow->execute(['id' => $transitionId]);
             if (!(bool) $validWindow->fetchColumn()) {
-                throw new InvalidArgumentException('El plazo de 24 horas para revertir el cierre ha finalizado.');
+                throw new InvalidArgumentException('El plazo de ' . $hours . ' horas para revertir el cierre ha finalizado.');
             }
             $latestId = (int) $db->query('SELECT id FROM academic_period_transitions ORDER BY performed_at DESC,id DESC LIMIT 1 FOR UPDATE')->fetchColumn();
             if ($latestId !== $transitionId) {
@@ -317,7 +319,7 @@ final class AdminAcademicModel
                 'reopened_period_id' => (int) $closed['id'],
                 'planned_period_id' => (int) $activated['id'],
                 'planned_period_name' => (string) $activated['name'],
-                'technical_reason' => 'Reversión administrativa dentro de la ventana autorizada de 24 horas y sin actividad académica posterior.',
+                'technical_reason' => 'Reversión administrativa dentro de la ventana autorizada de ' . (new SystemSettingModel())->retentionDays('academic_period_reversal_hours') . ' horas y sin actividad académica posterior.',
             ]);
 
             return ['reopened' => $closed['name'], 'planned' => $activated['name'], 'transition_id' => $transitionId];
@@ -484,15 +486,18 @@ final class AdminAcademicModel
 
     private function reversalAvailability(PDO $db, int $actor): ?array
     {
-        $statement = $db->query(
+        $settings = (new SystemSettingModel())->all();
+        $hours = max(1, (int)($settings['academic_period_reversal_hours'] ?? 24));
+        $statement = $db->prepare(
             "SELECT transition.*,closed_period.name closed_period_name,active_period.name activated_period_name,
-                    DATE_ADD(transition.performed_at,INTERVAL 24 HOUR) expires_at
+                    DATE_ADD(transition.performed_at,INTERVAL " . $hours . " HOUR) expires_at
              FROM academic_period_transitions transition
              JOIN academic_periods closed_period ON closed_period.id=transition.closed_period_id
              JOIN academic_periods active_period ON active_period.id=transition.activated_period_id
              ORDER BY transition.performed_at DESC,transition.id DESC
              LIMIT 1"
         );
+        $statement->execute();
         $transition = $statement->fetch();
         if (!$transition || $transition['reverted_at'] !== null || (int) $transition['performed_by'] !== $actor) return null;
         if (strtotime((string) $transition['expires_at'] . ' UTC') < time()) return null;

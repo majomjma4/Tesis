@@ -12,6 +12,15 @@ final class SupportMaterialModel
     ];
     private const PREVIEW_EXTENSIONS = ['pdf','docx','txt','png','jpg','jpeg','webp'];
 
+    public function restoreHours(): int
+    {
+        try {
+            return (new SystemSettingModel())->retentionDays('withdrawn_file_restore_hours');
+        } catch (Throwable) {
+            return self::RESTORE_HOURS;
+        }
+    }
+
     public function getAll(): array
     {
         return $this->listing('published');
@@ -747,6 +756,8 @@ final class SupportMaterialModel
     public function restorableFiles(int $materialId): array
     {
         if ($materialId < 1) return [];
+        $settings = (new SystemSettingModel())->all();
+        $hours = max(1, (int)($settings['withdrawn_file_restore_hours'] ?? 24));
         $statement = Database::connection()->prepare(
             'SELECT file.id,file.material_id,file.original_name,file.relative_path,
                     file.extension,file.mime_type,file.size_bytes,file.sort_order,
@@ -756,7 +767,7 @@ final class SupportMaterialModel
              WHERE file.material_id=:material_id
                AND file.deleted_at IS NOT NULL
                AND file.purged_at IS NULL
-               AND file.deleted_at>DATE_SUB(UTC_TIMESTAMP(),INTERVAL ' . self::RESTORE_HOURS . ' HOUR)
+               AND file.deleted_at>DATE_SUB(UTC_TIMESTAMP(),INTERVAL ' . $hours . ' HOUR)
                AND file.deleted_at<=UTC_TIMESTAMP()
                AND file.is_package=0
              ORDER BY file.deleted_at DESC,file.id DESC'
@@ -768,7 +779,7 @@ final class SupportMaterialModel
             $path = $this->supportFilePath((string) $file['relative_path']);
             if (!is_file($path)) continue;
             $deletedAt = new DateTimeImmutable((string) $file['deleted_at'], new DateTimeZone('UTC'));
-            $expiresAt = $deletedAt->modify('+' . self::RESTORE_HOURS . ' hours');
+            $expiresAt = $deletedAt->modify('+' . $hours . ' hours');
             $remainingSeconds = max(0, $expiresAt->getTimestamp() - $now->getTimestamp());
             if ($remainingSeconds < 1) continue;
             $files[] = [
@@ -820,9 +831,10 @@ final class SupportMaterialModel
         }
         $now = new DateTimeImmutable('now', new DateTimeZone('UTC'));
         $deletedAt = new DateTimeImmutable((string) $file['deleted_at'], new DateTimeZone('UTC'));
-        $expiresAt = $deletedAt->modify('+' . self::RESTORE_HOURS . ' hours');
+        $hours = $this->restoreHours();
+        $expiresAt = $deletedAt->modify('+' . $hours . ' hours');
         if ($deletedAt > $now || $expiresAt <= $now) {
-            throw new InvalidArgumentException('El plazo de 24 horas para restaurar este archivo expiró.');
+            throw new InvalidArgumentException('El plazo de ' . $hours . ' horas para restaurar este archivo expiró.');
         }
         $path = $this->supportFilePath((string) $file['relative_path']);
         if (!is_file($path) || !is_readable($path)) {

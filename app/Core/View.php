@@ -74,6 +74,8 @@ final class View
             'layoutIsInitialAdmin' => (new AuthSessionService())->isInitialAdmin(),
             'layoutPasswordWarningCount' => (new AuthSessionService())->passwordWarningCount(),
             'layoutMustChangePassword' => (new AuthSessionService())->mustChangePassword(),
+            'layoutTemporaryPasswordRemainingDays' => (new AuthSessionService())->temporaryPasswordRemainingDays(),
+            'layoutIsTemporaryPasswordDismissedToday' => (new AuthSessionService())->isTemporaryPasswordWarningDismissedToday(),
         ];
     }
     // Final de datos globales de notificaciones

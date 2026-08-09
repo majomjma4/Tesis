@@ -55,6 +55,7 @@ final class NotificationsController
             'sidebarSummary' => ['unread' => $counters['unread'], 'read' => max(0, $counters['total'] - $counters['unread']), 'updated' => date('d/m/Y H:i')],
             'sidebarActivity' => $this->activitySummary($notifications),
             'notificationUnreadCount' => $counters['unread'],
+            'notificationTrashRetentionDays' => (new SystemSettingModel())->retentionDays('notification_trash_retention_days'),
             'notificationCsrfToken' => $this->csrfToken(),
             'notificationEndpoints' => $this->endpoints(),
             'loadError' => $error,
@@ -140,7 +141,7 @@ final class NotificationsController
                 'date_to' => $dateTo
             ];
             // La limpieza global programada queda pendiente como mejora posterior; aquí solo se depura la papelera del usuario actual.
-            $model->purgeExpiredTrashForUser($this->currentUserId(), 60);
+            $model->purgeExpiredTrashForUser($this->currentUserId());
             $result = $model->getByUserPaginated($this->currentUserId(), $filters, ['page' => $page, 'size' => $perPage, 'pageKey' => 'notification_page', 'sizeKey' => 'notifications_per_page']);
             $notifications = $result['items'];
             $pagination = $result['pagination'];

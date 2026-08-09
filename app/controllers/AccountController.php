@@ -31,6 +31,15 @@ final class AccountController
         View::render('account/change-password',['currentPage'=>'profile','title'=>'Cambiar contraseña | Administración','bodyClass'=>'account-page','pageStyles'=>[asset('css/admin-access.css')],'passwordCsrfToken'=>$session->csrfToken('change_password'),'passwordError'=>$error,'passwordSuccess'=>$success,'forcedPasswordChange'=>$forcedPasswordChange]);
     }
 
+    public function dismissTemporaryPasswordWarning(): void
+    {
+        $session = new AuthSessionService();
+        $session->dismissTemporaryPasswordWarningToday();
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
     public function forbidden(): void
     {
         http_response_code(403);View::render('errors/403',['currentPage'=>'','title'=>'Acceso no autorizado','bodyClass'=>'error-page','pageStyles'=>[asset('css/admin-access.css')]]);

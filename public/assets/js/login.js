@@ -78,6 +78,41 @@ passwordToggle?.addEventListener("click", () => {
 });
 // Final de eventos de entrada
 
+// Manejo de contador de bloqueo temporal (Lockout Countdown)
+(() => {
+    if (!loginAlert) return;
+    let seconds = Number(loginAlert.dataset.lockoutSeconds || 0);
+    if (seconds <= 0) return;
+
+    const alertText = document.querySelector("#loginAlertText") || loginAlert.querySelector("span");
+    const submitBtn = loginForm?.querySelector("button[type='submit']");
+
+    const updateUI = (secs) => {
+        const mins = Math.floor(secs / 60);
+        const remSecs = secs % 60;
+        const formatted = `${String(mins).padStart(2, "0")}:${String(remSecs).padStart(2, "0")}`;
+        if (alertText) alertText.textContent = `Demasiados intentos de inicio de sesión. Podrás intentarlo nuevamente en ${formatted}.`;
+        if (submitBtn) submitBtn.disabled = true;
+        if (userInput) userInput.disabled = true;
+        if (passwordInput) passwordInput.disabled = true;
+    };
+
+    updateUI(seconds);
+    const interval = setInterval(() => {
+        seconds--;
+        if (seconds <= 0) {
+            clearInterval(interval);
+            loginAlert.classList.remove("show");
+            if (submitBtn) submitBtn.disabled = false;
+            if (userInput) userInput.disabled = false;
+            if (passwordInput) passwordInput.disabled = false;
+            if (alertText) alertText.textContent = "";
+        } else {
+            updateUI(seconds);
+        }
+    }, 1000);
+})();
+
 // Inicio de envio del formulario
 loginForm?.addEventListener("submit", (event) => {
     updateFieldState(userInput);

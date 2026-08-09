@@ -529,10 +529,10 @@ final class AdminController
             $model=new SupportMaterialModel();
             if($action==='list_restorable'){
                 if($model->findById($materialId,true)===null)$this->json(false,'El material ya no está disponible.',[],404);
+                $settings=(new SystemSettingModel())->all();
+                $hours=(int)($settings['withdrawn_file_restore_hours']??24);
                 $files=$model->restorableFiles($materialId);
-                $this->json(true,'Archivos retirados consultados correctamente.',[
-                    'files'=>$files,'count'=>count($files),'restore_hours'=>SupportMaterialModel::RESTORE_HOURS,
-                ]);
+                $this->json(true,'Archivos retirados consultados correctamente.',['files'=>$files,'count'=>count($files),'restore_hours'=>$hours]);
             }
             if($action==='inspect_restore'){
                 $fileId=(int)($_POST['file_id']??0);
