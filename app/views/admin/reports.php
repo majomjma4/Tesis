@@ -475,9 +475,17 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.appendChild(modal);
     }
 
-    function openModal(type) {
+    let lastActiveTrigger = null;
+
+    function openModal(type, triggerEl = null) {
         if (!modal) return;
         closePopover();
+        if (triggerEl) {
+            lastActiveTrigger = triggerEl;
+        } else if (document.activeElement && document.activeElement !== document.body) {
+            lastActiveTrigger = document.activeElement;
+        }
+
         typeInput.value = type;
         if (subtitleDisplay) {
             const iconClass = typeIcons[type] || 'fa-file-lines';
@@ -492,19 +500,37 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.setAttribute('aria-hidden', 'false');
         modal.classList.add('is-open');
         document.body.classList.add('rp-modal-active');
+
+        // Mover foco al primer control del modal después de remover aria-hidden
+        setTimeout(function() {
+            if (scopeSelect) scopeSelect.focus();
+        }, 30);
     }
 
     function closeModal() {
         if (!modal) return;
+
+        // 1. Quitar el foco de cualquier elemento dentro del modal ANTES de ocultarlo para evitar el aviso de aria-hidden
+        if (document.activeElement && modal.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+
         if (emptyBanner) {
             emptyBanner.hidden = true;
             emptyBanner.style.display = 'none';
         }
+
+        // 2. Ocultar modal y aplicar aria-hidden/hidden
         modal.hidden = true;
         modal.setAttribute('hidden', '');
         modal.setAttribute('aria-hidden', 'true');
         modal.classList.remove('is-open');
         document.body.classList.remove('rp-modal-active');
+
+        // 3. Devolver el foco al botón disparador original si existe
+        if (lastActiveTrigger && typeof lastActiveTrigger.focus === 'function') {
+            lastActiveTrigger.focus();
+        }
     }
 
     document.querySelectorAll('.rp-export-trigger').forEach(function(trigger) {
@@ -512,7 +538,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             e.stopPropagation();
             const type = this.getAttribute('data-export-type');
-            openModal(type);
+            openModal(type, this);
         });
     });
 
@@ -524,6 +550,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target === modal) closeModal();
         });
     }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal && modal.classList.contains('is-open')) {
+            closeModal();
+        }
+    });
 
     if (scopeSelect) {
         scopeSelect.addEventListener('change', updateScopeDates);

@@ -63,7 +63,7 @@ final class AdminController
 
             $exportFilename = 'reporte-' . $type . '-' . $suffix . '.' . ($format === 'csv' ? 'csv' : 'doc');
 
-            if ($format === 'word' || $format === 'doc' || $format === 'pdf') {
+            if ($format === 'word' || $format === 'doc') {
                 $rootPath = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
                 $logoLibertadorFile = $rootPath . '/public/assets/img/logo_libertador.png';
                 $logoDsFile = $rootPath . '/public/assets/img/logo_ds.png';
