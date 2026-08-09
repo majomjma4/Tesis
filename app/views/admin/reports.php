@@ -34,6 +34,8 @@
                 <input type="date" name="to" id="rpPopoverToInput" value="<?=e($reportTo)?>" max="<?=e(date('Y-m-d'))?>" required>
             </div>
 
+            <div class="rp-popover-error" id="rpPopoverError" hidden style="display:none; color: #dc2626; font-size: 0.78rem; font-weight: 600; margin-top: 4px;"></div>
+
             <div class="rp-popover-actions">
                 <button type="button" class="rp-popover-clear" id="rpPopoverClearBtn" <?=$isCustomFilterActive ? '' : 'disabled'?>>Limpiar filtros</button>
                 <button type="submit" class="rp-popover-apply">Aplicar</button>
@@ -46,7 +48,7 @@
     <article><strong><?=$reportData['summary']['users']?></strong><span>Usuarios creados</span></article>
     <article><strong><?=$reportData['summary']['projects']?></strong><span>Proyectos registrados</span></article>
     <article><strong><?=$reportData['summary']['deliveries']?></strong><span>Entregas recibidas</span></article>
-    <article><strong><?=$reportData['summary']['actions']?></strong><span>Acciones auditadas</span></article>
+    <article><strong><?=$reportData['summary']['actions']?></strong><span>Acciones relevantes</span></article>
 </section>
 
 <div class="rp-grid rp-grid-three">
@@ -82,7 +84,7 @@
         <h2>Proyectos por estado</h2>
         <div class="rp-equal-list">
             <?php if(!$reportData['statuses']):?>
-                <p class="rp-empty">Sin proyectos registrados.</p>
+                <p class="rp-empty">No hay registros para el período seleccionado.</p>
             <?php else:foreach($reportData['statuses'] as $row):?>
                 <a class="rp-bar" href="<?=e($row['url'])?>"><span><?=e($row['label'])?></span><strong><?=$row['total']?></strong></a>
             <?php endforeach;endif;?>
@@ -92,9 +94,11 @@
     <section class="rp-card-equal">
         <h2>Situación de revisión</h2>
         <div class="rp-equal-list">
-            <?php foreach($reportData['reviewSituations'] as $row):?>
+            <?php if(!$reportData['reviewSituations']):?>
+                <p class="rp-empty">No hay registros para el período seleccionado.</p>
+            <?php else:foreach($reportData['reviewSituations'] as $row):?>
                 <a class="rp-bar is-review-situation" href="<?=e($row['url'])?>"><span><?=e($row['label'])?></span><strong><?=$row['total']?></strong></a>
-            <?php endforeach;?>
+            <?php endforeach;endif;?>
         </div>
     </section>
 </div>
@@ -105,7 +109,7 @@
         <span>Eventos del período</span>
     </header>
     <?php if(!$reportData['activity']):?>
-        <p class="rp-empty">No existe actividad durante estas fechas.</p>
+        <p class="rp-empty">No se registraron acciones relevantes en este período.</p>
     <?php else:foreach($reportData['activity'] as $item):?>
         <article>
             <i class="fa-solid fa-shield-halved"></i>
@@ -120,7 +124,7 @@
     <footer class="rp-pagination-bar">
         <?php
             $pagination = $pagePaginationData ?? $reportData['pagination'] ?? [];
-            $currentPage = (int)($pagination['page'] ?? 1);
+            $reportCurrentPage = (int)($pagination['page'] ?? 1);
             $totalPages = (int)($pagination['pages'] ?? 1);
             $perPage = (int)($pagination['per_page'] ?? 10);
             $totalItems = (int)($pagination['total'] ?? 0);
@@ -147,8 +151,8 @@
             </label>
 
             <nav class="rp-pagination-pages" aria-label="Navegación de páginas">
-                <?php if ($currentPage > 1): ?>
-                    <a class="rp-page-btn" href="<?=e($buildUrl($currentPage - 1))?>" title="Página anterior">‹</a>
+                <?php if ($reportCurrentPage > 1): ?>
+                    <a class="rp-page-btn" href="<?=e($buildUrl($reportCurrentPage - 1))?>" title="Página anterior">‹</a>
                 <?php else: ?>
                     <span class="rp-page-btn is-disabled">‹</span>
                 <?php endif; ?>
@@ -157,7 +161,7 @@
                     $range = [];
                     $delta = 2;
                     for ($i = 1; $i <= $totalPages; $i++) {
-                        if ($i === 1 || $i === $totalPages || ($i >= $currentPage - $delta && $i <= $currentPage + $delta)) {
+                        if ($i === 1 || $i === $totalPages || ($i >= $reportCurrentPage - $delta && $i <= $reportCurrentPage + $delta)) {
                             $range[] = $i;
                         }
                     }
@@ -168,7 +172,7 @@
                             <span class="rp-page-ellipsis">…</span>
                 <?php
                         endif;
-                        if ($i === $currentPage):
+                        if ($i === $reportCurrentPage):
                 ?>
                             <span class="rp-page-btn is-active"><?=$i?></span>
                 <?php else: ?>
@@ -179,8 +183,8 @@
                     endforeach;
                 ?>
 
-                <?php if ($currentPage < $totalPages): ?>
-                    <a class="rp-page-btn" href="<?=e($buildUrl($currentPage + 1))?>" title="Página siguiente">›</a>
+                <?php if ($reportCurrentPage < $totalPages): ?>
+                    <a class="rp-page-btn" href="<?=e($buildUrl($reportCurrentPage + 1))?>" title="Página siguiente">›</a>
                 <?php else: ?>
                     <span class="rp-page-btn is-disabled">›</span>
                 <?php endif; ?>
@@ -193,7 +197,7 @@
                 <input type="hidden" name="reports_per_page" value="<?=$perPage?>">
                 <label>
                     Ir a página:
-                    <input type="number" name="report_page" min="1" max="<?=$totalPages?>" value="<?=$currentPage?>" required>
+                    <input type="number" name="report_page" min="1" max="<?=$totalPages?>" value="<?=$reportCurrentPage?>" required>
                 </label>
                 <button type="submit" class="rp-jump-btn">Ir</button>
             </form>
@@ -373,20 +377,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    const popoverError = document.getElementById('rpPopoverError');
+
     if (popoverForm) {
         popoverForm.addEventListener('submit', function(e) {
             const fromVal = popoverFromInput.value;
             const toVal = popoverToInput.value;
 
+            if (popoverError) {
+                popoverError.hidden = true;
+                popoverError.style.display = 'none';
+            }
+
             if (!fromVal || !toVal) {
                 e.preventDefault();
-                alert('Por favor selecciona ambas fechas.');
+                if (popoverError) {
+                    popoverError.textContent = 'Por favor selecciona ambas fechas.';
+                    popoverError.hidden = false;
+                    popoverError.style.display = 'block';
+                }
                 return false;
             }
 
             if (fromVal > toVal) {
                 e.preventDefault();
-                alert('La fecha "Desde" no puede ser posterior a la fecha "Hasta".');
+                if (popoverError) {
+                    popoverError.textContent = 'La fecha inicial no puede ser posterior a la fecha final.';
+                    popoverError.hidden = false;
+                    popoverError.style.display = 'block';
+                }
                 return false;
             }
 

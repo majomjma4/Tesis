@@ -10,11 +10,24 @@ final class AdminReportModel
     {
         $db = Database::connection();
         $range = ['from'=>$from.' 00:00:00','to'=>$to.' 23:59:59'];
+        
+        $params=['from1'=>$range['from'],'to1'=>$range['to'],'from2'=>$range['from'],'to2'=>$range['to']];
+        $sql = "SELECT action, entity_type, entity_id, created_at, actor FROM (
+                    SELECT a.action, a.entity_type, a.entity_id, a.created_at, u.full_name actor FROM admin_audit_log a LEFT JOIN users u ON u.id=a.actor_user_id WHERE a.created_at BETWEEN :from1 AND :to1
+                    UNION ALL
+                    SELECT p.action, p.entity_type, p.entity_id, p.created_at, u.full_name actor FROM project_audit_log p LEFT JOIN users u ON u.id=p.user_id WHERE p.created_at BETWEEN :from2 AND :to2
+                ) audit_events ORDER BY created_at DESC";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $rawEvents = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $processed = $this->processEvents($rawEvents);
+
         $summary = [
             'users'=>$this->count($db,'SELECT COUNT(*) FROM users WHERE created_at BETWEEN :from AND :to',$range),
             'projects'=>$this->count($db,'SELECT COUNT(*) FROM projects WHERE created_at BETWEEN :from AND :to',$range),
             'deliveries'=>$this->count($db,'SELECT COUNT(*) FROM project_deliveries WHERE submitted_at BETWEEN :from AND :to',$range),
-            'actions'=>$this->count($db,"SELECT (SELECT COUNT(*) FROM admin_audit_log WHERE created_at BETWEEN :from1 AND :to1)+(SELECT COUNT(*) FROM project_audit_log WHERE created_at BETWEEN :from2 AND :to2)",['from1'=>$range['from'],'to1'=>$range['to'],'from2'=>$range['from'],'to2'=>$range['to']]),
+            'actions'=>count($processed),
         ];
         $roles = $db->query("SELECT r.name label,
                                     SUM(CASE WHEN u.status = 'active' AND u.deleted_at IS NULL THEN 1 ELSE 0 END) active,
@@ -39,17 +52,7 @@ final class AdminReportModel
             ['code'=>'none','label'=>'Sin observaciones registradas','total'=>$reviewCounts['none'],'url'=>route('projects').'&review_situation=none'],
         ];
         
-        $params=['from1'=>$range['from'],'to1'=>$range['to'],'from2'=>$range['from'],'to2'=>$range['to']];
-        $sql = "SELECT action, entity_type, entity_id, created_at, actor FROM (
-                    SELECT a.action, a.entity_type, a.entity_id, a.created_at, u.full_name actor FROM admin_audit_log a LEFT JOIN users u ON u.id=a.actor_user_id WHERE a.created_at BETWEEN :from1 AND :to1
-                    UNION ALL
-                    SELECT p.action, p.entity_type, p.entity_id, p.created_at, u.full_name actor FROM project_audit_log p LEFT JOIN users u ON u.id=p.user_id WHERE p.created_at BETWEEN :from2 AND :to2
-                ) audit_events ORDER BY created_at DESC";
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        $rawEvents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $processed = $this->processEvents($rawEvents);
         
         $page = (int)($pagination['page'] ?? PaginationService::request()['page'] ?? 1);
         $perPage = (int)($pagination['size'] ?? PaginationService::request()['size'] ?? 10);
@@ -75,14 +78,28 @@ final class AdminReportModel
         $filtered = [];
         $seenKeys = [];
 
+        $ignoredActions = [
+            'demo_teacher_updated', 'demo_users_imported', 'demo_catalog_configured',
+            'profile_updated', 'project_updated',
+            'support_material.presentation_selected',
+            'support_material.presentation_changed',
+            'support_material.presentation_removed'
+        ];
+
         foreach ($events as $event) {
             $action = (string)$event['action'];
             $entityType = (string)$event['entity_type'];
             $actor = $event['actor'] ?: 'Sistema';
             $createdAt = (string)$event['created_at'];
 
-            // Filtrar eventos irrelevantes o de soporte documental repetitivo
-            if (in_array($action, ['demo_teacher_updated', 'demo_users_imported', 'demo_catalog_configured'], true)) {
+            // 1. Ocultar acciones internas/técnicas o demasiado genéricas
+            if (in_array($action, $ignoredActions, true)) {
+                continue;
+            }
+
+            // 2. Consolidar duplicados lógicos donde un evento se registra como 'project' y como 'project_file'
+            // Si la entidad es 'project' para una acción de archivo, descartar la duplicada manteniendo la de 'project_file'
+            if ($entityType === 'project' && strpos($action, 'project.') === 0) {
                 continue;
             }
 
@@ -135,7 +152,7 @@ final class AdminReportModel
             'project.file_removed' => 'Documento eliminado del proyecto',
             'project.file_restored' => 'Documento restaurado en el proyecto',
             'project.file_replaced' => 'Documento reemplazado en el proyecto',
-            'project.file_purged' => 'Documento depurado permanentemente',
+            'project.file_purged' => 'Documento eliminado definitivamente',
             'project.presentation_changed' => 'Archivo de presentación actualizado',
             'project.presentation_removed' => 'Archivo de presentación removido',
             'delivery_submitted' => 'Nueva entrega recibida',
