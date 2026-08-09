@@ -42,6 +42,12 @@ final class AccountController
 
     public function forbidden(): void
     {
-        http_response_code(403);View::render('errors/403',['currentPage'=>'','title'=>'Acceso no autorizado','bodyClass'=>'error-page','pageStyles'=>[asset('css/admin-access.css')]]);
+        http_response_code(403);
+        View::render('errors/403', [
+            'currentPage' => '',
+            'title' => 'Acceso no autorizado | Gestión Académica',
+            'bodyClass' => 'error-page',
+            'pageStyles' => [asset('css/admin-access.css')],
+        ], 'error');
     }
 }

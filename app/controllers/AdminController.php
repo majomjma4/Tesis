@@ -4,7 +4,7 @@ declare(strict_types=1);
 final class AdminController
 {
     public function settings():void{$model=new SystemSettingModel();$error=null;try{$settings=$model->all();$uploadPolicy=$model->fileUploadPolicy();}catch(Throwable $e){error_log('Admin settings: '.$e->getMessage());$error='No fue posible consultar la configuración.';$settings=$model->defaults();$uploadPolicy=['max_mb'=>20,'total_max_mb'=>35,'file_ceiling_mb'=>20,'operation_ceiling_mb'=>35,'application_file_ceiling_mb'=>500,'application_operation_ceiling_mb'=>1024];}$s=new AuthSessionService();View::render('admin/settings',['currentPage'=>'admin-settings','title'=>'Configuración | Administración','bodyClass'=>'admin-settings-page','pageStyles'=>[asset('css/admin-settings.css')],'pageScript'=>asset('js/admin-settings.js'),'settings'=>$settings,'uploadPolicy'=>$uploadPolicy,'settingsError'=>$error,'settingsCsrf'=>$s->csrfToken('admin_settings'),'settingsSaveEndpoint'=>route('admin-settings-save')]);}
-    public function saveSettings():void{$this->requirePost();$s=new AuthSessionService();if(!$s->validateCsrf('admin_settings',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);try{(new SystemSettingModel())->save($_POST,(int)$s->userId());$this->json(true,'Configuración guardada y aplicada.');}catch(InvalidArgumentException $e){$this->activityFailure($s,'settings_updated','Intentó actualizar la configuración institucional','Configuración','settings',null,'Configuración del sistema',$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,'settings_updated','Intentó actualizar la configuración institucional','Configuración','settings',null,'Configuración del sistema',$e);error_log('Save settings: '.$e->getMessage());$this->json(false,'No fue posible guardar la configuración.',[],500);}}
+    public function saveSettings():void{$this->requirePost();$s=new AuthSessionService();if(!$s->validateCsrf('admin_settings',(string)($_POST['_csrf']??'')))$this->json(false,'La solicitud ya no es válida. Recarga la página e inténtalo nuevamente.',[],403);try{(new SystemSettingModel())->save($_POST,(int)$s->userId());$this->json(true,'Configuración guardada y aplicada.');}catch(InvalidArgumentException $e){$this->activityFailure($s,'settings_updated','Intentó actualizar la configuración institucional','Configuración','settings',null,'Configuración del sistema',$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,'settings_updated','Intentó actualizar la configuración institucional','Configuración','settings',null,'Configuración del sistema',$e);error_log('Save settings: '.$e->getMessage());$this->json(false,'No fue posible guardar la configuración.',[],500);}}
     public function reports():void{$from=$this->reportDate('from',date('Y-m-01'));$to=$this->reportDate('to',date('Y-m-d'));$model=new AdminReportModel();$error=null;$paginationRequest=['page'=>(int)($_GET['report_page']??PaginationService::request()['page']??1),'size'=>(int)($_GET['reports_per_page']??PaginationService::request()['size']??10)];try{$data=$model->dashboard($from,$to,$paginationRequest);}catch(Throwable $e){error_log('Admin reports: '.$e->getMessage());$error='No fue posible generar los reportes.';$data=['summary'=>['users'=>0,'projects'=>0,'deliveries'=>0,'actions'=>0],'roles'=>[],'statuses'=>[],'reviewSituations'=>[],'activity'=>[],'pagination'=>['total'=>0]];}View::render('admin/reports',['currentPage'=>'admin-reports','title'=>'Reportes | Administración','bodyClass'=>'admin-reports-page','pageStyles'=>[asset('css/admin-reports.css')],'reportData'=>$data,'pagePaginationData'=>$data['pagination'],'reportFrom'=>$from,'reportTo'=>$to,'reportError'=>$error]);}
     public function exportReport():never{
         $type=(string)($_GET['type']??'');
@@ -65,6 +65,8 @@ final class AdminController
             $exportFilename = 'reporte-' . $type . '-' . $suffix . '.' . ($format === 'csv' ? 'csv' : 'doc');
 
             if ($format === 'word' || $format === 'doc') {
+                $isAuditReport = $type === 'audit';
+                $wordLandscape = $type !== 'users';
                 $rootPath = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
                 $logoLibertadorFile = $rootPath . '/public/assets/img/logo_libertador.png';
                 $logoDsFile = $rootPath . '/public/assets/img/logo_ds.png';
@@ -96,10 +98,12 @@ final class AdminController
 </xml>
 <![endif]-->
 <style>
-    @page {
-        size: A4 <?= $type === 'users' ? 'portrait' : 'landscape' ?>;
-        margin: 2cm 1.5cm 2cm 1.5cm;
+    @page Section1 {
+        size: <?= $wordLandscape ? '841.9pt 595.3pt' : '595.3pt 841.9pt' ?>;
+        margin: <?= $isAuditReport ? '42.5pt 42.5pt 42.5pt 42.5pt' : '56.7pt 42.5pt 56.7pt 42.5pt' ?>;
+        <?= $isAuditReport ? 'mso-footer: f1;' : '' ?>
     }
+    div.Section1 { page: Section1; }
     body {
         font-family: 'Segoe UI', Arial, sans-serif;
         font-size: 10pt;
@@ -180,6 +184,12 @@ final class AdminController
     .data-table tr:nth-child(even) td {
         background-color: #f8fafc;
     }
+    .audit-table { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #cbd5e1; }
+    .audit-table th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; border: 1px solid #cbd5e1; padding: 8px 10px; }
+    .audit-table td { border: 1px solid #e2e8f0; padding: 7px 10px; vertical-align: top; }
+    .audit-table th, .audit-table td { overflow-wrap: break-word; word-wrap: break-word; }
+    .audit-table thead { display: table-header-group; }
+    .audit-table tr { page-break-inside: avoid; }
     .footer-note {
         margin-top: 24px;
         font-size: 8pt;
@@ -192,6 +202,7 @@ final class AdminController
 </head>
 <body>
 
+<div class="Section1">
 <table class="header-table">
     <tr>
         <td style="width: 20%; text-align: left;">
@@ -216,19 +227,30 @@ final class AdminController
 <div class="report-title"><?=e($reportTitle)?></div>
 <div class="report-meta"><?=e($subtitle)?></div>
 
-<table class="data-table">
+<?php
+    $auditWidths = ['13%', '12%', '35%', '18%', '22%'];
+    $auditTableStyle = 'width:96%; margin-left:auto; margin-right:auto; border-collapse:collapse; table-layout:fixed; border:1px solid #cbd5e1; mso-table-lspace:0pt; mso-table-rspace:0pt;';
+    $auditHeaderStyle = 'background:#1e3a8a; background-color:#1e3a8a; color:#ffffff; border:1px solid #cbd5e1; padding:8pt 10pt; font-family:Segoe UI, Arial, sans-serif; font-size:9pt; font-weight:bold; text-align:left; vertical-align:middle;';
+    $auditCellStyle = 'border:1px solid #e2e8f0; padding:7pt 10pt; font-family:Segoe UI, Arial, sans-serif; font-size:9pt; vertical-align:top; text-align:left; word-wrap:break-word;';
+?>
+<table class="data-table<?= $isAuditReport ? ' audit-table' : '' ?>"<?= $isAuditReport ? ' border="1" cellspacing="0" cellpadding="0" width="96%" align="center" style="' . $auditTableStyle . '"' : '' ?>>
+    <?php if ($isAuditReport): ?>
+        <colgroup>
+            <col style="width:13%"><col style="width:12%"><col style="width:35%"><col style="width:18%"><col style="width:22%">
+        </colgroup>
+    <?php endif; ?>
     <thead>
-        <tr>
-            <?php foreach ($report['headers'] as $header): ?>
-                <th><?=e($header)?></th>
+        <tr<?= $isAuditReport ? ' style="page-break-inside:avoid;"' : '' ?>>
+            <?php foreach ($report['headers'] as $index => $header): ?>
+                <th<?= $isAuditReport ? ' bgcolor="#1e3a8a" width="' . $auditWidths[$index] . '" style="width:' . $auditWidths[$index] . '; ' . $auditHeaderStyle . '"' : '' ?>><?=e($header)?></th>
             <?php endforeach; ?>
         </tr>
     </thead>
     <tbody>
         <?php foreach ($report['rows'] as $row): ?>
-            <tr>
-                <?php foreach ($row as $cell): ?>
-                    <td><?=nl2br(e((string)$cell))?></td>
+            <tr<?= $isAuditReport ? ' style="page-break-inside:avoid;"' : '' ?>>
+                <?php foreach (array_values($row) as $index => $cell): ?>
+                    <td<?= $isAuditReport ? ' width="' . $auditWidths[$index] . '" style="width:' . $auditWidths[$index] . '; ' . $auditCellStyle . '"' : '' ?>><?=nl2br(e((string)$cell))?></td>
                 <?php endforeach; ?>
             </tr>
         <?php endforeach; ?>
@@ -238,6 +260,12 @@ final class AdminController
 <div class="footer-note">
     Documento institucional generado automáticamente por el Sistema de Gestión Documental Académica - <?=e(date('d/m/Y H:i'))?>
 </div>
+</div>
+<?php if ($isAuditReport): ?>
+<div style="mso-element:footer" id="f1">
+    <p style="margin:0; text-align:center; font-family:Segoe UI, Arial, sans-serif; font-size:8pt; color:#475569;">Página <span style="mso-field-code: PAGE"></span> de <span style="mso-field-code: NUMPAGES"></span></p>
+</div>
+<?php endif; ?>
 
 </body>
 </html>

@@ -184,6 +184,12 @@ final class SystemSettingModel
                     }
                     continue;
                 }
+                if($key==='project_code_prefixes'){
+                    foreach($this->prefixChanges($values['old'],$values['new']) as $change){
+                        $activity->record($actor,'settings_updated',$change['message'],'Configuración','settings',null,$change['label'],'correct',['setting_key'=>$key,'prefix_key'=>$change['key'],'previous_value'=>$change['old'],'new_value'=>$change['new'],'previous_prefixes'=>$values['old'],'new_prefixes'=>$values['new']]);
+                    }
+                    continue;
+                }
                 $unit = str_contains($key, 'hours') ? 'horas' : 'días';
                 $formattedOld = $secret ? 'sensible' : $values['old'] . ' ' . $unit;
                 $formattedNew = $secret ? 'sensible' : $values['new'] . ' ' . $unit;
@@ -240,6 +246,16 @@ final class SystemSettingModel
         $enabled=static function(array $values,string $format):bool{return $format==='jpg'?(in_array('jpg',$values,true)||in_array('jpeg',$values,true)):in_array($format,$values,true);};
         $changes=[];
         foreach($formats as $format=>$label){$before=$enabled($oldValues,$format);$after=$enabled($newValues,$format);if($before===$after)continue;$changes[]=['format'=>$label,'flow'=>$flow,'enabled'=>$after,'message'=>$label.' '.($after?'habilitado':'deshabilitado').' para '.$flow];}
+        return $changes;
+    }
+    private function prefixChanges(string $old,string $new):array
+    {
+        $previous=json_decode($old,true);$current=json_decode($new,true);
+        $previous=is_array($previous)?array_replace(self::CODE_TYPES,$previous):self::CODE_TYPES;
+        $current=is_array($current)?array_replace(self::CODE_TYPES,$current):self::CODE_TYPES;
+        $labels=['thesis'=>'Titulación','thesis_profile'=>'Perfil de tesis','pis'=>'Proyecto integrador de saberes','practice'=>'Prácticas preprofesionales','community'=>'Proyecto de vinculación'];
+        $changes=[];
+        foreach(self::CODE_TYPES as $key=>$fallback){$from=(string)($previous[$key]??$fallback);$to=(string)($current[$key]??$fallback);if($from!==$to)$changes[]=['key'=>$key,'label'=>'Prefijo de '.$labels[$key],'old'=>$from,'new'=>$to,'message'=>'Prefijo de '.$labels[$key].': '.$from.' → '.$to];}
         return $changes;
     }
 }
