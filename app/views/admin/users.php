@@ -53,16 +53,38 @@ $career=$catalogs['career']??null;$period=$catalogs['period']??null;
     <?php else:?><div class="users-list">
         <?php foreach($users as $user):?>
         <article class="user-record" data-role="<?=e($user['role_code'])?>" data-status="<?=e($user['status'])?>" data-search-text="<?=e(implode(' ',[$user['username']??'',$user['full_name'],$user['email']]))?>" data-search-number="<?=e($user['institutional_code']??'')?>">
-            <div class="user-identity"><span><?=e(mb_strtoupper(mb_substr($user['full_name'],0,1,'UTF-8'),'UTF-8'))?></span><div><strong><?=e($user['full_name'])?></strong><small><?=e($user['email'])?></small></div></div>
+            <div class="user-identity">
+                <span><?=e(mb_strtoupper(mb_substr($user['full_name'],0,1,'UTF-8'),'UTF-8'))?></span>
+                <div>
+                    <strong><?=e($user['full_name'])?></strong>
+                    <small><?=e($user['email'])?></small>
+                    <?php if(!empty($user['username'])):?><small class="user-username">@<?=e($user['username'])?></small><?php endif;?>
+                </div>
+            </div>
             <dl>
-                <div><dt>Usuario</dt><dd><?=e($user['username']?:'Sin usuario')?></dd></div>
                 <div><dt>Cédula</dt><dd><?=e($user['institutional_code']?:'No registrada')?></dd></div>
                 <div><dt>Rol</dt><dd><span class="role-chip <?=e($user['role_code'])?>"><?=e($roleLabels[$user['role_code']]??$user['role_code'])?></span><?php if($user['is_admin']&&!$user['is_initial_admin']):?><small class="temporary-label">Acceso administrativo</small><?php elseif($user['is_initial_admin']):?><small class="temporary-label">Temporal · sin funciones académicas</small><?php endif;?></dd></div>
                 <div><dt>Semestre</dt><dd><?= $user['role_code']==='student'&&$user['semester']?(int)$user['semester'].'.º':'No aplica'?></dd></div>
                 <div><dt>Estado</dt><dd><span class="status-chip <?=e($user['status'])?>"><?=e($statusLabels[$user['status']]??$user['status'])?></span><?php if($user['must_change_password']):?><small class="temporary-label">Clave temporal</small><?php endif;?></dd></div>
                 <div><dt>Último acceso</dt><dd><?= $user['last_login_at']?e(date('d/m/Y H:i',strtotime($user['last_login_at']))):'Nunca'?></dd></div>
             </dl>
-            <details class="user-actions-wrap"><summary class="user-actions-button" aria-label="Acciones de <?=e($user['full_name'])?>"><i class="fa-solid fa-ellipsis-vertical"></i></summary><div class="user-actions" role="menu"><button type="button" data-action="edit">Editar</button><?php if(!$user['must_change_password']):?><button type="button" data-action="password">Restablecer contraseña</button><?php endif;?><?php if($user['status']!=='active'):?><button type="button" data-action="status" data-status="active" class="success">Restablecer acceso</button><?php endif;?><?php if($user['status']!=='blocked'):?><button type="button" data-action="status" data-status="blocked" class="danger">Bloquear acceso</button><?php endif;?></div></details>
+            <details class="user-actions-wrap">
+                <summary class="user-actions-button" aria-label="Acciones de <?=e($user['full_name'])?>"><i class="fa-solid fa-ellipsis-vertical"></i></summary>
+                <div class="user-actions" role="menu">
+                    <button type="button" data-action="edit"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i><span>Editar</span></button>
+                    <?php if(!$user['must_change_password']):?>
+                        <button type="button" data-action="password"><i class="fa-solid fa-key" aria-hidden="true"></i><span>Restablecer contraseña</span></button>
+                    <?php endif;?>
+                    <?php if($user['status']!=='active'):?>
+                        <button type="button" data-action="status" data-status="active" class="success"><i class="fa-solid fa-lock-open" aria-hidden="true"></i><span>Restablecer acceso</span></button>
+                    <?php endif;?>
+                    <?php if($user['status']!=='blocked'):?>
+                        <button type="button" data-action="status" data-status="blocked" class="warning"><i class="fa-solid fa-lock" aria-hidden="true"></i><span>Bloquear acceso</span></button>
+                    <?php endif;?>
+                    <hr class="user-actions-separator">
+                    <button type="button" data-action="trash" class="danger"><i class="fa-solid fa-trash-can" aria-hidden="true"></i><span>Enviar a Papelera</span></button>
+                </div>
+            </details>
             <script type="application/json" class="user-data"><?=json_encode($user,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE)?></script>
         </article>
         <?php endforeach;?>
@@ -93,7 +115,7 @@ $career=$catalogs['career']??null;$period=$catalogs['period']??null;
     </form>
 </div></div>
 
-<div class="user-confirm" id="userConfirm" hidden><div role="alertdialog" aria-modal="true"><i class="fa-solid fa-triangle-exclamation"></i><h2 id="confirmTitle">Confirmar acción</h2><p id="confirmText"></p><div><button type="button" class="secondary" data-cancel-confirm>Cancelar</button><button type="button" class="primary" data-accept-confirm>Confirmar</button></div></div></div>
+<div class="user-confirm" id="userConfirm" hidden><div role="alertdialog" aria-modal="true"><i class="fa-solid fa-triangle-exclamation"></i><h2 id="confirmTitle">Confirmar acción</h2><p id="confirmText"></p><label class="user-trash-reason" id="trashReasonField" hidden><span>Motivo</span><textarea id="trashReason" maxlength="500" rows="3" placeholder="Indica el motivo de envío a Papelera"></textarea></label><div><button type="button" class="secondary" data-cancel-confirm>Cancelar</button><button type="button" class="primary" data-accept-confirm>Confirmar</button></div></div></div>
 
 <div class="user-modal import-modal" id="importUsersModal" hidden><div class="user-modal-card" role="dialog" aria-modal="true" aria-labelledby="importUsersTitle">
     <header><div><span>Creación masiva</span><h2 id="importUsersTitle">Importar usuarios</h2></div><button type="button" data-close-import aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button></header>
@@ -111,4 +133,4 @@ $career=$catalogs['career']??null;$period=$catalogs['period']??null;
 </div></div>
 <div class="user-confirm" id="importConfirm" hidden><div role="alertdialog" aria-modal="true"><i class="fa-solid fa-user-check"></i><h2>Crear usuarios</h2><p>¿Estás seguro de crear todas las cuentas mostradas? Esta acción quedará registrada.</p><div><button type="button" class="secondary" data-cancel-import-confirm>Cancelar</button><button type="button" class="primary" data-accept-import-confirm>Crear</button></div></div></div>
 
-<div id="adminUsersConfig" data-save="<?=e($adminUserEndpoints['save']??'')?>" data-status="<?=e($adminUserEndpoints['status']??'')?>" data-password="<?=e($adminUserEndpoints['password']??'')?>" data-import="<?=e($adminUserEndpoints['import']??'')?>" data-csrf="<?=e($adminUserCsrf??'')?>"></div>
+<div id="adminUsersConfig" data-save="<?=e($adminUserEndpoints['save']??'')?>" data-status="<?=e($adminUserEndpoints['status']??'')?>" data-password="<?=e($adminUserEndpoints['password']??'')?>" data-import="<?=e($adminUserEndpoints['import']??'')?>" data-trash="<?=e($adminUserEndpoints['trash']??'')?>" data-csrf="<?=e($adminUserCsrf??'')?>"></div>

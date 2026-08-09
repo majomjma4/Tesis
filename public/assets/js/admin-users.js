@@ -1,11 +1,11 @@
 (()=>{
-    const modal=document.querySelector('#userModal'),form=document.querySelector('#userForm'),config=document.querySelector('#adminUsersConfig'),message=document.querySelector('#userFormMessage'),confirmBox=document.querySelector('#userConfirm');
+    const modal=document.querySelector('#userModal'),form=document.querySelector('#userForm'),config=document.querySelector('#adminUsersConfig')||document.querySelector('#userConfig'),message=document.querySelector('#userFormMessage'),confirmBox=document.querySelector('#userConfirm')||document.querySelector('#userConfirmBox');
     if(!modal||!form||!config)return;
     const dialogLayers=[modal,confirmBox,document.querySelector('#importUsersModal'),document.querySelector('#importConfirm')].filter(Boolean);
     dialogLayers.forEach(layer=>document.body.append(layer));
     const refreshToast=document.createElement('div');refreshToast.className='users-refresh-toast';refreshToast.hidden=true;refreshToast.innerHTML='<i class="fa-solid fa-circle-check"></i><span>Usuarios actualizados</span>';document.body.append(refreshToast);
     let refreshToastTimer;
-    const showRefreshToast=(text='Usuarios actualizados')=>{refreshToast.querySelector('span').textContent=text;clearTimeout(refreshToastTimer);refreshToast.hidden=false;requestAnimationFrame(()=>refreshToast.classList.add('is-visible'));refreshToastTimer=setTimeout(()=>{refreshToast.classList.remove('is-visible');setTimeout(()=>{refreshToast.hidden=true;},220);},2600);};
+    const showRefreshToast=(text='Usuarios actualizados',type='success')=>{refreshToast.classList.toggle('is-error',type==='error');refreshToast.querySelector('span').textContent=text;clearTimeout(refreshToastTimer);refreshToast.hidden=false;requestAnimationFrame(()=>refreshToast.classList.add('is-visible'));refreshToastTimer=setTimeout(()=>{refreshToast.classList.remove('is-visible');setTimeout(()=>{refreshToast.hidden=true;},220);},2600);};
     window.showAdminUsersToast=showRefreshToast;
     const syncDialogState=()=>document.body.classList.toggle('user-dialog-open',dialogLayers.some(layer=>!layer.hidden));
     window.syncAdminUserDialogs=syncDialogState;
@@ -14,11 +14,35 @@
     const saveButton=form.querySelector('[type=submit]');
     const formSnapshot=()=>JSON.stringify([...new FormData(form).entries()]);
     const syncSaveButton=()=>{saveButton.disabled=formSnapshot()===formBaseline;};
-    const openConfirmation=(title,text)=>{document.querySelector('#confirmTitle').textContent=title;document.querySelector('#confirmText').textContent=text;const accept=confirmBox.querySelector('[data-accept-confirm]');accept.disabled=false;confirmBox.hidden=false;syncDialogState();requestAnimationFrame(()=>accept.focus());};
+    const resetConfirmModal=()=>{
+        const reasonField=document.querySelector('#trashReasonField'),reasonInput=document.querySelector('#trashReason');
+        if(reasonField){reasonField.hidden=true;reasonField.setAttribute('hidden','hidden');reasonField.style.display='none';}
+        if(reasonInput)reasonInput.value='';
+    };
+    const openConfirmation=(title,text,options={})=>{
+        const isTrash=options.isTrash===true;
+        const titleEl=document.querySelector('#confirmTitle')||document.querySelector('#userConfirmTitle');if(titleEl)titleEl.textContent=title;
+        const textEl=document.querySelector('#confirmText')||document.querySelector('#userConfirmText');if(textEl)textEl.textContent=text;
+        const reasonField=document.querySelector('#trashReasonField'),reasonInput=document.querySelector('#trashReason');
+        if(reasonField){
+            reasonField.hidden=!isTrash;
+            if(!isTrash){reasonField.setAttribute('hidden','hidden');reasonField.style.display='none';}
+            else{reasonField.removeAttribute('hidden');reasonField.style.display='block';}
+        }
+        if(reasonInput){reasonInput.value='';if(isTrash)reasonInput.placeholder='Indica el motivo por el que se envía esta cuenta a la Papelera.';}
+        const accept=confirmBox.querySelector('[data-accept-confirm]');
+        if(accept){
+            accept.disabled=false;
+            accept.textContent=options.confirmText||(isTrash?'Enviar a Papelera':(pending?.kind==='save'?'Guardar cambios':'Confirmar'));
+            accept.classList.toggle('danger',isTrash);
+        }
+        confirmBox.hidden=false;syncDialogState();
+        requestAnimationFrame(()=>(isTrash&&reasonInput?reasonInput.focus():accept?.focus()));
+    };
     const showRole=()=>{const role=field('role').value;form.querySelectorAll('.role-fields').forEach(el=>el.hidden=!el.dataset.for.split(' ').includes(role));const adminAccess=field('is_admin');if(adminAccess){if(role!=='teacher')adminAccess.checked=false;adminAccess.disabled=role!=='teacher';}};
     const open=(user=null)=>{
         form.reset();field('id').value=user?.id||'';field('full_name').value=user?.full_name||'';field('email').value=user?.email||'';field('username').value=user?.username||'';field('role').value=user?.role_code||'student';field('status').value=user?.status||'active';field('institutional_code').value=user?.institutional_code||'';field('semester').value=user?.semester||'';field('academic_title').value=user?.academic_title||'';field('can_tutor').checked=Boolean(Number(user?.can_tutor||0));field('is_admin').checked=Boolean(Number(user?.is_admin||0));
-        document.querySelector('#userModalTitle').textContent=user?'Editar usuario':'Nuevo usuario';document.querySelector('#temporaryPasswordNote').hidden=Boolean(user);document.querySelector('#importUsersButton').hidden=Boolean(user);message.hidden=true;showRole();formBaseline=formSnapshot();syncSaveButton();modal.hidden=false;syncDialogState();requestAnimationFrame(()=>field('full_name').focus());
+        document.querySelector('#userModalTitle').textContent=user?'Editar usuario':'Nuevo usuario';const note=document.querySelector('#temporaryPasswordNote');if(note)note.hidden=Boolean(user);const importBtn=document.querySelector('#importUsersButton');if(importBtn)importBtn.hidden=Boolean(user);if(message)message.hidden=true;showRole();formBaseline=formSnapshot();syncSaveButton();modal.hidden=false;syncDialogState();requestAnimationFrame(()=>field('full_name').focus());
     };
     const close=()=>{modal.hidden=true;syncDialogState();};
     const request=async(url,data)=>{const response=await fetch(url,{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'},body:data});const result=await response.json().catch(()=>({success:false,message:'La respuesta del servidor no es válida.'}));if(!response.ok||!result.success)throw new Error(result.message||'No fue posible completar la acción.');return result;};
@@ -27,7 +51,15 @@
     field('role').addEventListener('change',showRole);form.addEventListener('input',syncSaveButton);form.addEventListener('change',syncSaveButton);
     document.querySelectorAll('[data-close-modal]').forEach(button=>button.addEventListener('click',close));
     modal.addEventListener('click',event=>{if(event.target===modal)close();});
-    form.addEventListener('submit',event=>{event.preventDefault();const button=form.querySelector('[type=submit]');if(button.disabled)return;pending={kind:'save',url:config.dataset.save,data:new FormData(form)};openConfirmation(field('id').value?'Guardar cambios':'Crear usuario',field('id').value?'¿Estás seguro de guardar los cambios realizados en este usuario?':'¿Estás seguro de crear esta cuenta institucional?');});
+    form.addEventListener('submit',event=>{
+        event.preventDefault();const button=form.querySelector('[type=submit]');if(button.disabled)return;
+        pending={kind:'save',url:config.dataset.save,data:new FormData(form)};
+        openConfirmation(
+            field('id').value?'Guardar cambios':'Crear usuario',
+            field('id').value?'¿Estás seguro de guardar los cambios realizados en este usuario?':'¿Estás seguro de crear esta cuenta institucional?',
+            {isTrash:false,confirmText:field('id').value?'Guardar cambios':'Crear usuario'}
+        );
+    });
 
     const closeMenus=()=>document.querySelectorAll('.user-actions-wrap[open]').forEach(details=>details.removeAttribute('open'));
     const bindActionMenus=(root=document)=>root.querySelectorAll('.user-actions-wrap').forEach(details=>{if(details.dataset.menuReady)return;details.dataset.menuReady='true';details.addEventListener('toggle',()=>{const record=details.closest('.user-record');record?.classList.toggle('has-open-actions',details.open);if(!details.open)return;document.querySelectorAll('.user-actions-wrap[open]').forEach(other=>{if(other!==details)other.removeAttribute('open');});});});
@@ -37,75 +69,130 @@
         const button=event.target.closest('.user-actions [data-action]');if(!button)return;
         const record=button.closest('.user-record'),user=JSON.parse(record.querySelector('.user-data').textContent);closeMenus();
         if(button.dataset.action==='edit')return open(user);
-        const isPassword=button.dataset.action==='password',restoring=button.dataset.status==='active';pending={kind:'action',url:isPassword?config.dataset.password:config.dataset.status,data:{id:user.id,status:button.dataset.status||''}};
-        openConfirmation(isPassword?'Restablecer contraseña':restoring?'Restablecer acceso':'Bloquear usuario',isPassword?`La contraseña de ${user.full_name} volverá a ser Istel2026+ y sus sesiones se cerrarán.`:restoring?`¿Estás seguro de restablecer el acceso de ${user.full_name}?`:`¿Estás seguro de bloquear a ${user.full_name}? Sus sesiones activas se cerrarán.`);
+        const isPassword=button.dataset.action==='password',isTrash=button.dataset.action==='trash',restoring=button.dataset.status==='active';
+        const targetUrl=isPassword?config.dataset.password:(isTrash?(config.dataset.trash||'index.php?page=admin-trash-user'):config.dataset.status);
+        const targetData=isTrash?{id:user.id}:{id:user.id,status:button.dataset.status||''};
+        pending={kind:'action',url:targetUrl,data:targetData};
+        openConfirmation(
+            isPassword?'Restablecer contraseña':(isTrash?'Enviar usuario a Papelera':(restoring?'Restablecer acceso':'Bloquear usuario')),
+            isPassword?`La contraseña de ${user.full_name} volverá a ser Istel2026+ y sus sesiones se cerrarán.`:
+            (isTrash?`¿Estás seguro de enviar la cuenta de ${user.full_name} a la Papelera?`:
+            (restoring?`¿Estás seguro de restablecer el acceso de ${user.full_name}?`:`¿Estás seguro de bloquear a ${user.full_name}? Sus sesiones activas se cerrarán.`)),
+            {isTrash:isTrash,confirmText:isPassword?'Restablecer':(isTrash?'Enviar a Papelera':(restoring?'Restablecer':'Bloquear'))}
+        );
     });
-    document.querySelector('[data-cancel-confirm]')?.addEventListener('click',()=>{confirmBox.hidden=true;pending=null;syncDialogState();});
-    confirmBox.addEventListener('click',event=>{if(event.target===confirmBox){confirmBox.hidden=true;pending=null;syncDialogState();}});
-    document.querySelector('[data-accept-confirm]')?.addEventListener('click',async event=>{if(!pending)return;const confirmButton=event.currentTarget;confirmButton.disabled=true;const action=pending,data=action.kind==='save'?action.data:new FormData();if(action.kind!=='save'){data.set('_csrf',config.dataset.csrf);Object.entries(action.data).forEach(([key,value])=>data.set(key,value));}try{const result=await request(action.url,data);confirmBox.hidden=true;pending=null;if(action.kind==='save')close();else syncDialogState();await updateListing(new URL(location.href));showRefreshToast(result.message||'Usuario actualizado correctamente.');}catch(error){confirmBox.hidden=true;pending=null;syncDialogState();if(action.kind==='save'){message.className='users-message error';message.textContent=error.message;message.hidden=false;syncSaveButton();}else alert(error.message);}finally{confirmButton.disabled=false;}});
+    document.querySelector('[data-cancel-confirm]')?.addEventListener('click',()=>{if(confirmBox)confirmBox.hidden=true;pending=null;resetConfirmModal();syncDialogState();});
+    confirmBox?.addEventListener('click',event=>{if(event.target===confirmBox){confirmBox.hidden=true;pending=null;resetConfirmModal();syncDialogState();}});
+    document.querySelector('[data-accept-confirm]')?.addEventListener('click',async event=>{
+        if(!pending)return;
+        const confirmButton=event.currentTarget;
+        const action=pending;
+        const data=action.kind==='save'?action.data:new FormData();
+        if(action.kind!=='save'){
+            if(action.url===(config.dataset.trash||'index.php?page=admin-trash-user')){
+                const reasonInput=document.querySelector('#trashReason');
+                const reason=String(reasonInput?.value||'').trim();
+                if(reason.length<5){
+                    showRefreshToast('Indica el motivo por el que se envía a Papelera (mínimo 5 caracteres).','error');
+                    reasonInput?.focus();
+                    return;
+                }
+                action.data.reason=reason;
+            }
+            confirmButton.disabled=true;
+            data.set('_csrf',config.dataset.csrf);
+            Object.entries(action.data).forEach(([key,value])=>data.set(key,value));
+        }else{
+            confirmButton.disabled=true;
+        }
+        try{
+            const result=await request(action.url,data);
+            if(confirmBox)confirmBox.hidden=true;
+            pending=null;
+            resetConfirmModal();
+            if(action.kind==='save')close();
+            else syncDialogState();
+            await updateListing(new URL(location.href));
+            showRefreshToast(result.message||'Operación realizada correctamente.');
+        }catch(error){
+            if(confirmBox)confirmBox.hidden=true;
+            pending=null;
+            resetConfirmModal();
+            syncDialogState();
+            if(action.kind==='save'&&message){
+                message.className='users-message error';
+                message.textContent=error.message;
+                message.hidden=false;
+                syncSaveButton();
+            }else{
+                showRefreshToast(error.message,'error');
+            }
+        }finally{
+            confirmButton.disabled=false;
+        }
+    });
 
     const filters=document.querySelector('.users-filters'),search=filters?.querySelector('input[name="search"]'),clear=filters?.querySelector('.users-search-clear');let list=document.querySelector('.users-list'),reindexListing=()=>{},applySearch=()=>{},updateListing=async()=>{};
     if(filters&&search&&list){
         let rows=[],empty=null,searchableNodes=new Map(),original=new WeakMap();const fold=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es');
         const textNodes=row=>searchableNodes.get(row)||[];
-        reindexListing=()=>{list=document.querySelector('.users-list');rows=list?[...list.querySelectorAll('.user-record')]:[];empty=list?.querySelector('.users-search-empty')||null;searchableNodes=new Map(rows.map(row=>[row,[...row.querySelectorAll('.user-identity strong,.user-identity small,dd')].filter(node=>!node.closest('.user-actions')&&node.children.length===0)]));original=new WeakMap();rows.forEach(row=>textNodes(row).forEach(node=>original.set(node,node.textContent)));};
+        reindexListing=()=>{
+            rows=[...list.querySelectorAll('.user-record')];empty=list.querySelector('.users-search-empty');
+            searchableNodes=new Map();original=new WeakMap();
+            rows.forEach(row=>{
+                const nodes=[],walker=document.createTreeWalker(row,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement?.closest('.user-actions-wrap, script')?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
+                let node;while((node=walker.nextNode()))if(node.nodeValue.trim())nodes.push(node);
+                searchableNodes.set(row,nodes);
+                nodes.forEach(n=>original.set(n,n.nodeValue));
+            });
+        };
         reindexListing();
-        const restore=()=>rows.forEach(row=>textNodes(row).forEach(node=>{node.textContent=original.get(node)??node.textContent;}));
-        const highlight=(node,terms)=>{const value=node.textContent,chars=[...value];let normalized='';const positions=[];chars.forEach((char,index)=>{const folded=fold(char);normalized+=folded;[...folded].forEach(()=>positions.push(index));});const ranges=[];terms.forEach(term=>{let from=0;while(term&&(from=normalized.indexOf(term,from))!==-1){ranges.push([positions[from],positions[from+term.length-1]+1]);from+=term.length;}});if(!ranges.length)return;ranges.sort((a,b)=>a[0]-b[0]);const merged=ranges.reduce((result,range)=>{const last=result.at(-1);if(last&&range[0]<=last[1])last[1]=Math.max(last[1],range[1]);else result.push(range);return result;},[]),fragment=document.createDocumentFragment();let cursor=0;merged.forEach(([start,end])=>{if(start>cursor)fragment.append(document.createTextNode(chars.slice(cursor,start).join('')));const mark=document.createElement('mark');mark.className='users-search-highlight';mark.textContent=chars.slice(start,end).join('');fragment.append(mark);cursor=end;});if(cursor<chars.length)fragment.append(document.createTextNode(chars.slice(cursor).join('')));node.replaceChildren(fragment);};
-        let serverQuery=new URLSearchParams(location.search).get('search')||'',refreshTimer,listingRequest=0;
-        const listingUrl=()=>{const url=new URL(location.href);const data=new FormData(filters);for(const [key,value]of data.entries()){if(String(value).trim())url.searchParams.set(key,String(value));else url.searchParams.delete(key);}url.searchParams.delete('p');return url;};
-        const syncPagination=(page,nextCard)=>{
-            const current=document.querySelector('.data-pagination'),next=page.querySelector('.data-pagination');
-            if(!current&&next){next.querySelector('.data-pagination-size select')?.removeAttribute('onchange');document.querySelector('.users-table-card')?.insertAdjacentElement('afterend',next);return;}
-            if(!current)return;
-            if(next){
-                current.querySelector('p').innerHTML=next.querySelector('p').innerHTML;
-                current.querySelector('.data-pagination-pages').innerHTML=next.querySelector('.data-pagination-pages').innerHTML;
-                const currentSelect=current.querySelector('select'),nextSelect=next.querySelector('select');
-                if(currentSelect&&nextSelect){currentSelect.innerHTML=nextSelect.innerHTML;currentSelect.value=nextSelect.value;currentSelect.dispatchEvent(new Event('input',{bubbles:true}));}
-                current.querySelector('.data-pagination-size')?.removeAttribute('hidden');
-            }else{
-                const count=Number(nextCard.querySelector('header span')?.textContent.match(/\d+/)?.[0]||0);
-                current.querySelector('p').innerHTML=`Mostrando <strong>${count}</strong> de <strong>${count}</strong>`;
-                current.querySelector('.data-pagination-pages').innerHTML='<a class="is-active is-disabled" href="#" aria-current="page" aria-disabled="true" tabindex="-1">1</a>';
-                current.querySelector('.data-pagination-size')?.setAttribute('hidden','');
-            }
-            delete current.dataset.originalSummary;delete current.dataset.originalPages;
+        const clearHighlights=()=>{rows.forEach(row=>textNodes(row).forEach(n=>{if(original.has(n))n.nodeValue=original.get(n);const parent=n.parentElement;if(parent?.classList.contains('users-search-highlight'))parent.replaceWith(document.createTextNode(n.nodeValue));}));};
+        const highlight=query=>{
+            if(!query){clearHighlights();return;}
+            const terms=fold(query).split(/\s+/).filter(Boolean);
+            rows.forEach(row=>{
+                if(row.hidden)return;
+                textNodes(row).forEach(node=>{
+                    const raw=original.get(node)||node.nodeValue,normalized=fold(raw);
+                    let matched=false;
+                    for(const term of terms){if(normalized.includes(term)){matched=true;break;}}
+                    if(!matched){if(node.parentElement?.classList.contains('users-search-highlight'))node.parentElement.replaceWith(document.createTextNode(raw));else node.nodeValue=raw;return;}
+                    const frag=document.createDocumentFragment();let lastIndex=0;
+                    const regex=new RegExp('('+terms.map(t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')','gi');
+                    raw.replace(regex,(match,offset)=>{
+                        if(offset>lastIndex)frag.appendChild(document.createTextNode(raw.slice(lastIndex,offset)));
+                        const mark=document.createElement('mark');mark.className='users-search-highlight';mark.textContent=match;frag.appendChild(mark);lastIndex=offset+match.length;return match;
+                    });
+                    if(lastIndex<raw.length)frag.appendChild(document.createTextNode(raw.slice(lastIndex)));
+                    node.parentElement?.replaceChild(frag,node);
+                });
+            });
         };
-        updateListing=async(url=listingUrl(),toastMessage='',minimumDelay=0)=>{
-            const requestId=++listingRequest,currentCard=document.querySelector('.users-table-card');currentCard?.classList.add('is-refreshing');
-            try{
-                const [response]=await Promise.all([fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest'},cache:'no-store'}),minimumDelay>0?new Promise(resolve=>setTimeout(resolve,minimumDelay)):Promise.resolve()]);
-                if(!response.ok)throw new Error();
-                const page=new DOMParser().parseFromString(await response.text(),'text/html'),nextCard=page.querySelector('.users-table-card');
-                if(!nextCard||requestId!==listingRequest)return;
-                currentCard.replaceWith(nextCard);syncPagination(page,nextCard);bindActionMenus(nextCard);serverQuery=url.searchParams.get('search')||'';history.replaceState(null,'',url);reindexListing();applySearch();if(toastMessage)showRefreshToast(toastMessage);
-            }catch{if(requestId!==listingRequest)return;currentCard?.classList.remove('is-refreshing');alert('No fue posible consultar los usuarios.');}
+        applySearch=()=>{
+            const query=search.value.trim(),term=fold(query);clear.hidden=!query;
+            let visible=0;
+            rows.forEach(row=>{
+                const text=fold(row.dataset.searchText||''),num=row.dataset.searchNumber||'';
+                const match=!term||text.includes(term)||(num&&num.includes(term));
+                row.hidden=!match;if(match)visible++;
+            });
+            if(empty)empty.hidden=visible>0||rows.length===0;
+            highlight(query);
         };
-        window.refreshAdminUsersListing=(toastMessage='')=>updateListing(new URL(location.href),toastMessage);
-        const syncSearchCounters=(visible,query)=>{
-            const resultCounter=document.querySelector('.users-table-card>header span');
-            const pagination=document.querySelector('.data-pagination');
-            if(resultCounter)resultCounter.textContent=query?`${visible} resultados en esta página`:`${rows.length} resultados en esta página`;
-            if(!pagination)return;
-            const summary=pagination.querySelector('p');
-            const pages=pagination.querySelector('.data-pagination-pages');
-            if(!pagination.dataset.originalSummary&&summary)pagination.dataset.originalSummary=summary.innerHTML;
-            if(!pagination.dataset.originalPages&&pages)pagination.dataset.originalPages=pages.innerHTML;
-            if(query&&visible===0){
-                if(summary)summary.innerHTML='Mostrando <strong>0</strong> de <strong>0</strong>';
-                if(pages)pages.innerHTML='<a class="is-active is-disabled" href="#" aria-current="page" aria-disabled="true" tabindex="-1">1</a>';
-                return;
-            }
-            if(summary&&pagination.dataset.originalSummary)summary.innerHTML=pagination.dataset.originalSummary;
-            if(pages&&pagination.dataset.originalPages)pages.innerHTML=pagination.dataset.originalPages;
-        };
-        applySearch=()=>{restore();const query=fold(search.value).trim(),terms=query.split(/\s+/).filter(Boolean),numeric=/^\d+$/.test(query);let visible=0;rows.forEach(row=>{const searchable=numeric?row.dataset.searchNumber:row.dataset.searchText;const matches=!query||terms.every(term=>fold(searchable).includes(term));row.hidden=!matches;if(matches){visible++;if(query){const nodes=numeric?[...row.querySelectorAll('dl>div:nth-child(2) dd')]:[...row.querySelectorAll('.user-identity strong,.user-identity small,dl>div:first-child dd')];nodes.forEach(node=>highlight(node,terms));}}});clear.hidden=!search.value;if(empty)empty.hidden=visible!==0||!query;syncSearchCounters(visible,query);if(query!==fold(serverQuery).trim()){clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>updateListing(listingUrl()),450);}};
-        filters.addEventListener('submit',event=>{event.preventDefault();clearTimeout(refreshTimer);updateListing(listingUrl());});search.addEventListener('input',applySearch);clear.addEventListener('click',()=>{search.value='';applySearch();search.focus();clearTimeout(refreshTimer);updateListing(listingUrl());});filters.querySelectorAll('select').forEach(select=>select.addEventListener('change',()=>{clearTimeout(refreshTimer);updateListing(listingUrl());}));document.querySelector('.data-pagination-size select')?.removeAttribute('onchange');document.addEventListener('change',event=>{const size=event.target.closest('.data-pagination-size select');if(!size)return;const url=new URL(location.href);url.searchParams.set(size.name,size.value);url.searchParams.delete('p');updateListing(url);});document.addEventListener('click',event=>{const link=event.target.closest('.data-pagination-pages a[href]');if(!link||link.classList.contains('is-disabled'))return;event.preventDefault();updateListing(new URL(link.href,location.href));});applySearch();
-    }else filters?.querySelectorAll('select').forEach(select=>select.addEventListener('change',()=>filters.requestSubmit()));
-    document.addEventListener('click',async event=>{
-        const button=event.target.closest('.users-refresh');if(!button)return;
-        const firstPageUrl=new URL(location.href);firstPageUrl.searchParams.delete('p');button.disabled=true;button.querySelector('i')?.classList.add('fa-spin');await updateListing(firstPageUrl,'Usuarios actualizados',320);if(button.isConnected){button.disabled=false;button.querySelector('i')?.classList.remove('fa-spin');}
-    });
-    document.addEventListener('keydown',event=>{if(event.key==='Escape'){if(!confirmBox.hidden){confirmBox.hidden=true;pending=null;syncDialogState();}else if(!modal.hidden)close();else closeMenus();}});
+        search.addEventListener('input',applySearch);
+        clear.addEventListener('click',()=>{search.value='';applySearch();search.focus();});
+    }
+    updateListing=async url=>{
+        const card=document.querySelector('.users-table-card');card?.classList.add('is-refreshing');
+        try{
+            const res=await fetch(url.href,{headers:{'X-Requested-With':'XMLHttpRequest'}});
+            const html=await res.text();
+            const doc=new DOMParser().parseFromString(html,'text/html');
+            const newList=doc.querySelector('.users-list'),newSummary=doc.querySelector('.users-summary');
+            if(newList&&list){list.innerHTML=newList.innerHTML;bindActionMenus(list);reindexListing();applySearch();}
+            if(newSummary){const curSummary=document.querySelector('.users-summary');if(curSummary)curSummary.innerHTML=newSummary.innerHTML;}
+        }finally{card?.classList.remove('is-refreshing');}
+    };
+    document.querySelector('.users-refresh')?.addEventListener('click',async event=>{const button=event.currentTarget,icon=button.querySelector('i');button.disabled=true;icon?.classList.add('fa-spin');try{await updateListing(new URL(button.dataset.resetUrl||location.href));showRefreshToast('Lista de usuarios actualizada');}finally{button.disabled=false;icon?.classList.remove('fa-spin');}});
 })();
