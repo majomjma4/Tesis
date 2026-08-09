@@ -3130,11 +3130,12 @@ function validateRecordUploadFiles(files) {
     const allowed = new Set((recordUploadForm?.dataset.extensions || "").split(",").filter(Boolean));
     const maxBytes = Number(recordUploadForm?.dataset.maxBytes || 26214400);
     const maxOperationBytes = Number(recordUploadForm?.dataset.maxOperationBytes || 36700160);
+    const maxOperationMb = Number(recordUploadForm?.dataset.maxOperationMb || 35);
     const maxName = Number(recordUploadForm?.dataset.maxName || 200);
     if (files.reduce((total, file) => total + file.size, 0) > maxOperationBytes) {
         recordUploadEntries = [];
         renderRecordUploadEntries();
-        setRecordUploadState("error", "La selección completa supera el límite de 35 MB por operación.");
+        setRecordUploadState("error", `La selección completa supera el límite de ${maxOperationMb} MB por operación.`);
         return;
     }
     const seen = new Set();
@@ -4081,13 +4082,14 @@ function openFileReplacePicker(item, origin) {
 function validateReplacementSelection(file) {
     if (!(file instanceof File) || !fileReplaceDialog) return "Selecciona un archivo.";
     const maxBytes = Number(fileReplaceDialog.dataset.maxBytes || 26214400);
+    const maxMb = Number(fileReplaceDialog.dataset.maxMb || 20);
     const maxName = Number(fileReplaceDialog.dataset.maxName || 200);
     const extensions = String(fileReplaceDialog.dataset.extensions || "")
         .split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
     const extension = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
     if (!extension || !extensions.includes(extension)) return "El formato del archivo no está permitido.";
     if (file.name.length > maxName) return `El nombre supera el límite de ${maxName} caracteres.`;
-    if (file.size < 1 || file.size > maxBytes) return "El archivo está vacío o supera el límite de 25 MB.";
+    if (file.size < 1 || file.size > maxBytes) return `El archivo está vacío o supera el límite máximo permitido de ${maxMb} MB.`;
     if (fileReplaceTarget?.dataset.filePresentation === "true"
         && !["pdf", "docx", "png", "jpg", "jpeg", "webp", "txt"].includes(extension)) {
         return "La presentación solo puede reemplazarse por un archivo compatible con la vista previa.";

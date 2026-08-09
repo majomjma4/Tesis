@@ -18,6 +18,7 @@ final class View
             return;
         }
 
+        $data += self::institutionalData();
         if ($layout === 'main') {
             $data += self::notificationLayoutData();
         }
@@ -30,6 +31,13 @@ final class View
         $content = ob_get_clean();
 
         require $layoutFile;
+    }
+
+    private static function institutionalData(): array
+    {
+        try {$name=(string)(new SystemSettingModel())->all()['institution_name'];}
+        catch (Throwable) {$name=(string)(new SystemSettingModel())->defaults()['institution_name'];}
+        return ['institutionName'=>$name];
     }
     // Final de renderizado de vistas
 

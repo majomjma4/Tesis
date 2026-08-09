@@ -6,7 +6,7 @@ $replaceExtensions = is_array($replaceLimits['extensions'] ?? null) ? $replaceLi
 <input type="file" data-file-replace-input hidden
     accept="<?= e('.' . implode(',.', $replaceExtensions)) ?>">
 <div class="ed-file-remove-overlay" data-file-replace-dialog
-    data-max-bytes="<?= (int) ($replaceLimits['max_file_bytes'] ?? 26214400) ?>"
+    data-max-bytes="<?= (int) ($replaceLimits['max_file_bytes'] ?? 20971520) ?>" data-max-mb="<?= (int) ($replaceLimits['max_file_mb'] ?? 20) ?>"
     data-max-name="<?= (int) ($replaceLimits['max_name_length'] ?? 200) ?>"
     data-extensions="<?= e(implode(',', $replaceExtensions)) ?>" hidden>
     <section class="ed-file-remove-dialog ed-file-replace-dialog" role="dialog" aria-modal="true"

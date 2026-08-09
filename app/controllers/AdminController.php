@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 final class AdminController
 {
-    public function settings():void{$model=new SystemSettingModel();$error=null;try{$settings=$model->all();}catch(Throwable $e){error_log('Admin settings: '.$e->getMessage());$error='No fue posible consultar la configuración.';$settings=$model->defaults();}$s=new AuthSessionService();View::render('admin/settings',['currentPage'=>'admin-settings','title'=>'Configuración | Administración','bodyClass'=>'admin-settings-page','pageStyles'=>[asset('css/admin-settings.css')],'pageScript'=>asset('js/admin-settings.js'),'settings'=>$settings,'settingsError'=>$error,'settingsCsrf'=>$s->csrfToken('admin_settings'),'settingsSaveEndpoint'=>route('admin-settings-save')]);}
+    public function settings():void{$model=new SystemSettingModel();$error=null;try{$settings=$model->all();$uploadPolicy=$model->fileUploadPolicy();}catch(Throwable $e){error_log('Admin settings: '.$e->getMessage());$error='No fue posible consultar la configuración.';$settings=$model->defaults();$uploadPolicy=['max_mb'=>20,'total_max_mb'=>35,'file_ceiling_mb'=>20,'operation_ceiling_mb'=>35,'application_file_ceiling_mb'=>500,'application_operation_ceiling_mb'=>1024];}$s=new AuthSessionService();View::render('admin/settings',['currentPage'=>'admin-settings','title'=>'Configuración | Administración','bodyClass'=>'admin-settings-page','pageStyles'=>[asset('css/admin-settings.css')],'pageScript'=>asset('js/admin-settings.js'),'settings'=>$settings,'uploadPolicy'=>$uploadPolicy,'settingsError'=>$error,'settingsCsrf'=>$s->csrfToken('admin_settings'),'settingsSaveEndpoint'=>route('admin-settings-save')]);}
     public function saveSettings():void{$this->requirePost();$s=new AuthSessionService();if(!$s->validateCsrf('admin_settings',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);try{(new SystemSettingModel())->save($_POST,(int)$s->userId());$this->json(true,'Configuración guardada y aplicada.');}catch(InvalidArgumentException $e){$this->activityFailure($s,'settings_updated','Intentó actualizar la configuración institucional','Configuración','settings',null,'Configuración del sistema',$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,'settings_updated','Intentó actualizar la configuración institucional','Configuración','settings',null,'Configuración del sistema',$e);error_log('Save settings: '.$e->getMessage());$this->json(false,'No fue posible guardar la configuración.',[],500);}}
     public function reports():void{$from=$this->reportDate('from',date('Y-m-01'));$to=$this->reportDate('to',date('Y-m-d'));$model=new AdminReportModel();$error=null;$paginationRequest=['page'=>(int)($_GET['report_page']??PaginationService::request()['page']??1),'size'=>(int)($_GET['reports_per_page']??PaginationService::request()['size']??10)];try{$data=$model->dashboard($from,$to,$paginationRequest);}catch(Throwable $e){error_log('Admin reports: '.$e->getMessage());$error='No fue posible generar los reportes.';$data=['summary'=>['users'=>0,'projects'=>0,'deliveries'=>0,'actions'=>0],'roles'=>[],'statuses'=>[],'reviewSituations'=>[],'activity'=>[],'pagination'=>['total'=>0]];}View::render('admin/reports',['currentPage'=>'admin-reports','title'=>'Reportes | Administración','bodyClass'=>'admin-reports-page','pageStyles'=>[asset('css/admin-reports.css')],'reportData'=>$data,'pagePaginationData'=>$data['pagination'],'reportFrom'=>$from,'reportTo'=>$to,'reportError'=>$error]);}
     public function exportReport():never{
@@ -16,6 +16,7 @@ final class AdminController
         try{
             $model=new AdminReportModel();
             $report=$model->export($type,$from,$to);
+            try{$institutionName=(string)(new SystemSettingModel())->all()['institution_name'];}catch(Throwable){$institutionName=(string)(new SystemSettingModel())->defaults()['institution_name'];}
 
             // Si no hay registros, devolver respuesta HTTP 422 controlada sin descargar
             if (empty($report['rows'])) {
@@ -195,11 +196,11 @@ final class AdminController
     <tr>
         <td style="width: 20%; text-align: left;">
             <?php if ($logoLibertadorSrc): ?>
-                <img src="<?=$logoLibertadorSrc?>" class="logo-img" alt="Instituto El Libertador">
+                <img src="<?=$logoLibertadorSrc?>" class="logo-img" alt="<?=e($institutionName)?>">
             <?php endif; ?>
         </td>
         <td style="width: 60%; text-align: center;">
-            <div class="institution-name">Instituto Superior Tecnológico "El Libertador"</div>
+            <div class="institution-name"><?=e($institutionName)?></div>
             <div class="career-name">Tecnología en Desarrollo de Software</div>
         </td>
         <td style="width: 20%; text-align: right;">
@@ -250,7 +251,7 @@ final class AdminController
             header('Content-Disposition: attachment; filename="' . $exportFilename . '"');
             echo "\xEF\xBB\xBF";
             $out=fopen('php://output','wb');
-            fputcsv($out,['Instituto Superior Tecnológico "El Libertador"'],';');
+            fputcsv($out,[$institutionName],';');
             fputcsv($out,[$reportTitle],';');
             fputcsv($out,["Período: $formattedFrom al $formattedTo"],';');
             fputcsv($out,["Generado: $generatedAt"],';');
@@ -806,7 +807,7 @@ final class AdminController
             if($uploads===[])$this->json(false,'Selecciona al menos un archivo.',[],422);
             if(count($uploads)>(int)$limits['max_operation_files'])$this->json(false,'Puedes agregar hasta '.$limits['max_operation_files'].' archivos por operación.',[],422);
             if(array_sum(array_map(static fn(array $upload):int=>(int)($upload['size']??0),$uploads))>(int)$limits['max_operation_bytes']){
-                $this->json(false,'La selección completa supera el límite de 35 MB por operación.',[],422);
+                $this->json(false,'La selección completa supera el límite de '.$limits['max_operation_mb'].' MB por operación.',[],422);
             }
             $added=[];$failed=[];$actor=(int)$session->userId();
             foreach($uploads as $upload){
@@ -1009,7 +1010,7 @@ final class AdminController
     public function resetUserPassword(): void
     {
         $this->requirePost();$session=$this->sessionAndCsrf();$id=(int)($_POST['id']??0);
-        try{(new AdminUserModel())->resetPassword($id,'Istel2026+',(int)$session->userId());$this->json(true,'Contraseña temporal restablecida. El usuario deberá cambiarla.');}
+        try{(new AdminUserModel())->resetPassword($id,(int)$session->userId());$this->json(true,'Contraseña temporal restablecida según la política vigente.');}
         catch(InvalidArgumentException $exception){$this->json(false,$exception->getMessage(),[],422);}
         catch(Throwable $exception){error_log('Admin password reset: '.$exception->getMessage());$this->json(false,'No fue posible restablecer la contraseña.',[],500);}
     }

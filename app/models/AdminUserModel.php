@@ -5,7 +5,6 @@ final class AdminUserModel
 {
     private const ROLES=['student','teacher','administrator'];
     private const STATUSES=['active','inactive','blocked'];
-    private const TEMPORARY_PASSWORD='Istel2026+';
     public const LAST_ADMIN_MESSAGE='No es posible realizar esta acción porque esta es la única cuenta con acceso administrativo. Asigna privilegios administrativos a otro docente antes de continuar.';
 
     public function listing(array $filters=[],array $pagination=[]):array
@@ -46,7 +45,8 @@ final class AdminUserModel
     public function save(array $data,int $id,int $actorId):array
     {
         $data=$this->withInstitutionalDefaults($data);$this->validate($data,$id);
-        return Database::transaction(function(PDO $db)use($data,$id,$actorId):array{
+        $temporary=$this->temporaryPolicy();
+        return Database::transaction(function(PDO $db)use($data,$id,$actorId,$temporary):array{
             $previousRole=null;$previousAdmin=false;$initialAdmin=false;
             if($id>0){
                 $read=$db->prepare("SELECT u.*,r.code role_code FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id WHERE u.id=:id LIMIT 1 FOR UPDATE");
@@ -61,8 +61,8 @@ final class AdminUserModel
                 $statement->execute(['username'=>$data['username']?:null,'name'=>$data['full_name'],'email'=>$data['email'],'status'=>$data['status'],'admin'=>$data['is_admin'],'id'=>$id]);
                 $userId=$id;$action='user_updated';
             }else{
-                $statement=$db->prepare('INSERT INTO users(email,username,password_hash,must_change_password,password_warning_count,temporary_password_expires_at,full_name,is_admin,status) VALUES(:email,:username,:hash,1,0,DATE_ADD(CURRENT_TIMESTAMP,INTERVAL 7 DAY),:name,:admin,:status)');
-                $statement->execute(['email'=>$data['email'],'username'=>$data['username']?:null,'hash'=>password_hash(self::TEMPORARY_PASSWORD,PASSWORD_DEFAULT),'name'=>$data['full_name'],'admin'=>$data['is_admin'],'status'=>$data['status']]);
+                $statement=$db->prepare('INSERT INTO users(email,username,password_hash,must_change_password,password_warning_count,temporary_password_expires_at,full_name,is_admin,status) VALUES(:email,:username,:hash,:force,0,DATE_ADD(CURRENT_TIMESTAMP,INTERVAL '.$temporary['days'].' DAY),:name,:admin,:status)');
+                $statement->execute(['email'=>$data['email'],'username'=>$data['username']?:null,'hash'=>password_hash($temporary['password'],PASSWORD_DEFAULT),'force'=>$temporary['force_change']?1:0,'name'=>$data['full_name'],'admin'=>$data['is_admin'],'status'=>$data['status']]);
                 $userId=(int)$db->lastInsertId();$action='user_created';
             }
             $role=$db->prepare('SELECT id FROM roles WHERE code=:code');$role->execute(['code'=>$data['role']]);$roleId=(int)$role->fetchColumn();
@@ -100,10 +100,10 @@ final class AdminUserModel
         });
     }
 
-    public function resetPassword(int $id,string $password,int $actorId):void
+    public function resetPassword(int $id,int $actorId):void
     {
         if($id<1)throw new InvalidArgumentException('El usuario no es válido.');
-        Database::transaction(function(PDO $db)use($id,$password,$actorId):void{$this->ensureUser($db,$id);$check=$db->prepare('SELECT must_change_password FROM users WHERE id=:id');$check->execute(['id'=>$id]);if((int)$check->fetchColumn()===1)throw new InvalidArgumentException('El usuario todavía utiliza una clave temporal; no es necesario restablecerla.');$db->prepare('UPDATE users SET password_hash=:hash,must_change_password=1,password_warning_count=0,temporary_password_expires_at=DATE_ADD(CURRENT_TIMESTAMP,INTERVAL 7 DAY),session_version=session_version+1 WHERE id=:id')->execute(['hash'=>password_hash($password,PASSWORD_DEFAULT),'id'=>$id]);$this->audit($db,$actorId,'password_reset',$id,[]);});
+        $temporary=$this->temporaryPolicy();Database::transaction(function(PDO $db)use($id,$actorId,$temporary):void{$this->ensureUser($db,$id);$check=$db->prepare('SELECT must_change_password FROM users WHERE id=:id');$check->execute(['id'=>$id]);if((int)$check->fetchColumn()===1)throw new InvalidArgumentException('El usuario todavía utiliza una clave temporal; no es necesario restablecerla.');$db->prepare('UPDATE users SET password_hash=:hash,must_change_password=:force,password_warning_count=0,temporary_password_expires_at=DATE_ADD(CURRENT_TIMESTAMP,INTERVAL '.$temporary['days'].' DAY),session_version=session_version+1 WHERE id=:id')->execute(['hash'=>password_hash($temporary['password'],PASSWORD_DEFAULT),'force'=>$temporary['force_change']?1:0,'id'=>$id]);$this->audit($db,$actorId,'password_reset',$id,[]);});
     }
 
     public function previewImport(string $content,array $config):array
@@ -129,7 +129,7 @@ final class AdminUserModel
             if(!$errors&&$username!==''){$usernameCheck->execute(['username'=>$username]);if((int)$usernameCheck->fetchColumn()>0)$errors[]='El usuario ya está registrado';}
             if(!$errors&&$code!==''){$codeCheck->execute(['student'=>$code,'teacher'=>$code]);if((int)$codeCheck->fetchColumn()>0)$errors[]='La identificación ya está registrada';}
             $emails[$email]=true;$codes[$code]=true;if($username!=='')$usernames[mb_strtolower($username)]=true;if(!$errors)$valid++;
-            $result[]=['line'=>$index+1,'name'=>$name,'email'=>$email,'code'=>$code,'username'=>$username,'academic_title'=>$title,'password'=>self::TEMPORARY_PASSWORD,'valid'=>!$errors,'error'=>implode('. ',$errors)];
+            $result[]=['line'=>$index+1,'name'=>$name,'email'=>$email,'code'=>$code,'username'=>$username,'academic_title'=>$title,'valid'=>!$errors,'error'=>implode('. ',$errors)];
         }
         return ['rows'=>$result,'total'=>count($result),'valid'=>$valid,'invalid'=>count($result)-$valid,'config'=>['role'=>$config['role'],'career'=>'Desarrollo de Software','period'=>$config['period_name'],'semester'=>$config['semester']??null,'can_tutor'=>(int)($config['can_tutor']??0)]];
     }
@@ -139,17 +139,17 @@ final class AdminUserModel
         $config=$this->withInstitutionalDefaults($config);$preview=$this->previewImport($content,$config);
         if($preview['invalid']>0)throw new InvalidArgumentException('Corrige las filas inválidas antes de importar.');
         if($preview['total']<1)throw new InvalidArgumentException('La lista no contiene usuarios.');
-        return Database::transaction(function(PDO $db)use($preview,$config,$actorId):array{
+        $temporary=$this->temporaryPolicy();return Database::transaction(function(PDO $db)use($preview,$config,$actorId,$temporary):array{
             $role=$db->prepare('SELECT id FROM roles WHERE code=:code');$role->execute(['code'=>$config['role']]);$roleId=(int)$role->fetchColumn();
             if(!$roleId)throw new InvalidArgumentException('El rol seleccionado no está disponible.');
-            $userInsert=$db->prepare('INSERT INTO users(email,username,password_hash,must_change_password,password_warning_count,temporary_password_expires_at,full_name,status) VALUES(:email,:username,:hash,1,0,DATE_ADD(CURRENT_TIMESTAMP,INTERVAL 7 DAY),:name,\'active\')');
+            $userInsert=$db->prepare('INSERT INTO users(email,username,password_hash,must_change_password,password_warning_count,temporary_password_expires_at,full_name,status) VALUES(:email,:username,:hash,:force,0,DATE_ADD(CURRENT_TIMESTAMP,INTERVAL '.$temporary['days'].' DAY),:name,\'active\')');
             $userRole=$db->prepare('INSERT INTO user_roles(user_id,role_id) VALUES(:user,:role)');
             $student=$db->prepare('INSERT INTO student_profiles(user_id,institutional_code,career_id) VALUES(:id,:code,:career)');
             $enrollment=$db->prepare("INSERT INTO student_enrollments(student_id,academic_period_id,career_id,semester,status) VALUES(:id,:period,:career,:semester,'active')");
             $teacher=$db->prepare('INSERT INTO teacher_profiles(user_id,institutional_code,academic_title,can_tutor) VALUES(:id,:code,:title,:tutor)');
-            $hash=password_hash(self::TEMPORARY_PASSWORD,PASSWORD_DEFAULT);
+            $hash=password_hash($temporary['password'],PASSWORD_DEFAULT);
             foreach($preview['rows'] as $row){
-                $userInsert->execute(['email'=>$row['email'],'username'=>$row['username']?:null,'hash'=>$hash,'name'=>$row['name']]);$id=(int)$db->lastInsertId();
+                $userInsert->execute(['email'=>$row['email'],'username'=>$row['username']?:null,'hash'=>$hash,'force'=>$temporary['force_change']?1:0,'name'=>$row['name']]);$id=(int)$db->lastInsertId();
                 $userRole->execute(['user'=>$id,'role'=>$roleId]);
                 if($config['role']==='student'){$student->execute(['id'=>$id,'code'=>$row['code'],'career'=>$config['career_id']]);$enrollment->execute(['id'=>$id,'period'=>$config['academic_period_id'],'career'=>$config['career_id'],'semester'=>$config['semester']]);}
                 else{$teacher->execute(['id'=>$id,'code'=>$row['code'],'title'=>$row['academic_title']?:null,'tutor'=>$config['can_tutor']]);}
@@ -159,6 +159,7 @@ final class AdminUserModel
         });
     }
 
+    private function temporaryPolicy():array{return (new SystemSettingModel())->temporaryPasswordPolicy();}
     private function parseImportRows(string $content):array
     {
         $content=preg_replace('/^\xEF\xBB\xBF/','',trim($content));

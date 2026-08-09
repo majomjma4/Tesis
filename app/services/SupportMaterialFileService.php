@@ -33,8 +33,9 @@ final class SupportMaterialFileService
             );
         }
         $size = (int) ($upload['size'] ?? 0);
-        if ($size < 1 || $size > self::MAX_FILE_BYTES) {
-            throw new InvalidArgumentException('El archivo está vacío o supera el límite de 25 MB.');
+        $limits = $this->limits();
+        if ($size < 1 || $size > (int) $limits['max_file_bytes']) {
+            throw new InvalidArgumentException('El archivo está vacío o supera el límite máximo permitido de '.$limits['max_file_mb'].' MB.');
         }
         $rawName = (string) ($upload['name'] ?? '');
         $originalName = basename(str_replace('\\', '/', $rawName));
@@ -44,9 +45,10 @@ final class SupportMaterialFileService
             throw new InvalidArgumentException('El nombre del archivo no es válido.');
         }
         $extension = mb_strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-        if (!isset(self::MIME_BY_EXTENSION[$extension])) {
-            throw new InvalidArgumentException('El formato del archivo no está permitido.');
+        if (!in_array($extension, $limits['extensions'], true) || !isset(self::MIME_BY_EXTENSION[$extension])) {
+            throw new InvalidArgumentException('El formato del archivo no está permitido por la configuración actual.');
         }
+
         $temporaryPath = (string) ($upload['tmp_name'] ?? '');
         $mime = is_file($temporaryPath) ? (string) (new finfo(FILEINFO_MIME_TYPE))->file($temporaryPath) : '';
         if (!in_array($mime, self::MIME_BY_EXTENSION[$extension], true)) {
@@ -82,13 +84,21 @@ final class SupportMaterialFileService
 
     public function limits(): array
     {
+        try {
+            $model = new SystemSettingModel();$settings = $model->all();$policy=$model->fileUploadPolicy();
+            $configured = (array)($settings['file_extensions_support'] ?? array_keys(self::MIME_BY_EXTENSION));
+        } catch (Throwable) {
+            $configured = array_keys(self::MIME_BY_EXTENSION);$policy=['max_mb'=>20,'total_max_mb'=>35,'max_bytes'=>20*1024*1024,'max_total_bytes'=>35*1024*1024];
+        }
+        $allowed = array_values(array_intersect(array_keys(self::MIME_BY_EXTENSION), $configured));
         return [
             'max_operation_files' => self::MAX_OPERATION_FILES,
-            'max_file_bytes' => self::MAX_FILE_BYTES,
-            'max_operation_bytes' => self::MAX_OPERATION_BYTES,
-            'max_file_mb' => 25,
+            'max_file_bytes' => $policy['max_bytes'],
+            'max_operation_bytes' => $policy['max_total_bytes'],
+            'max_file_mb' => $policy['max_mb'],
+            'max_operation_mb' => $policy['total_max_mb'],
             'max_name_length' => self::MAX_NAME_LENGTH,
-            'extensions' => array_keys(self::MIME_BY_EXTENSION),
+            'extensions' => $allowed,
         ];
     }
 

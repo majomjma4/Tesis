@@ -28,10 +28,9 @@
     <aside class="sidebar" id="sidebar" aria-label="Menu principal">
         <div>
             <div class="logo-area">
-                <img src="<?= e(asset('img/Logo2.webp')) ?>" alt="Logo Instituto Superior Tecnologico El Libertador">
+                <img src="<?= e(asset('img/Logo2.webp')) ?>" alt="Logo <?= e($institutionName ?? '') ?>">
                 <h1>
-                    Instituto Superior Tecnologico<br>
-                    "El Libertador"
+                    <?= e($institutionName ?? '') ?>
                 </h1>
                 <p>Plataforma academica de gestion de proyectos estudiantiles.</p>
             </div>

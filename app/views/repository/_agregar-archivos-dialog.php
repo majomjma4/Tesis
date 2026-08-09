@@ -8,13 +8,13 @@ $extensions = is_array($limits['extensions'] ?? null) ? $limits['extensions'] : 
         <header class="ed-upload-dialog__header">
             <div>
                 <h2 id="recordUploadTitle">Agregar archivos</h2>
-                <p id="recordUploadDescription">Selecciona hasta <?= (int) ($limits['max_operation_files'] ?? 5) ?> archivos. Formatos permitidos: <?= e(strtoupper(implode(', ', $extensions))) ?>. Máximo <?= (int) ($limits['max_file_mb'] ?? 25) ?> MB por archivo y 35 MB por operación.</p>
+                <p id="recordUploadDescription">Selecciona hasta <?= (int) ($limits['max_operation_files'] ?? 5) ?> archivos. Formatos permitidos: <?= e(strtoupper(implode(', ', $extensions))) ?>. Máximo <?= (int) ($limits['max_file_mb'] ?? 20) ?> MB por archivo y <?= (int) ($limits['max_operation_mb'] ?? 35) ?> MB por operación.</p>
             </div>
             <button class="ed-upload-close" type="button" data-upload-close aria-label="Cerrar carga de archivos"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
         </header>
         <form data-record-file-upload-form action="<?= e((string) ($upload['endpoint'] ?? '')) ?>" method="post" enctype="multipart/form-data"
             data-max-files="<?= (int) ($limits['max_operation_files'] ?? 5) ?>" data-max-bytes="<?= (int) ($limits['max_file_bytes'] ?? 26214400) ?>"
-            data-max-operation-bytes="<?= (int) ($limits['max_operation_bytes'] ?? 36700160) ?>"
+            data-max-operation-bytes="<?= (int) ($limits['max_operation_bytes'] ?? 36700160) ?>" data-max-operation-mb="<?= (int) ($limits['max_operation_mb'] ?? 35) ?>"
             data-max-name="<?= (int) ($limits['max_name_length'] ?? 200) ?>" data-extensions="<?= e(implode(',', $extensions)) ?>">
             <div class="ed-upload-dialog__body">
                 <input type="hidden" name="_csrf" value="<?= e((string) ($upload['csrf_token'] ?? '')) ?>">

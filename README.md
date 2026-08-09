@@ -4,6 +4,10 @@
 
 El proyecto busca centralizar el proceso de entrega, revisión, observaciones, control de versiones y almacenamiento de documentos académicos, reemplazando el intercambio mediante aplicaciones de mensajería y correos electrónicos.
 
+## Capacidad de carga recomendada
+
+Para habilitar la capacidad máxima de la aplicación (500 MB por archivo y 1 GB por operación), el administrador técnico del servidor debe configurar PHP con valores al menos equivalentes a `upload_max_filesize = 512M` y `post_max_size = 1100M`, y reiniciar el servicio web. La aplicación detecta la capacidad real del servidor y reduce automáticamente los máximos configurables cuando el entorno admite menos.
+
 # Objetivo
 
 Desarrollar una plataforma web que permita administrar de forma organizada los proyectos académicos de la institución, facilitando la comunicación entre estudiantes, docentes, tutores y jurados mediante un sistema de seguimiento documental con historial y repositorio institucional.

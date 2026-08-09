@@ -35,7 +35,7 @@ final class ProjectDraftService
             'thesis' => ['required' => ['title','description','period','modality','research_line','tutor_id'], 'additional' => ['research_line'], 'uses_description' => true],
             'thesis_profile' => ['required' => ['title','description','period','research_line','tutor_id'], 'additional' => ['research_line'], 'uses_description' => true],
             'pis' => ['required' => ['title','description','period','tutor_id'], 'additional' => [], 'uses_description' => true],
-            'practice' => ['required' => ['title','period','tutor_id'], 'additional' => [], 'uses_description' => false, 'institution_scope' => 'Instituto Superior Tecnológico El Libertador'],
+            'practice' => ['required' => ['title','period','tutor_id'], 'additional' => [], 'uses_description' => false, 'institution_scope' => $this->institutionName()],
             'community' => ['required' => ['title','period','tutor_id'], 'additional' => [], 'uses_description' => false],
         ];
     }
@@ -83,4 +83,5 @@ final class ProjectDraftService
         return $draft+['type_label'=>self::TYPES[$draft['type']]['label']??'Sin definir','tutor_label'=>$teachers[$draft['tutor_id']]??'Pendiente de asignación','provisional_code'=>$prefix.'-'.date('Y').'-'.str_repeat('X',$digits),'file_count'=>count($files)];
     }
     private function flattenFiles(array $files):array {if(!isset($files['name'])||!is_array($files['name']))return[];$out=[];foreach($files['name'] as $i=>$name)if(($files['error'][$i]??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_NO_FILE)$out[]=['name'=>$name,'type'=>$files['type'][$i]??'','tmp_name'=>$files['tmp_name'][$i]??'','error'=>$files['error'][$i]??UPLOAD_ERR_NO_FILE,'size'=>$files['size'][$i]??0];return$out;}
+    private function institutionName():string{try{return (string)(new SystemSettingModel())->all()['institution_name'];}catch(Throwable){return (string)(new SystemSettingModel())->defaults()['institution_name'];}}
 }

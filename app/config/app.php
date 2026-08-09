@@ -13,6 +13,7 @@ $config = [
     'dev_autoreload' => filter_var(getenv('DEV_AUTORELOAD') ?: 'true', FILTER_VALIDATE_BOOL),
     'auth_required' => filter_var(getenv('AUTH_REQUIRED') ?: 'false', FILTER_VALIDATE_BOOL),
     'timezone' => getenv('APP_TIMEZONE') ?: 'America/Guayaquil',
+    'settings_encryption_key' => getenv('APP_SETTINGS_ENCRYPTION_KEY') ?: '',
 ];
 
 $localFile = __DIR__ . '/app.local.php';
