@@ -19,9 +19,32 @@ $career=$catalogs['career']??null;$period=$catalogs['period']??null;
 
 <form class="users-filters admin-filter-bar" method="get" role="search">
     <input type="hidden" name="page" value="admin-users">
-    <label class="users-search-field admin-filter-search admin-filter-item-search"><span class="sr-only">Buscar usuarios</span><i class="fa-solid fa-magnifying-glass"></i><input type="search" name="search" value="<?=e($filters['search'])?>" placeholder="Buscar por usuario, nombre, correo o cédula" autocomplete="off" data-no-search-history><button type="button" class="users-search-clear" aria-label="Limpiar búsqueda" hidden><i class="fa-solid fa-xmark"></i></button></label>
-    <label class="admin-filter-control"><span>Rol</span><select name="role" aria-label="Filtrar por rol"><option value="">Todos</option><option value="student" <?=$filters['role']==='student'?'selected':''?>>Estudiantes</option><option value="teacher" <?=$filters['role']==='teacher'?'selected':''?>>Docentes</option><option value="administrator" <?=$filters['role']==='administrator'?'selected':''?>>Administradores</option></select></label>
-    <label class="admin-filter-control"><span>Estado</span><select name="status" aria-label="Filtrar por estado"><option value="">Todos</option><option value="active" <?=$filters['status']==='active'?'selected':''?>>Activos</option><option value="inactive" <?=$filters['status']==='inactive'?'selected':''?>>Inactivos</option><option value="blocked" <?=$filters['status']==='blocked'?'selected':''?>>Bloqueados</option></select></label>
+    <label class="users-filter-control users-filter-search admin-filter-item-search">
+        <span class="sr-only">Buscar usuarios</span>
+        <span class="users-search-field admin-filter-search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" name="search" value="<?=e($filters['search'])?>" placeholder="Buscar por usuario, nombre, correo o cédula" autocomplete="off" data-no-search-history>
+            <button type="button" class="users-search-clear" aria-label="Limpiar búsqueda" title="Limpiar búsqueda" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+        </span>
+    </label>
+    <label class="users-filter-control admin-filter-control">
+        <span>Rol</span>
+        <select name="role" aria-label="Filtrar por rol">
+            <option value="">Todos</option>
+            <option value="student" <?=$filters['role']==='student'?'selected':''?>>Estudiantes</option>
+            <option value="teacher" <?=$filters['role']==='teacher'?'selected':''?>>Docentes</option>
+            <option value="administrator" <?=$filters['role']==='administrator'?'selected':''?>>Administradores</option>
+        </select>
+    </label>
+    <label class="users-filter-control admin-filter-control">
+        <span>Estado</span>
+        <select name="status" aria-label="Filtrar por estado">
+            <option value="">Todos</option>
+            <option value="active" <?=$filters['status']==='active'?'selected':''?>>Activos</option>
+            <option value="inactive" <?=$filters['status']==='inactive'?'selected':''?>>Inactivos</option>
+            <option value="blocked" <?=$filters['status']==='blocked'?'selected':''?>>Bloqueados</option>
+        </select>
+    </label>
 </form>
 
 <section class="users-table-card">
@@ -58,34 +81,16 @@ $career=$catalogs['career']??null;$period=$catalogs['period']??null;
             <label><span>Tipo de usuario</span><select name="role" required><option value="student">Estudiante</option><option value="teacher">Docente</option><option value="administrator" hidden>Cuenta inicial temporal</option></select></label>
             <label><span>Estado</span><select name="status"><option value="active">Activo</option><option value="inactive">Inactivo</option><option value="blocked">Bloqueado</option></select></label>
             <div class="role-fields student-fields wide" data-for="student">
-                <label><span>Usuario <small>(opcional)</small></span><input name="username" maxlength="80" placeholder="Ej. maria.perez"></label>
-                <label><span>Semestre</span><select name="semester"><option value="">Selecciona</option><?php for($semester=1;$semester<=4;$semester++):?><option value="<?=$semester?>"><?=$semester?>.º semestre</option><?php endfor;?></select></label>
-                <div class="user-fixed-field"><i class="fa-solid fa-code" aria-hidden="true"></i><div><span>Carrera</span><strong><?=e($career['name']??'Desarrollo de Software')?></strong></div></div>
-                <div class="user-fixed-field"><i class="fa-regular fa-calendar" aria-hidden="true"></i><div><span>Periodo académico</span><strong><?=e($period['name']??'Sin periodo activo')?></strong></div></div>
+                <label><span>Semestre</span><select name="semester"><option value="">Selecciona</option><?php for($s=1;$s<=10;$s++):?><option value="<?=$s?>"><?=$s?>.º Semestre</option><?php endfor;?></select></label>
             </div>
-            <div class="role-fields teacher-fields wide" data-for="teacher"><label><span>Título académico <small>(opcional)</small></span><input name="academic_title" maxlength="120" placeholder="Ej. Msc."></label><label class="check-label"><input type="checkbox" name="can_tutor" value="1"><span>Disponible para asignación como tutor</span></label><label class="check-label"><input type="checkbox" name="is_admin" value="1"><span>Acceso administrativo</span></label></div>
+            <div class="user-fixed-field wide" aria-label="Carrera institucional"><i class="fa-solid fa-code" aria-hidden="true"></i><span><small>Carrera</small><strong><?=e($career['name']??'Desarrollo de Software')?></strong></span></div>
+            <div class="user-fixed-field wide" aria-label="Período académico activo"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i><span><small>Período académico</small><strong><?=e($period['name']??'Sin período activo')?></strong></span></div>
+            <label class="check-label wide"><input type="checkbox" name="is_admin" value="1"><span>Asignar acceso administrativo temporal</span></label>
         </div>
-        <div class="form-note" id="temporaryPasswordNote"><i class="fa-solid fa-key"></i><span>La cuenta se creará con la contraseña temporal <strong>Istel2026+</strong> y deberá cambiarla.</span></div><div class="users-message" id="userFormMessage" hidden></div>
-        <footer><button type="button" class="secondary" data-close-modal>Cancelar</button><button type="submit" class="primary">Guardar usuario</button></footer>
+        <aside class="form-note wide" hidden><i class="fa-solid fa-circle-info"></i><p>El usuario podrá acceder de inmediato con su correo y su contraseña temporal. Tendrá que cambiar su clave en el primer ingreso.</p></aside>
+        <footer><button class="secondary" type="button" data-close-modal>Cancelar</button><button class="primary" type="submit">Guardar usuario</button></footer>
     </form>
 </div></div>
 
-<div class="user-confirm" id="userConfirm" hidden><div role="alertdialog" aria-modal="true"><i class="fa-solid fa-triangle-exclamation"></i><h2 id="confirmTitle">Confirmar acción</h2><p id="confirmText"></p><div><button type="button" class="secondary" data-cancel-confirm>Cancelar</button><button type="button" class="primary" data-accept-confirm>Confirmar</button></div></div></div>
-
-<div class="user-modal import-modal" id="importUsersModal" hidden><div class="user-modal-card" role="dialog" aria-modal="true" aria-labelledby="importUsersTitle">
-    <header><div><span>Creación masiva</span><h2 id="importUsersTitle">Importar usuarios</h2></div><button type="button" data-close-import aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button></header>
-    <form id="importUsersForm"><input type="hidden" name="_csrf" value="<?=e($adminUserCsrf)?>"><input type="hidden" name="career_id" value="<?= (int)($career['id']??0)?>"><input type="hidden" name="academic_period_id" value="<?= (int)($period['id']??0)?>">
-        <div class="import-steps"><button type="button" class="active" data-import-step-button="1">1. Configurar</button><button type="button" data-import-step-button="2">2. Revisar</button><button type="button" data-import-step-button="3">3. Verificar</button></div>
-        <section class="import-panel" data-import-step="1">
-            <div class="form-grid import-config"><label><span>Tipo de usuarios</span><select name="role"><option value="student">Estudiantes</option><option value="teacher">Docentes</option></select></label><label class="import-student"><span>Semestre</span><select name="semester"><option value="">Selecciona</option><?php for($semester=1;$semester<=4;$semester++):?><option value="<?=$semester?>"><?=$semester?>.º semestre</option><?php endfor;?></select></label><div class="user-fixed-field"><i class="fa-solid fa-code" aria-hidden="true"></i><div><span>Carrera</span><strong><?=e($career['name']??'Desarrollo de Software')?></strong></div></div><div class="user-fixed-field"><i class="fa-regular fa-calendar" aria-hidden="true"></i><div><span>Periodo</span><strong><?=e($period['name']??'Sin periodo activo')?></strong></div></div><label class="check-label import-teacher" hidden><input type="checkbox" name="can_tutor" value="1" checked><span>Disponibles para asignación como tutores</span></label></div>
-            <div class="import-source"><label class="file-drop"><i class="fa-solid fa-file-csv"></i><strong>Seleccionar CSV o TXT</strong><small>Máximo 1 MB y 500 usuarios</small><input type="file" name="file" accept=".csv,.txt,text/csv,text/plain"></label><span>o pega la lista</span><label><span class="sr-only">Lista de usuarios</span><textarea name="content" rows="6" placeholder="Nombre completo, correo, cédula de 10 dígitos, usuario&#10;María Pérez, maria@email.com, 0202053831, maria.perez"></textarea></label><p id="importColumnsHelp">Columnas para estudiantes: <strong>nombre, correo, cédula y usuario opcional</strong>.</p></div>
-            <footer><button type="button" class="secondary" data-close-import>Cancelar</button><button type="button" class="primary" data-import-next> Siguiente</button></footer>
-        </section>
-        <section class="import-panel" data-import-step="2" hidden><div class="import-table-wrap"><table><thead><tr><th>Fila</th><th>Nombre</th><th>Correo</th><th>Usuario</th><th>Cédula</th><th>Contraseña</th><th>Resultado</th></tr></thead><tbody data-import-rows></tbody></table></div><footer><button type="button" class="secondary" data-close-import>Cancelar</button><button type="button" class="secondary" data-import-back>Atrás</button><button type="button" class="primary" data-import-next>Siguiente</button></footer></section>
-        <section class="import-panel" data-import-step="3" hidden><div class="import-verification"><h3>Verificación final</h3><dl data-import-config-summary></dl></div><div class="import-table-wrap compact"><table><thead><tr><th>Nombre</th><th>Correo</th><th>Usuario</th><th>Cédula</th><th>Contraseña</th></tr></thead><tbody data-import-final-rows></tbody></table></div><footer><button type="button" class="secondary" data-close-import>Cancelar</button><button type="button" class="secondary" data-import-back>Atrás</button><button type="button" class="primary" data-import-create>Crear</button></footer></section>
-        <div class="users-message" id="importMessage" hidden></div>
-    </form>
-</div></div>
-<div class="user-confirm" id="importConfirm" hidden><div role="alertdialog" aria-modal="true"><i class="fa-solid fa-user-check"></i><h2>Crear usuarios</h2><p>¿Estás seguro de crear todas las cuentas mostradas? Esta acción quedará registrada.</p><div><button type="button" class="secondary" data-cancel-import-confirm>Cancelar</button><button type="button" class="primary" data-accept-import-confirm>Crear</button></div></div></div>
-
-<div id="adminUsersConfig" data-save="<?=e($adminUserEndpoints['save'])?>" data-status="<?=e($adminUserEndpoints['status'])?>" data-password="<?=e($adminUserEndpoints['password'])?>" data-import="<?=e($adminUserEndpoints['import'])?>" data-csrf="<?=e($adminUserCsrf)?>"></div>
+<div class="user-confirm" id="userConfirmBox" hidden><div role="alertdialog" aria-modal="true" aria-labelledby="userConfirmTitle"><i class="fa-solid fa-triangle-exclamation"></i><h2 id="userConfirmTitle">Confirmar</h2><p id="userConfirmText">¿Estás seguro?</p><div><button class="secondary" type="button" data-cancel-confirm>Cancelar</button><button class="primary" type="button" data-accept-confirm>Aceptar</button></div></div></div>
+<div id="adminUsersConfig" data-save="<?=e($adminUserEndpoints['save']??'')?>" data-status="<?=e($adminUserEndpoints['status']??'')?>" data-password="<?=e($adminUserEndpoints['password']??'')?>" data-import="<?=e($adminUserEndpoints['import']??'')?>" data-csrf="<?=e($adminUserCsrf??'')?>"></div>

@@ -306,18 +306,45 @@ final class AdminController
                 ?$model->supportMaterialDashboard(PaginationService::request())
                 :$model->dashboard($type,PaginationService::request());
             $data['materials']=$data['materials']??[];
-            $data['summary']['materials']=(int)Database::connection()->query(
-                'SELECT COUNT(*) FROM support_materials WHERE deleted_at IS NOT NULL AND purged_at IS NULL'
-            )->fetchColumn();
         }catch(Throwable $e){
             error_log('Admin trash: '.$e->getMessage());$error='No fue posible consultar la Papelera.';
-            $data=['users'=>[],'projects'=>[],'materials'=>[],'pagination'=>['total'=>0],'active_type'=>'users','summary'=>['users'=>0,'projects'=>0,'materials'=>0,'expired'=>0]];
+            $data=['users'=>[],'projects'=>[],'materials'=>[],'pagination'=>['total'=>0],'active_type'=>'users','summary'=>['users'=>0,'projects'=>0,'materials'=>0,'expired'=>0,'total'=>0]];
         }
         $s=new AuthSessionService();
-        View::render('admin/trash',['currentPage'=>'admin-trash','title'=>'Papelera | Administración','bodyClass'=>'admin-trash-page','pageStyles'=>[asset('css/admin-trash.css')],'pageScript'=>asset('js/admin-trash.js'),'trashData'=>$data,'pagePagination'=>$data['pagination'],'trashError'=>$error,'trashCsrf'=>$s->csrfToken('admin_trash'),'trashEndpoints'=>['user'=>route('admin-trash-user'),'restore'=>route('admin-trash-restore'),'purge'=>route('admin-trash-purge')]]);
+        $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') || !empty($_GET['ajax']);
+        if ($isAjax) {
+            ob_start();
+            $trashData = $data;
+            $trashError = $error;
+            $trashCsrf = $s->csrfToken('admin_trash');
+            $trashEndpoints = $this->trashEndpoints();
+            include __DIR__ . '/../views/admin/trash.php';
+            $html = ob_get_clean();
+            $this->json(true, '', [
+                'ok' => true,
+                'active_type' => $type,
+                'html' => $html,
+                'summary' => $data['summary']
+            ]);
+            return;
+        }
+        View::render('admin/trash',['currentPage'=>'admin-trash','title'=>'Papelera | Administración','bodyClass'=>'admin-trash-page','pageStyles'=>[asset('css/admin-trash.css')],'pageScript'=>asset('js/admin-trash.js'),'trashData'=>$data,'pagePagination'=>$data['pagination'],'trashError'=>$error,'trashCsrf'=>$s->csrfToken('admin_trash'),'trashEndpoints'=>$this->trashEndpoints()]);
     }
     public function trashUser():void{$this->requirePost();$s=$this->trashSession();$id=(int)($_POST['id']??0);try{(new AdminTrashModel())->trashUser($id,(string)($_POST['reason']??''),(int)$s->userId());$this->json(true,'Usuario enviado a la Papelera y acceso revocado.');}catch(InvalidArgumentException $e){$this->activityFailure($s,'user_trashed','Intentó enviar un usuario a la papelera','Papelera','user',$id,'Usuario #'.$id,$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,'user_trashed','Intentó enviar un usuario a la papelera','Papelera','user',$id,'Usuario #'.$id,$e);error_log('Trash user: '.$e->getMessage());$this->json(false,'No fue posible eliminar el usuario.',[],500);}}
-    public function restoreTrash():void{$this->requirePost();$s=$this->trashSession();$entity=(string)($_POST['entity']??'');$id=(int)($_POST['id']??0);try{$trash=new AdminTrashModel();if($entity==='support_material')$trash->restoreSupportMaterial($id,(int)$s->userId());else $trash->restore($entity,$id,(int)$s->userId());$this->json(true,'Elemento restaurado correctamente.');}catch(InvalidArgumentException $e){$this->activityFailure($s,$entity.'_restored','Intentó restaurar un elemento desde la papelera','Papelera',$entity,$id,ucfirst($entity).' #'.$id,$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,$entity.'_restored','Intentó restaurar un elemento desde la papelera','Papelera',$entity,$id,ucfirst($entity).' #'.$id,$e);$this->json(false,'No fue posible restaurar el elemento.',[],500);}}
+    public function restoreTrash():void{$this->trashOperation('restore');}
+    public function restoreTrashBatch():void{$this->trashOperation('restore_batch');}
+    public function restoreTrashAll():void{$this->trashOperation('restore_all');}
+    public function deleteTrashPermanently():void{$this->trashOperation('delete');}
+    public function deleteTrashPermanentlyBatch():void{$this->trashOperation('delete_batch');}
+    public function emptyTrashCategory():void{$this->trashOperation('empty');}
+    private function trashOperation(string $operation):void
+    {
+        $this->requirePost();$s=$this->trashSession();$entity=(string)($_POST['entity']??'');$ids=$operation==='restore_batch'||$operation==='delete_batch'?(array)($_POST['ids']??[]):[(string)($_POST['id']??'')];
+        try{$trash=new AdminTrashModel();$category=$this->trashCategory($entity);$actor=(int)$s->userId();$count=match($operation){'restore'=>$trash->restoreBatch($category,$ids,$actor),'restore_batch'=>$trash->restoreBatch($category,$ids,$actor),'restore_all'=>$trash->restoreAll($category,$actor),'delete'=>$trash->deletePermanentlyBatch($category,$ids,$actor),'delete_batch'=>$trash->deletePermanentlyBatch($category,$ids,$actor),'empty'=>$trash->emptyCategory($category,$actor)};$message=match($operation){'restore'=>'Elemento restaurado correctamente.','restore_batch'=>'Elementos restaurados correctamente.','restore_all'=>'Categoría restaurada correctamente.','delete'=>'Elemento eliminado definitivamente.','delete_batch'=>'Elementos eliminados definitivamente.','empty'=>'Categoría vaciada correctamente.'};$this->json(true,$message,['count'=>$count,'summary'=>$trash->summary()]);}
+        catch(InvalidArgumentException $e){$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){error_log('Trash operation: '.$e->getMessage());$this->json(false,'No fue posible completar la operación.',[],500);}
+    }
+    private function trashCategory(string $entity):string{return match($entity){'user','users'=>'users','project','projects'=>'projects','support_material','materials'=>'materials',default=>throw new InvalidArgumentException('La categoría solicitada no es válida.')};}
+    private function trashEndpoints():array{return ['user'=>route('admin-trash-user'),'restore'=>route('admin-trash-restore'),'restoreBatch'=>route('admin-trash-restore-batch'),'restoreAll'=>route('admin-trash-restore-all'),'delete'=>route('admin-trash-delete'),'deleteBatch'=>route('admin-trash-delete-batch'),'emptyCategory'=>route('admin-trash-empty-category'),'purge'=>route('admin-trash-purge')];}
     public function purgeTrash():void{$this->requirePost();$s=$this->trashSession();try{$r=(new AdminTrashModel())->purgeExpired((int)$s->userId());$this->json(true,'Se procesaron '.$r['users'].' usuarios y '.$r['projects'].' proyectos vencidos.',$r);}catch(Throwable $e){$this->activityFailure($s,'trash_purged','Intentó ejecutar la eliminación definitiva','Papelera','trash',null,'Elementos vencidos',$e);error_log('Purge trash: '.$e->getMessage());$this->json(false,'No fue posible procesar los elementos vencidos.',[],500);}}
     private function trashSession():AuthSessionService{$s=new AuthSessionService();if(!$s->validateCsrf('admin_trash',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);return $s;}
     public function notifications():void{$model=new AdminNotificationModel();$error=null;try{$data=$model->dashboard(PaginationService::request());}catch(Throwable $e){error_log('Admin notifications: '.$e->getMessage());$error='No fue posible consultar el centro de notificaciones.';$data=['users'=>[],'projects'=>[],'sent'=>[],'pagination'=>['total'=>0],'summary'=>['sent'=>0,'recipients'=>0,'today'=>0]];}$s=new AuthSessionService();View::render('admin/notifications',['currentPage'=>'notifications','title'=>'Notificaciones | Administración','bodyClass'=>'admin-notifications-page','pageStyles'=>[asset('css/admin-notifications.css')],'pageScript'=>asset('js/admin-notifications.js'),'adminNotifications'=>$data,'pagePagination'=>$data['pagination'],'adminNotificationsError'=>$error,'adminNotificationCsrf'=>$s->csrfToken('admin_notifications'),'adminNotificationSendEndpoint'=>route('admin-notification-send')]);}
