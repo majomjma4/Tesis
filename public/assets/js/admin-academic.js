@@ -400,9 +400,11 @@
     });
     document.querySelector('[data-revert-period]:not(:disabled)')?.addEventListener('click', event => {
         const button = event.currentTarget;
+        const reversalHours = Math.max(1, Number(config.dataset.reversalHours || 24));
+        const reversalWindow = `${reversalHours} ${reversalHours === 1 ? 'hora' : 'horas'}`;
         openConfirm(
             'Revertir cierre del período',
-            'El período anterior volverá a estar activo y el período actual regresará a estado planificado. Esta acción solo está disponible durante las primeras 24 horas posteriores al cierre y únicamente si no existe actividad académica en el nuevo período.',
+            `El período anterior volverá a estar activo y el período actual regresará a estado planificado. Esta acción solo está disponible durante ${reversalWindow} posteriores al cierre y únicamente si no existe actividad académica en el nuevo período.`,
             { kind: 'revert-period', transition: button.dataset.transitionId },
             'Revertir cierre',
             'primary'

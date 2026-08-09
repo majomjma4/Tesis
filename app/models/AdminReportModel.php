@@ -12,10 +12,10 @@ final class AdminReportModel
         $range = ['from'=>$from.' 00:00:00','to'=>$to.' 23:59:59'];
         
         $params=['from1'=>$range['from'],'to1'=>$range['to'],'from2'=>$range['from'],'to2'=>$range['to']];
-        $sql = "SELECT action, entity_type, entity_id, created_at, actor FROM (
-                    SELECT a.action, a.entity_type, a.entity_id, a.created_at, u.full_name actor FROM admin_audit_log a LEFT JOIN users u ON u.id=a.actor_user_id WHERE a.created_at BETWEEN :from1 AND :to1
+        $sql = "SELECT action, action_label, module, entity_type, entity_id, element_label, created_at, actor FROM (
+                    SELECT a.action, a.action_label, a.module, a.entity_type, a.entity_id, a.element_label, a.created_at, u.full_name actor FROM admin_audit_log a LEFT JOIN users u ON u.id=a.actor_user_id WHERE a.created_at BETWEEN :from1 AND :to1
                     UNION ALL
-                    SELECT p.action, p.entity_type, p.entity_id, p.created_at, u.full_name actor FROM project_audit_log p LEFT JOIN users u ON u.id=p.user_id WHERE p.created_at BETWEEN :from2 AND :to2
+                    SELECT p.action, NULL action_label, NULL module, p.entity_type, p.entity_id, NULL element_label, p.created_at, u.full_name actor FROM project_audit_log p LEFT JOIN users u ON u.id=p.user_id WHERE p.created_at BETWEEN :from2 AND :to2
                 ) audit_events ORDER BY created_at DESC";
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
@@ -105,11 +105,14 @@ final class AdminReportModel
 
             // Mapear traducción limpia
             $labels = $this->translateAction($action, $entityType);
+            $actionLabel = trim((string)($event['action_label'] ?? '')) ?: $labels['action_label'];
+            $elementLabel = trim((string)($event['element_label'] ?? ''));
+            $entityLabel = $elementLabel !== '' ? $elementLabel : $labels['entity_label'];
             
             // Llave de deduplicación basada en actor, acción traducida, entidad y ventana de 3 segundos
             $timestamp = strtotime($createdAt);
             $timeBlock = floor($timestamp / 3);
-            $dedupKey = $actor . '|' . $labels['action_label'] . '|' . $labels['entity_label'] . '|' . $timeBlock;
+            $dedupKey = $actor . '|' . $actionLabel . '|' . $entityLabel . '|' . $timeBlock;
 
             if (isset($seenKeys[$dedupKey])) {
                 continue;
@@ -118,10 +121,14 @@ final class AdminReportModel
 
             $filtered[] = [
                 'action' => $action,
-                'action_label' => $labels['action_label'],
+                'action_label' => $actionLabel,
                 'entity_type' => $entityType,
-                'entity_label' => $labels['entity_label'],
+                'entity_id' => $event['entity_id'] ?? null,
+                'entity_label' => $entityLabel,
+                'module' => trim((string)($event['module'] ?? '')),
+                'element_label' => $elementLabel,
                 'created_at' => $createdAt,
+                'created_at_local' => $this->formatLocalDateTime($createdAt),
                 'actor' => $actor
             ];
         }
@@ -201,6 +208,15 @@ final class AdminReportModel
         $entityLabel = $entityMap[$entityType] ?? ucfirst(str_replace('_', ' ', $entityType));
 
         return ['action_label' => $actionLabel, 'entity_label' => $entityLabel];
+    }
+
+    private function formatLocalDateTime(string $value): string
+    {
+        if (trim($value) === '') return '';
+        $timezone = (string)($GLOBALS['config']['timezone'] ?? 'America/Guayaquil');
+        return (new DateTimeImmutable($value, new DateTimeZone('UTC')))
+            ->setTimezone(new DateTimeZone($timezone))
+            ->format('d/m/Y H:i');
     }
 
     public function export(string $type, string $from, string $to): array
@@ -297,10 +313,10 @@ final class AdminReportModel
             $headers=['Código','Título','Tipo','Carrera','Período académico','Estado','Situación de revisión','Autor(es)','Tutor','Fecha de registro','Última actualización'];
             return ['headers'=>$headers,'rows'=>$rows];
         }else{
-            $sql="SELECT action, entity_type, entity_id, actor, created_at FROM (
-                    SELECT a.action, a.entity_type, a.entity_id, u.full_name actor, a.created_at FROM admin_audit_log a LEFT JOIN users u ON u.id=a.actor_user_id
+            $sql="SELECT action, action_label, module, entity_type, entity_id, element_label, actor, created_at FROM (
+                    SELECT a.action, a.action_label, a.module, a.entity_type, a.entity_id, a.element_label, u.full_name actor, a.created_at FROM admin_audit_log a LEFT JOIN users u ON u.id=a.actor_user_id
                     UNION ALL
-                    SELECT p.action, p.entity_type, p.entity_id, u.full_name actor, p.created_at FROM project_audit_log p LEFT JOIN users u ON u.id=p.user_id
+                    SELECT p.action, NULL action_label, NULL module, p.entity_type, p.entity_id, NULL element_label, u.full_name actor, p.created_at FROM project_audit_log p LEFT JOIN users u ON u.id=p.user_id
                   ) audit WHERE created_at BETWEEN :from AND :to ORDER BY created_at DESC";
             $stmt = $db->prepare($sql);
             $stmt->execute($params);
@@ -309,11 +325,11 @@ final class AdminReportModel
             $processed = $this->processEvents($rawAudit);
             $rows = array_map(function($item) {
                 return [
-                    'created_at' => date('d/m/Y H:i', strtotime($item['created_at'])),
+                    'created_at' => $item['created_at_local'],
                     'actor' => $item['actor'],
                     'action' => $item['action_label'],
-                    'entity_type' => $item['entity_label'],
-                    'entity_id' => $item['entity_id'] ?? '-',
+                    'entity_type' => $item['module'] ?: $item['entity_label'],
+                    'entity_id' => $item['element_label'] ?: '-',
                 ];
             }, $processed);
 

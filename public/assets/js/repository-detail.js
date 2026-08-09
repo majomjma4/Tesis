@@ -3757,6 +3757,7 @@ document.addEventListener("click", (event) => {
 const fileRemoveDialog = document.querySelector("[data-file-remove-dialog]");
 if (fileRemoveDialog && fileRemoveDialog.parentElement !== document.body) document.body.append(fileRemoveDialog);
 const fileRemoveConfig = fileRemoveDialog?.querySelector("[data-file-remove-config]");
+const fileRestoreHours = Number(fileRemoveConfig?.dataset.restoreHours || 24);
 const fileRemoveTitle = fileRemoveDialog?.querySelector("[data-file-remove-title]");
 const fileRemoveDescription = fileRemoveDialog?.querySelector("[data-file-remove-description]");
 const fileRemoveName = fileRemoveDialog?.querySelector("[data-file-remove-name]");
@@ -4772,8 +4773,8 @@ function openFileRemoveDialogForTargets(items, origin, bulk = false) {
         );
         fileRemoveDescription.textContent = protectedProjectRemoval
             ? (multiple
-                ? "Los archivos seleccionados dejarán de estar disponibles dentro del expediente y podrán recuperarse durante las próximas 24 horas."
-                : "El archivo dejará de estar disponible dentro del expediente y podrá recuperarse durante las próximas 24 horas.")
+                ? `Los archivos seleccionados dejarán de estar disponibles dentro del expediente y podrán recuperarse durante las próximas ${fileRestoreHours} horas.`
+                : `El archivo dejará de estar disponible dentro del expediente y podrá recuperarse durante las próximas ${fileRestoreHours} horas.`)
             : (multiple
                 ? "Los archivos seleccionados dejarán de estar disponibles en el Expediente Digital, pero permanecerán almacenados y podrán restaurarse posteriormente."
                 : "El archivo dejará de estar disponible en el Expediente Digital, pero permanecerá almacenado y podrá restaurarse posteriormente.");

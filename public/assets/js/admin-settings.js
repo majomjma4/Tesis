@@ -201,7 +201,7 @@
         const settingNames = {
             institution_name: 'Nombre de la institución', project_code_prefixes: 'Prefijos de proyectos',
             project_code_digits: 'Dígitos de códigos de proyectos', file_max_mb: 'Límite por archivo',
-            file_total_max_mb: 'Límite total por entrega', file_extensions_private: 'Formatos de Borrador',
+            file_total_max_mb: 'Límite total por operación', file_extensions_private: 'Formatos de Borrador',
             file_extensions_project: 'Formatos de Documentos del proyecto', file_extensions_support: 'Formatos de Materiales de apoyo',
             temporary_password_days: 'Vigencia de contraseña temporal', temporary_password_force_change: 'Cambio obligatorio',
             retention_users_days: 'Retención de usuarios', retention_projects_days: 'Retención de proyectos', retention_materials_days: 'Retención de materiales',

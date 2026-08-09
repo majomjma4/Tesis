@@ -117,7 +117,7 @@
                 <strong><?=e($item['action_label'])?></strong>
                 <p><?=e($item['actor']?:'Sistema')?> · <?=e($item['entity_label'])?></p>
             </div>
-            <time><?=e(date('d/m/Y H:i',strtotime($item['created_at'])))?></time>
+            <time><?=e($item['created_at_local'] ?? '')?></time>
         </article>
     <?php endforeach;?>
 
@@ -650,4 +650,3 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-

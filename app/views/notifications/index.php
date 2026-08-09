@@ -48,7 +48,7 @@
     </div>
 </section>
 
-<section class="notifications-shell is-loading" id="notificationsShell" aria-labelledby="notificationsTitle" aria-busy="true" data-csrf-token="<?= e($notificationCsrfToken) ?>" data-endpoints="<?= e(json_encode($notificationEndpoints, JSON_UNESCAPED_SLASHES)) ?>" data-is-admin="<?= $isAdmin ? 'true' : 'false' ?>">
+<section class="notifications-shell is-loading" id="notificationsShell" aria-labelledby="notificationsTitle" aria-busy="true" data-csrf-token="<?= e($notificationCsrfToken) ?>" data-endpoints="<?= e(json_encode($notificationEndpoints, JSON_UNESCAPED_SLASHES)) ?>" data-is-admin="<?= $isAdmin ? 'true' : 'false' ?>" data-trash-retention-days="<?= (int)($notificationTrashRetentionDays ?? 60) ?>">
     <header class="notifications-heading">
         <div>
             <span class="notifications-eyebrow"><i class="fa-regular fa-comments"></i> Comunicación</span>

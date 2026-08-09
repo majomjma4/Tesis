@@ -29,6 +29,7 @@ const dateFromInput = document.querySelector("#notificationDateFrom");
 const dateToInput = document.querySelector("#notificationDateTo");
 const csrfToken = shell?.dataset.csrfToken || "";
 const endpoints = JSON.parse(shell?.dataset.endpoints || "{}");
+const notificationTrashRetentionDays = Number(shell?.dataset.trashRetentionDays || 60);
 let requestController = null;
 let pendingDeleteId = null;
 let pendingDeleteMode = "archive";
@@ -176,11 +177,11 @@ function createRow(notification) {
         row.classList.add("is-hidden-notification");
     } else if (isArchived) {
         addMenuItem("restore", "Desarchivar", "Devolver a la bandeja");
-        addMenuItem("destroy", "Mover a la papelera", "Se eliminará automáticamente en 60 días", true);
+        addMenuItem("destroy", "Mover a la papelera", `Se eliminará automáticamente en ${notificationTrashRetentionDays} días`, true);
     } else {
         addMenuItem("toggle-read", notification.is_read ? "Marcar como no leída" : "Marcar como leída", "Cambiar estado de lectura");
         addMenuItem("delete", "Archivar", "Ocultar de la bandeja sin eliminar");
-        addMenuItem("destroy", "Mover a la papelera", "Se eliminará automáticamente en 60 días", true);
+        addMenuItem("destroy", "Mover a la papelera", `Se eliminará automáticamente en ${notificationTrashRetentionDays} días`, true);
     }
     actions.append(view, more, menu);
     meta.append(time, actions); row.append(dot, icon, copy, meta);
@@ -805,7 +806,7 @@ document.querySelector("#notificationModalTrashBtn")?.addEventListener("click", 
     const titleEl = document.querySelector("#notificationDeleteTitle");
     if (titleEl) titleEl.textContent = "¿Mover esta notificación a la papelera?";
     const textEl = document.querySelector("#notificationDeleteText");
-    if (textEl) textEl.textContent = "Podrás restaurarla desde Papelera durante 60 días. Después se eliminará automáticamente.";
+    if (textEl) textEl.textContent = `Podrás restaurarla desde Papelera durante ${notificationTrashRetentionDays} días. Después se eliminará automáticamente.`;
     const confirmBtn = document.querySelector("#confirmDeleteNotification");
     if (confirmBtn) confirmBtn.textContent = "Mover a la papelera";
     openModal(deleteModal);

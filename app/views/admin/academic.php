@@ -5,6 +5,7 @@ $plannedPeriod = $academic['promotion']['target'] ?? null;
 $closedPeriods = array_values(array_filter($periods, static fn(array $period): bool => ($period['status'] ?? '') === 'closed'));
 $suggestedPeriod = $academic['promotion']['suggested'] ?? null;
 $reversal = $academic['reversal'] ?? null;
+$academicReversalHours = max(1, (int) (new SystemSettingModel())->retentionDays('academic_period_reversal_hours'));
 $typeCount = count($academic['types'] ?? []);
 $materialTypeCount = count($academic['material_types'] ?? []);
 $keywordCount = count($academic['keywords'] ?? []);
@@ -368,6 +369,7 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
     data-save="<?= e($academicEndpoints['save']) ?>"
     data-promote="<?= e($academicEndpoints['promote']) ?>"
     data-revert="<?= e($academicEndpoints['revert']) ?>"
+    data-reversal-hours="<?= $academicReversalHours ?>"
     data-csrf="<?= e($academicCsrf) ?>"
     data-target-period="<?= (int) ($plannedPeriod['id'] ?? 0) ?>"
     data-close-early="<?= $activePeriodClosesEarly ? '1' : '0' ?>"

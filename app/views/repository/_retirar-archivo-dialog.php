@@ -23,6 +23,6 @@
             <button type="button" class="ed-file-remove-cancel" data-file-remove-cancel>Cancelar</button>
             <button type="button" class="ed-file-remove-confirm" data-file-remove-confirm aria-live="polite">Retirar archivo</button>
         </footer>
-        <div data-file-remove-config data-endpoint="<?= e($fileEndpoint) ?>" data-csrf="<?= e((string) ($digitalRecord['file_upload']['csrf_token'] ?? '')) ?>" data-context="<?= e((string) ($digitalRecord['file_upload']['context'] ?? '')) ?>" data-material-id="<?= (int) ($digitalRecord['entity']['id'] ?? 0) ?>" hidden></div>
+        <div data-file-remove-config data-endpoint="<?= e($fileEndpoint) ?>" data-csrf="<?= e((string) ($digitalRecord['file_upload']['csrf_token'] ?? '')) ?>" data-context="<?= e((string) ($digitalRecord['file_upload']['context'] ?? '')) ?>" data-material-id="<?= (int) ($digitalRecord['entity']['id'] ?? 0) ?>" data-restore-hours="<?= (int)(new SystemSettingModel())->retentionDays('withdrawn_file_restore_hours') ?>" hidden></div>
     </section>
 </div>
