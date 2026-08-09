@@ -390,6 +390,24 @@ body.rp-modal-active {
     margin-top: 2px;
     flex-shrink: 0;
 }
+.rp-modal-empty-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    background: #fef2f2;
+    color: #991b1b;
+    font-size: .84rem;
+    line-height: 1.4;
+}
+.rp-modal-empty-banner i {
+    color: #ef4444;
+    font-size: 1rem;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
 
 .rp-modal-footer {
     display: flex;

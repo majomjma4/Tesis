@@ -262,6 +262,13 @@
                     </div>
                 </div>
 
+                <div class="rp-modal-empty-banner" id="rpModalEmptyBanner" hidden style="display:none;">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <div id="rpModalEmptyText">
+                        No hay información para el período seleccionado. Prueba con otro alcance o un rango personalizado.
+                    </div>
+                </div>
+
                 <div class="rp-modal-grid-dates" id="rpModalCustomDates" hidden style="display:none;">
                     <div class="rp-modal-field">
                         <label for="rpModalFromInput">Desde</label>
@@ -277,11 +284,11 @@
                     <label>Formato</label>
                     <div class="rp-modal-formats">
                         <label class="rp-format-option">
-                            <input type="radio" name="format" value="pdf" checked>
+                            <input type="radio" name="format" value="word" checked>
                             <div class="rp-format-info">
-                                <strong><i class="fa-solid fa-file-pdf"></i> PDF</strong>
+                                <strong><i class="fa-solid fa-file-word" style="color: #2b579a;"></i> WORD</strong>
                                 <span class="rp-format-tag">Reporte formal</span>
-                                <small>Documento diseñado para presentar o imprimir.</small>
+                                <small>Documento diseñado para presentar, imprimir o guardar posteriormente como PDF.</small>
                             </div>
                         </label>
                         <label class="rp-format-option">
@@ -425,7 +432,14 @@ document.addEventListener('DOMContentLoaded', function() {
         return `${yyyy}-${mm}-${dd}`;
     }
 
+    const emptyBanner = document.getElementById('rpModalEmptyBanner');
+
     function updateScopeDates() {
+        if (emptyBanner) {
+            emptyBanner.hidden = true;
+            emptyBanner.style.display = 'none';
+        }
+
         const val = scopeSelect ? scopeSelect.value : 'this_month';
         if (val === 'custom') {
             customDatesGroup.hidden = false;
@@ -482,6 +496,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function closeModal() {
         if (!modal) return;
+        if (emptyBanner) {
+            emptyBanner.hidden = true;
+            emptyBanner.style.display = 'none';
+        }
         modal.hidden = true;
         modal.setAttribute('hidden', '');
         modal.setAttribute('aria-hidden', 'true');
@@ -534,8 +552,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 return false;
             }
 
-            // Descarga limpia sin redirección ni skeleton
-            setTimeout(closeModal, 350);
+            // Ocultar banner previo de vacio
+            if (emptyBanner) {
+                emptyBanner.hidden = true;
+                emptyBanner.style.display = 'none';
+            }
+
+            // Peticion previa AJAX de verificación para evitar descargas sin registros
+            e.preventDefault();
+            const submitBtn = document.getElementById('rpModalSubmitBtn');
+            if (submitBtn) submitBtn.disabled = true;
+
+            const url = new URL(exportForm.action, window.location.origin);
+            url.searchParams.set('page', 'admin-report-export');
+            url.searchParams.set('type', typeInput.value);
+            url.searchParams.set('scope', scopeSelect.value);
+            url.searchParams.set('from', fromVal);
+            url.searchParams.set('to', toVal);
+            url.searchParams.set('format', exportForm.querySelector('input[name="format"]:checked').value);
+
+            fetch(url.toString(), {
+                method: 'GET',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }).then(function(res) {
+                if (!res.ok) {
+                    return res.json().then(function(data) {
+                        throw new Error(data.message || 'No hay información para el período seleccionado.');
+                    });
+                }
+                // Si la respuesta fue OK (200), se descarga mediante iframe o redirección de ventana sin cerrar si da error
+                window.location.href = url.toString();
+                setTimeout(closeModal, 600);
+            }).catch(function(err) {
+                if (emptyBanner) {
+                    const textContainer = document.getElementById('rpModalEmptyText');
+                    if (textContainer) textContainer.textContent = err.message || 'No hay información para el período seleccionado. Prueba con otro alcance o un rango personalizado.';
+                    emptyBanner.hidden = false;
+                    emptyBanner.style.display = 'flex';
+                } else {
+                    alert(err.message);
+                }
+            }).finally(function() {
+                if (submitBtn) submitBtn.disabled = false;
+            });
         });
     }
 });

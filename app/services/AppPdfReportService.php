@@ -2,23 +2,17 @@
 
 declare(strict_types=1);
 
-require_once APP_PATH . '/services/fpdf.php';
-
 final class AppPdfReportService extends FPDF
 {
     private string $reportTitle;
     private string $subtitle;
     private array $headers;
     private array $colWidths;
+    protected float $tableStartY = 0.0;
 
     public function __construct(string $orientation = 'P', string $reportTitle = '', string $subtitle = '', array $headers = [], array $colWidths = [])
     {
         parent::__construct($orientation, 'mm', 'A4');
-        $this->w = $this->CurOrientation === 'P' ? 210 : 297;
-        $this->h = $this->CurOrientation === 'P' ? 297 : 210;
-        $this->wPt = $this->w * $this->k;
-        $this->hPt = $this->h * $this->k;
-        $this->PageBreakTrigger = $this->h - 15;
         $this->reportTitle = $reportTitle;
         $this->subtitle = $subtitle;
         $this->headers = $headers;
@@ -80,6 +74,7 @@ final class AppPdfReportService extends FPDF
         if (!empty($this->headers)) {
             $this->renderTableHeaders();
         }
+        $this->tableStartY = $this->GetY();
     }
 
     public function Footer(): void
@@ -114,6 +109,7 @@ final class AppPdfReportService extends FPDF
     public function buildReport(array $rows): void
     {
         $this->AddPage();
+        $this->SetY($this->tableStartY);
         $this->SetFont('Helvetica', '', 8);
         $this->SetTextColor(15, 23, 42);
         $this->SetDrawColor(226, 232, 240);
@@ -143,25 +139,32 @@ final class AppPdfReportService extends FPDF
             }
             $h = 5 * $maxLines;
 
-            // Verificar si la fila cabe en la página actual
+            // Verificar si la fila cabe en la página actual antes de empezar a dibujarla
             if ($this->GetY() + $h > $this->PageBreakTrigger) {
                 $this->AddPage($this->CurOrientation);
+                $this->SetY($this->tableStartY);
             }
 
-            $startX = $this->GetX();
-            $startY = $this->GetY();
+            $rowX = $this->lMargin;
+            $rowY = $this->GetY();
 
+            // Deshabilitar temporalmente el auto page break para que MultiCell no agregue páginas fantasma
+            $this->SetAutoPageBreak(false);
+
+            $currentX = $rowX;
             foreach ($cellTexts as $i => $text) {
                 $w = $this->colWidths[$i] ?? 30;
-                // Dibujar fondo de celda
-                $this->Rect($startX, $startY, $w, $h, $fill ? 'DF' : 'D');
-                // Escribir texto
-                $this->SetXY($startX, $startY);
+                // Dibujar fondo y borde de celda
+                $this->Rect($currentX, $rowY, $w, $h, $fill ? 'DF' : 'D');
+                // Escribir texto fijando posición de inicio exacta
+                $this->SetXY($currentX, $rowY);
                 $this->MultiCell($w, 5, $this->iconvText((string)$text), 0, 'L', false);
-                $startX += $w;
+                $currentX += $w;
             }
 
-            $this->SetXY($this->lMargin, $startY + $h);
+            // Restaurar auto page break y avanzar posición Y al final de la fila
+            $this->SetAutoPageBreak(true, 15);
+            $this->SetXY($this->lMargin, $rowY + $h);
             $fill = !$fill;
         }
     }

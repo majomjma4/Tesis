@@ -16,6 +16,18 @@ final class AdminController
         try{
             $model=new AdminReportModel();
             $report=$model->export($type,$from,$to);
+
+            // Si no hay registros, devolver respuesta HTTP 422 controlada sin descargar
+            if (empty($report['rows'])) {
+                http_response_code(422);
+                header('Content-Type: application/json; charset=UTF-8');
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'No hay información para el período seleccionado. Prueba con otro alcance o un rango personalizado.'
+                ]);
+                exit;
+            }
+
             $titleMap=['users'=>'Reporte de Usuarios','projects'=>'Reporte de Proyectos Académicos','audit'=>'Reporte de Auditoría y Trazabilidad'];
             $reportTitle=$titleMap[$type]??'Reporte Institucional';
             $formattedFrom=date('d/m/Y',strtotime($from));
@@ -49,16 +61,187 @@ final class AdminController
                 $suffix = date('d-m-Y', $fromTs) . '-al-' . date('d-m-Y', $toTs);
             }
 
-            $exportFilename = 'reporte-' . $type . '-' . $suffix . '.' . ($format === 'pdf' ? 'pdf' : 'csv');
+            $exportFilename = 'reporte-' . $type . '-' . $suffix . '.' . ($format === 'csv' ? 'csv' : 'doc');
 
-            if($format==='pdf'){
-                $orientation=$type==='users'?'P':'L';
-                $colWidths=['users'=>[40,55,30,25,25,35,35],'projects'=>[24,55,32,32,25,25,32,38,35,26,26],'audit'=>[28,40,65,35,28]];
-                $widths=$colWidths[$type]??array_fill(0,count($report['headers']),30);
-                $pdf=new AppPdfReportService($orientation,$reportTitle,$subtitle,$report['headers'],$widths);
-                $pdf->SetTitle($reportTitle);
-                $pdf->buildReport($report['rows']);
-                $pdf->Output('D',$exportFilename);
+            if ($format === 'word' || $format === 'doc' || $format === 'pdf') {
+                $rootPath = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
+                $logoLibertadorFile = $rootPath . '/public/assets/img/logo_libertador.png';
+                $logoDsFile = $rootPath . '/public/assets/img/logo_ds.png';
+
+                $logoLibertadorSrc = is_file($logoLibertadorFile) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoLibertadorFile)) : '';
+                $logoDsSrc = is_file($logoDsFile) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoDsFile)) : '';
+
+                while (ob_get_level() > 0) {
+                    ob_end_clean();
+                }
+
+                header('Content-Type: application/msword; charset=UTF-8');
+                header('Content-Disposition: attachment; filename="' . $exportFilename . '"');
+
+                ob_start();
+                ?>
+<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="UTF-8">
+<title><?=e($reportTitle)?></title>
+<!--[if gte mso 9]>
+<xml>
+ <w:WordDocument>
+  <w:View>Print</w:View>
+  <w:Zoom>100</w:Zoom>
+  <w:DoNotOptimizeForBrowser/>
+ </w:WordDocument>
+</xml>
+<![endif]-->
+<style>
+    @page {
+        size: A4 <?= $type === 'users' ? 'portrait' : 'landscape' ?>;
+        margin: 2cm 1.5cm 2cm 1.5cm;
+    }
+    body {
+        font-family: 'Segoe UI', Arial, sans-serif;
+        font-size: 10pt;
+        color: #0f172a;
+        background-color: #ffffff;
+        margin: 0;
+        padding: 0;
+    }
+    .header-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 12px;
+    }
+    .header-table td {
+        vertical-align: middle;
+        border: none;
+        padding: 4px;
+    }
+    .logo-img {
+        max-width: 90px;
+        max-height: 70px;
+        height: auto;
+    }
+    .institution-name {
+        font-size: 13pt;
+        font-weight: bold;
+        color: #1e3a8a;
+        text-align: center;
+        margin: 0;
+        text-transform: uppercase;
+    }
+    .career-name {
+        font-size: 10pt;
+        font-weight: bold;
+        color: #059669;
+        text-align: center;
+        margin: 2px 0 0 0;
+    }
+    .divider-line {
+        border-bottom: 2px solid #cbd5e1;
+        margin-bottom: 16px;
+    }
+    .report-title {
+        font-size: 14pt;
+        font-weight: bold;
+        color: #0f172a;
+        text-align: center;
+        margin: 10px 0 4px 0;
+        text-transform: uppercase;
+    }
+    .report-meta {
+        font-size: 9pt;
+        color: #64748b;
+        text-align: center;
+        margin-bottom: 16px;
+        font-style: italic;
+    }
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    .data-table th {
+        background-color: #1e3a8a;
+        color: #ffffff;
+        font-size: 9pt;
+        font-weight: bold;
+        text-align: left;
+        padding: 8px 10px;
+        border: 1px solid #cbd5e1;
+    }
+    .data-table td {
+        font-size: 9pt;
+        padding: 7px 10px;
+        border: 1px solid #e2e8f0;
+        vertical-align: top;
+    }
+    .data-table tr:nth-child(even) td {
+        background-color: #f8fafc;
+    }
+    .footer-note {
+        margin-top: 24px;
+        font-size: 8pt;
+        color: #94a3b8;
+        text-align: right;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 6px;
+    }
+</style>
+</head>
+<body>
+
+<table class="header-table">
+    <tr>
+        <td style="width: 20%; text-align: left;">
+            <?php if ($logoLibertadorSrc): ?>
+                <img src="<?=$logoLibertadorSrc?>" class="logo-img" alt="Instituto El Libertador">
+            <?php endif; ?>
+        </td>
+        <td style="width: 60%; text-align: center;">
+            <div class="institution-name">Instituto Superior Tecnológico "El Libertador"</div>
+            <div class="career-name">Tecnología en Desarrollo de Software</div>
+        </td>
+        <td style="width: 20%; text-align: right;">
+            <?php if ($logoDsSrc): ?>
+                <img src="<?=$logoDsSrc?>" class="logo-img" alt="Desarrollo de Software">
+            <?php endif; ?>
+        </td>
+    </tr>
+</table>
+
+<div class="divider-line"></div>
+
+<div class="report-title"><?=e($reportTitle)?></div>
+<div class="report-meta"><?=e($subtitle)?></div>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <?php foreach ($report['headers'] as $header): ?>
+                <th><?=e($header)?></th>
+            <?php endforeach; ?>
+        </tr>
+    </thead>
+    <tbody>
+        <?php foreach ($report['rows'] as $row): ?>
+            <tr>
+                <?php foreach ($row as $cell): ?>
+                    <td><?=nl2br(e((string)$cell))?></td>
+                <?php endforeach; ?>
+            </tr>
+        <?php endforeach; ?>
+    </tbody>
+</table>
+
+<div class="footer-note">
+    Documento institucional generado automáticamente por el Sistema de Gestión Documental Académica - <?=e(date('d/m/Y H:i'))?>
+</div>
+
+</body>
+</html>
+                <?php
+                echo ob_get_clean();
                 exit;
             }
 
