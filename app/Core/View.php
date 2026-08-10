@@ -68,6 +68,7 @@ final class View
             'notificationOpenEndpoint' => route('notifications/open'),
             'layoutUserName' => (new AuthSessionService())->name(),
             'layoutUserEmail' => (new AuthSessionService())->email(),
+            'layoutAvatarUrl' => $session->avatarPath() !== null ? route('profile-avatar') . '&v=' . rawurlencode((string) $session->avatarUpdatedAt()) : null,
             'layoutUserRoles' => (new AuthSessionService())->roles(),
             'layoutIsAdmin' => (new AuthSessionService())->hasAdminAccess(),
             'layoutIsInitialAdmin' => (new AuthSessionService())->isInitialAdmin(),

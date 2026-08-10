@@ -11,12 +11,14 @@
     const initial = {
         fullName: String(form.elements.full_name?.value ?? '').trim(),
         email: String(form.elements.email?.value ?? '').trim().toLowerCase(),
+        username: String(form.elements.username?.value ?? '').trim(),
     };
     let confirmationAccepted = false;
 
     const hasChanges = () => (
         String(form.elements.full_name?.value ?? '').trim() !== initial.fullName
         || String(form.elements.email?.value ?? '').trim().toLowerCase() !== initial.email
+        || String(form.elements.username?.value ?? '').trim() !== initial.username
     );
 
     const syncSubmitState = () => {

@@ -9,7 +9,7 @@ final class AccountController
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             if (!$session->validateCsrf('profile', (string) ($_POST['_csrf'] ?? ''))) $error = 'La sesión del formulario venció.';
             else try {
-                $changes = $model->updateProfile((int) $session->userId(), trim((string) ($_POST['full_name'] ?? '')), mb_strtolower(trim((string) ($_POST['email'] ?? ''))), (string) ($_POST['current_password'] ?? ''));
+                $changes = $model->updateProfile((int) $session->userId(), trim((string) ($_POST['full_name'] ?? '')), mb_strtolower(trim((string) ($_POST['email'] ?? ''))), trim((string) ($_POST['username'] ?? '')), (string) ($_POST['current_password'] ?? ''));
                 $identity = $model->sessionIdentity((int) $session->userId());
                 if (!$identity) throw new RuntimeException('La cuenta dejó de estar disponible.');
                 $session->refresh($identity);
@@ -50,15 +50,111 @@ final class AccountController
         $this->json(true, 'Aviso descartado por hoy.');
     }
 
+    public function updateAvatar(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') $this->json(false, 'Método no permitido.', 405);
+        $session = new AuthSessionService();
+        try { $userId = $this->authenticatedUserId($session); }
+        catch (Throwable) { $this->json(false, 'La sesión no está activa.', 403); }
+        if (!$session->validateCsrf('profile_avatar', (string) ($_POST['_csrf'] ?? ''))) $this->json(false, 'La sesión del formulario venció.', 403);
+
+        $storage = new ProfileAvatarStorageService();
+        $model = new AuthModel();
+        $stored = [];
+        $persisted = false;
+        try {
+            $upload = $_FILES['avatar'] ?? null;
+            if (!is_array($upload)) throw new InvalidArgumentException('Selecciona una fotografía.');
+            $stored = $storage->store($upload);
+            $previous = $model->replaceAvatar($userId, (string) $stored['path']);
+            $persisted = true;
+            if ($previous !== null && !$storage->delete($previous)) error_log('Previous profile avatar cleanup failed for user ' . $userId);
+            $identity = $model->sessionIdentity($userId);
+            if (!$identity) throw new RuntimeException('La cuenta dejó de estar disponible.');
+            $session->refresh($identity);
+            $this->json(true, 'Fotografía de perfil actualizada.', 200, ['avatar_url' => $this->avatarUrl($identity['avatar_updated_at'] ?? null)]);
+        } catch (InvalidArgumentException $exception) {
+            if (!$persisted) $storage->discard($stored);
+            $this->json(false, $exception->getMessage(), 422);
+        } catch (Throwable $exception) {
+            if (!$persisted) $storage->discard($stored);
+            error_log('Profile avatar update: ' . $exception->getMessage());
+            $this->json(false, 'No fue posible guardar la fotografía.', 500);
+        }
+    }
+
+    public function removeAvatar(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') $this->json(false, 'Método no permitido.', 405);
+        $session = new AuthSessionService();
+        try { $userId = $this->authenticatedUserId($session); }
+        catch (Throwable) { $this->json(false, 'La sesión no está activa.', 403); }
+        if (!$session->validateCsrf('profile_avatar', (string) ($_POST['_csrf'] ?? ''))) $this->json(false, 'La sesión del formulario venció.', 403);
+
+        try {
+            $previous = (new AuthModel())->removeAvatar($userId);
+            if (!(new ProfileAvatarStorageService())->delete($previous)) error_log('Profile avatar file was unavailable during removal for user ' . $userId);
+            $identity = (new AuthModel())->sessionIdentity($userId);
+            if (!$identity) throw new RuntimeException('La cuenta dejó de estar disponible.');
+            $session->refresh($identity);
+            $this->json(true, 'Fotografía de perfil eliminada.', 200, ['avatar_url' => null]);
+        } catch (InvalidArgumentException $exception) {
+            $this->json(false, $exception->getMessage(), 422);
+        } catch (Throwable $exception) {
+            error_log('Profile avatar removal: ' . $exception->getMessage());
+            $this->json(false, 'No fue posible eliminar la fotografía.', 500);
+        }
+    }
+
+    public function avatar(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') { http_response_code(405); exit; }
+        $session = new AuthSessionService();
+        try { $userId = $this->authenticatedUserId($session); }
+        catch (Throwable) { http_response_code(403); exit; }
+        try {
+            $path = (new AuthModel())->avatarPath($userId);
+            if ($path === null) throw new RuntimeException('Avatar absent.');
+            $file = (new ProfileAvatarStorageService())->resolve($path);
+            header('Content-Type: ' . $file['mime']);
+            header('Content-Length: ' . (string) filesize($file['path']));
+            header('Content-Disposition: inline');
+            header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: private, max-age=3600');
+            readfile($file['path']);
+            exit;
+        } catch (Throwable) {
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=utf-8');
+            exit('Fotografía no disponible.');
+        }
+    }
+
     public function forbidden(): void
     {
         http_response_code(403);
         View::render('errors/403', ['currentPage'=>'','title'=>'Acceso no autorizado | Gestión Académica','bodyClass'=>'error-page','pageStyles'=>[asset('css/admin-access.css')]], 'error');
     }
 
-    private function json(bool $success, string $message, int $status = 200): never
+    private function avatarUrl(mixed $updatedAt): string
+    {
+        return route('profile-avatar') . '&v=' . rawurlencode((string) $updatedAt);
+    }
+
+    private function authenticatedUserId(AuthSessionService $session): int
+    {
+        $userId = (int) ($session->userId() ?? 0);
+        if ($userId < 1) throw new RuntimeException('Inactive session.');
+        $identity = (new AuthModel())->sessionIdentity($userId);
+        if (!$identity || ($identity['status'] ?? '') !== 'active' || (int) ($identity['session_version'] ?? 0) !== $session->sessionVersion()) {
+            throw new RuntimeException('Inactive session.');
+        }
+        return $userId;
+    }
+
+    private function json(bool $success, string $message, int $status = 200, array $data = []): never
     {
         http_response_code($status); header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['success'=>$success,'message'=>$message], JSON_UNESCAPED_UNICODE); exit;
+        echo json_encode(['success'=>$success,'message'=>$message,'data'=>$data], JSON_UNESCAPED_UNICODE); exit;
     }
 }

@@ -116,12 +116,25 @@
 
                 <div class="avatar-menu">
                     <button class="user-avatar" id="avatarButton" type="button" aria-label="Abrir menu de usuario" aria-expanded="false">
-                        <?= e(mb_strtoupper(mb_substr($layoutUserName ?? 'U', 0, 1, 'UTF-8'), 'UTF-8')) ?>
+                        <?php if(!empty($layoutAvatarUrl)): ?><img src="<?= e((string) $layoutAvatarUrl) ?>" alt=""><?php else: ?><?= e(mb_strtoupper(mb_substr($layoutUserName ?? 'U', 0, 1, 'UTF-8'), 'UTF-8')) ?><?php endif; ?>
                     </button>
                     <div class="avatar-dropdown" id="avatarDropdown">
                         <div class="avatar-dropdown-identity"><strong><?= e($layoutUserName ?? 'Usuario') ?></strong><small><?= e($layoutUserEmail ?? '') ?></small></div>
-                        <a href="<?= e(route('profile')) ?>">Mi perfil</a>
-                        <a href="<?= e(route('change-password')) ?>">Cambiar contraseña</a>
+                        <?php
+                            $currentUri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+                            $isProfileRoute = str_contains($currentUri, 'page=profile');
+                            $isChangePasswordRoute = str_contains($currentUri, 'page=change-password');
+                        ?>
+                        <?php if ($isProfileRoute): ?>
+                            <span class="avatar-dropdown-active-item" aria-current="page">Mi perfil</span>
+                        <?php else: ?>
+                            <a href="<?= e(route('profile')) ?>">Mi perfil</a>
+                        <?php endif; ?>
+                        <?php if ($isChangePasswordRoute): ?>
+                            <span class="avatar-dropdown-active-item" aria-current="page">Cambiar contraseña</span>
+                        <?php else: ?>
+                            <a href="<?= e(route('change-password')) ?>">Cambiar contraseña</a>
+                        <?php endif; ?>
                         <button type="button" class="danger-option js-logout-trigger">Cerrar sesión</button>
                     </div>
                 </div>

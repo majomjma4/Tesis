@@ -31,6 +31,8 @@ final class AuthSessionService
         $_SESSION['password_warning_count'] = (int) ($user['password_warning_count'] ?? 0);
         $_SESSION['temporary_password_expires_at'] = $user['temporary_password_expires_at'] ?? null;
         $_SESSION['temporary_password_last_warning_at'] = $user['temporary_password_last_warning_at'] ?? null;
+        $_SESSION['avatar_path'] = $user['avatar_path'] ?? null;
+        $_SESSION['avatar_updated_at'] = $user['avatar_updated_at'] ?? null;
     }
 
     public function logout(): void
@@ -47,6 +49,9 @@ final class AuthSessionService
     public function isInitialAdmin(): bool { $this->start(); return (bool)($_SESSION['is_initial_admin']??false); }
     public function name(): string { $this->start(); return (string)($_SESSION['user_name']??'Usuario'); }
     public function email(): string { $this->start(); return (string)($_SESSION['user_email']??''); }
+    public function sessionVersion(): int { $this->start(); return (int) ($_SESSION['session_version'] ?? 0); }
+    public function avatarPath(): ?string { $this->start(); $path=$_SESSION['avatar_path']??null; return is_string($path)&&$path!==''?$path:null; }
+    public function avatarUpdatedAt(): ?string { $this->start(); $value=$_SESSION['avatar_updated_at']??null; return is_string($value)&&$value!==''?$value:null; }
     public function passwordWarningCount(): int { $this->start(); return (int)($_SESSION['password_warning_count']??0); }
     public function mustChangePassword(): bool { $this->start(); return (bool)($_SESSION['must_change_password']??false); }
     public function temporaryPasswordExpiresAt(): ?string { $this->start(); return isset($_SESSION['temporary_password_expires_at']) ? (string)$_SESSION['temporary_password_expires_at'] : null; }
@@ -79,7 +84,7 @@ final class AuthSessionService
     }
     public function refresh(array $identity): void
     {
-        $this->start(); $_SESSION['user_name']=(string)$identity['full_name'];$_SESSION['user_email']=(string)$identity['email'];$_SESSION['roles']=$identity['roles'];$_SESSION['role']=(string)($identity['roles'][0]??'student');$_SESSION['is_admin']=(bool)($identity['is_admin']??false);$_SESSION['is_initial_admin']=(bool)($identity['is_initial_admin']??false);$_SESSION['session_version']=(int)$identity['session_version'];$_SESSION['must_change_password']=(bool)$identity['must_change_password'];$_SESSION['password_warning_count']=(int)$identity['password_warning_count'];$_SESSION['temporary_password_expires_at']=$identity['temporary_password_expires_at'];$_SESSION['temporary_password_last_warning_at']=$identity['temporary_password_last_warning_at']??$_SESSION['temporary_password_last_warning_at']??null;
+        $this->start(); $_SESSION['user_name']=(string)$identity['full_name'];$_SESSION['user_email']=(string)$identity['email'];$_SESSION['roles']=$identity['roles'];$_SESSION['role']=(string)($identity['roles'][0]??'student');$_SESSION['is_admin']=(bool)($identity['is_admin']??false);$_SESSION['is_initial_admin']=(bool)($identity['is_initial_admin']??false);$_SESSION['session_version']=(int)$identity['session_version'];$_SESSION['must_change_password']=(bool)$identity['must_change_password'];$_SESSION['password_warning_count']=(int)$identity['password_warning_count'];$_SESSION['temporary_password_expires_at']=$identity['temporary_password_expires_at'];$_SESSION['temporary_password_last_warning_at']=$identity['temporary_password_last_warning_at']??$_SESSION['temporary_password_last_warning_at']??null;$_SESSION['avatar_path']=$identity['avatar_path']??null;$_SESSION['avatar_updated_at']=$identity['avatar_updated_at']??null;
     }
 
     public function csrfToken(string $scope): string
