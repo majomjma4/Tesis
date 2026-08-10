@@ -381,9 +381,7 @@ async function openRecentNotification(item) {
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || "No fue posible abrir la notificacion.");
     updateTopbarNotificationCount(payload.data.counters.unread);
-    const notificationsUrl = new URL(topbarNotificationsPanel?.querySelector("footer a")?.href || fallbackUrl, window.location.href);
-    notificationsUrl.searchParams.set("notification_id", notificationId);
-    window.location.assign(notificationsUrl.href);
+    window.location.assign(payload.data?.url || fallbackUrl);
 }
 
 async function loadRecentNotifications() {
@@ -423,6 +421,7 @@ topbarNotificationsList?.addEventListener("click", async (event) => {
     } catch (error) {
         item.removeAttribute("aria-busy");
         console.error(error);
+        window.location.assign(item.href);
     }
 });
 
