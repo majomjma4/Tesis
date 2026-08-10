@@ -1,17 +1,78 @@
 <main class="admin-access-shell<?= $forcedPasswordChange ? ' forced-password-shell' : '' ?>">
-    <?php if (!$forcedPasswordChange): ?><nav aria-label="Migas de pan"><a href="<?= e(route('dashboard')) ?>">Inicio</a><i class="fa-solid fa-chevron-right"></i><span>Cambiar contraseña</span></nav><?php endif; ?>
+    <?php if (!$forcedPasswordChange): ?>
+        <nav aria-label="Migas de pan"><a href="<?= e(route('dashboard')) ?>">Inicio</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span>Cambiar contraseña</span></nav>
+    <?php endif; ?>
     <section class="admin-access-card">
-        <span class="admin-access-icon"><i class="fa-solid fa-shield-halved"></i></span>
-        <p class="admin-access-eyebrow">Seguridad de la cuenta</p><h1><?= $forcedPasswordChange ? 'Actualiza tu contraseña para continuar' : 'Cambiar contraseña' ?></h1>
+        <span class="admin-access-icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
+        <p class="admin-access-eyebrow">Seguridad de la cuenta</p>
+        <h1><?= $forcedPasswordChange ? 'Actualiza tu contraseña para continuar' : 'Cambiar contraseña' ?></h1>
         <p><?= $forcedPasswordChange ? 'La contraseña temporal llegó a su límite de avisos o venció.' : 'El cambio cerrará las demás sesiones abiertas de tu cuenta.' ?></p>
-        <?php if($passwordError): ?><div class="admin-access-alert is-error" role="alert"><?= e($passwordError) ?></div><?php endif; ?>
-        <?php if($passwordSuccess): ?><div class="admin-access-alert is-success" role="status"><?= e($passwordSuccess) ?> <a href="<?= e(route('dashboard')) ?>">Volver al inicio</a></div><?php endif; ?>
-        <form method="post" class="admin-password-form" novalidate>
+
+        <?php if($passwordError): ?>
+            <div class="admin-access-alert is-error" role="alert"><?= e($passwordError) ?></div>
+        <?php endif; ?>
+        <?php if($passwordSuccess): ?>
+            <div class="admin-access-alert is-success" role="status">
+                <p><?= e($passwordSuccess) ?></p>
+                <div class="admin-access-success-action">
+                    <a href="<?= e(route('logout')) ?>" class="admin-access-primary"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Iniciar sesión de nuevo</a>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <?php if(!$passwordSuccess): ?>
+        <form method="post" class="admin-password-form" id="changePasswordForm" novalidate>
             <input type="hidden" name="_csrf" value="<?= e($passwordCsrfToken) ?>">
-            <label><span>Contraseña actual</span><input type="password" name="current_password" autocomplete="current-password" required></label>
-            <label><span>Nueva contraseña</span><input type="password" name="new_password" autocomplete="new-password" minlength="8" required><small>Mínimo 8 caracteres, mayúscula, minúscula, número y símbolo.</small></label>
-            <label><span>Confirmar nueva contraseña</span><input type="password" name="new_password_confirmation" autocomplete="new-password" required></label>
-            <button type="submit"><i class="fa-solid fa-key"></i> Actualizar contraseña</button>
+
+            <label class="password-field-group">
+                <span>Contraseña actual</span>
+                <div class="password-input-wrapper">
+                    <input type="password" id="currentPassword" name="current_password" autocomplete="current-password" placeholder="Ingresa tu contraseña actual" required>
+                    <button type="button" class="password-toggle-btn" aria-label="Mostrar contraseña" tabindex="0">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </label>
+
+            <label class="password-field-group">
+                <span>Nueva contraseña</span>
+                <div class="password-input-wrapper">
+                    <input type="password" id="newPassword" name="new_password" autocomplete="new-password" placeholder="Crea una nueva contraseña" minlength="8" required>
+                    <button type="button" class="password-toggle-btn" aria-label="Mostrar contraseña" tabindex="0">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </label>
+
+            <div class="password-requirements" id="passwordRequirements" aria-live="polite">
+                <p class="password-req-title">Tu contraseña debe incluir:</p>
+                <ul class="password-req-list">
+                    <li data-req="length"><span class="req-icon" aria-hidden="true"><i class="fa-solid fa-xmark"></i></span> 8 caracteres o más</li>
+                    <li data-req="uppercase"><span class="req-icon" aria-hidden="true"><i class="fa-solid fa-xmark"></i></span> Una letra mayúscula</li>
+                    <li data-req="lowercase"><span class="req-icon" aria-hidden="true"><i class="fa-solid fa-xmark"></i></span> Una letra minúscula</li>
+                    <li data-req="number"><span class="req-icon" aria-hidden="true"><i class="fa-solid fa-xmark"></i></span> Un número</li>
+                    <li data-req="symbol"><span class="req-icon" aria-hidden="true"><i class="fa-solid fa-xmark"></i></span> Un símbolo</li>
+                </ul>
+            </div>
+
+            <label class="password-field-group">
+                <span>Confirmar nueva contraseña</span>
+                <div class="password-input-wrapper">
+                    <input type="password" id="confirmPassword" name="new_password_confirmation" autocomplete="new-password" placeholder="Repite la nueva contraseña" required>
+                    <button type="button" class="password-toggle-btn" aria-label="Mostrar contraseña" tabindex="0">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </label>
+
+            <div class="password-match-status" id="passwordMatchStatus" hidden aria-live="polite"></div>
+
+            <button type="submit" id="submitPasswordBtn" disabled aria-disabled="true">
+                <i class="fa-solid fa-key" aria-hidden="true"></i> Actualizar contraseña
+            </button>
         </form>
+        <?php endif; ?>
     </section>
 </main>
+
+<script src="<?= e(asset('js/account-change-password.js')) ?>"></script>

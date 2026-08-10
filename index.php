@@ -29,6 +29,8 @@ $page = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
 
 match ($page) {
     'login' => (new AuthController())->login(),
+    'login-session-replace' => (new AuthController())->replaceActiveSession(),
+    'login-session-replace-cancel' => (new AuthController())->cancelSessionReplacement(),
     'logout' => (new AuthController())->logout(),
     'change-password' => (new AccountController())->changePassword(),
     'dismiss-temp-password-warning' => (new AccountController())->dismissTemporaryPasswordWarning(),

@@ -15,9 +15,50 @@ final class AuthSessionService
         session_start();
     }
 
-    public function login(array $user): void
+    public function login(array $user): ?array
     {
-        $this->start(); session_regenerate_id(true);
+        $this->start();
+        $opened = (new UserSessionRegistryService())->openIfNoActiveSession((int) $user['id'], (int) ($user['session_version'] ?? 1));
+        if ($opened['conflict'] !== null) return $opened['conflict'];
+        $this->completeLogin($user, (string) $opened['token']);
+        return null;
+    }
+
+    public function loginReplacingActiveSession(array $user): void
+    {
+        $this->start();
+        $token = (new UserSessionRegistryService())->replaceActiveSessionsAndOpen((int) $user['id'], (int) ($user['session_version'] ?? 1));
+        $this->completeLogin($user, $token);
+    }
+
+    public function beginSessionReplacementChallenge(int $userId, int $sessionVersion, string $deviceLabel): void
+    {
+        $this->start();
+        $_SESSION['session_replacement_challenge'] = ['user_id' => $userId, 'session_version' => $sessionVersion, 'device_label' => mb_substr($deviceLabel, 0, 120), 'nonce' => bin2hex(random_bytes(32)), 'expires_at' => time() + 300];
+    }
+
+    public function sessionReplacementChallenge(): ?array
+    {
+        $this->start(); $challenge = $_SESSION['session_replacement_challenge'] ?? null;
+        if (!is_array($challenge) || (int) ($challenge['expires_at'] ?? 0) < time() || (int) ($challenge['user_id'] ?? 0) < 1) { unset($_SESSION['session_replacement_challenge']); return null; }
+        return $challenge;
+    }
+
+    public function consumeSessionReplacementChallenge(): ?array
+    {
+        $challenge = $this->sessionReplacementChallenge();
+        unset($_SESSION['session_replacement_challenge']);
+        return $challenge;
+    }
+
+    public function clearSessionReplacementChallenge(): void
+    {
+        $this->start(); unset($_SESSION['session_replacement_challenge']);
+    }
+
+    private function completeLogin(array $user, string $token): void
+    {
+        session_regenerate_id(true);
         $_SESSION['user_id'] = (int) $user['id'];
         $_SESSION['user_name'] = (string) $user['full_name'];
         $_SESSION['user_email'] = (string) $user['email'];
@@ -33,16 +74,68 @@ final class AuthSessionService
         $_SESSION['temporary_password_last_warning_at'] = $user['temporary_password_last_warning_at'] ?? null;
         $_SESSION['avatar_path'] = $user['avatar_path'] ?? null;
         $_SESSION['avatar_updated_at'] = $user['avatar_updated_at'] ?? null;
+        $_SESSION['logical_session_token'] = $token;
+        unset($_SESSION['session_replacement_challenge']);
     }
 
-    public function logout(): void
+    public function logout(?string $notice = null): void
     {
-        $this->start(); $_SESSION = [];
-        if (ini_get('session.use_cookies')) { $params = session_get_cookie_params(); setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']); }
-        session_destroy();
+        $this->start();
+        $userId = (int) ($_SESSION['user_id'] ?? 0);
+        $token = (string) ($_SESSION['logical_session_token'] ?? '');
+        if ($userId > 0 && $token !== '') {
+            try { (new UserSessionRegistryService())->revoke($userId, $token); }
+            catch (Throwable $exception) { error_log('Logical session logout cleanup: ' . $exception->getMessage()); }
+        }
+
+        $_SESSION = [];
+
+        if ($notice !== null && $notice !== '') {
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_regenerate_id(true);
+            }
+            $_SESSION['auth_notice'] = $notice;
+            session_write_close();
+        } else {
+            if (ini_get('session.use_cookies')) {
+                $params = session_get_cookie_params();
+                setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+            }
+            session_destroy();
+        }
     }
 
     public function isAuthenticated(): bool { $this->start(); return isset($_SESSION['user_id']) && (int) $_SESSION['user_id'] > 0; }
+    public function hasValidLogicalSession(): bool
+    {
+        $this->start();
+        try {
+            return (new UserSessionRegistryService())->isValid((int) ($_SESSION['user_id'] ?? 0), (string) ($_SESSION['logical_session_token'] ?? ''), (int) ($_SESSION['session_version'] ?? 0));
+        } catch (Throwable $exception) {
+            error_log('Logical session validation: ' . $exception->getMessage());
+            return false;
+        }
+    }
+    public function validateLogicalSession(bool $touchActivity): string
+    {
+        $this->start();
+        try { return (new UserSessionRegistryService())->validateActivity((int) ($_SESSION['user_id'] ?? 0), (string) ($_SESSION['logical_session_token'] ?? ''), (int) ($_SESSION['session_version'] ?? 0), $touchActivity); }
+        catch (Throwable $exception) { error_log('Logical session activity validation: ' . $exception->getMessage()); return 'invalid'; }
+    }
+    public function rememberInvalidSessionReason(string $reason): void
+    {
+        $this->start(); if ($reason === 'inactivity') $_SESSION['logical_session_invalid_reason'] = 'inactivity';
+    }
+    public function invalidSessionReason(): ?string
+    {
+        $this->start(); return ($_SESSION['logical_session_invalid_reason'] ?? null) === 'inactivity' ? 'inactivity' : null;
+    }
+    public function logicalSessionWasRevoked(): bool
+    {
+        $this->start();
+        try { return (new UserSessionRegistryService())->isRevoked((int) ($_SESSION['user_id'] ?? 0), (string) ($_SESSION['logical_session_token'] ?? '')); }
+        catch (Throwable) { return false; }
+    }
     public function userId(): ?int { return $this->isAuthenticated() ? (int) $_SESSION['user_id'] : null; }
     public function roles(): array { $this->start(); return array_values(array_filter(array_map('strval', (array) ($_SESSION['roles'] ?? [$_SESSION['role'] ?? ''])))); }
     public function hasAdminAccess(): bool { $this->start(); return (bool)($_SESSION['is_admin']??false); }
@@ -84,7 +177,9 @@ final class AuthSessionService
     }
     public function refresh(array $identity): void
     {
-        $this->start(); $_SESSION['user_name']=(string)$identity['full_name'];$_SESSION['user_email']=(string)$identity['email'];$_SESSION['roles']=$identity['roles'];$_SESSION['role']=(string)($identity['roles'][0]??'student');$_SESSION['is_admin']=(bool)($identity['is_admin']??false);$_SESSION['is_initial_admin']=(bool)($identity['is_initial_admin']??false);$_SESSION['session_version']=(int)$identity['session_version'];$_SESSION['must_change_password']=(bool)$identity['must_change_password'];$_SESSION['password_warning_count']=(int)$identity['password_warning_count'];$_SESSION['temporary_password_expires_at']=$identity['temporary_password_expires_at'];$_SESSION['temporary_password_last_warning_at']=$identity['temporary_password_last_warning_at']??$_SESSION['temporary_password_last_warning_at']??null;$_SESSION['avatar_path']=$identity['avatar_path']??null;$_SESSION['avatar_updated_at']=$identity['avatar_updated_at']??null;
+        $this->start(); $previousVersion=(int)($_SESSION['session_version']??0);$_SESSION['user_name']=(string)$identity['full_name'];$_SESSION['user_email']=(string)$identity['email'];$_SESSION['roles']=$identity['roles'];$_SESSION['role']=(string)($identity['roles'][0]??'student');$_SESSION['is_admin']=(bool)($identity['is_admin']??false);$_SESSION['is_initial_admin']=(bool)($identity['is_initial_admin']??false);$_SESSION['session_version']=(int)$identity['session_version'];$_SESSION['must_change_password']=(bool)$identity['must_change_password'];$_SESSION['password_warning_count']=(int)$identity['password_warning_count'];$_SESSION['temporary_password_expires_at']=$identity['temporary_password_expires_at'];$_SESSION['temporary_password_last_warning_at']=$identity['temporary_password_last_warning_at']??$_SESSION['temporary_password_last_warning_at']??null;$_SESSION['avatar_path']=$identity['avatar_path']??null;$_SESSION['avatar_updated_at']=$identity['avatar_updated_at']??null;
+        if($previousVersion!==(int)$_SESSION['session_version'])try { (new UserSessionRegistryService())->synchronizeVersion((int) ($_SESSION['user_id'] ?? 0), (string) ($_SESSION['logical_session_token'] ?? ''), (int) $_SESSION['session_version']); }
+        catch (Throwable $exception) { error_log('Logical session version sync: ' . $exception->getMessage()); }
     }
 
     public function csrfToken(string $scope): string

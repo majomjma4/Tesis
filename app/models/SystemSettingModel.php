@@ -34,6 +34,7 @@ final class SystemSettingModel
             'academic_period_reversal_hours'=>24,
             'academic_period_reminder_days'=>7,
             'calendar_reminder_days'=>3
+            ,'session_inactivity_minutes'=>30
         ];
     }
 
@@ -76,6 +77,13 @@ final class SystemSettingModel
     {
         $all = $this->all();
         return (int) ($all[$key] ?? $this->defaults()[$key] ?? 60);
+    }
+
+    public function sessionInactivityMinutes(): int
+    {
+        try { $value = (int) ($this->all()['session_inactivity_minutes'] ?? 30); }
+        catch (Throwable) { $value = 30; }
+        return $value >= 1 && $value <= 1440 ? $value : 30;
     }
 
     public function save(array $input,int $actor):array

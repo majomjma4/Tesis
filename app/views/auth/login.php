@@ -91,3 +91,17 @@
     </section>
     <!-- Final de panel de acceso -->
 </main>
+<?php if(is_array($sessionReplacementChallenge ?? null)): ?>
+<div class="login-session-modal-overlay" data-session-replacement-modal>
+    <section class="login-session-modal" role="dialog" aria-modal="true" aria-labelledby="sessionReplacementTitle" aria-describedby="sessionReplacementDescription">
+        <span class="login-session-modal-icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
+        <h2 id="sessionReplacementTitle">Ya existe una sesión activa</h2>
+        <p id="sessionReplacementDescription">Tu cuenta está abierta en otro dispositivo o navegador. Si continúas, la sesión anterior se cerrará y podrás iniciar sesión aquí.</p>
+        <?php if(!empty($sessionReplacementChallenge['device_label'])): ?><small>Sesión actual: <?= e((string) $sessionReplacementChallenge['device_label']) ?></small><?php endif; ?>
+        <div class="login-session-modal-actions">
+            <form method="post" action="<?= e(route('login-session-replace-cancel')) ?>"><input type="hidden" name="_csrf" value="<?= e($loginReplacementCsrfToken ?? '') ?>"><button type="submit" class="login-session-cancel">Cancelar</button></form>
+            <form method="post" action="<?= e(route('login-session-replace')) ?>" data-session-replacement-form><input type="hidden" name="_csrf" value="<?= e($loginReplacementCsrfToken ?? '') ?>"><button type="submit" class="login-session-confirm"><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i><span>Continuar e iniciar aquí</span></button></form>
+        </div>
+    </section>
+</div>
+<?php endif; ?>

@@ -18,3 +18,5 @@
 /app/config/app.local.php
 /database/snapshot.before-portability.local.sql
 /dist/
+storage/private/avatars/*
+!storage/private/avatars/.gitkeep

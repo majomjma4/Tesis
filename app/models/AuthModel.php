@@ -40,7 +40,23 @@ final class AuthModel
             if($changes===[])return [];
             $db->prepare('UPDATE users SET full_name=:name,email=:email,username=:username,session_version=session_version+1 WHERE id=:id')
                 ->execute(['name'=>$name,'email'=>$email,'username'=>$username!==''?$username:null,'id'=>$userId]);
-            (new AdminActivityService($db))->record($userId,'profile_updated','Actualizó su perfil','Cuenta','user',$userId,$name,'correct',['changes'=>$changes]);
+
+            $hasName = isset($changes['full_name']);
+            $hasEmail = isset($changes['email']);
+            $hasUsername = isset($changes['username']);
+
+            if ($hasName && !$hasEmail && !$hasUsername) {
+                $action = 'profile_name_changed';
+                $actionLabel = 'Nombre del perfil actualizado';
+            } elseif ($hasEmail && !$hasName && !$hasUsername) {
+                $action = 'profile_email_changed';
+                $actionLabel = 'Correo del perfil actualizado';
+            } else {
+                $action = 'profile_updated';
+                $actionLabel = 'Perfil actualizado';
+            }
+
+            (new AdminActivityService($db))->record($userId, $action, $actionLabel, 'Cuenta', 'user', $userId, 'Cuenta personal', 'correct', ['changed_fields' => array_keys($changes)]);
             return $changes;
         });
     }
@@ -149,7 +165,7 @@ final class AuthModel
             if ($previous === false) throw new RuntimeException('La cuenta no está disponible.');
             $db->prepare('UPDATE users SET avatar_path=:path,avatar_updated_at=UTC_TIMESTAMP() WHERE id=:id')
                 ->execute(['path' => $avatarPath, 'id' => $userId]);
-            (new AdminActivityService($db))->record($userId, 'avatar_updated', 'Actualizó su fotografía de perfil', 'Cuenta', 'user', $userId, 'Cuenta personal', 'correct', []);
+            (new AdminActivityService($db))->record($userId, 'avatar_updated', 'Fotografía de perfil actualizada', 'Cuenta', 'user', $userId, 'Cuenta personal', 'correct', []);
             return $previous !== null ? (string) $previous : null;
         });
     }
@@ -163,7 +179,7 @@ final class AuthModel
             if ($previous === false) throw new RuntimeException('La cuenta no está disponible.');
             if ($previous === null || $previous === '') throw new InvalidArgumentException('No existe una fotografía personalizada para eliminar.');
             $db->prepare('UPDATE users SET avatar_path=NULL,avatar_updated_at=NULL WHERE id=:id')->execute(['id' => $userId]);
-            (new AdminActivityService($db))->record($userId, 'avatar_removed', 'Eliminó su fotografía de perfil', 'Cuenta', 'user', $userId, 'Cuenta personal', 'correct', []);
+            (new AdminActivityService($db))->record($userId, 'avatar_removed', 'Fotografía de perfil eliminada', 'Cuenta', 'user', $userId, 'Cuenta personal', 'correct', []);
             return (string) $previous;
         });
     }
@@ -187,7 +203,7 @@ final class AuthModel
     public function changePassword(int $userId,string $current,string $new): bool
     {
         $this->assertPasswordPolicy($new);
-        return Database::transaction(function(PDO $db)use($userId,$current,$new):bool{$read=$db->prepare('SELECT password_hash FROM users WHERE id=:id AND status=\'active\' AND deleted_at IS NULL AND purged_at IS NULL FOR UPDATE');$read->execute(['id'=>$userId]);$hash=$read->fetchColumn();if(!$hash||!password_verify($current,(string)$hash))return false;$update=$db->prepare('UPDATE users SET password_hash=:hash,must_change_password=0,password_warning_count=0,temporary_password_expires_at=NULL,temporary_password_last_warning_at=NULL,password_changed_at=CURRENT_TIMESTAMP,session_version=session_version+1 WHERE id=:id');$update->execute(['hash'=>password_hash($new,PASSWORD_DEFAULT),'id'=>$userId]);(new AdminActivityService($db))->record($userId,'password_changed','Actualizó su contraseña','Cuenta','user',$userId,'Cuenta personal','correct',[]);return true;});
+        return Database::transaction(function(PDO $db)use($userId,$current,$new):bool{$read=$db->prepare('SELECT password_hash FROM users WHERE id=:id AND status=\'active\' AND deleted_at IS NULL AND purged_at IS NULL FOR UPDATE');$read->execute(['id'=>$userId]);$hash=$read->fetchColumn();if(!$hash||!password_verify($current,(string)$hash))return false;$update=$db->prepare('UPDATE users SET password_hash=:hash,must_change_password=0,password_warning_count=0,temporary_password_expires_at=NULL,temporary_password_last_warning_at=NULL,password_changed_at=CURRENT_TIMESTAMP,session_version=session_version+1 WHERE id=:id');$update->execute(['hash'=>password_hash($new,PASSWORD_DEFAULT),'id'=>$userId]);(new AdminActivityService($db))->record($userId,'password_changed','Contraseña actualizada','Cuenta','user',$userId,'Cuenta personal','correct',[]);return true;});
     }
 
     public function assertPasswordPolicy(string $password): void

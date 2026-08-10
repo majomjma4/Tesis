@@ -124,3 +124,11 @@ loginForm?.addEventListener("submit", (event) => {
     if (hasEmptyFields) event.preventDefault();
 });
 // Final de envio del formulario
+
+document.querySelector("[data-session-replacement-form]")?.addEventListener("submit", (event) => {
+    const form = event.currentTarget;
+    const button = form.querySelector("button[type='submit']");
+    if (!button || button.disabled) { event.preventDefault(); return; }
+    button.disabled = true;
+    button.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i><span>Iniciando…</span>';
+});

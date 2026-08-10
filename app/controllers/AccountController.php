@@ -19,7 +19,7 @@ final class AccountController
         }
         try { $profile = $model->profile((int) $session->userId()); }
         catch (Throwable) { $profile = ['full_name'=>$session->name(),'email'=>$session->email(),'created_at'=>null,'last_login_at'=>null,'password_changed_at'=>null,'roles'=>$session->roles()]; $error ??= 'No fue posible consultar todos los datos del perfil.'; }
-        View::render('account/profile',['currentPage'=>'profile','title'=>'Mi perfil | Administración','bodyClass'=>'account-profile-page','pageStyles'=>[asset('css/account-profile.css')],'profile'=>$profile,'profileError'=>$error,'profileSuccess'=>$success,'profileCsrf'=>$session->csrfToken('profile')]);
+        View::render('account/profile',['currentPage'=>'profile','title'=>'Mi perfil | Administración','bodyClass'=>'account-profile-page','pageStyles'=>[asset('css/account-profile.css')],'profile'=>$profile,'profileError'=>$error,'profileSuccess'=>$success,'profileCsrf'=>$session->csrfToken('profile'),'profileAvatarCsrf'=>$session->csrfToken('profile_avatar')]);
     }
 
     public function changePassword(): void
@@ -28,12 +28,12 @@ final class AccountController
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $current = (string) ($_POST['current_password'] ?? ''); $new = (string) ($_POST['new_password'] ?? ''); $confirmation = (string) ($_POST['new_password_confirmation'] ?? '');
             if (!$session->validateCsrf('change_password', (string) ($_POST['_csrf'] ?? ''))) $error = 'La sesión del formulario venció.';
-            elseif ($new !== $confirmation) $error = 'La confirmación no coincide con la nueva contraseña.';
-            elseif ($current === $new) $error = 'La nueva contraseña debe ser diferente a la actual.';
+            elseif ($new !== $confirmation) $error = 'Las contraseñas no coinciden.';
+            elseif ($current === $new) $error = 'La nueva contraseña debe ser diferente de la actual.';
             else try {
                 $model->assertPasswordPolicy($new);
                 if (!$model->changePassword((int) $session->userId(), $current, $new)) $error = 'La contraseña actual no es correcta.';
-                else { $identity = $model->sessionIdentity((int) $session->userId()); if (!$identity) throw new RuntimeException('La cuenta dejó de estar disponible.'); $session->refresh($identity); $success = 'Contraseña actualizada. Por seguridad, las demás sesiones dejarán de ser válidas.'; }
+                else { $identity = $model->sessionIdentity((int) $session->userId()); if (!$identity) throw new RuntimeException('La cuenta dejó de estar disponible.'); $session->refresh($identity); $success = 'Contraseña actualizada correctamente. Por seguridad, vuelve a iniciar sesión.'; }
             } catch (InvalidArgumentException $exception) { $error = $exception->getMessage(); }
             catch (Throwable $exception) { error_log('Password change: '.$exception->getMessage()); $error = 'No fue posible actualizar la contraseña.'; }
         }
