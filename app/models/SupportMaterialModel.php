@@ -487,16 +487,13 @@ final class SupportMaterialModel
         if ($material === null) {
             throw new InvalidArgumentException('El material ya no está disponible.');
         }
-        $targetAvailability = $status === 'published';
-        if ((string) $material['status'] === $status
-            && (bool) $material['is_available'] === $targetAvailability) {
+        if ((string) $material['status'] === $status) {
             throw new InvalidArgumentException($status === 'published'
                 ? 'El material ya está publicado.'
                 : 'El material ya está retirado.');
         }
         Database::connection()->prepare(
             "UPDATE support_materials SET status=:status,
-             is_available=:is_available,
              publication_date=IF(:status_for_publication_date='published',COALESCE(publication_date,UTC_DATE()),publication_date),
              published_at=IF(:status_for_publication='published',COALESCE(published_at,UTC_TIMESTAMP()),published_at),
              withdrawn_at=IF(:status_for_date='withdrawn',CURRENT_TIMESTAMP,NULL),
@@ -505,7 +502,6 @@ final class SupportMaterialModel
              WHERE id=:id"
         )->execute([
             'status' => $status,
-            'is_available' => $targetAvailability ? 1 : 0,
             'status_for_publication_date' => $status,
             'status_for_publication' => $status,
             'status_for_date' => $status,
@@ -518,7 +514,7 @@ final class SupportMaterialModel
             'previous_status' => (string) $material['status'],
             'new_status' => $status,
             'previous_available' => (bool) $material['is_available'],
-            'is_available' => $targetAvailability,
+            'is_available' => (bool) $material['is_available'],
             'was_previously_published' => !empty($material['published_at']),
         ];
     }

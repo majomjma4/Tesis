@@ -182,6 +182,12 @@ final class AdminRepositoryModel
                     WHERE f.project_id=p.id AND f.deleted_at IS NULL
                 )"
             )->fetchColumn(),
+            'withdrawn' => (int) $database->query(
+                "SELECT COUNT(*) FROM projects p
+                WHERE p.deleted_at IS NULL
+                  AND p.status='published'
+                  AND p.withdrawn_at IS NOT NULL"
+            )->fetchColumn(),
             'incomplete' => (int) $database->query(
                 "SELECT COUNT(DISTINCT p.id) FROM projects p
                 JOIN project_types pt ON pt.id=p.project_type_id
@@ -222,6 +228,12 @@ final class AdminRepositoryModel
             "SELECT
                 p.id,p.code,p.title,p.status,p.published_at,p.is_available,p.withdrawn_at,p.withdrawn_by,pt.name type_name,ap.name period_name,
                 u.full_name tutor_name,
+                (
+                    SELECT GROUP_CONCAT(participant.full_name ORDER BY pp.is_leader DESC, participant.full_name SEPARATOR ', ')
+                    FROM project_participants pp
+                    JOIN users participant ON participant.id=pp.user_id
+                    WHERE pp.project_id=p.id AND pp.status='active'
+                ) authors,
                 (
                     SELECT COUNT(*) FROM project_files f
                     WHERE f.project_id=p.id AND f.deleted_at IS NULL

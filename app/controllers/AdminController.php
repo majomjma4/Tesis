@@ -354,6 +354,30 @@ final class AdminController
     public function repository():void{$model=new AdminRepositoryModel();$error=null;try{$summary=$model->summary();$catalogRequest=PaginationService::request();$catalogRequest['size']=100;$published=$model->listing('published',$catalogRequest);$projects=$published['items'];$pagination=$published['pagination'];$catalogs=$model->filterCatalogs();$withdrawnPublications=$model->withdrawnPublications();$materialModel=new SupportMaterialModel();$supportMaterials=$materialModel->getAdminMaterials();$withdrawnMaterials=$materialModel->getWithdrawn();$materialCategories=$materialModel->categories();}catch(Throwable $e){error_log('Admin repository: '.$e->getMessage());$error='No fue posible consultar las publicaciones.';$projects=[];$pagination=['total'=>0];$summary=['eligible'=>0,'published'=>0,'incomplete'=>0,'pending'=>0,'pending_by_period'=>[]];$catalogs=['types'=>[],'periods'=>[]];$withdrawnPublications=[];$supportMaterials=[];$withdrawnMaterials=[];$materialCategories=[];}$s=new AuthSessionService();View::render('admin/repository',['currentPage'=>'repository','title'=>'Repositorio | Administración','bodyClass'=>'admin-repository-page','pageStyles'=>[asset('css/admin-repository.css')],'pageScript'=>asset('js/admin-repository.js'),'repositoryProjects'=>$projects,'pagePagination'=>$pagination,'repositorySummary'=>$summary,'repositoryError'=>$error,'repositoryCatalogs'=>$catalogs,'withdrawnPublications'=>$withdrawnPublications,'supportMaterials'=>$supportMaterials,'withdrawnMaterials'=>$withdrawnMaterials,'materialCategories'=>$materialCategories,'repositoryCsrf'=>$s->csrfToken('admin_repository'),'repositoryPublishEndpoint'=>route('admin-repository-publish'),'materialSaveEndpoint'=>route('admin-support-material-save'),'materialStatusEndpoint'=>route('admin-support-material-status'),'materialFileEndpoint'=>route('admin-support-material-file')]);}
     public function publishProject():void{$this->requirePost();$s=new AuthSessionService();if(!$s->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);$id=(int)($_POST['id']??0);$action=(string)($_POST['action']??'');$capabilities=(new ProjectCapabilityService())->forProjectId($id,'repository');$required=in_array($action,['presentation','unpresentation'],true)?'manage_files':'manage_publication';if(empty($capabilities[$required]))$this->json(false,'No tienes autorización para completar esta acción sobre el proyecto.',[],403);try{$model=new AdminRepositoryModel();if($action==='presentation'||$action==='unpresentation'){$model->setPresentationFile($id,$action==='presentation'?(int)($_POST['file_id']??0):null,(int)$s->userId());$this->json(true,$action==='unpresentation'?'Archivo de presentación eliminado.':'Archivo de presentación actualizado correctamente.');}if($action==='availability'){$available=filter_var($_POST['is_available']??null,FILTER_VALIDATE_BOOL,FILTER_NULL_ON_FAILURE);if($available===null)$this->json(false,'La disponibilidad solicitada no es válida.',[],422);$model->setAvailability($id,$available,(int)$s->userId());$this->json(true,$available?'Proyecto marcado como disponible.':'Proyecto marcado como no disponible.');}if($action==='publish')$this->json(false,'La publicación depende del flujo académico y no puede realizarse desde la administración.',[],403);if($action==='restore'){$model->restorePublication($id,(int)$s->userId());$this->json(true,'La publicación fue restaurada correctamente.');}$model->setPublished($id,false,(int)$s->userId());$this->json(true,'Proyecto retirado del repositorio. Permanece disponible en Proyectos.');}catch(InvalidArgumentException $e){$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){error_log('Publish project: '.$e->getMessage());$this->json(false,'No fue posible actualizar la publicación.',[],500);}}
 
+    public function trashRepositoryProject(): void
+    {
+        $this->requirePost();
+        $session = new AuthSessionService();
+        if (!$session->validateCsrf('admin_repository', (string) ($_POST['_csrf'] ?? ''))) {
+            $this->json(false, 'La sesión venció.', [], 419);
+        }
+        $id = (int) ($_POST['id'] ?? 0);
+        $capabilities = (new ProjectCapabilityService())->forProjectId($id, 'repository');
+        if (empty($capabilities['manage_publication'])) {
+            $this->json(false, 'No tienes autorización para completar esta acción sobre el proyecto.', [], 403);
+        }
+        try {
+            $trash = new AdminTrashModel();
+            $trash->trashRepositoryProject($id, (string) ($_POST['reason'] ?? ''), (int) $session->userId());
+            $this->json(true, 'Proyecto enviado a Papelera correctamente.', ['summary' => $trash->summary()]);
+        } catch (InvalidArgumentException $exception) {
+            $this->json(false, $exception->getMessage(), [], 422);
+        } catch (Throwable $exception) {
+            error_log('Repository trash project: ' . $exception->getMessage());
+            $this->json(false, 'No fue posible enviar el proyecto a Papelera.', [], 500);
+        }
+    }
+
     public function saveSupportMaterial():void
     {
         $this->requirePost();$session=new AuthSessionService();

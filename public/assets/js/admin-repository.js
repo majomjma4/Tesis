@@ -32,6 +32,7 @@
     const paginationState = {
         projects: { page: 1, size: 10 },
         materials: { page: 1, size: 10 },
+        withdrawn: { page: 1, size: 10 },
     };
     const materialEditModal = document.querySelector("#arMaterialEditModal");
     const materialFilesModal = document.querySelector("#arMaterialFilesModal");
@@ -45,6 +46,8 @@
     const confirmation = document.querySelector("#arConfirm");
     const confirmationTitle = document.querySelector("#arConfirmTitle");
     const confirmationText = document.querySelector("#arConfirmText");
+    const confirmationReason = confirmation?.querySelector("[data-confirm-reason]");
+    const confirmationReasonInput = confirmation?.querySelector("[data-confirm-reason-input]");
     const confirmationAccept = confirmation?.querySelector("[data-confirm-accept]");
     const confirmationCancel = confirmation?.querySelector("[data-confirm-cancel]");
     const toastStack = document.querySelector("#arToastStack");
@@ -165,12 +168,19 @@
         }
         confirmationTitle.textContent = options.title || "Confirmar acción";
         confirmationText.textContent = message;
+        const requiresReason = options.reason === true;
+        if (confirmationReason && confirmationReasonInput) {
+            confirmationReason.hidden = !requiresReason;
+            confirmationReasonInput.disabled = !requiresReason;
+            confirmationReasonInput.required = requiresReason;
+            confirmationReasonInput.value = "";
+        }
         confirmationAccept.textContent = options.acceptLabel || "Confirmar";
         confirmationAccept.classList.toggle("danger", options.danger !== false);
         confirmationAccept.classList.toggle("restore-material-confirm-primary", options.variant === "restore-material");
         confirmation.hidden = false;
         document.body.classList.add("modal-open");
-        confirmationAccept.focus();
+        (requiresReason ? confirmationReasonInput : confirmationAccept)?.focus();
         const close = (accepted) => {
             confirmation.hidden = true;
             const secondaryModalOpen = [materialEditModal, materialFilesModal, presentationModal]
@@ -182,7 +192,18 @@
             document.removeEventListener("keydown", escape);
             resolve(accepted);
         };
-        const accept = () => close(true);
+        const accept = () => {
+            if (!requiresReason) return close(true);
+            const reason = confirmationReasonInput?.value.trim() || "";
+            if (reason.length < 5 || reason.length > 500) {
+                confirmationReasonInput?.focus();
+                confirmationReasonInput?.setCustomValidity("Indica un motivo entre 5 y 500 caracteres.");
+                confirmationReasonInput?.reportValidity();
+                return;
+            }
+            confirmationReasonInput?.setCustomValidity("");
+            close(reason);
+        };
         const cancel = () => close(false);
         const backdrop = (event) => {
             if (event.target === confirmation) close(false);
@@ -569,6 +590,56 @@
         });
     });
 
+    document.querySelectorAll("[data-project-trash]").forEach((button) => {
+        button.addEventListener("click", async () => {
+            const reason = await requestConfirmation(
+                "El proyecto dejará de estar disponible en el Repositorio y podrá restaurarse desde la Papelera durante el periodo de recuperación. Esta acción no elimina inmediatamente los archivos ni el historial académico.",
+                { title: "Enviar a Papelera", acceptLabel: "Enviar a Papelera", danger: true, reason: true }
+            );
+            if (!reason) return;
+            button.disabled = true;
+            const data = new FormData();
+            data.set("_csrf", config.dataset.csrf);
+            data.set("id", button.dataset.id);
+            data.set("reason", reason);
+            try {
+                const response = await fetch(config.dataset.trashEndpoint, { method: "POST", body: data });
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.message);
+                sessionStorage.setItem("repositoryToast", result.message || "Proyecto enviado a Papelera correctamente.");
+                window.location.reload();
+            } catch (error) {
+                showToast(error.message || "No fue posible enviar el proyecto a Papelera.", "error");
+                button.disabled = false;
+            }
+        });
+    });
+
+    document.querySelectorAll("[data-restore-project]").forEach((button) => {
+        button.addEventListener("click", async () => {
+            const confirmed = await requestConfirmation(
+                "El elemento volverá a mostrarse en el Repositorio Académico conservando su estado y disponibilidad anteriores.",
+                { title: "Reincorporar al repositorio", acceptLabel: "Reincorporar", danger: false, variant: "restore-project" }
+            );
+            if (!confirmed) return;
+            button.disabled = true;
+            const data = new FormData();
+            data.set("_csrf", config.dataset.csrf);
+            data.set("id", button.dataset.id);
+            data.set("action", "restore");
+            try {
+                const response = await fetch(config.dataset.endpoint, { method: "POST", body: data });
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.message);
+                sessionStorage.setItem("repositoryToast", result.message || "Elemento reincorporado correctamente.");
+                window.location.reload();
+            } catch (error) {
+                showToast(error.message || "No fue posible reincorporar el proyecto.", "error");
+                button.disabled = false;
+            }
+        });
+    });
+
     const searchableNodes = () => [...document.querySelectorAll(
         "[data-repository-item] h3,[data-repository-item] dd,[data-repository-item] .ar-code,[data-repository-item] .ar-project-type,[data-repository-item] .ar-card-copy p,[data-repository-item] header strong"
     )];
@@ -718,7 +789,9 @@
             }
         });
 
-        const count = document.querySelector(activeTab === "projects" ? "#arProjectCount" : "#arMaterialCount");
+        const count = document.querySelector(activeTab === "projects"
+            ? "#arProjectCount"
+            : activeTab === "materials" ? "#arMaterialCount" : "#arWithdrawnCount");
         const materialCountText = document.querySelector("#arMaterialCountText");
         const empty = document.querySelector(activeTab === "projects" ? "#arProjectsEmpty" : "#arMaterialsEmpty");
         const hasCriteria = Boolean(
@@ -873,7 +946,7 @@
     const requestedTab = requestedParams.get("tab");
     const requestedMaterialStatus = requestedParams.get("status");
     const requestedPeriod = requestedParams.get("period");
-    const allowedMaterialStatuses = new Set(["all", "available", "unavailable", "withdrawn"]);
+    const allowedMaterialStatuses = new Set(["all", "available", "unavailable"]);
     if (materialStatusFilter) {
         materialStatusFilter.value = allowedMaterialStatuses.has(requestedMaterialStatus)
             ? requestedMaterialStatus
@@ -899,7 +972,8 @@
         }
         updateResults(true);
     });
-    selectTab(requestedTab === "materials" ? "materials" : "projects");
+    const validTabs = new Set([...document.querySelectorAll("[data-repository-tab]")].map((button) => button.dataset.repositoryTab));
+    selectTab(validTabs.has(requestedTab) ? requestedTab : "projects");
     const requestedMaterialEdit = requestedParams.get("edit_material");
     if (requestedMaterialEdit) {
         const requestedMaterialCard = [...document.querySelectorAll('[data-repository-item="materials"]')].find((card) => {

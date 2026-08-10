@@ -2,14 +2,34 @@
 declare(strict_types=1);
 final class AdminTrashModel
 {
+ public function trashRepositoryProject(int $id,string $reason,int $actor):void
+ {
+  $reason=trim($reason);
+  if($id<1)throw new InvalidArgumentException('El proyecto no es válido.');
+  if(mb_strlen($reason)<5||mb_strlen($reason)>500)throw new InvalidArgumentException('Indica un motivo entre 5 y 500 caracteres.');
+  Database::transaction(function(PDO $d)use($id,$reason,$actor):void{
+   $read=$d->prepare("SELECT id,code,title,status,published_at,is_available,withdrawn_at,withdrawn_by,deleted_at FROM projects WHERE id=:id FOR UPDATE");
+   $read->execute(['id'=>$id]);$project=$read->fetch();
+   if(!$project)throw new InvalidArgumentException('El proyecto no existe.');
+   if($project['deleted_at']!==null)throw new InvalidArgumentException('El proyecto ya se encuentra en la Papelera.');
+   if((string)$project['status']!=='published')throw new InvalidArgumentException('Solo pueden enviarse a Papelera proyectos académicamente publicados.');
+   $update=$d->prepare('UPDATE projects SET deleted_at=UTC_TIMESTAMP(),deleted_by=:actor,deletion_reason=:reason WHERE id=:id AND deleted_at IS NULL');
+   $update->execute(['actor'=>$actor,'reason'=>$reason,'id'=>$id]);
+   if($update->rowCount()!==1)throw new RuntimeException('El proyecto cambió de estado antes de completar la operación.');
+   (new ProjectAuditService($d))->record($id,$actor,'project_trashed','project',$id,$project,[
+    'status'=>(string)$project['status'],'published_at'=>$project['published_at'],'is_available'=>(bool)$project['is_available'],
+    'withdrawn_at'=>$project['withdrawn_at'],'withdrawn_by'=>$project['withdrawn_by'],'deleted'=>true,'origin'=>'admin_repository'
+   ],$reason);
+  });
+ }
  public function trashSupportMaterial(int $id,string $reason,int $actor,string $reasonCode='',string $reasonDetail=''):void{Database::transaction(fn(PDO $d)=>$this->trashSupportMaterialAtomic($d,$id,$reason,$actor,$reasonCode,$reasonDetail));}
  public function trashSupportMaterialAtomic(PDO $d,int $id,string $reason,int $actor,string $reasonCode='',string $reasonDetail=''):array
  {
   if($id<1||mb_strlen(trim($reason))<5)throw new InvalidArgumentException('Indica un motivo de al menos cinco caracteres.');
-  $read=$d->prepare('SELECT sm.id,sm.title,sm.material_type,sm.category_id,category.name category_name,sm.status,sm.is_available,sm.published_at FROM support_materials sm LEFT JOIN support_material_categories category ON category.id=sm.category_id WHERE sm.id=:id AND sm.deleted_at IS NULL AND sm.purged_at IS NULL FOR UPDATE');$read->execute(['id'=>$id]);$material=$read->fetch();
+  $read=$d->prepare('SELECT sm.id,sm.title,sm.material_type,sm.category_id,category.name category_name,sm.status,sm.is_available,sm.published_at,sm.withdrawn_at,sm.withdrawn_by FROM support_materials sm LEFT JOIN support_material_categories category ON category.id=sm.category_id WHERE sm.id=:id AND sm.deleted_at IS NULL AND sm.purged_at IS NULL FOR UPDATE');$read->execute(['id'=>$id]);$material=$read->fetch();
   if(!$material){$exists=$d->prepare('SELECT deleted_at,purged_at FROM support_materials WHERE id=:id');$exists->execute(['id'=>$id]);$state=$exists->fetch();if($state&&$state['deleted_at']!==null&&$state['purged_at']===null)throw new InvalidArgumentException('El material ya se encuentra en Papelera.');throw new InvalidArgumentException('El material cambió de estado antes de completar la operación.');}
   $storedReason=trim($reason).($reasonDetail!==''?': '.trim($reasonDetail):'');
-  $update=$d->prepare('UPDATE support_materials SET is_available=0,deleted_at=UTC_TIMESTAMP(),deleted_by=:deleted_by,deletion_reason=:reason,updated_by=:updated_by WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL');$update->execute(['deleted_by'=>$actor,'updated_by'=>$actor,'reason'=>$storedReason,'id'=>$id]);
+  $update=$d->prepare('UPDATE support_materials SET deleted_at=UTC_TIMESTAMP(),deleted_by=:deleted_by,deletion_reason=:reason,updated_by=:updated_by WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL');$update->execute(['deleted_by'=>$actor,'updated_by'=>$actor,'reason'=>$storedReason,'id'=>$id]);
   if($update->rowCount()!==1)throw new InvalidArgumentException('El material cambió de estado antes de completar la operación.');
   (new AdminActivityService($d))->record($actor,'support_material.trashed','Envió material de apoyo a la Papelera','Papelera','support_material',$id,(string)$material['title'],'correct',[
    'material_id'=>$id,'title'=>(string)$material['title'],'material_type'=>(string)$material['material_type'],
@@ -24,15 +44,16 @@ final class AdminTrashModel
  {
   if($id<1)throw new InvalidArgumentException('El material no es válido.');
   Database::transaction(function(PDO $d)use($id,$actor):void{
-   $read=$d->prepare('SELECT title,status,is_available,deletion_reason FROM support_materials WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL FOR UPDATE');
+   $read=$d->prepare('SELECT title,status,is_available,withdrawn_at,withdrawn_by,deletion_reason FROM support_materials WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL FOR UPDATE');
    $read->execute(['id'=>$id]);$material=$read->fetch();
    if(!$material)throw new InvalidArgumentException('El material ya no puede restaurarse.');
-   $update=$d->prepare("UPDATE support_materials SET status='published',is_available=1,withdrawn_at=NULL,withdrawn_by=NULL,publication_date=COALESCE(publication_date,UTC_DATE()),published_at=COALESCE(published_at,UTC_TIMESTAMP()),deleted_at=NULL,deleted_by=NULL,deletion_reason=NULL,updated_by=:actor WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL");
+   $update=$d->prepare("UPDATE support_materials SET deleted_at=NULL,deleted_by=NULL,deletion_reason=NULL,updated_by=:actor WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL");
    $update->execute(['actor'=>$actor,'id'=>$id]);
    if($update->rowCount()!==1)throw new RuntimeException('El material cambió de estado antes de completar la restauración.');
    (new AdminActivityService($d))->record($actor,'support_material_restored','Restauró material de apoyo desde la Papelera','Papelera','support_material',$id,(string)$material['title'],'correct',[
-    'previous_status'=>'Papelera','restored_from_status'=>(string)$material['status'],'new_status'=>'published',
-    'previous_available'=>(bool)$material['is_available'],'is_available'=>true,
+    'previous_status'=>'Papelera','restored_from_status'=>(string)$material['status'],'new_status'=>(string)$material['status'],
+    'previous_available'=>(bool)$material['is_available'],'is_available'=>(bool)$material['is_available'],
+    'withdrawn_at'=>$material['withdrawn_at'],'withdrawn_by'=>$material['withdrawn_by'],
     'previous_trash_reason'=>(string)$material['deletion_reason'],
    ]);
   });
@@ -146,7 +167,7 @@ final class AdminTrashModel
   private function trashedIds(string $entity):array{$entity=$this->entity($entity);$table=$entity==='users'?'users':($entity==='projects'?'projects':'support_materials');$extra=$entity==='projects'?'':' AND purged_at IS NULL';return array_map('intval',Database::connection()->query('SELECT id FROM '.$table.' WHERE deleted_at IS NOT NULL'.$extra)->fetchAll(PDO::FETCH_COLUMN));}
   private function assertAllTrashed(PDO $d,string $entity,array $ids):void{$table=$entity==='users'?'users':($entity==='projects'?'projects':'support_materials');$extra=$entity==='projects'?'':' AND purged_at IS NULL';$ph=implode(',',array_fill(0,count($ids),'?'));$q=$d->prepare('SELECT id FROM '.$table.' WHERE id IN ('.$ph.') AND deleted_at IS NOT NULL'.$extra.' FOR UPDATE');$q->execute($ids);if(count($q->fetchAll(PDO::FETCH_COLUMN))!==count($ids))throw new InvalidArgumentException('Uno o más elementos ya no están disponibles en la Papelera.');}
   private function restoreAtomic(PDO $d,string $entity,int $id,int $actor):void{if($entity==='users'){$q=$d->prepare("UPDATE users SET status='active',deleted_at=NULL,deleted_by=NULL,deletion_reason=NULL,session_version=session_version+1 WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL");}else{$valid=$d->prepare('SELECT 1 FROM users WHERE id=(SELECT created_by FROM projects WHERE id=:id) AND deleted_at IS NULL AND purged_at IS NULL');$valid->execute(['id'=>$id]);if(!$valid->fetchColumn())throw new InvalidArgumentException('No puede restaurarse el proyecto porque su autor ya no está disponible.');$q=$d->prepare('UPDATE projects SET deleted_at=NULL,deleted_by=NULL,deletion_reason=NULL WHERE id=:id AND deleted_at IS NOT NULL');}$q->execute(['id'=>$id]);if($q->rowCount()!==1)throw new RuntimeException('El elemento cambió de estado durante la restauración.');$this->audit($d,$actor,$entity==='users'?'user_restored':'project_restored',$entity==='users'?'user':'project',$id,[]);}
-  private function restoreSupportMaterialAtomic(PDO $d,int $id,int $actor):void{$q=$d->prepare('SELECT title FROM support_materials WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL FOR UPDATE');$q->execute(['id'=>$id]);if(!$q->fetch())throw new InvalidArgumentException('El material ya no puede restaurarse.');$files=$d->prepare('SELECT relative_path FROM support_material_files WHERE material_id=:id AND purged_at IS NULL');$files->execute(['id'=>$id]);$fs=new SupportMaterialFileService();foreach($files->fetchAll(PDO::FETCH_COLUMN) as $path)if(!$fs->isAvailable((string)$path))throw new InvalidArgumentException('El archivo físico del material no está disponible y no puede restaurarse.');$u=$d->prepare("UPDATE support_materials SET status='published',is_available=1,deleted_at=NULL,deleted_by=NULL,deletion_reason=NULL,updated_by=:actor WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL");$u->execute(['actor'=>$actor,'id'=>$id]);if($u->rowCount()!==1)throw new RuntimeException('El material cambió de estado durante la restauración.');$this->audit($d,$actor,'support_material_restored','support_material',$id,[]);}
+  private function restoreSupportMaterialAtomic(PDO $d,int $id,int $actor):void{$q=$d->prepare('SELECT title FROM support_materials WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL FOR UPDATE');$q->execute(['id'=>$id]);if(!$q->fetch())throw new InvalidArgumentException('El material ya no puede restaurarse.');$files=$d->prepare('SELECT relative_path FROM support_material_files WHERE material_id=:id AND purged_at IS NULL');$files->execute(['id'=>$id]);$fs=new SupportMaterialFileService();foreach($files->fetchAll(PDO::FETCH_COLUMN) as $path)if(!$fs->isAvailable((string)$path))throw new InvalidArgumentException('El archivo físico del material no está disponible y no puede restaurarse.');$u=$d->prepare("UPDATE support_materials SET deleted_at=NULL,deleted_by=NULL,deletion_reason=NULL,updated_by=:actor WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL");$u->execute(['actor'=>$actor,'id'=>$id]);if($u->rowCount()!==1)throw new RuntimeException('El material cambió de estado durante la restauración.');$this->audit($d,$actor,'support_material_restored','support_material',$id,[]);}
   private function permanentlyDeleteAtomic(PDO $d,string $entity,int $id,int $actor):void{if($entity==='users'){$d->prepare('DELETE FROM student_enrollments WHERE student_id=:id')->execute(['id'=>$id]);$d->prepare('DELETE FROM student_profiles WHERE user_id=:id')->execute(['id'=>$id]);$d->prepare('DELETE FROM teacher_profiles WHERE user_id=:id')->execute(['id'=>$id]);$d->prepare('DELETE FROM user_roles WHERE user_id=:id')->execute(['id'=>$id]);$q=$d->prepare("UPDATE users SET email=CONCAT('deleted-',id,'@invalid.local'),username=NULL,full_name='Usuario eliminado',password_hash=:hash,status='inactive',purged_at=UTC_TIMESTAMP(),session_version=session_version+1 WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL");$q->execute(['hash'=>password_hash(bin2hex(random_bytes(32)),PASSWORD_DEFAULT),'id'=>$id]);}elseif($entity==='projects'){$q=$d->prepare('DELETE FROM projects WHERE id=:id AND deleted_at IS NOT NULL');$q->execute(['id'=>$id]);}else{$d->prepare('UPDATE support_material_files SET purged_at=UTC_TIMESTAMP(),purged_by=:actor WHERE material_id=:id AND purged_at IS NULL')->execute(['actor'=>$actor,'id'=>$id]);$q=$d->prepare('UPDATE support_materials SET purged_at=UTC_TIMESTAMP(),purged_by=:actor,is_available=0 WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL');$q->execute(['actor'=>$actor,'id'=>$id]);}if($q->rowCount()!==1)throw new RuntimeException('El elemento cambió de estado durante la eliminación.');$this->audit($d,$actor,'trash_permanently_deleted',$entity==='materials'?'support_material':substr($entity,0,-1),$id,['entity'=>$entity]);}
   public function purgeExpired(int $actor):array{
    $settings=(new SystemSettingModel())->all();
