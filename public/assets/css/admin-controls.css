@@ -11,12 +11,12 @@
 .data-pagination-pages{gap:3px}.data-pagination-pages a{min-width:32px;height:32px;padding:0 6px;border-radius:8px;font-size:.78rem}.data-pagination-pages .pagination-ellipsis{display:grid;place-items:center;min-width:17px;height:32px;color:var(--muted);font-size:.78rem;font-weight:850;user-select:none}
 
 /* Todos los diálogos y ventanas modales de la plataforma se centran en el espacio útil a la derecha del sidebar en escritorio. */
-:is(.ap-modal,.ap-confirm,.aa-modal,.user-modal,.user-confirm,.notification-modal-overlay,.calendar-modal-overlay,.repository-preview-modal,.project-file-modal,.forced-password-shell,.logout-modal-overlay,.rp-modal-overlay,.at-modal-overlay,.as-modal-overlay,.sw-modal-overlay){
+:is(.ap-modal,.ap-confirm,.aa-modal,.user-modal,.user-confirm,.notification-modal-overlay,.calendar-modal-overlay,.repository-preview-modal,.project-file-modal,.forced-password-shell,.logout-modal-overlay,.rp-modal-overlay,.at-modal-overlay,.as-modal-overlay,.sw-modal-overlay,.ar-confirm,.ar-withdrawn-modal,.ar-material-modal,#arPresentationModal,[data-sma-overlay]){
     padding-left:calc(280px + var(--app-shell-gutter, 0px) + 16px)!important;
     padding-right:calc(var(--app-shell-gutter, 0px) + 16px)!important;
 }
 @media(max-width:1000px){
-    :is(.ap-modal,.ap-confirm,.aa-modal,.user-modal,.user-confirm,.notification-modal-overlay,.calendar-modal-overlay,.repository-preview-modal,.project-file-modal,.forced-password-shell,.logout-modal-overlay,.rp-modal-overlay,.at-modal-overlay,.as-modal-overlay,.sw-modal-overlay){
+    :is(.ap-modal,.ap-confirm,.aa-modal,.user-modal,.user-confirm,.notification-modal-overlay,.calendar-modal-overlay,.repository-preview-modal,.project-file-modal,.forced-password-shell,.logout-modal-overlay,.rp-modal-overlay,.at-modal-overlay,.as-modal-overlay,.sw-modal-overlay,.ar-confirm,.ar-withdrawn-modal,.ar-material-modal,#arPresentationModal,[data-sma-overlay]){
         padding-left:16px!important;
         padding-right:16px!important;
     }

@@ -9,10 +9,10 @@ final class AuthModel
         $q=Database::connection()->prepare('SELECT id,full_name,email,created_at,last_login_at,password_changed_at,is_admin,is_initial_admin FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL');$q->execute(['id'=>$userId]);$profile=$q->fetch();if(!$profile)throw new RuntimeException('La cuenta no existe.');$profile['roles']=$this->effectiveRoles((int)$profile['id'],(bool)$profile['is_admin']);return $profile;
     }
 
-    public function updateProfile(int $userId,string $name,string $email,string $password):void
+    public function updateProfile(int $userId,string $name,string $email,string $password): array
     {
         if(mb_strlen($name)<3||mb_strlen($name)>180)throw new InvalidArgumentException('Ingresa tu nombre completo.');if(!filter_var($email,FILTER_VALIDATE_EMAIL))throw new InvalidArgumentException('Ingresa un correo válido.');
-        Database::transaction(function(PDO $db)use($userId,$name,$email,$password):void{$q=$db->prepare('SELECT full_name,email,password_hash FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL FOR UPDATE');$q->execute(['id'=>$userId]);$before=$q->fetch();if(!$before||!password_verify($password,(string)$before['password_hash']))throw new InvalidArgumentException('La contraseña actual no es correcta.');$duplicate=$db->prepare('SELECT id FROM users WHERE email=:email AND id<>:id LIMIT 1');$duplicate->execute(['email'=>$email,'id'=>$userId]);if($duplicate->fetch())throw new InvalidArgumentException('Ese correo ya está asociado a otra cuenta.');$db->prepare('UPDATE users SET full_name=:name,email=:email,session_version=session_version+1 WHERE id=:id')->execute(['name'=>$name,'email'=>$email,'id'=>$userId]);$audit=$db->prepare("INSERT INTO admin_audit_log(actor_user_id,action,entity_type,entity_id,details) VALUES(:id,'profile_updated','user',:id2,:details)");$audit->execute(['id'=>$userId,'id2'=>$userId,'details'=>json_encode(['previous_name'=>$before['full_name'],'previous_email'=>$before['email'],'new_name'=>$name,'new_email'=>$email],JSON_UNESCAPED_UNICODE)]);});
+        return Database::transaction(function(PDO $db)use($userId,$name,$email,$password):array{$q=$db->prepare('SELECT full_name,email,password_hash FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL FOR UPDATE');$q->execute(['id'=>$userId]);$before=$q->fetch();if(!$before||!password_verify($password,(string)$before['password_hash']))throw new InvalidArgumentException('La contraseña actual no es correcta.');$changes=[];if($before['full_name']!==$name)$changes['full_name']=['from'=>$before['full_name'],'to'=>$name];if($before['email']!==$email){$duplicate=$db->prepare('SELECT id FROM users WHERE email=:email AND id<>:id LIMIT 1');$duplicate->execute(['email'=>$email,'id'=>$userId]);if($duplicate->fetch())throw new InvalidArgumentException('Ese correo ya está asociado a otra cuenta.');$changes['email']=['from'=>$before['email'],'to'=>$email];}if($changes===[])return [];$db->prepare('UPDATE users SET full_name=:name,email=:email,session_version=session_version+1 WHERE id=:id')->execute(['name'=>$name,'email'=>$email,'id'=>$userId]);$action=count($changes)===2?'profile_updated':(isset($changes['full_name'])?'profile_name_changed':'profile_email_changed');(new AdminActivityService($db))->record($userId,$action,'Actualizó su perfil','Cuenta','user',$userId,$name,'correct',['changes'=>$changes]);return $changes;});
     }
 
     public function findActiveUserByLogin(string $login): ?array
@@ -25,6 +25,7 @@ final class AuthModel
         $user = $statement->fetch();
         if (!$user) return null;
         $user['roles'] = $this->effectiveRoles((int)$user['id'],(bool)$user['is_admin']);
+        if ($this->isGraduatedStudentOnly((int) $user['id'], $user['roles'])) return null;
         return $user;
     }
 
@@ -99,6 +100,7 @@ final class AuthModel
         $statement->execute(['id'=>$userId]); $user=$statement->fetch();
         if(!$user)return null;
         $user['roles']=$this->effectiveRoles($userId,(bool)$user['is_admin']);
+        if($this->isGraduatedStudentOnly($userId,$user['roles']))return null;
         return $user;
     }
 
@@ -118,10 +120,21 @@ final class AuthModel
 
     public function changePassword(int $userId,string $current,string $new): bool
     {
-        $read=Database::connection()->prepare('SELECT password_hash FROM users WHERE id=:id AND status=\'active\'');$read->execute(['id'=>$userId]);$hash=$read->fetchColumn();
-        if(!$hash||!password_verify($current,(string)$hash))return false;
-        $update=Database::connection()->prepare('UPDATE users SET password_hash=:hash,must_change_password=0,password_warning_count=0,temporary_password_expires_at=NULL,temporary_password_last_warning_at=NULL,password_changed_at=CURRENT_TIMESTAMP,session_version=session_version+1 WHERE id=:id');
-        $update->execute(['hash'=>password_hash($new,PASSWORD_DEFAULT),'id'=>$userId]);return true;
+        $this->assertPasswordPolicy($new);
+        return Database::transaction(function(PDO $db)use($userId,$current,$new):bool{$read=$db->prepare('SELECT password_hash FROM users WHERE id=:id AND status=\'active\' AND deleted_at IS NULL AND purged_at IS NULL FOR UPDATE');$read->execute(['id'=>$userId]);$hash=$read->fetchColumn();if(!$hash||!password_verify($current,(string)$hash))return false;$update=$db->prepare('UPDATE users SET password_hash=:hash,must_change_password=0,password_warning_count=0,temporary_password_expires_at=NULL,temporary_password_last_warning_at=NULL,password_changed_at=CURRENT_TIMESTAMP,session_version=session_version+1 WHERE id=:id');$update->execute(['hash'=>password_hash($new,PASSWORD_DEFAULT),'id'=>$userId]);(new AdminActivityService($db))->record($userId,'password_changed','Actualizó su contraseña','Cuenta','user',$userId,'Cuenta personal','correct',[]);return true;});
+    }
+
+    public function assertPasswordPolicy(string $password): void
+    {
+        if(mb_strlen($password,'UTF-8')<8||!preg_match('/[A-Z]/',$password)||!preg_match('/[a-z]/',$password)||!preg_match('/\d/',$password)||!preg_match('/[^A-Za-z0-9]/',$password))throw new InvalidArgumentException('La nueva contraseña debe tener al menos 8 caracteres e incluir mayúscula, minúscula, número y símbolo.');
+    }
+
+    private function isGraduatedStudentOnly(int $userId,array $roles): bool
+    {
+        $roles=array_values(array_unique(array_map('strval',$roles)));
+        if($roles!==['student'])return false;
+        $statement=Database::connection()->prepare("SELECT 1 FROM student_enrollments WHERE student_id=:id AND status='graduated' LIMIT 1");
+        $statement->execute(['id'=>$userId]);return (bool)$statement->fetchColumn();
     }
 
     public function getAllowedRoles(): array

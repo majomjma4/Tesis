@@ -156,7 +156,9 @@
                 if (!btn) return;
                 var banner = btn.closest('[data-password-warning]');
                 if (banner) banner.remove();
-                fetch('index.php?page=dismiss-temp-password-warning', { method: 'POST' }).catch(function(){});
+                var data = new FormData();
+                data.set('_csrf', '<?= e($layoutTemporaryPasswordWarningCsrf ?? '') ?>');
+                fetch('index.php?page=dismiss-temp-password-warning', { method: 'POST', body: data, headers: { 'Accept': 'application/json' } }).catch(function(){});
             });
         </script>
         <?php endif; ?>

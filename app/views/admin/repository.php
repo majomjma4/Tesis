@@ -257,7 +257,8 @@ $formatDate = static function (?string $date): string {
                         <footer>
                             <a class="ar-primary-action" href="<?= e(route('support-material-detail') . '&id=' . (int) $material['id']) ?>"><i class="fa-regular fa-eye"></i> Ver detalle</a>
                             <button class="ar-icon-action ar-availability-action" type="button" data-material-availability data-available="<?= !empty($material['is_available']) ? '1' : '0' ?>" aria-label="<?= !empty($material['is_available']) ? 'Marcar material como no disponible' : 'Marcar material como disponible' ?>" data-tooltip="<?= !empty($material['is_available']) ? 'Marcar como no disponible' : 'Marcar como disponible' ?>"><i class="fa-solid <?= !empty($material['is_available']) ? 'fa-ban' : 'fa-circle-check' ?>"></i></button>
-                            <button class="ar-icon-action ar-danger-action" type="button" data-withdraw-material aria-label="Retirar material" data-tooltip="Retirar del repositorio"><i class="fa-solid fa-box-archive"></i></button>
+                            <button class="ar-icon-action ar-withdraw-action" type="button" data-withdraw-material aria-label="Retirar del repositorio" data-tooltip="Retirar del repositorio"><i class="fa-solid fa-box-archive"></i></button>
+                            <button class="ar-icon-action ar-trash-action" type="button" data-trash-material aria-label="Enviar a Papelera" data-tooltip="Enviar a Papelera"><i class="fa-solid fa-trash-can"></i></button>
                         </footer>
                         <script type="application/json" data-material-json><?= json_encode([
                             'id'=>$material['id'],'title'=>$material['title'],'category_id'=>(int)$material['category_id'],

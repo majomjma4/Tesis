@@ -45,9 +45,8 @@ final class View
     // Mantiene contador, protección CSRF y endpoint disponibles en todas las pantallas principales.
     private static function notificationLayoutData(): array
     {
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            session_start();
-        }
+        $session = new AuthSessionService();
+        $session->start();
 
         if (!isset($_SESSION['notification_csrf'])) {
             $_SESSION['notification_csrf'] = bin2hex(random_bytes(32));
@@ -76,6 +75,7 @@ final class View
             'layoutMustChangePassword' => (new AuthSessionService())->mustChangePassword(),
             'layoutTemporaryPasswordRemainingDays' => (new AuthSessionService())->temporaryPasswordRemainingDays(),
             'layoutIsTemporaryPasswordDismissedToday' => (new AuthSessionService())->isTemporaryPasswordWarningDismissedToday(),
+            'layoutTemporaryPasswordWarningCsrf' => $session->csrfToken('dismiss_temp_password_warning'),
         ];
     }
     // Final de datos globales de notificaciones

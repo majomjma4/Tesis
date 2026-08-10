@@ -515,6 +515,21 @@
         });
     });
 
+    document.querySelectorAll("[data-trash-material]").forEach((button) => {
+        button.addEventListener("click", () => {
+            const material = readMaterial(button);
+            if (!material) return;
+            window.SupportMaterialAdminActions.open({
+                trigger: button, type: "trash", action: "trash",
+                endpoint: config.dataset.trashEndpoint, csrf: config.dataset.csrf, material,
+                onSuccess: result => {
+                    sessionStorage.setItem("repositoryToast", result.message || "Material enviado a Papelera correctamente.");
+                    window.location.reload();
+                },
+            });
+        });
+    });
+
     document.querySelectorAll("[data-material-availability]").forEach((button) => {
         button.addEventListener("click", () => {
             const material = readMaterial(button);
