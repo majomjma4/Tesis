@@ -156,6 +156,26 @@ function highlightNode(node, terms) {
     node.replaceChildren(fragment);
 }
 
+function normalizeTypeSlug(value) {
+    const slug = normalizeRepositoryText(value).replace(/[\s_]+/g, "-");
+    if (["proyecto-pis", "proyecto-integrador-de-saberes", "pis", "proyectos-pis"].includes(slug)) return "proyecto-pis";
+    if (["practicas", "practicas-preprofesionales", "practice"].includes(slug)) return "practicas-preprofesionales";
+    if (["perfil-tesis", "perfil-de-tesis", "thesis-profile", "thesis_profile"].includes(slug)) return "perfil-tesis";
+    if (["tesis", "titulacion", "thesis"].includes(slug)) return "tesis";
+    if (["vinculacion", "proyecto-de-vinculacion", "community"].includes(slug)) return "vinculacion";
+    return slug;
+}
+
+function normalizeCategorySlug(value) {
+    const slug = normalizeRepositoryText(value).replace(/[\s_]+/g, "-");
+    if (["proyecto-pis", "proyecto-integrador-de-saberes", "pis", "proyectos-pis"].includes(slug)) return "proyecto-pis";
+    if (["practicas", "practicas-preprofesionales", "practice"].includes(slug)) return "practicas";
+    if (["perfil-tesis", "perfil-de-tesis", "thesis-profile", "thesis_profile"].includes(slug)) return "perfil-tesis";
+    if (["tesis", "titulacion", "thesis"].includes(slug)) return "tesis";
+    if (["vinculacion", "proyecto-de-vinculacion", "community"].includes(slug)) return "vinculacion";
+    return slug;
+}
+
 function filterRepositoryProjects(resetPage = true) {
     const rawSearchValue = repositorySearch?.value ?? "";
     const searchValue = normalizeRepositoryText(rawSearchValue);
@@ -185,7 +205,9 @@ function filterRepositoryProjects(resetPage = true) {
         );
 
         const matchesSearch = !searchValue || searchTerms.every(term => haystack.includes(term));
-        const matchesType = typeValue === "all" || card.dataset.type === typeValue || card.dataset.typeCode === typeValue;
+        const matchesType = typeValue === "all"
+            || normalizeTypeSlug(card.dataset.type) === normalizeTypeSlug(typeValue)
+            || normalizeTypeSlug(card.dataset.typeCode) === normalizeTypeSlug(typeValue);
         const matchesPao = paoValue === "all" || card.dataset.pao === paoValue || normalizeRepositoryText(card.dataset.pao || "").includes(paoValue);
 
         const isVisible = matchesSearch && matchesType && matchesPao;
@@ -358,7 +380,8 @@ function filterRepositorySupportDocuments() {
     supportCards.forEach((card) => {
         const haystack = normalizeRepositoryText(card.dataset.supportText ?? card.textContent ?? "");
         const matchesSearch = !searchValue || searchTerms.every(term => haystack.includes(term));
-        const matchesCategory = categoryValue === "all" || card.dataset.supportCategory === categoryValue;
+        const matchesCategory = categoryValue === "all"
+            || normalizeCategorySlug(card.dataset.supportCategory) === normalizeCategorySlug(categoryValue);
         const matchesFilters = matchesSearch && matchesCategory;
 
         card.dataset.supportMatch = matchesFilters ? "true" : "false";

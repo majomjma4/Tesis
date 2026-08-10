@@ -10,6 +10,10 @@
     --status-completed: 37, 99, 235;
 }
 
+[hidden], .ar-project-card[hidden], .ar-material-card[hidden] {
+    display: none !important;
+}
+
 .ar-page {
     display: grid;
     gap: 22px;

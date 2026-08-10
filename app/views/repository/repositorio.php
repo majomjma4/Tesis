@@ -114,6 +114,7 @@
                         <option value="vinculacion">Vinculación</option>
                         <option value="practicas">Prácticas</option>
                         <option value="tesis">Tesis</option>
+                        <option value="perfil-tesis">Perfil de tesis</option>
                         <option value="proyecto-pis">Proyectos PIS</option>
                     </select>
                 </label>

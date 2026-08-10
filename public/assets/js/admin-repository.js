@@ -765,6 +765,26 @@
         }));
     };
 
+    const normalizeTypeSlug = (value) => {
+        const slug = normalize(value).replace(/[\s_]+/g, "-");
+        if (["proyecto-pis", "proyecto-integrador-de-saberes", "pis", "proyectos-pis"].includes(slug)) return "proyecto-pis";
+        if (["practicas", "practicas-preprofesionales", "practice"].includes(slug)) return "practicas-preprofesionales";
+        if (["perfil-tesis", "perfil-de-tesis", "thesis-profile", "thesis_profile"].includes(slug)) return "perfil-tesis";
+        if (["tesis", "titulacion", "thesis"].includes(slug)) return "tesis";
+        if (["vinculacion", "proyecto-de-vinculacion", "community"].includes(slug)) return "vinculacion";
+        return slug;
+    };
+
+    const normalizeCategorySlug = (value) => {
+        const slug = normalize(value).replace(/[\s_]+/g, "-");
+        if (["proyecto-pis", "proyecto-integrador-de-saberes", "pis", "proyectos-pis"].includes(slug)) return "proyecto-pis";
+        if (["practicas", "practicas-preprofesionales", "practice"].includes(slug)) return "practicas";
+        if (["perfil-tesis", "perfil-de-tesis", "thesis-profile", "thesis_profile"].includes(slug)) return "perfil-tesis";
+        if (["tesis", "titulacion", "thesis"].includes(slug)) return "tesis";
+        if (["vinculacion", "proyecto-de-vinculacion", "community"].includes(slug)) return "vinculacion";
+        return slug;
+    };
+
     function updateResults(resetPage = false) {
         const state = paginationState[activeTab];
         const controls = paginationControls[activeTab];
@@ -783,9 +803,15 @@
         const matches = items.filter((item) => {
             const searchable = normalize(item.dataset.search);
             const matchesSearch = !terms.length || terms.every((term) => searchable.includes(term));
-            const matchesType = activeTab !== "projects" || !type || normalize(item.dataset.type) === type;
+            const matchesType = activeTab !== "projects" || !type
+                || normalize(item.dataset.type) === type
+                || normalizeTypeSlug(item.dataset.type) === normalizeTypeSlug(type)
+                || normalizeTypeSlug(item.dataset.typeCode) === normalizeTypeSlug(type);
             const matchesPeriod = activeTab !== "projects" || !period || normalize(item.dataset.period) === period;
-            const matchesCategory = activeTab !== "materials" || !category || normalize(item.dataset.category) === category;
+            const matchesCategory = activeTab !== "materials" || !category
+                || normalize(item.dataset.category) === category
+                || normalizeCategorySlug(item.dataset.category) === normalizeCategorySlug(category)
+                || normalizeCategorySlug(item.dataset.categorySlug) === normalizeCategorySlug(category);
             const matchesMaterialStatus = activeTab !== "materials"
                 || materialStatus === "all"
                 || item.dataset.materialState === materialStatus;
