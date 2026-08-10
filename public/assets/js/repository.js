@@ -85,7 +85,7 @@ function normalizeRepositoryText(value) {
 }
 
 function getProjectCards() {
-    return [...document.querySelectorAll("#panelProjects .ar-project-card, #panelProjects .repository-card, #repositoryGrid .ar-project-card")];
+    return [...document.querySelectorAll("#panelProjects .ar-project-card, #panelProjects .repository-card, #readerProjectGrid .ar-project-card")];
 }
 
 function getSupportCards() {
@@ -262,7 +262,7 @@ function showRepositoryToast(message) {
 // Escuchar eventos en las tarjetas de proyecto (Favoritos y Navegación)
 function bindProjectCardEvents() {
     const cards = getProjectCards();
-    const repositoryResults = document.querySelector("#panelProjects, #repositoryGrid");
+    const repositoryResults = document.querySelector("#panelProjects, #readerProjectGrid");
 
     cards.forEach((card) => {
         const favoriteButton = card.querySelector(".repository-favorite-btn");
@@ -339,13 +339,13 @@ repositoryClearSearch?.addEventListener("click", () => {
 repositoryPagePrevious?.addEventListener("click", () => {
     repositoryCurrentPage = Math.max(1, repositoryCurrentPage - 1);
     filterRepositoryProjects(false);
-    document.querySelector("#repositoryGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelector("#readerProjectGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
 repositoryPageNext?.addEventListener("click", () => {
     repositoryCurrentPage += 1;
     filterRepositoryProjects(false);
-    document.querySelector("#repositoryGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelector("#readerProjectGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
 function filterRepositorySupportDocuments() {

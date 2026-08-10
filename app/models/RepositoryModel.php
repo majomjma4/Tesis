@@ -10,7 +10,7 @@ final class RepositoryModel
     public function getPublishedProjects(): array
     {
         if (Database::isEnabled()) {
-            $statement=Database::connection()->query("SELECT p.id,p.title,COALESCE(NULLIF(p.subtitle,''),NULLIF(p.summary,''),'Proyecto académico publicado.') AS description,
+            $statement=Database::connection()->query("SELECT p.id,p.code,p.title,COALESCE(NULLIF(p.subtitle,''),NULLIF(p.summary,''),'Proyecto académico publicado.') AS description,
                 c.name AS career,pt.name AS type,pt.code AS type_code,ap.name AS period_name,ap.code AS period_code,
                 COALESCE(s.semester,1) AS semester,COALESCE(t.full_name,'Sin tutor asignado') AS tutor,
                 GROUP_CONCAT(DISTINCT CASE WHEN pp.role_code='student' THEN u.full_name END ORDER BY pp.is_leader DESC,u.full_name SEPARATOR ' y ') AS authors,
@@ -26,10 +26,10 @@ final class RepositoryModel
                 ORDER BY COALESCE(p.published_at,p.updated_at) DESC,p.id DESC");
             return array_map(function(array $row):array{
                 $slug=static function(string $value):string{$value=mb_strtolower($value,'UTF-8');if(class_exists('Normalizer')){$n=Normalizer::normalize($value,Normalizer::FORM_D);if(is_string($n))$value=(string)preg_replace('/\p{Mn}+/u','',$n);}return trim((string)preg_replace('/[^a-z0-9]+/','-',$value),'-');};
-                return ['id'=>(int)$row['id'],'title'=>(string)$row['title'],'description'=>(string)$row['description'],'career'=>(string)$row['career'],'career_slug'=>$slug((string)$row['career']),
+                return ['id'=>(int)$row['id'],'code'=>(string)$row['code'],'title'=>(string)$row['title'],'description'=>(string)$row['description'],'career'=>(string)$row['career'],'career_slug'=>$slug((string)$row['career']),
                     'authors'=>(string)($row['authors']?:'Autoría institucional no registrada'),'tutor'=>(string)$row['tutor'],'teacher_slug'=>$slug((string)$row['tutor']),
                     'semester'=>(string)$row['semester'],'category'=>(string)$row['type'],'category_slug'=>$slug((string)$row['type']),'year'=>(string)$row['publication_year'],
-                    'pao'=>$slug((string)$row['period_code']),'pao_label'=>(string)$row['period_name'],'type'=>(string)$row['type'],'type_slug'=>$slug((string)$row['type']),
+                    'pao'=>$slug((string)$row['period_code']),'pao_label'=>(string)$row['period_name'],'type'=>(string)$row['type'],'type_slug'=>$slug((string)$row['type']),'type_code'=>(string)($row['type_code']??''),
                     'downloads'=>0,'technologies'=>[],'keywords'=>[]];
             },$statement->fetchAll());
         }

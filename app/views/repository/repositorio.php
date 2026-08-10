@@ -135,11 +135,11 @@
                 </header>
 
                 <!-- Grilla de proyectos con tarjetas exactas Admin -->
-                <div class="ar-grid" id="repositoryGrid">
+                <div class="ar-grid" id="readerProjectGrid">
                     <?php foreach ($projects as $project): ?>
                         <?php
                         $projectSearchText = implode(' ', [
-                            $project['code'] ?? sprintf('PRJ-%03d', $project['id']),
+                            $project['code'] ?? '',
                             $project['title'],
                             $project['description'],
                             $project['authors'],
@@ -151,17 +151,18 @@
                             implode(' ', $project['keywords'] ?? [])
                         ]);
                         $typeSlug = $project['type_slug'] ?? 'tesis';
-                        $typeCode = match ($typeSlug) {
-                            'tesis' => 'thesis',
+                        $typeCode = !empty($project['type_code']) ? $project['type_code'] : match ($typeSlug) {
+                            'tesis', 'titulacion' => 'thesis',
                             'perfil-tesis' => 'thesis_profile',
-                            'practicas' => 'practice',
-                            'proyecto-pis' => 'pis',
-                            'vinculacion' => 'community',
+                            'practicas', 'practicas-preprofesionales' => 'practice',
+                            'proyecto-pis', 'proyecto-integrador-de-saberes', 'pis' => 'pis',
+                            'vinculacion', 'proyecto-de-vinculacion' => 'community',
                             default => $typeSlug,
                         };
+                        $typeBadge = $typeCode === 'pis' ? 'PIS' : $project['type'];
                         ?>
                         <article
-                            class="ar-project-card repository-card repository-project-card"
+                            class="ar-project-card"
                             tabindex="0"
                             role="link"
                             aria-label="Explorar proyecto <?= e($project['title']) ?>"
@@ -174,8 +175,8 @@
                             data-pao="<?= e($project['pao'] ?? '') ?>"
                         >
                             <header>
-                                <span class="ar-code"><?= e($project['code'] ?? sprintf('PRJ-%03d', $project['id'])) ?></span>
-                                <span class="ar-project-type"><?= e($project['type']) ?></span>
+                                <span class="ar-code"><?= e($project['code'] ?? '') ?></span>
+                                <span class="ar-project-type"><?= e($typeBadge) ?></span>
                             </header>
                             <div class="ar-card-copy">
                                 <h3 title="<?= e($project['title']) ?>"><?= e($project['title']) ?></h3>
@@ -193,16 +194,6 @@
                                 <a class="ar-primary-action" href="<?= e($project['detail_url']) ?>">
                                     <i class="fa-solid fa-diagram-project"></i> Abrir expediente
                                 </a>
-                                <button
-                                    class="repository-favorite-btn ar-icon-action<?= !empty($project['is_favorite']) ? ' is-favorite' : '' ?>"
-                                    type="button"
-                                    aria-label="<?= !empty($project['is_favorite']) ? 'Eliminar de favoritos' : 'Guardar en favoritos' ?>: <?= e($project['title']) ?>"
-                                    aria-pressed="<?= !empty($project['is_favorite']) ? 'true' : 'false' ?>"
-                                    title="<?= !empty($project['is_favorite']) ? 'Eliminar de favoritos' : 'Guardar en favoritos' ?>"
-                                    style="margin-left: auto;"
-                                >
-                                    <i class="<?= !empty($project['is_favorite']) ? 'fa-solid' : 'fa-regular' ?> fa-heart" aria-hidden="true"></i>
-                                </button>
                             </footer>
                         </article>
                     <?php endforeach; ?>

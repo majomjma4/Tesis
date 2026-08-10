@@ -2,10 +2,10 @@
 
 :root {
     --project-thesis: 37, 99, 235;
-    --project-profile: 124, 58, 237;
-    --project-practices: 13, 148, 136;
-    --project-pis: 217, 119, 6;
-    --project-linkage: 225, 29, 72;
+    --project-profile: 139, 92, 246;
+    --project-practices: 244, 99, 90;
+    --project-pis: 16, 185, 129;
+    --project-linkage: 245, 158, 11;
     --status-published: 16, 185, 129;
     --status-completed: 37, 99, 235;
 }
@@ -257,19 +257,25 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    position: relative;
     transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
 }
 
-.ar-project-card[data-type-code="thesis"], .ar-project-card[data-type="tesis"] { --card-accent: var(--project-thesis); }
-.ar-project-card[data-type-code="thesis_profile"], .ar-project-card[data-type="perfil-tesis"] { --card-accent: var(--project-profile); }
-.ar-project-card[data-type-code="practice"], .ar-project-card[data-type="practicas"] { --card-accent: var(--project-practices); }
-.ar-project-card[data-type-code="pis"], .ar-project-card[data-type="proyecto-pis"] { --card-accent: var(--project-pis); }
-.ar-project-card[data-type-code="community"], .ar-project-card[data-type="vinculacion"] { --card-accent: var(--project-linkage); }
+.ar-project-card::after, .ar-material-card::after {
+    display: none !important;
+    content: none !important;
+}
 
-.ar-material-card[data-category-slug="tesis"] { --card-accent: var(--project-thesis); }
-.ar-material-card[data-category-slug="practicas"] { --card-accent: var(--project-practices); }
-.ar-material-card[data-category-slug="proyecto-pis"] { --card-accent: var(--project-pis); }
-.ar-material-card[data-category-slug="vinculacion"] { --card-accent: var(--project-linkage); }
+.app-page-content .ar-grid .ar-project-card[data-type-code="thesis"], .app-page-content .ar-grid .ar-project-card[data-type="tesis"], .app-page-content .ar-grid .ar-project-card[data-type="titulacion"] { --card-accent: var(--project-thesis); }
+.app-page-content .ar-grid .ar-project-card[data-type-code="thesis_profile"], .app-page-content .ar-grid .ar-project-card[data-type="perfil-tesis"] { --card-accent: var(--project-profile); }
+.app-page-content .ar-grid .ar-project-card[data-type-code="practice"], .app-page-content .ar-grid .ar-project-card[data-type="practicas"], .app-page-content .ar-grid .ar-project-card[data-type="practicas-preprofesionales"] { --card-accent: var(--project-practices); }
+.app-page-content .ar-grid .ar-project-card[data-type-code="pis"], .app-page-content .ar-grid .ar-project-card[data-type="proyecto-pis"], .app-page-content .ar-grid .ar-project-card[data-type="proyecto-integrador-de-saberes"] { --card-accent: var(--project-pis); }
+.app-page-content .ar-grid .ar-project-card[data-type-code="community"], .app-page-content .ar-grid .ar-project-card[data-type="vinculacion"], .app-page-content .ar-grid .ar-project-card[data-type="proyecto-de-vinculacion"] { --card-accent: var(--project-linkage); }
+
+.app-page-content .ar-grid .ar-material-card[data-category-slug="tesis"] { --card-accent: var(--project-thesis); }
+.app-page-content .ar-grid .ar-material-card[data-category-slug="practicas"] { --card-accent: var(--project-practices); }
+.app-page-content .ar-grid .ar-material-card[data-category-slug="proyecto-pis"] { --card-accent: var(--project-pis); }
+.app-page-content .ar-grid .ar-material-card[data-category-slug="vinculacion"] { --card-accent: var(--project-linkage); }
 
 .ar-project-card:hover, .ar-material-card:hover {
     border-color: rgba(var(--card-accent), .58);
@@ -574,8 +580,7 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
     transform: translateY(0);
 }
 
-/* Responsive Breakpoints */
-@media(max-width: 1000px) {
+@media(max-width: 760px) {
     .ar-grid {
         grid-template-columns: 1fr;
     }

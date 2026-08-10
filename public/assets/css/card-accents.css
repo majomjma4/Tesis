@@ -6,7 +6,7 @@
 :root{--status-development:37,99,235;--status-review:245,158,11;--status-danger:239,68,68;--status-approved:16,185,129;--status-completed:8,145,178;--status-published:139,92,246;--status-defense:79,70,229;--status-tribunal-approved:13,148,136}
 
 /* Cards informativas sin un tipo o estado específico. */
-.app-page-content :is(article,section,div,a)[class$="-card"]:not(.status-card):not(.repository-card),
+.app-page-content :is(article,section,div,a)[class$="-card"]:not(.status-card):not(.repository-card):not(.ar-project-card):not(.ar-material-card),
 .app-page-content :is(.admin-dashboard-panel,.an-compose,.an-history,.at-remove,.rp-activity,.rp-exports,.aa-subjects,.as-form>section,.calendar-board,.calendar-agenda,.document-rows,.review-master-detail,.workspace-header,.summary-situation,.summary-facts,.summary-recent,.information-section,.conversation-view,.activity-view,.final-documents-v2),
 .app-page-content :is(.admin-metrics,.projects-metrics,.calendar-stats,.ap-stats,.an-stats,.at-stats,.ar-stats,.rp-stats,.aa-grid,.aa-catalogs,.ap-list,.at-list,.ar-list) > :is(article,section,a){
     --card-accent:var(--project-thesis);
