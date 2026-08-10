@@ -157,7 +157,7 @@ $formatDate = static function (?string $date): string {
                         $project['code'], $project['type_name'], $project['title'],
                         $project['authors'] ?: '', $project['tutor_name'] ?: '',
                         $project['period_name'],
-                    ]); ?>
+                    ]); $projectTypeBadge = mb_strtolower((string) $project['type_name'], 'UTF-8') === 'proyecto integrador de saberes' ? 'PIS' : $project['type_name']; ?>
                     <article class="ar-project-card"
                         data-repository-item="projects"
                         data-project-available="<?= !empty($project['is_available']) ? '1' : '0' ?>"
@@ -167,7 +167,7 @@ $formatDate = static function (?string $date): string {
                         data-period="<?= e(mb_strtolower($project['period_name'], 'UTF-8')) ?>">
                         <header>
                             <span class="ar-code"><?= e($project['code']) ?></span>
-                            <span class="ar-project-type"><?= e($project['type_name']) ?></span>
+                            <span class="ar-project-type"><?= e($projectTypeBadge) ?></span>
                         </header>
                         <div class="ar-card-copy">
                             <h3 title="<?= e($project['title']) ?>"><?= e($project['title']) ?></h3>
@@ -303,11 +303,11 @@ $formatDate = static function (?string $date): string {
                     <header class="ar-section-head"><div><span>Publicaciones académicas</span><h2>Proyectos retirados</h2></div></header>
                     <div class="ar-grid">
                         <?php foreach ($withdrawnProjects as $project): ?>
-                            <?php $projectSearch = implode(' ', [$project['code'], $project['type_name'], $project['title'], $project['authors'] ?: '', $project['tutor_name'] ?: '', $project['period_name']]); ?>
+                            <?php $projectSearch = implode(' ', [$project['code'], $project['type_name'], $project['title'], $project['authors'] ?: '', $project['tutor_name'] ?: '', $project['period_name']]); $projectTypeBadge = mb_strtolower((string) $project['type_name'], 'UTF-8') === 'proyecto integrador de saberes' ? 'PIS' : $project['type_name']; ?>
                             <article class="ar-project-card"
                                 data-repository-item="withdrawn"
                                 data-search="<?= e(mb_strtolower($projectSearch, 'UTF-8')) ?>">
-                                <header><span class="ar-code"><?= e($project['code']) ?></span><span class="ar-project-type"><?= e($project['type_name']) ?></span></header>
+                                <header><span class="ar-code"><?= e($project['code']) ?></span><span class="ar-project-type"><?= e($projectTypeBadge) ?></span></header>
                                 <div class="ar-card-copy">
                                     <h3 title="<?= e($project['title']) ?>"><?= e($project['title']) ?></h3>
                                     <dl>
