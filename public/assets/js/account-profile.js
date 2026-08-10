@@ -253,15 +253,20 @@
         if (!file) return;
         hideAlert();
 
+        if (file.size < 1) {
+            showAlert('La imagen seleccionada está vacía o no es válida.', 'error');
+            return;
+        }
+
         const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
         if (!allowedTypes.includes(file.type.toLowerCase())) {
-            showAlert('Formato no permitido. Selecciona una imagen JPG, JPEG o PNG.', 'error');
+            showAlert('Solo se permiten imágenes JPG, JPEG o PNG.', 'error');
             return;
         }
 
         const maxSizeBytes = 5 * 1024 * 1024;
         if (file.size > maxSizeBytes) {
-            showAlert('La imagen supera el tamaño máximo permitido de 5 MB.', 'error');
+            showAlert('La imagen supera el límite máximo de 5 MB.', 'error');
             return;
         }
 
@@ -275,7 +280,7 @@
                 initCropEngine();
             };
             img.onerror = () => {
-                showAlert('No fue posible cargar la imagen seleccionada.', 'error');
+                showAlert('La imagen seleccionada está vacía o no es válida.', 'error');
             };
             img.src = e.target.result;
         };
@@ -373,17 +378,17 @@
 
             try {
                 const response = await fetch(updateEndpoint, { method: 'POST', body: data });
-                const result = await response.json();
+                const result = await response.json().catch(() => ({ success: false, message: 'No se pudo actualizar la fotografía. Inténtalo nuevamente.' }));
 
                 if (!response.ok || !result.success) {
-                    throw new Error(result.message || 'Error al guardar la fotografía.');
+                    throw new Error(result.message || 'No se pudo actualizar la fotografía. Inténtalo nuevamente.');
                 }
 
                 updateAvatarDOM(result.data?.avatar_url);
                 closeEditModal();
-                showAlert(result.message || 'Fotografía de perfil actualizada.', 'success');
+                showAlert(result.message || 'Fotografía de perfil actualizada correctamente.', 'success');
             } catch (error) {
-                showAlert(error.message || 'No fue posible guardar la fotografía.', 'error');
+                showAlert(error.message || 'No se pudo actualizar la fotografía. Inténtalo nuevamente.', 'error');
             } finally {
                 editSaveBtn.disabled = false;
                 editCancelBtn.disabled = false;
@@ -418,17 +423,17 @@
 
         try {
             const response = await fetch(removeEndpoint, { method: 'POST', body: data });
-            const result = await response.json();
+            const result = await response.json().catch(() => ({ success: false, message: 'No se pudo eliminar la fotografía. Inténtalo nuevamente.' }));
 
             if (!response.ok || !result.success) {
-                throw new Error(result.message || 'Error al eliminar la fotografía.');
+                throw new Error(result.message || 'No se pudo eliminar la fotografía. Inténtalo nuevamente.');
             }
 
             updateAvatarDOM(null);
             closeRemoveModal();
-            showAlert(result.message || 'Fotografía de perfil eliminada.', 'success');
+            showAlert(result.message || 'Fotografía de perfil eliminada correctamente.', 'success');
         } catch (error) {
-            showAlert(error.message || 'No fue posible eliminar la fotografía.', 'error');
+            showAlert(error.message || 'No se pudo eliminar la fotografía. Inténtalo nuevamente.', 'error');
         } finally {
             removeConfirmBtn.disabled = false;
             removeCancelBtn.disabled = false;

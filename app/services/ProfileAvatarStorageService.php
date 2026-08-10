@@ -25,10 +25,10 @@ final class ProfileAvatarStorageService
         $image = @getimagesize($temporary);
 
         if (!is_array($image) || !in_array((string) ($image['mime'] ?? ''), self::FORMATS, true)) {
-            throw new InvalidArgumentException('El archivo no contiene una imagen válida.');
+            throw new InvalidArgumentException('La imagen seleccionada está vacía o no es válida.');
         }
         if ((string) $image['mime'] !== $mime || self::FORMATS[$extension] !== $mime) {
-            throw new InvalidArgumentException('El contenido de la imagen no coincide con su formato.');
+            throw new InvalidArgumentException('La imagen seleccionada está vacía o no es válida.');
         }
         if ((int) $image[0] < 1 || (int) $image[1] < 1 || (int) $image[0] > self::MAX_DIMENSION || (int) $image[1] > self::MAX_DIMENSION) {
             throw new InvalidArgumentException('La imagen supera las dimensiones máximas permitidas.');
@@ -83,7 +83,8 @@ final class ProfileAvatarStorageService
             throw new InvalidArgumentException($error === UPLOAD_ERR_NO_FILE ? 'Selecciona una fotografía.' : 'La fotografía no se recibió correctamente.');
         }
         $size = (int) ($upload['size'] ?? 0);
-        if ($size < 1 || $size > self::MAX_BYTES) throw new InvalidArgumentException('La fotografía está vacía o supera el límite de 5 MB.');
+        if ($size < 1) throw new InvalidArgumentException('La imagen seleccionada está vacía o no es válida.');
+        if ($size > self::MAX_BYTES) throw new InvalidArgumentException('La imagen supera el límite máximo de 5 MB.');
         $name = (string) ($upload['name'] ?? '');
         $extension = mb_strtolower(pathinfo($name, PATHINFO_EXTENSION));
         if (!isset(self::FORMATS[$extension])) throw new InvalidArgumentException('Solo se permiten imágenes JPG, JPEG o PNG.');

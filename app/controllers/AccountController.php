@@ -72,14 +72,14 @@ final class AccountController
             $identity = $model->sessionIdentity($userId);
             if (!$identity) throw new RuntimeException('La cuenta dejó de estar disponible.');
             $session->refresh($identity);
-            $this->json(true, 'Fotografía de perfil actualizada.', 200, ['avatar_url' => $this->avatarUrl($identity['avatar_updated_at'] ?? null)]);
+            $this->json(true, 'Fotografía de perfil actualizada correctamente.', 200, ['avatar_url' => $this->avatarUrl($identity['avatar_updated_at'] ?? null)]);
         } catch (InvalidArgumentException $exception) {
             if (!$persisted) $storage->discard($stored);
             $this->json(false, $exception->getMessage(), 422);
         } catch (Throwable $exception) {
             if (!$persisted) $storage->discard($stored);
             error_log('Profile avatar update: ' . $exception->getMessage());
-            $this->json(false, 'No fue posible guardar la fotografía.', 500);
+            $this->json(false, 'No se pudo actualizar la fotografía. Inténtalo nuevamente.', 500);
         }
     }
 
@@ -97,12 +97,12 @@ final class AccountController
             $identity = (new AuthModel())->sessionIdentity($userId);
             if (!$identity) throw new RuntimeException('La cuenta dejó de estar disponible.');
             $session->refresh($identity);
-            $this->json(true, 'Fotografía de perfil eliminada.', 200, ['avatar_url' => null]);
+            $this->json(true, 'Fotografía de perfil eliminada correctamente.', 200, ['avatar_url' => null]);
         } catch (InvalidArgumentException $exception) {
             $this->json(false, $exception->getMessage(), 422);
         } catch (Throwable $exception) {
             error_log('Profile avatar removal: ' . $exception->getMessage());
-            $this->json(false, 'No fue posible eliminar la fotografía.', 500);
+            $this->json(false, 'No se pudo eliminar la fotografía. Inténtalo nuevamente.', 500);
         }
     }
 

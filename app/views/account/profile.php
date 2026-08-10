@@ -35,7 +35,7 @@ $avatarUrl = $hasAvatar ? (route('profile-avatar') . '&v=' . rawurlencode((strin
             <h2>Información personal</h2><p>Actualiza los datos institucionales de tu cuenta.</p>
             <?php if($profileError): ?><div class="profile-message error" role="alert"><?= e($profileError) ?></div><?php endif; ?>
             <?php if($profileSuccess): ?><div class="profile-message success" role="status"><?= e($profileSuccess) ?></div><?php endif; ?>
-            <div class="profile-message" id="profileAvatarAlert" hidden role="status"></div>
+            <div class="profile-message" id="profileAvatarAlert" hidden role="status" aria-live="polite"></div>
             <form id="profileForm" method="post" data-profile-form>
                 <input type="hidden" name="_csrf" value="<?= e($profileCsrf) ?>">
                 <label>Nombre completo<input name="full_name" value="<?= e($profile['full_name']) ?>" maxlength="180" required></label>
