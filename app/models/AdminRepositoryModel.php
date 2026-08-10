@@ -62,7 +62,7 @@ final class AdminRepositoryModel
         $params = [];
 
         if ($filter === '' || $filter === 'published') {
-            $where .= " AND p.status='published' AND EXISTS(
+            $where .= " AND p.status='published' AND p.withdrawn_at IS NULL AND EXISTS(
                 SELECT 1 FROM project_files published_file
                 WHERE published_file.project_id=p.id AND published_file.deleted_at IS NULL
             )";
@@ -171,7 +171,7 @@ final class AdminRepositoryModel
             'published' => (int) $database->query(
                 "SELECT COUNT(DISTINCT p.id) FROM projects p
                 JOIN project_types pt ON pt.id=p.project_type_id
-                WHERE p.deleted_at IS NULL AND p.status='published'
+                WHERE p.deleted_at IS NULL AND p.status='published' AND p.withdrawn_at IS NULL
                 AND EXISTS(
                     SELECT 1 FROM project_participants pp
                     JOIN student_profiles sp ON sp.user_id=pp.user_id
@@ -220,26 +220,21 @@ final class AdminRepositoryModel
     {
         return Database::connection()->query(
             "SELECT
-                p.id,p.code,p.title,p.status,pt.name type_name,ap.name period_name,
+                p.id,p.code,p.title,p.status,p.published_at,p.is_available,p.withdrawn_at,p.withdrawn_by,pt.name type_name,ap.name period_name,
                 u.full_name tutor_name,
                 (
                     SELECT COUNT(*) FROM project_files f
                     WHERE f.project_id=p.id AND f.deleted_at IS NULL
                 ) file_count,
                 (
-                    SELECT MAX(log.created_at) FROM project_audit_log log
-                    WHERE log.project_id=p.id AND log.action='project_unpublished'
-                ) withdrawn_at
+                    SELECT u.full_name FROM users u WHERE u.id=p.withdrawn_by
+                ) withdrawn_by_name
             FROM projects p
             JOIN project_types pt ON pt.id=p.project_type_id
             JOIN academic_periods ap ON ap.id=p.academic_period_id
             LEFT JOIN users u ON u.id=p.tutor_id
             WHERE p.deleted_at IS NULL
-            AND p.status IN ('approved','tribunal_approved')
-            AND EXISTS(
-                SELECT 1 FROM project_audit_log log
-                WHERE log.project_id=p.id AND log.action='project_unpublished'
-            )
+            AND p.status='published' AND p.withdrawn_at IS NOT NULL
             AND EXISTS(
                 SELECT 1 FROM project_files f
                 WHERE f.project_id=p.id AND f.deleted_at IS NULL
@@ -256,7 +251,7 @@ final class AdminRepositoryModel
 
         Database::transaction(function (PDO $database) use ($id, $actor): void {
             $query = $database->prepare(
-                "SELECT p.id,p.title,p.status,p.published_at,pt.code type_code
+                "SELECT p.id,p.title,p.status,p.published_at,p.is_available,p.withdrawn_at,pt.code type_code
                 FROM projects p
                 JOIN project_types pt ON pt.id=p.project_type_id
                 WHERE p.id=:id AND p.deleted_at IS NULL
@@ -268,39 +263,21 @@ final class AdminRepositoryModel
                 throw new InvalidArgumentException('El proyecto ya no está disponible.');
             }
 
-            $requiredStatus = $before['type_code'] === 'thesis' ? 'tribunal_approved' : 'approved';
-            if ($before['status'] !== $requiredStatus) {
-                throw new InvalidArgumentException(
-                    'El proyecto cambió de estado y ya no puede restaurarse directamente.'
-                );
-            }
-
-            $withdrawn = $database->prepare(
-                "SELECT COUNT(*) FROM project_audit_log
-                WHERE project_id=:id AND action='project_unpublished'"
-            );
-            $withdrawn->execute(['id' => $id]);
-            if ((int) $withdrawn->fetchColumn() < 1) {
-                throw new InvalidArgumentException(
-                    'Solo pueden restaurarse proyectos retirados previamente del repositorio.'
-                );
-            }
+            if ($before['status'] !== 'published' || $before['withdrawn_at'] === null) throw new InvalidArgumentException('Solo pueden reincorporarse proyectos retirados previamente del repositorio.');
 
             $database->prepare(
-                "UPDATE projects
-                SET status='published',published_at=CURRENT_TIMESTAMP,is_available=1
-                WHERE id=:id"
+                "UPDATE projects SET withdrawn_at=NULL,withdrawn_by=NULL WHERE id=:id AND status='published' AND withdrawn_at IS NOT NULL"
             )->execute(['id' => $id]);
 
             (new ProjectAuditService($database))->record(
                 $id,
                 $actor,
-                'project_republished',
+                'project_reincorporated',
                 'project',
                 $id,
                 $before,
-                ['status' => 'published'],
-                'Restauración de una publicación retirada'
+                ['status' => 'published','published_at' => $before['published_at'],'is_available' => (bool)$before['is_available'],'withdrawn_at' => null],
+                'Reincorporación al repositorio institucional'
             );
         });
     }
@@ -313,7 +290,7 @@ final class AdminRepositoryModel
 
         Database::transaction(function (PDO $database) use ($id, $publish, $actor): void {
             $query = $database->prepare(
-                'SELECT p.id,p.title,p.status,p.published_at,pt.code type_code
+                'SELECT p.id,p.title,p.status,p.published_at,p.is_available,p.withdrawn_at,pt.code type_code
                 FROM projects p
                 JOIN project_types pt ON pt.id=p.project_type_id
                 WHERE p.id=:id AND p.deleted_at IS NULL
@@ -343,13 +320,12 @@ final class AdminRepositoryModel
                 if ($before['status'] !== 'published') {
                     throw new InvalidArgumentException('El proyecto no está publicado.');
                 }
-
-                $previous = $before['type_code'] === 'thesis' ? 'tribunal_approved' : 'approved';
+                if ($before['withdrawn_at'] !== null) throw new InvalidArgumentException('El proyecto ya está retirado del Repositorio.');
                 $database->prepare(
-                    'UPDATE projects SET status=:status, published_at=NULL,is_available=0 WHERE id=:id'
-                )->execute(['status' => $previous, 'id' => $id]);
-                $after = ['status' => $previous];
-                $action = 'project_unpublished';
+                    'UPDATE projects SET withdrawn_at=UTC_TIMESTAMP(),withdrawn_by=:actor WHERE id=:id AND status=\'published\' AND withdrawn_at IS NULL'
+                )->execute(['actor' => $actor, 'id' => $id]);
+                $after = ['status' => 'published','published_at' => $before['published_at'],'is_available' => (bool)$before['is_available'],'withdrawn_at' => 'set'];
+                $action = 'project_withdrawn';
             }
 
             (new ProjectAuditService($database))->record(
