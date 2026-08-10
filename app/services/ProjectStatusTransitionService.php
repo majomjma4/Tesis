@@ -150,6 +150,15 @@ final class ProjectStatusTransitionService
                 $reason !== '' ? $reason : null
             );
             if ($publishes) (new ProjectDocumentArchiveService())->archiveHistoricalVersionsForProjectInTransaction($db,$projectId,$actor,'Publicación institucional del proyecto.');
+            if ($publishes) {
+                try {
+                    (new ProjectRepositoryPackageService())->buildForProject($projectId);
+                } catch (Throwable $zipError) {
+                    // El ZIP se puede regenerar después con el script de mantenimiento.
+                    // No interrumpimos la publicación por un fallo del sistema de archivos.
+                    error_log('ProjectRepositoryPackageService: no se pudo generar el ZIP al publicar el proyecto ' . $projectId . ': ' . $zipError->getMessage());
+                }
+            }
             (new ProjectDescriptionService($db))->registerStatusReminder($projectId, $auditId);
 
             $labels = project_academic_labels($targetStatus);

@@ -30,6 +30,20 @@
     const tutoringEditor = form?.querySelector('[data-tutoring-editor]');
     const tutoringAdd = form?.querySelector('[data-tutoring-add]');
     const tutoringNote = form?.querySelector('[data-tutoring-note]');
+    const authorCatalogNode = document.querySelector('#apAuthorsCatalog');
+    const authors = (() => {
+        if (!tutoring || !form) return null;
+        const section = document.createElement('div');
+        section.className = 'ap-tutoring';
+        section.dataset.projectAuthors = '';
+        section.innerHTML = '<div class="ap-tutoring-heading"><i class="fa-solid fa-users" aria-hidden="true"></i><div><small>Autores / Integrantes</small><strong>Estudiantes autores del proyecto</strong></div></div><aside class="ap-tutoring-warning"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><p>Los cambios en los autores se registrarán en el historial administrativo.<small>El proyecto debe conservar al menos un autor.</small></p></aside><div class="ap-tutoring-list" data-authors-list></div><div class="ap-tutoring-editor" data-authors-editor hidden></div><button class="ap-tutoring-add" type="button" data-authors-add><i class="fa-solid fa-plus" aria-hidden="true"></i>Añadir autor</button><p class="ap-tutoring-note" role="status" aria-live="polite" data-authors-note hidden></p>';
+        tutoring.after(section);
+        return section;
+    })();
+    const authorsList = authors?.querySelector('[data-authors-list]');
+    const authorsEditor = authors?.querySelector('[data-authors-editor]');
+    const authorsAdd = authors?.querySelector('[data-authors-add]');
+    const authorsNote = authors?.querySelector('[data-authors-note]');
     const statusActions = form?.querySelector('[data-project-status-actions]');
     const statusComplete = form?.querySelector('[data-project-status-complete]');
     const statusDialog = document.querySelector('[data-project-status-dialog]');
@@ -56,7 +70,11 @@
     let temporaryTutors = [];
     let initialPrimaryTutorId = '';
     let tutoringEditorAbort = null;
+    let temporaryAuthors = [];
+    let authorsEditorAbort = null;
     const tutoringState = () => JSON.stringify(temporaryTutors.map(tutor => [String(tutor.user_id), tutor.is_primary ? 'principal' : 'additional'])
+        .sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1])));
+    const authorsState = () => JSON.stringify(temporaryAuthors.map(author => [String(author.user_id), author.is_leader ? 'leader' : 'member'])
         .sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1])));
     const selectedKeywordState = () => [...(keywordOptions?.querySelectorAll('input:checked') || [])].map(input => input.value.normalize('NFC')).sort((a, b) => a.localeCompare(b, 'es'));
     const normalizeComparableText = value => String(value ?? '')
@@ -70,6 +88,7 @@
         normalizeComparableText(form?.elements.title?.value),
         form?.elements.subtitle?.value ?? '',
         tutoringState(),
+        authorsState(),
         normalizeComparableText(form?.querySelector('[data-project-summary]')?.value),
         selectedKeywordState(),
     ]);
@@ -302,13 +321,15 @@
     const openTutoringEditor = (mode, targetId = '') => {
         if (!tutoringEditor) return;
         closeTutoringEditor();
+        closeAuthorsEditor();
         const excluded = new Set(temporaryTutors.filter(tutor => mode === 'replace' ? tutor.user_id !== targetId : true).map(tutor => tutor.user_id));
         const available = tutoringCatalog.map(person => normalizeTutor(person)).filter(person => person.user_id && !excluded.has(person.user_id));
         const copy = document.createElement('p');
         copy.textContent = mode === 'add'
-            ? 'Se añadirá un nuevo docente a la Tutoría del proyecto.'
-            : 'El docente seleccionado sustituirá al tutor actual. Este cambio todavía no se aplicará hasta guardar.';
+            ? 'El tutor se añadirá al guardar los cambios.'
+            : 'El tutor seleccionado se sustituirá al guardar los cambios.';
         const picker = document.createElement('div'); picker.className = 'ap-tutor-picker';
+        const tutorSearch = document.createElement('input'); tutorSearch.type = 'search'; tutorSearch.placeholder = 'Buscar tutor…'; tutorSearch.className = 'ap-tutor-picker-search'; tutorSearch.hidden = true;
         const trigger = document.createElement('button'); trigger.type = 'button'; trigger.className = 'ap-tutor-picker-trigger';
         const panelId = `apTutorPicker${mode}${targetId || 'New'}`;
         trigger.setAttribute('aria-haspopup', 'listbox'); trigger.setAttribute('aria-expanded', 'false'); trigger.setAttribute('aria-controls', panelId);
@@ -324,16 +345,26 @@
         });
         const actions = document.createElement('div'); actions.className = 'ap-tutoring-editor-actions';
         const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancelar';
-        const apply = document.createElement('button'); apply.type = 'button'; apply.textContent = mode === 'add' ? 'Añadir temporalmente' : 'Reemplazar'; apply.disabled = true;
-        const closePicker = (restoreFocus = false) => { panel.hidden = true; picker.classList.remove('is-open'); trigger.setAttribute('aria-expanded', 'false'); if (restoreFocus) trigger.focus(); };
-        const openPicker = () => { if (!available.length) return; panel.hidden = false; picker.classList.add('is-open'); trigger.setAttribute('aria-expanded', 'true'); (optionButtons.find(option => option.dataset.value === selectedId) || optionButtons[0])?.focus(); };
+        const apply = document.createElement('button'); apply.type = 'button'; apply.hidden = true;
+        const filterTutors = () => { const term = tutorSearch.value.trim().toLocaleLowerCase('es'); optionButtons.forEach(option => { const person = available.find(candidate => candidate.user_id === option.dataset.value); option.hidden = Boolean(term && ![person?.full_name, person?.username, person?.email].join(' ').toLocaleLowerCase('es').includes(term)); }); };
+        const closePicker = (restoreFocus = false) => { panel.hidden = true; tutorSearch.hidden = true; tutorSearch.value = ''; filterTutors(); picker.classList.remove('is-open'); trigger.setAttribute('aria-expanded', 'false'); if (restoreFocus) trigger.focus(); };
+        const openPicker = () => { if (!available.length) return; panel.hidden = false; tutorSearch.hidden = false; picker.classList.add('is-open'); trigger.setAttribute('aria-expanded', 'true'); tutorSearch.focus(); };
         const choose = option => {
-            selectedId = option.dataset.value || '';
-            optionButtons.forEach(item => item.setAttribute('aria-selected', String(item === option)));
-            trigger.querySelector('span').textContent = option.querySelector('strong')?.textContent || 'Docente seleccionado';
-            apply.disabled = !selectedId; closePicker(true);
+            const selected = available.find(person => person.user_id === (option.dataset.value || ''));
+            if (!selected) return;
+            if (mode === 'add') {
+                if (temporaryTutors.some(tutor => tutor.user_id === selected.user_id)) return;
+                const restoresInitialPrimary = selected.user_id === initialPrimaryTutorId;
+                if (restoresInitialPrimary) temporaryTutors = temporaryTutors.map(tutor => ({ ...tutor, is_primary: false }));
+                temporaryTutors.push({ ...selected, is_primary: temporaryTutors.length === 0 || restoresInitialPrimary });
+            } else {
+                const index = temporaryTutors.findIndex(person => person.user_id === targetId);
+                if (index >= 0) temporaryTutors[index] = { ...selected, is_primary: temporaryTutors[index].is_primary };
+            }
+            closeTutoringEditor(); renderTutoring(); syncChangeState();
         };
         trigger.addEventListener('click', () => panel.hidden ? openPicker() : closePicker());
+        tutorSearch.addEventListener('input', filterTutors);
         trigger.addEventListener('keydown', event => { if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) { event.preventDefault(); openPicker(); } else if (event.key === 'Escape') closePicker(); });
         optionButtons.forEach((option, index) => {
             option.addEventListener('click', () => choose(option));
@@ -347,7 +378,7 @@
             });
         });
         tutoringEditorAbort = new AbortController();
-        document.addEventListener('click', event => { if (!picker.contains(event.target)) closePicker(); }, { signal: tutoringEditorAbort.signal });
+        document.addEventListener('click', event => { if (!tutoringAdd?.contains(event.target) && !picker.contains(event.target)) closePicker(); }, { signal: tutoringEditorAbort.signal });
         cancel.addEventListener('click', closeTutoringEditor);
         apply.addEventListener('click', () => {
             const selected = available.find(person => person.user_id === selectedId);
@@ -362,10 +393,10 @@
             }
             closeTutoringEditor(); renderTutoring(); syncChangeState();
         });
-        picker.append(trigger, panel); actions.append(cancel, apply);
+        picker.append(trigger, tutorSearch, panel); actions.append(cancel, apply);
         tutoringEditor.replaceChildren(copy, picker, actions);
         tutoringEditor.hidden = false;
-        trigger.focus();
+        openPicker();
     };
     function renderTutoring() {
         if (!tutoringList) return;
@@ -383,8 +414,17 @@
             if (person.email) {
                 const contactId = `apTutorContact${person.user_id}`; identity.setAttribute('aria-expanded', 'false'); identity.setAttribute('aria-controls', contactId); identity.setAttribute('aria-label', `Mostrar correo de ${person.full_name}`);
                 const chevron = document.createElement('i'); chevron.className = 'fa-solid fa-chevron-down'; chevron.setAttribute('aria-hidden', 'true'); identity.append(chevron);
-                const contact = document.createElement('a'); contact.id = contactId; contact.className = 'ap-tutor-contact'; contact.href = `mailto:${person.email}`; contact.textContent = person.email; contact.hidden = true;
-                identity.addEventListener('click', () => { contact.hidden = !contact.hidden; identity.setAttribute('aria-expanded', String(!contact.hidden)); });
+                const contact = document.createElement('div'); contact.id = contactId; contact.className = 'ap-tutor-contact'; contact.hidden = true;
+                const contactLabel = document.createElement('small'); contactLabel.textContent = 'Correo institucional';
+                const contactEmail = document.createElement('a'); contactEmail.href = `mailto:${person.email}`; contactEmail.textContent = person.email;
+                contact.append(contactLabel, contactEmail);
+                identity.addEventListener('click', () => {
+                    const wasOpen = !contact.hidden;
+                    tutoringList.querySelectorAll('.ap-tutor-contact').forEach(panel => { panel.hidden = true; });
+                    tutoringList.querySelectorAll('.ap-tutor-identity[aria-expanded]').forEach(trigger => trigger.setAttribute('aria-expanded', 'false'));
+                    contact.hidden = wasOpen;
+                    identity.setAttribute('aria-expanded', String(!contact.hidden));
+                });
                 row.append(identity, contact);
             } else row.append(identity);
             const actions = document.createElement('div'); actions.className = 'ap-tutor-actions';
@@ -405,7 +445,83 @@
             const empty = document.createElement('p'); empty.className = 'ap-tutoring-empty'; empty.textContent = 'El proyecto debe conservar al menos un tutor.'; tutoringList.append(empty);
         }
     }
-    tutoringAdd?.addEventListener('click', () => openTutoringEditor('add'));
+    tutoringAdd?.addEventListener('click', () => tutoringEditor?.hidden ? openTutoringEditor('add') : closeTutoringEditor());
+    const authorsCatalog = (() => { try { return JSON.parse(authorCatalogNode?.textContent || '[]'); } catch { return []; } })();
+    const normalizeAuthor = (person, leader = false) => ({
+        user_id: String(person?.user_id ?? person?.id ?? ''), username: String(person?.username || ''),
+        full_name: String(person?.full_name || person?.name || ''), institutional_code: String(person?.institutional_code || ''),
+        is_leader: leader,
+    });
+    const authorInitials = person => String(person?.full_name || person?.username || '?').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase();
+    const announceAuthors = message => { if (authorsNote) { authorsNote.textContent = message; authorsNote.hidden = !message; } };
+    const closeAuthorsEditor = () => { authorsEditorAbort?.abort(); authorsEditorAbort = null; if (authorsEditor) { authorsEditor.hidden = true; authorsEditor.replaceChildren(); } };
+    const loadAuthors = project => {
+        const seen = new Set();
+        const candidates = (Array.isArray(project?.participants) ? project.participants : []).filter(person => String(person?.role_code || '').toLowerCase() === 'student');
+        temporaryAuthors = candidates.map(person => normalizeAuthor(person, Number(person?.is_leader) === 1)).filter(person => {
+            if (!person.user_id || seen.has(person.user_id)) return false;
+            seen.add(person.user_id); return true;
+        });
+        if (temporaryAuthors.length && !temporaryAuthors.some(author => author.is_leader)) temporaryAuthors[0].is_leader = true;
+        renderAuthors();
+    };
+    const renderAuthors = () => {
+        if (!authorsList) return;
+        authorsList.replaceChildren();
+        temporaryAuthors.forEach(person => {
+            const row = document.createElement('article'); row.className = 'ap-tutor-person';
+            const identity = document.createElement('div'); identity.className = 'ap-tutor-identity';
+            const avatar = document.createElement('span'); avatar.className = 'ap-tribunal-avatar'; avatar.textContent = authorInitials(person); avatar.setAttribute('aria-hidden', 'true');
+            const copy = document.createElement('span');
+            if (person.institutional_code) { const code = document.createElement('small'); code.textContent = person.institutional_code; copy.append(code); }
+            const name = document.createElement('strong'); name.textContent = person.full_name || 'Estudiante registrado';
+            const badge = document.createElement('em'); badge.textContent = person.is_leader ? 'Autor principal' : 'Integrante';
+            copy.append(name, badge); identity.append(avatar, copy); row.append(identity);
+            const actions = document.createElement('div'); actions.className = 'ap-tutor-actions';
+            const leader = document.createElement('button'); leader.type = 'button'; leader.className = 'ap-tutor-action'; leader.disabled = person.is_leader; leader.setAttribute('aria-disabled', String(leader.disabled));
+            leader.dataset.tooltip = person.is_leader ? 'Autor principal' : 'Establecer como autor principal'; leader.setAttribute('aria-label', leader.dataset.tooltip); leader.innerHTML = '<i class="fa-solid fa-star" aria-hidden="true"></i>';
+            leader.addEventListener('click', () => { temporaryAuthors = temporaryAuthors.map(author => ({ ...author, is_leader: author.user_id === person.user_id })); announceAuthors('Se actualizó el autor principal. Guarda los cambios para confirmarlo.'); renderAuthors(); syncChangeState(); });
+            const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'ap-tutor-action is-destructive'; remove.disabled = temporaryAuthors.length <= 1; remove.setAttribute('aria-disabled', String(remove.disabled));
+            remove.dataset.tooltip = remove.disabled ? 'El proyecto debe conservar al menos un autor.' : 'Retirar autor'; remove.setAttribute('aria-label', remove.dataset.tooltip); remove.title = remove.dataset.tooltip; remove.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
+            remove.addEventListener('click', () => { if (temporaryAuthors.length <= 1) return; temporaryAuthors = temporaryAuthors.filter(author => author.user_id !== person.user_id); if (person.is_leader && temporaryAuthors.length) temporaryAuthors[0].is_leader = true; announceAuthors('El autor se retirará al guardar los cambios.'); closeAuthorsEditor(); renderAuthors(); syncChangeState(); });
+            actions.append(leader, remove); row.append(actions); authorsList.append(row);
+        });
+        if (!temporaryAuthors.length) { const empty = document.createElement('p'); empty.className = 'ap-tutoring-empty'; empty.textContent = 'El proyecto debe conservar al menos un autor.'; authorsList.append(empty); }
+    };
+    const openAuthorsEditor = () => {
+        if (!authorsEditor) return;
+        closeAuthorsEditor();
+        closeTutoringEditor();
+        const excluded = new Set(temporaryAuthors.map(author => author.user_id));
+        const available = authorsCatalog.map(person => normalizeAuthor(person)).filter(person => person.user_id && !excluded.has(person.user_id));
+        const copy = document.createElement('p'); copy.textContent = 'El autor se añadirá al guardar los cambios.';
+        const search = document.createElement('input'); search.type = 'search'; search.placeholder = 'Buscar estudiante…'; search.className = 'ap-tutor-picker-search';
+        const picker = document.createElement('div'); picker.className = 'ap-tutor-picker';
+        const options = document.createElement('div'); options.className = 'ap-tutor-picker-options'; options.setAttribute('role', 'listbox');
+        let selectedId = '';
+        const apply = document.createElement('button'); apply.type = 'button'; apply.hidden = true;
+        const renderOptions = () => {
+            const term = search.value.trim().toLocaleLowerCase('es'); options.replaceChildren();
+            available.filter(person => !term || [person.full_name, person.username, person.institutional_code].join(' ').toLocaleLowerCase('es').includes(term)).forEach(person => {
+                const option = document.createElement('button'); option.type = 'button'; option.setAttribute('role', 'option'); option.setAttribute('aria-selected', String(person.user_id === selectedId));
+                const label = document.createElement('span'); const name = document.createElement('strong'); name.textContent = person.full_name || 'Estudiante registrado'; label.append(name);
+                const meta = document.createElement('small'); meta.textContent = [person.institutional_code, person.username && `@${person.username}`].filter(Boolean).join(' · '); if (meta.textContent) label.append(meta);
+                option.append(label); option.addEventListener('click', () => {
+                    if (temporaryAuthors.some(author => author.user_id === person.user_id)) return;
+                    temporaryAuthors.push({ ...person, is_leader: temporaryAuthors.length === 0 });
+                    announceAuthors('El autor se añadirá al guardar los cambios.');
+                    closeAuthorsEditor(); renderAuthors(); syncChangeState();
+                }); options.append(option);
+            });
+        };
+        authorsEditorAbort = new AbortController();
+        document.addEventListener('click', event => { if (!authorsAdd?.contains(event.target) && !authorsEditor.contains(event.target)) closeAuthorsEditor(); }, { signal: authorsEditorAbort.signal });
+        search.addEventListener('input', renderOptions); renderOptions();
+        const actions = document.createElement('div'); actions.className = 'ap-tutoring-editor-actions'; const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = 'Cancelar';
+        cancel.addEventListener('click', closeAuthorsEditor);
+        actions.append(cancel, apply); picker.append(search, options); authorsEditor.replaceChildren(copy, picker, actions); authorsEditor.hidden = false; search.focus();
+    };
+    authorsAdd?.addEventListener('click', () => authorsEditor?.hidden ? openAuthorsEditor() : closeAuthorsEditor());
     const renderTribunal = project => {
         form?.querySelector('[data-project-tribunal]')?.remove();
         const academicGrid = form?.querySelector('[data-project-academic-grid]');
@@ -631,6 +747,7 @@
         }
         loadKeywordSelector(project);
         loadTutoring(project);
+        loadAuthors(project);
         initialTutoringState = tutoringState();
         renderTribunal(project);
         if (editWarning) editWarning.hidden = !project;
@@ -647,7 +764,7 @@
                 url.searchParams.set('tab', tab);
                 return url.toString();
             };
-            if (manageParticipants) manageParticipants.href = projectUrl('information');
+            if (manageParticipants) manageParticipants.href = '#project-authors';
             if (manageFiles) manageFiles.href = projectUrl('documents');
         }
         showProjectDialog(modal);
@@ -662,12 +779,19 @@
         tutoring?.querySelectorAll('.ap-tutor-contact').forEach(contact => { contact.hidden = true; });
         tutoring?.querySelectorAll('.ap-tutor-identity[aria-expanded]').forEach(identity => identity.setAttribute('aria-expanded', 'false'));
         if (tutoringNote) { tutoringNote.hidden = true; tutoringNote.textContent = ''; }
+        closeAuthorsEditor();
+        if (authorsNote) { authorsNote.hidden = true; authorsNote.textContent = ''; }
     };
     const closeEditor = () => {
         closeKeywordSelector();
         resetTutoringPanels();
         modal.hidden = true;
     };
+    manageParticipants?.addEventListener('click', event => {
+        event.preventDefault();
+        authors?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        authorsAdd?.focus({ preventScroll: true });
+    });
     document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', closeEditor));
     modal?.addEventListener('click', event => { if (event.target === modal) closeEditor(); });
     document.addEventListener('keydown', event => {
@@ -756,6 +880,18 @@
         event.preventDefault();
         if (!syncChangeState()) return;
         const data = new FormData(form);
+        if (form.elements.id.value) {
+            const leader = temporaryAuthors.find(author => author.is_leader);
+            if (!temporaryAuthors.length || !leader) {
+                announceAuthors('El proyecto debe conservar al menos un autor principal.');
+                authors?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                return;
+            }
+            data.set('authors_managed', '1');
+            data.delete('author_user_ids[]');
+            temporaryAuthors.forEach(author => data.append('author_user_ids[]', author.user_id));
+            data.set('author_leader_id', leader.user_id);
+        }
         const primaryTutor = temporaryTutors.find(tutor => tutor.is_primary) || temporaryTutors[0];
         data.set('tutoring_managed', '1');
         data.delete('tutoring_user_ids[]');

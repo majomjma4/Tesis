@@ -135,3 +135,7 @@ body.project-dialog-open{overflow:hidden!important}
 #apForm .ap-keyword-trigger{
     color:var(--text);
 }
+/* Selector de autores: reutiliza el editor de Tutoría sin alterar su composición. */
+.ap-tutoring [data-authors-editor] .ap-tutor-picker-search{box-sizing:border-box;width:100%;min-height:40px;margin-bottom:6px;padding:8px 10px;border:1px solid color-mix(in srgb,var(--blue) 28%,var(--line));border-radius:9px;background:var(--surface);color:var(--text);font:inherit;font-size:.72rem}.ap-tutoring [data-authors-editor] .ap-tutor-picker-search:focus-visible{outline:3px solid rgba(37,99,235,.18);outline-offset:2px}
+/* Selectores compactos de autores y Tutoría. */
+.ap-tutoring-editor{padding:12px}.ap-tutoring-editor .ap-tutor-picker-options{position:static;max-height:240px;margin-top:6px}.ap-tutoring-editor .ap-tutor-picker-search{box-sizing:border-box;width:100%;min-height:40px;padding:8px 10px;border:1px solid color-mix(in srgb,var(--blue) 28%,var(--line));border-radius:9px;background:var(--surface);color:var(--text);font:inherit;font-size:.72rem}.ap-tutoring-editor .ap-tutor-picker-search:focus-visible{outline:3px solid rgba(37,99,235,.18);outline-offset:2px}@media(max-width:520px){.ap-tutoring-editor .ap-tutor-picker-options{max-height:200px}}

@@ -63,7 +63,7 @@ if ($project === null): ?>
         $query = '&project_id=' . $projectId . '&file_id=' . (int) $file['id'];
         $isBrowsableZip=$extension==='zip'&&$zipContextQuery!=='';
         return ['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'type'=>strtoupper($extension ?: 'FILE'),'mime_type'=>(string)($file['mime_type']??''),
-            'size'=>ArchiveService::formatBytes((int)$file['size_bytes']),'sort_order'=>(int)($file['sort_order']??$file['id']),'extension'=>$extension,'available'=>true,
+            'size'=>ArchiveService::formatBytes((int)$file['size_bytes']),'size_bytes'=>(int)$file['size_bytes'],'sort_order'=>(int)($file['sort_order']??$file['id']),'extension'=>$extension,'available'=>true,
             'is_presentation'=>$presentationFileId===(int)$file['id'],'is_package'=>false,
             'presentation_eligible'=>$extension!=='zip',
             'preview_supported'=>isset($previewTypes[$extension])||$isBrowsableZip,'preview_type'=>$isBrowsableZip?'zip':($previewTypes[$extension]??'unsupported'),
@@ -79,7 +79,10 @@ if ($project === null): ?>
     }, $project['files']);
     $archives = array_values(array_filter($documents, static fn(array $file): bool => $file['extension']==='zip'));
     $documents = array_values(array_filter($documents, static fn(array $file): bool => $file['extension']!=='zip'));
-    $headerPackage = [];
+    // Single source of truth for the institutional package.
+    $headerPackage = $publicContext
+        ? (new ProjectRepositoryPackageService())->describe($projectId, route('repository-download') . '&id=' . $projectId)
+        : ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'stored'];
     $versions = [];
     foreach ($project['deliveries'] as $delivery) {
         $deliveryFiles = array_values(array_filter($project['files'], static fn(array $file): bool => (int)($file['delivery_id'] ?? 0)===(int)$delivery['id']));
@@ -183,9 +186,12 @@ if ($project === null): ?>
         ],static fn(?array $section):bool=>$section!==null));
     }
     $actions=[];
+    if ($publicContext && !empty($projectCapabilities['edit_information'])) {
+        $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
+    }
     if ($isAcademicManagement && !empty($projectCapabilities['create_adjustment_request'])) $actions[]=['id'=>'adjustment','label'=>'Solicitar ajuste','kind'=>'secondary','icon'=>'fa-comment-dots','enabled'=>true,'url'=>'#projectAdjustmentDialog'];
     elseif (!$publicContext && !empty($projectCapabilities['register_delivery']) && $canDeliver) $actions[]=['id'=>'delivery','label'=>'Registrar entrega','kind'=>'primary','icon'=>'fa-upload','url'=>$detailUrl.'&tab=review','enabled'=>true];
-    if (!$isAcademicManagement&&!empty($projectCapabilities['download_files'])&&!empty($headerPackage['available'])) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'].($publicContext?'&scope=repository':''),'enabled'=>true,'download'=>true];
+    if (!$isAcademicManagement&&!empty($projectCapabilities['download_files'])&&!empty($headerPackage['available'])) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'],'enabled'=>true,'download'=>true];
     if($isAcademicManagement&&(string)$project['status']==='published')$actions[]=['id'=>'repository','label'=>'Ver en Repositorio','kind'=>'secondary','icon'=>'fa-book-open','url'=>route('repository-detail').'&id='.$projectId,'enabled'=>true];
     $statusActionCount=$isAcademicManagement&&!empty($projectCapabilities['change_status'])?count($projectStatusTransitions):0;
     foreach($statusActionCount>0?$projectStatusTransitions:[] as $transition)$actions[]=['id'=>'status-'.$transition['target'],'label'=>(string)$transition['label'],'kind'=>'secondary','icon'=>(string)$transition['icon'],'icon_style'=>'fa-solid','enabled'=>true,'trigger'=>'status-transition','transition'=>$transition];
@@ -238,7 +244,7 @@ if ($project === null): ?>
         'can_manage_files'=>!empty($projectCapabilities['manage_files'])&&($publicContext||$isAcademicManagement)&&!empty($projectDocuments),
         'restorable_files'=>(array)($projectDocuments['restorable']??[]),
         'file_upload'=>!empty($projectCapabilities['manage_files'])&&!empty($projectDocuments)?['context'=>(string)($projectDocuments['context']??$projectContext),'endpoint'=>(string)$projectDocuments['endpoint'],'csrf_token'=>(string)$projectDocuments['csrf'],'limits'=>(array)$projectDocuments['limits']]:[],
-        'package'=>[],
+        'package'=>$headerPackage,
         'global_file_actions'=>[],
         'document_review'=>$isAcademicManagement&&(string)$project['status']==='development'?(array)($documentReview??[]):[],
         'project_histories'=>[

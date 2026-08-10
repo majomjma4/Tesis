@@ -53,6 +53,7 @@ body.dark-mode .ed-form-state{color:#6ee7b7}body.dark-mode .ed-form-state.is-dir
 @media(max-width:800px){.digital-record[data-entity-type="project"] .ed-document-section[data-information-section="institutional"],.digital-record[data-entity-type="project"] .ed-document-section[data-information-section="participants"],.digital-record[data-entity-type="project"] .ed-document-section[data-information-section="project-classification"]{grid-column:auto;grid-row:auto}}
 .ed-keyword-option input:focus-visible,.ed-keyword-chip:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 28%,transparent);outline-offset:2px}
 </style>
+<style>.ed-participant-group.is-tutoring .ed-participant-contact[hidden]{display:none!important}</style>
 <?php if ($recordMode === 'edit'): ?>
     <div class="ed-form-error-summary" role="alert" tabindex="-1" hidden data-record-error-summary><strong>No fue posible guardar los cambios.</strong><p data-record-error-message>Revisa la información señalada.</p></div>
     <p class="ed-form-status" role="status" aria-live="polite" hidden data-record-form-status></p>

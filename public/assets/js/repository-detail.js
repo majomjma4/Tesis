@@ -3548,7 +3548,7 @@ function appendNeutralAddedFiles(files) {
 
 function updateNeutralPackage(packageData) {
     const fileCount = Number(packageData?.file_count || 0);
-    if (!packageData?.available || fileCount < 2) {
+    if (!packageData?.available || fileCount < 1) {
         neutralPackageDownload?.remove();
         neutralPackageDownload = null;
         return;
@@ -3561,14 +3561,14 @@ function updateNeutralPackage(packageData) {
         neutralPackageDownload.dataset.recordDownload = "";
         neutralPackageDownload.setAttribute("download", "");
         neutralPackageDownload.setAttribute("role", "menuitem");
-        neutralPackageDownload.innerHTML = '<i class="fa-solid fa-box-archive" aria-hidden="true"></i><span>Descargar paquete completo<small></small></span><strong class="ed-package-size"></strong>';
+        neutralPackageDownload.innerHTML = '<i class="fa-solid fa-file-zipper" aria-hidden="true"></i><span>Descargar ZIP<small></small></span><strong class="ed-package-size"></strong>';
         actions.prepend(neutralPackageDownload);
         protectNeutralDownload(neutralPackageDownload);
     }
     neutralPackageDownload.href = packageData.download_url || "";
-    neutralPackageDownload.setAttribute("aria-label", `Descargar paquete completo con ${fileCount} archivos`);
+    neutralPackageDownload.setAttribute("aria-label", `Descargar ZIP con ${fileCount} archivos`);
     const small = neutralPackageDownload.querySelector("small");
-    if (small) small.textContent = `${fileCount} archivos`;
+    if (small) small.textContent = `${fileCount} ${fileCount === 1 ? "archivo" : "archivos"}`;
     let size = neutralPackageDownload.querySelector(".ed-package-size");
     if (!size && packageData.size) {
         size = document.createElement("strong");
@@ -3749,6 +3749,16 @@ document.addEventListener("click", (event) => {
     const panel = panelId ? document.getElementById(panelId) : null;
     if (!panel) return;
     const expanded = toggle.getAttribute("aria-expanded") === "true";
+    const tutoringGroup = toggle.closest(".ed-participant-group.is-tutoring");
+    if (tutoringGroup) {
+        tutoringGroup.querySelectorAll("[data-participant-contact-toggle]").forEach((otherToggle) => {
+            if (otherToggle === toggle) return;
+            otherToggle.setAttribute("aria-expanded", "false");
+            const otherId = otherToggle.getAttribute("aria-controls");
+            const otherPanel = otherId ? document.getElementById(otherId) : null;
+            if (otherPanel) otherPanel.hidden = true;
+        });
+    }
     toggle.setAttribute("aria-expanded", String(!expanded));
     panel.hidden = expanded;
 });
@@ -4621,12 +4631,26 @@ function bindNeutralFileMenu(item) {
 
 function updateFileSelectionControls() {
     const count = selectedFileIds.size;
+    const allCheckboxes = [...(neutralFileList?.querySelectorAll("[data-file-select]") || [])];
+    const totalCount = allCheckboxes.length;
     if (fileSelectionCount) fileSelectionCount.textContent = `${count} ${count === 1 ? "archivo seleccionado" : "archivos seleccionados"}`;
     if (fileSelectionRemove) {
         fileSelectionRemove.disabled = count === 0;
         fileSelectionRemove.textContent = count === 0
             ? "Retirar archivos"
             : (count === 1 ? "Retirar archivo" : `Retirar ${count} archivos`);
+    }
+    const fileSelectionDownload = neutralFileList?.querySelector("[data-file-selection-download]");
+    if (fileSelectionDownload) {
+        fileSelectionDownload.disabled = count === 0;
+        fileSelectionDownload.textContent = count === 0
+            ? "Descargar seleccionados"
+            : (count === 1 ? "Descargar 1 archivo" : `Descargar ${count} archivos`);
+    }
+    const fileSelectionAll = neutralFileList?.querySelector("[data-file-selection-all]");
+    if (fileSelectionAll) {
+        const allSelected = totalCount > 0 && count === totalCount;
+        fileSelectionAll.textContent = allSelected ? "Deseleccionar todos" : "Seleccionar todos";
     }
 }
 
@@ -4961,6 +4985,24 @@ async function submitFileRemoval() {
 
 neutralFileList?.querySelectorAll("[data-record-file-item]").forEach(bindNeutralFileMenu);
 fileSelectionToggle?.addEventListener("click", () => setFileSelectionMode(!fileSelectionMode));
+neutralFileList?.querySelector("[data-file-selection-all]")?.addEventListener("click", () => {
+    const allCheckboxes = [...(neutralFileList?.querySelectorAll("[data-file-select]") || [])];
+    const totalCount = allCheckboxes.length;
+    const shouldSelectAll = selectedFileIds.size < totalCount;
+    selectedFileIds.clear();
+    allCheckboxes.forEach((checkbox) => {
+        const item = checkbox.closest("[data-record-file-item]");
+        const id = String(checkbox.value || "");
+        checkbox.checked = shouldSelectAll;
+        if (shouldSelectAll && id) {
+            selectedFileIds.add(id);
+            item?.classList.add("is-selected-for-removal");
+        } else {
+            item?.classList.remove("is-selected-for-removal");
+        }
+    });
+    updateFileSelectionControls();
+});
 fileSelectionCancel?.addEventListener("click", () => {
     setFileSelectionMode(false);
     globalFileToggle?.focus();
@@ -4968,6 +5010,24 @@ fileSelectionCancel?.addEventListener("click", () => {
 fileSelectionRemove?.addEventListener("click", () => {
     const targets = normalizedSelectedFileItems();
     if (targets.length) openFileRemoveDialogForTargets(targets, fileSelectionRemove, true);
+});
+neutralFileList?.querySelector("[data-file-selection-download]")?.addEventListener("click", () => {
+    const selected = normalizedSelectedFileItems();
+    if (!selected.length) return;
+    selected.forEach((item) => {
+        const button = item.querySelector("[data-record-file]");
+        const directDownload = item.querySelector(".ed-file-direct-download") || item.querySelector("[data-file-download-action]");
+        const downloadUrl = directDownload?.href || button?.dataset.downloadUrl || "";
+        if (downloadUrl) {
+            const link = document.createElement("a");
+            link.href = downloadUrl;
+            link.download = "";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+    });
+    setFileSelectionMode(false);
 });
 fileRemoveCancel?.addEventListener("click", () => closeFileRemoveDialog());
 fileRemoveClose?.addEventListener("click", () => closeFileRemoveDialog());

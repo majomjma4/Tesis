@@ -88,6 +88,7 @@
             'name' => $name,
             'type' => (string) ($file['format'] ?? ($extension !== '' ? mb_strtoupper($extension, 'UTF-8') : 'Archivo')),
             'size' => (string) ($file['size'] ?? 'Tamaño no disponible'),
+            'size_bytes' => (int) ($file['size_bytes'] ?? $file['size_raw'] ?? 0),
             'sort_order' => (int) ($file['sort_order'] ?? $fileId),
             'extension' => $extension,
             'mime_type' => (string) ($file['mime_type'] ?? ''),
