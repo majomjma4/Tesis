@@ -77,7 +77,7 @@
                             <i class="fa-regular fa-calendar"></i>
                             <strong><?= e($academicPeriods[0]['label']) ?></strong>
                         </div>
-                        <input id="repositoryPao" type="hidden" value="all">
+                        <input id="repositoryPao" type="hidden" value="<?= e($academicPeriods[0]['value']) ?>">
                     </div>
                 <?php elseif (count($academicPeriods) > 1): ?>
                     <label class="ar-filter-control">

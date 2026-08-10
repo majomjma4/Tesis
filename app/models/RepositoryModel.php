@@ -47,7 +47,7 @@ final class RepositoryModel
                 'category' => 'Tesis',
                 'category_slug' => 'tesis',
                 'year' => '2026',
-                'pao' => 'pao-i-2026',
+                'pao' => '2026-i',
                 'pao_label' => 'PAO I 2026',
                 'type' => 'Tesis',
                 'type_slug' => 'tesis',
@@ -68,7 +68,7 @@ final class RepositoryModel
                 'category' => 'Prácticas preprofesionales',
                 'category_slug' => 'practicas-preprofesionales',
                 'year' => '2025',
-                'pao' => 'pao-ii-2025',
+                'pao' => '2025-ii',
                 'pao_label' => 'PAO II 2025',
                 'type' => 'Prácticas preprofesionales',
                 'type_slug' => 'practicas-preprofesionales',
@@ -89,7 +89,7 @@ final class RepositoryModel
                 'category' => 'Vinculación',
                 'category_slug' => 'vinculacion',
                 'year' => '2025',
-                'pao' => 'pao-i-2025',
+                'pao' => '2025-i',
                 'pao_label' => 'PAO I 2025',
                 'type' => 'Vinculación',
                 'type_slug' => 'vinculacion',
@@ -279,13 +279,41 @@ final class RepositoryModel
 
     public function getAcademicPeriods(): array
     {
+        if (Database::isEnabled()) {
+            try {
+                $statement = Database::connection()->query(
+                    "SELECT id, name, code, status
+                     FROM academic_periods
+                     WHERE status IN ('active', 'closed')
+                     ORDER BY (status = 'active') DESC, starts_on DESC, id DESC"
+                );
+                $rows = $statement->fetchAll();
+                if (!empty($rows)) {
+                    $slug = static function (string $value): string {
+                        $value = mb_strtolower($value, 'UTF-8');
+                        if (class_exists('Normalizer')) {
+                            $n = Normalizer::normalize($value, Normalizer::FORM_D);
+                            if (is_string($n)) $value = (string) preg_replace('/\p{Mn}+/u', '', $n);
+                        }
+                        return trim((string) preg_replace('/[^a-z0-9]+/', '-', $value), '-');
+                    };
+                    return array_map(static function (array $row) use ($slug): array {
+                        return [
+                            'id' => (int) $row['id'],
+                            'value' => $slug((string) ($row['code'] ?? $row['name'])),
+                            'label' => (string) $row['name'],
+                            'code' => (string) ($row['code'] ?? ''),
+                            'status' => (string) ($row['status'] ?? 'active'),
+                        ];
+                    }, $rows);
+                }
+            } catch (Throwable $exception) {
+                error_log('RepositoryModel getAcademicPeriods: ' . $exception->getMessage());
+            }
+        }
+
         return [
-            ['value' => 'pao-i-2026', 'label' => 'PAO I 2026'],
-            ['value' => 'pao-ii-2026', 'label' => 'PAO II 2026'],
-            ['value' => 'pao-i-2025', 'label' => 'PAO I 2025'],
-            ['value' => 'pao-ii-2025', 'label' => 'PAO II 2025'],
-            ['value' => 'pao-i-2024', 'label' => 'PAO I 2024'],
-            ['value' => 'pao-ii-2024', 'label' => 'PAO II 2024']
+            ['id' => 1, 'value' => '2026-i', 'label' => 'I PAO 2026', 'code' => '2026-I', 'status' => 'active']
         ];
     }
 }
