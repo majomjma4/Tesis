@@ -584,14 +584,43 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
     transform: translateY(0);
 }
 
-@media(max-width: 760px) {
+@media (max-width: 1000px) {
+    .ar-tools {
+        grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(140px, 180px));
+    }
+}
+
+@media (max-width: 760px) {
+    .ar-head {
+        align-items: stretch;
+        flex-direction: column;
+    }
     .ar-grid {
         grid-template-columns: 1fr;
     }
-}
-@media(max-width: 760px) {
+    .ar-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        padding: 0 8px;
+        gap: 0;
+        overflow: hidden;
+    }
+    .ar-tabs button {
+        min-width: 0;
+        padding: 0 8px;
+        justify-content: center;
+    }
+    .ar-tabs button i {
+        flex: 0 0 auto;
+    }
+    .ar-tabs .ar-tab-count {
+        flex: 0 0 auto;
+    }
     .ar-tools {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+    }
+    .ar-search {
+        grid-column: 1 / -1;
     }
     .ar-section-head {
         align-items: flex-start;
@@ -599,21 +628,36 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
         gap: 5px;
     }
     .ar-pagination {
-        grid-template-columns: 1fr;
-        gap: 10px;
-        text-align: center;
+        grid-template-columns: 1fr auto;
     }
     .ar-pagination nav {
+        grid-column: 1 / -1;
         justify-self: center;
     }
 }
-@media(max-width: 480px) {
+
+@media (max-width: 480px) {
+    .ar-tabs {
+        padding: 0 4px;
+    }
+    .ar-tabs button {
+        padding: 0 5px;
+        gap: 5px;
+        font-size: .7rem;
+    }
+    .ar-tabs .ar-tab-count {
+        min-width: 19px;
+        height: 19px;
+        padding: 0 5px;
+        font-size: .62rem;
+    }
     .ar-panel {
         padding: 12px;
     }
     .ar-card-meta {
         align-items: flex-start;
         flex-direction: column;
+        gap: 3px;
     }
     .ar-project-card footer, .ar-material-card footer {
         padding: 11px 12px;
@@ -621,5 +665,21 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
     .ar-primary-action {
         flex: 1;
         justify-content: center;
+        min-height: 40px;
+    }
+    .repository-toast {
+        right: 14px;
+        bottom: 14px;
+        left: 14px;
+        width: auto;
+    }
+}
+
+@media (max-width: 360px) {
+    .repository-carousel-prev {
+        left: 4px;
+    }
+    .repository-carousel-next {
+        right: 4px;
     }
 }
