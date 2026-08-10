@@ -24,325 +24,261 @@
 <!-- Final de precarga del repositorio -->
 
 <div id="repositoryContent" style="display: none;">
-<!-- Inicio de cabecera del repositorio -->
-<section class="repository-hero">
-    <div>
-        <span class="section-eyebrow">CARRERA DE DESARROLLO DE SOFTWARE</span>
-        <h2>Repositorio de proyectos publicados</h2>
-        <p>Consulta trabajos desarrollados por estudiantes y accede a sus documentos académicos.</p>
-    </div>
-    <div class="repository-hero-icon" aria-hidden="true">
-        <i class="fa-solid fa-book-open-reader"></i>
-    </div>
-</section>
-<!-- Final de cabecera del repositorio -->
-
-<div class="dashboard-container repository-container">
-    <!-- Inicio de documentos de apoyo -->
-    <section class="repository-support" aria-labelledby="repositorySupportTitle">
-        <div class="section-heading repository-results-heading">
+    <div class="ar-page" id="arPage">
+        <!-- Encabezado exacto Admin -->
+        <header class="ar-head">
             <div>
-                <span class="section-eyebrow">Material complementario</span>
-                <h2 class="section-title" id="repositorySupportTitle">Guías y documentos de apoyo</h2>
+                <span class="ar-eyebrow">Biblioteca digital institucional</span>
+                <h1>Repositorio institucional</h1>
+                <p>Consulta proyectos publicados y materiales de apoyo disponibles para la comunidad académica.</p>
             </div>
-            <span class="repository-count" id="repositorySupportCount" aria-live="polite"><?= count($supportDocuments) ?> documentos</span>
-        </div>
+        </header>
 
-        <div class="repository-section-divider" aria-hidden="true"></div>
-
-        <div class="repository-support-tools repository-support-row">
-            <div class="repository-search repository-search-support">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="repositorySupportSearch" type="search" placeholder="Buscar guía o documento de apoyo" aria-label="Buscar documentos de apoyo">
-            </div>
-
-            <div class="repository-filters repository-support-category">
-                <div class="repository-filter">
-                    <span>Categoría</span>
-                    <div class="repository-dropdown" data-dropdown>
-                        <button class="repository-dropdown-trigger" type="button" data-dropdown-trigger aria-haspopup="listbox" aria-expanded="false">
-                            <span data-dropdown-label>Todos</span>
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </button>
-                        <input id="repositorySupportCategory" type="hidden" value="all" data-dropdown-input>
-                        <div class="repository-dropdown-menu" role="listbox" tabindex="-1" hidden data-dropdown-menu>
-                            <button type="button" class="repository-dropdown-option is-selected" data-dropdown-option data-value="all">Todos</button>
-                            <button type="button" class="repository-dropdown-option" data-dropdown-option data-value="vinculacion">Vinculación</button>
-                            <button type="button" class="repository-dropdown-option" data-dropdown-option data-value="practicas">Prácticas</button>
-                            <button type="button" class="repository-dropdown-option" data-dropdown-option data-value="tesis">Tesis</button>
-                            <button type="button" class="repository-dropdown-option" data-dropdown-option data-value="proyecto-pis">Proyectos PIS</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="repository-section-divider" aria-hidden="true"></div>
-
-        <div class="repository-carousel-topbar" aria-label="Opciones de documentos de apoyo">
-            <a class="repository-carousel-more" id="repositorySupportMore" href="<?= e($supportMaterialsUrl) ?>">
-                Ver más
-                <i class="fa-solid fa-arrow-right"></i>
-            </a>
-        </div>
-
-        <div class="repository-section-divider" aria-hidden="true"></div>
-
-        <div class="repository-carousel-stage">
-            <button class="repository-carousel-btn repository-carousel-prev" id="repositorySupportPrev" type="button" aria-label="Ver documentos anteriores">
-                <i class="fa-solid fa-chevron-left"></i>
-            </button>
-
-            <div class="repository-grid repository-support-grid" id="repositorySupportGrid">
-            <?php foreach ($supportDocuments as $document): ?>
-                <article class="repository-card repository-support-card" data-support-text="<?= e($document['title'] . ' ' . $document['description'] . ' ' . $document['type'] . ' ' . $document['year'] . ' ' . $document['pao_label'] . ' ' . $document['category_label'] . ' ' . implode(' ', $document['keywords'])) ?>" data-support-category="<?= e($document['category_slug']) ?>">
-                    <div class="repository-card-top">
-                        <span class="repository-document-icon"><i class="fa-solid fa-file-circle-check"></i></span>
-                        <span class="project-status approved">Disponible</span>
-                    </div>
-                    <span class="repository-type"><?= e($document['type']) ?> · <?= e($document['pao_label']) ?></span>
-                    <h3><?= e($document['title']) ?></h3>
-                    <p><?= e($document['description']) ?></p>
-
-                    <div class="repository-meta">
-                        <span><i class="fa-solid fa-calendar-days"></i> <?= e($document['year']) ?></span>
-                        <span><i class="fa-solid fa-folder-open"></i> Documento de apoyo</span>
-                    </div>
-
-                    <span hidden><?= e(implode(' ', $document['keywords'])) ?></span>
-
-                    <div class="repository-card-actions">
-                        <a class="open-btn repository-open-btn" href="<?= e($document['detail_url']) ?>">
-                            Ver documento
-                            <i class="fa-solid fa-arrow-right"></i>
-                        </a>
-                    </div>
-                </article>
-            <?php endforeach; ?>
-
-                <article class="repository-card repository-support-card repository-more-card" id="repositorySupportMoreCard" hidden>
-                    <div class="repository-more-card-icon" aria-hidden="true">
-                        <i class="fa-solid fa-folder-plus"></i>
-                    </div>
-                    <span class="repository-type">Más documentos disponibles</span>
-                    <h3>¿Quieres ver más?</h3>
-                    <p>Este carrusel muestra un máximo de documentos. Accede a la vista completa para consultar todo el material de apoyo disponible.</p>
-                    <a class="open-btn repository-open-btn" href="<?= e($supportMaterialsUrl) ?>">Consultar materiales <i class="fa-solid fa-arrow-right"></i></a>
-                </article>
-            </div>
-
-            <button class="repository-carousel-btn repository-carousel-next" id="repositorySupportNext" type="button" aria-label="Ver documentos siguientes">
-                <i class="fa-solid fa-chevron-right"></i>
-            </button>
-        </div>
-
-    </section>
-    <!-- Final de documentos de apoyo -->
-
-    <!-- Inicio de catálogo institucional -->
-    <section
-        class="repository-results"
-        aria-labelledby="repositoryResultsTitle"
-        data-favorite-url="<?= e($favoriteActionUrl) ?>"
-        data-favorite-csrf="<?= e($favoriteCsrfToken) ?>"
-    >
-        <div class="section-heading repository-results-heading">
-            <div>
-                <span class="section-eyebrow">Catálogo institucional</span>
-                <h2 class="section-title" id="repositoryResultsTitle">Proyectos disponibles</h2>
-            </div>
-            <div class="repository-catalog-summary">
-                <span class="repository-count" id="repositoryCount" aria-live="polite">Mostrando <?= count($projects) ?> de <?= count($projects) ?> proyectos</span>
-                <button class="repository-favorites-filter" id="repositoryFavoritesFilter" type="button" aria-pressed="false">
-                    <i class="fa-regular fa-heart"></i>
-                    <span>Favoritos</span>
-                    (<span id="repositoryFavoritesCount"><?= count(array_filter($projects, static fn (array $project): bool => $project['is_favorite'])) ?></span>)
+        <!-- Catálogo unificado y contenedor principal -->
+        <main class="ar-catalog" id="repositoryShell">
+            <!-- Pestañas exactas Admin -->
+            <nav class="ar-tabs" role="tablist" aria-label="Secciones del repositorio">
+                <button type="button" class="active" id="tabProjects" role="tab" aria-selected="true" aria-controls="panelProjects">
+                    <i class="fa-solid fa-diagram-project"></i>
+                    <span class="ar-tab-label">Proyectos publicados</span>
+                    <span class="ar-tab-count" id="badgeProjectsCount"><?= count($projects) ?></span>
                 </button>
-            </div>
-        </div>
+                <button type="button" id="tabSupport" role="tab" aria-selected="false" aria-controls="panelSupport">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <span class="ar-tab-label">Material de apoyo</span>
+                    <span class="ar-tab-count" id="badgeSupportCount"><?= count($supportDocuments) ?></span>
+                </button>
+            </nav>
 
-        <div class="repository-section-divider" aria-hidden="true"></div>
+            <!-- Toolbar de proyectos (hermano directo de ar-panel, como en Admin) -->
+            <div class="ar-tools" id="toolsProjects">
+                <label class="ar-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input id="repositorySearch" type="text" role="searchbox" placeholder="Buscar en el repositorio..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                    <button id="repositoryClearSearch" type="button" aria-label="Limpiar búsqueda" hidden>
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </label>
 
-        <div class="repository-support-tools repository-filter-row">
-            <div class="repository-search">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="repositorySearch" type="search" placeholder="Buscar por proyecto, autor, tutor o tecnología" aria-label="Buscar proyectos">
-            </div>
-
-            <div class="repository-filters repository-filters-inline">
-                <div class="repository-filter">
-                    <span>Semestre</span>
-                    <div class="repository-dropdown" data-dropdown>
-                        <button class="repository-dropdown-trigger" type="button" data-dropdown-trigger aria-haspopup="listbox" aria-expanded="false">
-                            <span data-dropdown-label>Todos</span>
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </button>
-                        <input id="repositorySemester" type="hidden" value="all" data-dropdown-input>
-                        <div class="repository-dropdown-menu" role="listbox" tabindex="-1" hidden data-dropdown-menu>
-                            <button type="button" class="repository-dropdown-option is-selected" data-dropdown-option data-value="all">Todos</button>
-                            <?php foreach ($semesters as $semester): ?>
-                                <button type="button" class="repository-dropdown-option" data-dropdown-option data-value="<?= e($semester['value']) ?>"><?= e($semester['label']) ?></button>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-                <div class="repository-filter">
-                    <span>Docente</span>
-                    <div class="repository-dropdown" data-dropdown>
-                        <button class="repository-dropdown-trigger" type="button" data-dropdown-trigger aria-haspopup="listbox" aria-expanded="false">
-                            <span data-dropdown-label>Todos</span>
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </button>
-                        <input id="repositoryTeacher" type="hidden" value="all" data-dropdown-input>
-                        <div class="repository-dropdown-menu" role="listbox" tabindex="-1" hidden data-dropdown-menu>
-                            <button type="button" class="repository-dropdown-option is-selected" data-dropdown-option data-value="all">Todos</button>
-                            <?php foreach ($teachers as $teacher): ?>
-                                <button type="button" class="repository-dropdown-option" data-dropdown-option data-value="<?= e($teacher['value']) ?>"><?= e($teacher['label']) ?></button>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-                <div class="repository-filter">
-                    <span>PAO</span>
-                    <div class="repository-dropdown" data-dropdown>
-                        <button class="repository-dropdown-trigger" type="button" data-dropdown-trigger aria-haspopup="listbox" aria-expanded="false">
-                            <span data-dropdown-label>Todos</span>
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </button>
-                        <input id="repositoryPao" type="hidden" value="all" data-dropdown-input>
-                        <div class="repository-dropdown-menu" role="listbox" tabindex="-1" hidden data-dropdown-menu>
-                            <button type="button" class="repository-dropdown-option is-selected" data-dropdown-option data-value="all">Todos</button>
-                            <?php foreach ($academicPeriods as $period): ?>
-                                <button type="button" class="repository-dropdown-option" data-dropdown-option data-value="<?= e($period['value']) ?>"><?= e($period['label']) ?></button>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-                <div class="repository-filter">
+                <label class="ar-filter-control">
                     <span>Tipo</span>
-                    <div class="repository-dropdown" data-dropdown>
-                        <button class="repository-dropdown-trigger" type="button" data-dropdown-trigger aria-haspopup="listbox" aria-expanded="false">
-                            <span data-dropdown-label>Todos</span>
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </button>
-                        <input id="repositoryType" type="hidden" value="all" data-dropdown-input>
-                        <div class="repository-dropdown-menu" role="listbox" tabindex="-1" hidden data-dropdown-menu>
-                            <button type="button" class="repository-dropdown-option is-selected" data-dropdown-option data-value="all">Todos</button>
-                            <?php foreach ($projectTypes as $type): ?>
-                                <button type="button" class="repository-dropdown-option" data-dropdown-option data-value="<?= e($type['value']) ?>"><?= e($type['label']) ?></button>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="repository-filter-actions">
-            <button class="repository-clear-filters" id="repositoryClearFilters" type="button">
-                <i class="fa-solid fa-rotate-left"></i>
-                Limpiar filtros
-            </button>
-        </div>
-
-        <div class="repository-section-divider" aria-hidden="true"></div>
-
-        <div class="repository-grid" id="repositoryGrid">
-            <?php foreach ($projects as $project): ?>
-                <?php
-                $visibleTechnologies = array_slice($project['technologies'], 0, 4);
-                $remainingTechnologies = max(0, count($project['technologies']) - count($visibleTechnologies));
-                $projectSearchText = implode(' ', [
-                    $project['title'],
-                    $project['description'],
-                    $project['authors'],
-                    $project['tutor'],
-                    $project['type'],
-                    $project['pao_label'],
-                    $project['year'],
-                    implode(' ', $project['technologies']),
-                    implode(' ', $project['keywords'])
-                ]);
-                ?>
-                <article
-                    class="repository-card repository-project-card repository-project-card--<?= e($project['type_slug']) ?>"
-                    tabindex="0"
-                    role="link"
-                    aria-label="Explorar proyecto <?= e($project['title']) ?>"
-                    data-project-id="<?= e((string) $project['id']) ?>"
-                    data-project-url="<?= e($project['detail_url']) ?>"
-                    data-project-search="<?= e($projectSearchText) ?>"
-                    data-favorite="<?= $project['is_favorite'] ? 'true' : 'false' ?>"
-                    data-semester="<?= e($project['semester']) ?>"
-                    data-teacher="<?= e($project['teacher_slug']) ?>"
-                    data-category="<?= e($project['category_slug']) ?>"
-                    data-type="<?= e($project['type_slug']) ?>"
-                    data-pao="<?= e($project['pao']) ?>"
-                >
-                    <div class="repository-card-top">
-                        <span class="repository-document-icon"><i class="fa-solid fa-file-lines"></i></span>
-                        <div class="repository-card-top-actions">
-                            <span class="project-status approved">Publicado</span>
-                            <button
-                                class="repository-favorite-btn<?= $project['is_favorite'] ? ' is-favorite' : '' ?>"
-                                type="button"
-                                aria-label="<?= $project['is_favorite'] ? 'Eliminar de favoritos' : 'Guardar en favoritos' ?>: <?= e($project['title']) ?>"
-                                aria-pressed="<?= $project['is_favorite'] ? 'true' : 'false' ?>"
-                                title="<?= $project['is_favorite'] ? 'Eliminar de favoritos' : 'Guardar en favoritos' ?>"
-                            >
-                                <i class="<?= $project['is_favorite'] ? 'fa-solid' : 'fa-regular' ?> fa-heart"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <span class="repository-type"><?= e($project['type']) ?> · <?= e($project['pao_label']) ?></span>
-                    <h3><?= e($project['title']) ?></h3>
-                    <p><?= e($project['description']) ?></p>
-
-                    <div class="repository-meta">
-                        <span><i class="fa-solid fa-graduation-cap"></i> <?= e($project['career']) ?></span>
-                        <span><i class="fa-solid fa-layer-group"></i> <?= e($project['semester']) ?>.° semestre</span>
-                        <span><i class="fa-solid fa-user-group"></i> <?= e($project['authors']) ?></span>
-                        <span><i class="fa-solid fa-chalkboard-user"></i> <?= e($project['tutor']) ?></span>
-                    </div>
-
-                    <div class="repository-technologies" aria-label="Tecnologías utilizadas">
-                        <?php foreach ($visibleTechnologies as $technology): ?>
-                            <span><?= e($technology) ?></span>
+                    <select id="repositoryType">
+                        <option value="all">Todos</option>
+                        <?php foreach ($projectTypes as $type): ?>
+                            <option value="<?= e($type['value']) ?>"><?= e($type['label']) ?></option>
                         <?php endforeach; ?>
-                        <?php if ($remainingTechnologies > 0): ?>
-                            <span class="repository-technologies-more">+<?= $remainingTechnologies ?></span>
-                        <?php endif; ?>
+                    </select>
+                </label>
+
+                <?php if (count($academicPeriods) === 1): ?>
+                    <div class="ar-filter-control ar-fixed-filter">
+                        <span>Período académico</span>
+                        <div>
+                            <i class="fa-regular fa-calendar"></i>
+                            <strong><?= e($academicPeriods[0]['label']) ?></strong>
+                        </div>
+                        <input id="repositoryPao" type="hidden" value="all">
+                    </div>
+                <?php elseif (count($academicPeriods) > 1): ?>
+                    <label class="ar-filter-control">
+                        <span>Período académico</span>
+                        <select id="repositoryPao">
+                            <option value="all">Todos</option>
+                            <?php foreach ($academicPeriods as $period): ?>
+                                <option value="<?= e($period['value']) ?>"><?= e($period['label']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                <?php else: ?>
+                    <div class="ar-filter-control ar-fixed-filter">
+                        <span>Período académico</span>
+                        <div>
+                            <i class="fa-regular fa-calendar"></i>
+                            <strong>Sin períodos disponibles</strong>
+                        </div>
+                        <input id="repositoryPao" type="hidden" value="all">
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- Toolbar de materiales (se muestra solo en pestaña de materiales) -->
+            <div class="ar-tools" id="toolsSupport" hidden>
+                <label class="ar-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input id="repositorySupportSearch" type="text" role="searchbox" placeholder="Buscar por título, tipo, PAO o palabra clave..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                </label>
+                <label class="ar-filter-control">
+                    <span>Categoría</span>
+                    <select id="repositorySupportCategory">
+                        <option value="all">Todas</option>
+                        <option value="vinculacion">Vinculación</option>
+                        <option value="practicas">Prácticas</option>
+                        <option value="tesis">Tesis</option>
+                        <option value="proyecto-pis">Proyectos PIS</option>
+                    </select>
+                </label>
+            </div>
+
+            <!-- Panel 1: Proyectos publicados -->
+            <section
+                class="ar-panel"
+                id="panelProjects"
+                role="tabpanel"
+                aria-labelledby="tabProjects"
+                data-favorite-url="<?= e($favoriteActionUrl) ?>"
+                data-favorite-csrf="<?= e($favoriteCsrfToken) ?>"
+            >
+                <!-- Encabezado de sección exacto Admin -->
+                <header class="ar-section-head">
+                    <div><span>Catálogo institucional</span><h2>Proyectos publicados</h2></div>
+                    <p><strong id="repositoryCount"><?= count($projects) ?></strong> resultados visibles</p>
+                </header>
+
+                <!-- Grilla de proyectos con tarjetas exactas Admin -->
+                <div class="ar-grid" id="repositoryGrid">
+                    <?php foreach ($projects as $project): ?>
+                        <?php
+                        $projectSearchText = implode(' ', [
+                            $project['code'] ?? sprintf('PRJ-%03d', $project['id']),
+                            $project['title'],
+                            $project['description'],
+                            $project['authors'],
+                            $project['tutor'],
+                            $project['type'],
+                            $project['pao_label'],
+                            $project['year'],
+                            implode(' ', $project['technologies'] ?? []),
+                            implode(' ', $project['keywords'] ?? [])
+                        ]);
+                        $typeSlug = $project['type_slug'] ?? 'tesis';
+                        $typeCode = match ($typeSlug) {
+                            'tesis' => 'thesis',
+                            'perfil-tesis' => 'thesis_profile',
+                            'practicas' => 'practice',
+                            'proyecto-pis' => 'pis',
+                            'vinculacion' => 'community',
+                            default => $typeSlug,
+                        };
+                        ?>
+                        <article
+                            class="ar-project-card repository-card repository-project-card"
+                            tabindex="0"
+                            role="link"
+                            aria-label="Explorar proyecto <?= e($project['title']) ?>"
+                            data-project-id="<?= e((string) $project['id']) ?>"
+                            data-project-url="<?= e($project['detail_url']) ?>"
+                            data-project-search="<?= e(mb_strtolower($projectSearchText, 'UTF-8')) ?>"
+                            data-favorite="<?= !empty($project['is_favorite']) ? 'true' : 'false' ?>"
+                            data-type="<?= e($typeSlug) ?>"
+                            data-type-code="<?= e($typeCode) ?>"
+                            data-pao="<?= e($project['pao'] ?? '') ?>"
+                        >
+                            <header>
+                                <span class="ar-code"><?= e($project['code'] ?? sprintf('PRJ-%03d', $project['id'])) ?></span>
+                                <span class="ar-project-type"><?= e($project['type']) ?></span>
+                            </header>
+                            <div class="ar-card-copy">
+                                <h3 title="<?= e($project['title']) ?>"><?= e($project['title']) ?></h3>
+                                <dl>
+                                    <div><dt><i class="fa-solid fa-users"></i> Autores</dt><dd><?= e($project['authors'] ?: 'Sin autores registrados') ?></dd></div>
+                                    <div><dt><i class="fa-solid fa-user-tie"></i> Tutor</dt><dd><?= e($project['tutor'] ?: 'Sin asignar') ?></dd></div>
+                                    <div><dt><i class="fa-regular fa-calendar"></i> Período</dt><dd><?= e($project['pao_label']) ?></dd></div>
+                                </dl>
+                            </div>
+                            <div class="ar-card-meta">
+                                <span><i class="fa-regular fa-file-lines"></i> <?= (int) ($project['file_count'] ?? 1) ?> <?= ((int) ($project['file_count'] ?? 1)) === 1 ? 'documento' : 'documentos' ?></span>
+                                <span><i class="fa-solid fa-globe"></i> <?= e(!empty($project['published_at']) ? $project['published_at'] : $project['year']) ?></span>
+                            </div>
+                            <footer>
+                                <a class="ar-primary-action" href="<?= e($project['detail_url']) ?>">
+                                    <i class="fa-solid fa-diagram-project"></i> Abrir expediente
+                                </a>
+                                <button
+                                    class="repository-favorite-btn ar-icon-action<?= !empty($project['is_favorite']) ? ' is-favorite' : '' ?>"
+                                    type="button"
+                                    aria-label="<?= !empty($project['is_favorite']) ? 'Eliminar de favoritos' : 'Guardar en favoritos' ?>: <?= e($project['title']) ?>"
+                                    aria-pressed="<?= !empty($project['is_favorite']) ? 'true' : 'false' ?>"
+                                    title="<?= !empty($project['is_favorite']) ? 'Eliminar de favoritos' : 'Guardar en favoritos' ?>"
+                                    style="margin-left: auto;"
+                                >
+                                    <i class="<?= !empty($project['is_favorite']) ? 'fa-solid' : 'fa-regular' ?> fa-heart" aria-hidden="true"></i>
+                                </button>
+                            </footer>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+
+                <!-- Estado vacío exacto Admin -->
+                <div class="ar-empty" id="repositoryEmpty" hidden>
+                    <span><i class="fa-solid fa-book-open"></i></span>
+                    <h2 id="repositoryEmptyTitle">Aún no existen proyectos publicados.</h2>
+                    <p id="repositoryEmptyText">Los proyectos aprobados aparecerán aquí después de completar su publicación.</p>
+                </div>
+
+                <!-- Paginación exacta Admin (Se oculta automáticamente si totalPages <= 1) -->
+                <footer class="ar-pagination" id="repositoryPagination" hidden>
+                    <span id="repositoryPaginationSummary">Mostrando 0 de 0</span>
+                    <nav id="repositoryPaginationPages" aria-label="Paginación de proyectos publicados">
+                        <button type="button" id="repositoryPagePrevious" disabled><i class="fa-solid fa-chevron-left"></i> Anterior</button>
+                        <span id="repositoryPageInfo" aria-live="polite">Página 1 de 1</span>
+                        <button type="button" id="repositoryPageNext">Siguiente <i class="fa-solid fa-chevron-right"></i></button>
+                    </nav>
+                </footer>
+            </section>
+
+            <!-- Panel 2: Material de apoyo -->
+            <section class="ar-panel" id="panelSupport" role="tabpanel" aria-labelledby="tabSupport" hidden>
+                <header class="ar-section-head">
+                    <div><span>Recursos académicos</span><h2>Material de apoyo</h2></div>
+                    <p id="repositorySupportCount" aria-live="polite"><?= count($supportDocuments) ?> <?= count($supportDocuments) === 1 ? 'resultado visible' : 'resultados visibles' ?></p>
+                </header>
+
+                <div class="repository-carousel-stage">
+                    <button class="repository-carousel-btn repository-carousel-prev" id="repositorySupportPrev" type="button" aria-label="Ver documentos anteriores">
+                        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                    </button>
+
+                    <div class="ar-grid" id="repositorySupportGrid">
+                        <?php foreach ($supportDocuments as $document): ?>
+                            <article class="ar-material-card"
+                                data-category-slug="<?= e($document['category_slug']) ?>"
+                                data-support-text="<?= e($document['title'] . ' ' . $document['description'] . ' ' . $document['type'] . ' ' . $document['year'] . ' ' . $document['pao_label'] . ' ' . $document['category_label'] . ' ' . implode(' ', $document['keywords'])) ?>"
+                                data-support-category="<?= e($document['category_slug']) ?>"
+                            >
+                                <header>
+                                    <span class="ar-material-icon"><i class="fa-regular fa-file-lines"></i></span>
+                                    <div><span><?= e($document['type']) ?></span><strong><?= e($document['category_label']) ?></strong></div>
+                                    <span class="ar-available">Disponible</span>
+                                </header>
+                                <div class="ar-card-copy">
+                                    <h3 title="<?= e($document['title']) ?>"><?= e($document['title']) ?></h3>
+                                    <p><?= e($document['description']) ?></p>
+                                </div>
+                                <div class="ar-card-meta">
+                                    <span><i class="fa-regular fa-calendar"></i> <?= e(!empty($document['publication_date']) ? $document['publication_date'] : $document['year']) ?></span>
+                                    <span><i class="fa-solid fa-download"></i> <?= number_format((int) $document['downloads'], 0, ',', '.') ?> descargas</span>
+                                </div>
+                                <footer>
+                                    <a class="ar-primary-action" href="<?= e($document['detail_url']) ?>"><i class="fa-regular fa-eye"></i> Ver detalle</a>
+                                </footer>
+                            </article>
+                        <?php endforeach; ?>
                     </div>
 
-                    <span class="repository-downloads">
-                        <i class="fa-solid fa-arrow-down"></i>
-                        <?= number_format((int) $project['downloads'], 0, ',', '.') ?> descargas
-                    </span>
+                    <button class="repository-carousel-btn repository-carousel-next" id="repositorySupportNext" type="button" aria-label="Ver documentos siguientes">
+                        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                    </button>
+                </div>
 
-                    <div class="repository-card-actions">
-                        <span class="open-btn repository-open-btn" aria-hidden="true">
-                            Explorar proyecto
-                            <i class="fa-solid fa-arrow-right"></i>
-                        </span>
-                    </div>
-                </article>
-            <?php endforeach; ?>
-        </div>
+                <div class="ar-empty" id="repositorySupportEmpty" <?= $supportDocuments ? 'hidden' : '' ?>>
+                    <span><i class="fa-solid fa-folder-open"></i></span>
+                    <h2>Aún no existen materiales de apoyo.</h2>
+                    <p>Los recursos institucionales publicados aparecerán en esta sección.</p>
+                </div>
+            </section>
 
-        <div class="repository-empty" id="repositoryEmpty" hidden>
-            <i class="fa-solid fa-folder-open"></i>
-            <h3 id="repositoryEmptyTitle">No se encontraron proyectos</h3>
-            <p id="repositoryEmptyText">Prueba con otros términos o modifica los filtros seleccionados.</p>
-            <button class="repository-empty-action" id="repositoryShowAllProjects" type="button" hidden>Ver todos los proyectos</button>
-        </div>
-
-        <nav class="repository-pagination" id="repositoryPagination" aria-label="Paginación de proyectos" hidden>
-            <button type="button" id="repositoryPagePrevious"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> Anterior</button>
-            <span id="repositoryPageInfo" aria-live="polite">Página 1 de 1</span>
-            <button type="button" id="repositoryPageNext">Siguiente <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
-        </nav>
-
-        <div class="repository-toast" id="repositoryToast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
-    </section>
-    <!-- Final de catálogo institucional -->
-</div>
+            <!-- Toast de notificaciones de favorito -->
+            <div class="repository-toast" id="repositoryToast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+        </main>
+    </div>
 </div>

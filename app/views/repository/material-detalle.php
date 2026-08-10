@@ -1,13 +1,14 @@
 <?php if ($material === null): ?>
     <section class="repository-detail-not-found"><i class="fa-solid fa-folder-open"></i><h1>Contenido no encontrado</h1><p>El contenido solicitado no existe o ya no se encuentra disponible.</p><a class="open-btn" href="<?= e($repositoryUrl) ?>">Volver al repositorio</a></section>
 <?php else:
-    $allowedTabs = ['information', 'files', 'evolution'];
+    $administratorView = !empty($isAdministrator);
+    $allowedTabs = $administratorView ? ['information', 'files', 'evolution'] : ['information', 'files'];
     $requestedTab = strtolower(trim((string) ($_GET['tab'] ?? 'information')));
     $activeTab = in_array($requestedTab, $allowedTabs, true) ? $requestedTab : 'information';
     $materialId = (int) ($material['id'] ?? 0);
     $detailUrl = route('support-material-detail') . '&id=' . $materialId;
     $requestedMode = strtolower(trim((string) ($_GET['mode'] ?? 'view')));
-    $mode = $requestedMode === 'edit' && !empty($isAdministrator) ? 'edit' : 'view';
+    $mode = $requestedMode === 'edit' && $administratorView ? 'edit' : 'view';
     $modeQuery = $mode === 'edit' ? '&mode=edit' : '&mode=view';
     $viewUrl = $detailUrl . '&mode=view&tab=information';
     $updatedAtValue = trim((string) ($material['information_updated_at'] ?? ''));
@@ -116,7 +117,6 @@
     $publicationState = (string) ($material['status_key'] ?? 'published');
     $isPublished = $publicationState === 'published';
     $downloadUrl = $packageDownloadUrl !== '' ? $packageDownloadUrl : null;
-    $administratorView = !empty($isAdministrator);
     $classificationLabels = array_values(array_filter(
         array_map('strval', (array) ($material['keywords'] ?? [])),
         static fn (string $label): bool => trim($label) !== ''
@@ -162,11 +162,11 @@
             ['label' => 'Ver historial administrativo', 'icon' => 'fa-clock-rotate-left', 'enabled' => true, 'danger' => false, 'action' => 'admin-history', 'separator' => true, 'unread' => !empty($hasUnreadAdministrativeActivity)],
             ['label' => 'Enviar a Papelera', 'icon' => 'fa-trash-can', 'enabled' => true, 'danger' => true, 'action' => 'trash'],
         ] : [],
-        'tabs' => [
+        'tabs' => array_values(array_filter([
             ['id' => 'information', 'label' => 'Información', 'icon' => 'fa-file-lines', 'url' => $detailUrl . $modeQuery . '&tab=information'],
             ['id' => 'files', 'label' => 'Archivos', 'icon' => 'fa-folder-open', 'url' => $detailUrl . $modeQuery . '&tab=files'],
-            ['id' => 'evolution', 'label' => 'Evolución documental', 'icon' => 'fa-clock-rotate-left', 'url' => $detailUrl . $modeQuery . '&tab=evolution'],
-        ],
+            $administratorView ? ['id' => 'evolution', 'label' => 'Evolución documental', 'icon' => 'fa-clock-rotate-left', 'url' => $detailUrl . $modeQuery . '&tab=evolution'] : null,
+        ])),
         'active_tab' => $activeTab,
         'admin_actions' => [
             'endpoint' => (string) ($materialStatusEndpoint ?? ''),
@@ -257,3 +257,24 @@
     ];
     require __DIR__ . '/_ficha-institucional.php';
 endif; ?>
+<?php if ($material !== null && empty($administratorView)): ?>
+<style>
+/* Fase 2 visual: detalle público de materiales; no altera el expediente administrativo compartido. */
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-shell{border-radius:20px;box-shadow:var(--shadow-soft)}
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-header{background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 94%,var(--primary-soft)),var(--surface))}
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-files-panel{border-radius:16px;box-shadow:0 10px 24px rgba(15,23,42,.05)}
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-files-panel>header{background:var(--surface-soft)}
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-document-row{border:1px solid transparent;border-radius:12px}
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-document-row:hover{border-color:color-mix(in srgb,var(--primary) 20%,var(--line));background:color-mix(in srgb,var(--primary) 5%,var(--surface))}
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-viewer{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-viewer-head{padding:16px 18px;border-bottom:1px solid var(--line);background:var(--surface)}
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-viewer-body{background:var(--surface-soft)}
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-zip-tree{margin:0 8px 8px;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft);overflow:auto;overscroll-behavior:contain}
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-zip-tree-row{border-radius:8px}
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-zip-tree-row:hover,.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-zip-tree-row.is-selected{background:color-mix(in srgb,var(--primary) 9%,var(--surface));color:var(--primary)}
+.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-viewer-state{background:var(--surface-soft)}
+body.dark-mode .digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-header{background:var(--surface)}
+body.dark-mode .digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-document-row:hover,body.dark-mode .digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-zip-tree-row:hover{background:rgba(96,165,250,.1)}
+@media(max-width:600px){.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-shell{border-radius:16px}.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-viewer-head{padding:14px}.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-zip-tree{margin:0 5px 6px;max-height:46vh}.digital-record[data-entity-type="support_material"][data-record-context="repository"] .ed-files-panel{border-radius:14px}}
+</style>
+<?php endif; ?>

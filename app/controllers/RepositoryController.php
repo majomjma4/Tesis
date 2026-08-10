@@ -30,6 +30,7 @@ final class RepositoryController
         View::render('repository/repositorio', [
             'currentPage' => 'repository',
             'title' => 'Repositorio Institucional | Gestión Documental Académica',
+            'pageStyles' => [asset('css/repository-reader.css')],
             'pageScript' => asset('js/repository.js'),
             'projects' => $projects,
             'favoriteActionUrl' => route('repository-favorite'),

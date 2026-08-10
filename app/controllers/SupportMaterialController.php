@@ -21,6 +21,7 @@ final class SupportMaterialController
         View::render('repository/materiales', [
             'currentPage' => 'repository',
             'title' => 'Material de apoyo | Repositorio Institucional',
+            'pageStyles' => [asset('css/repository-reader.css')],
             'pageScript' => asset('js/support-materials.js'),
             'materials' => $materials,
             'repositoryUrl' => route('repository'),

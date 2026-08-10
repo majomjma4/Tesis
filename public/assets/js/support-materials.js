@@ -18,7 +18,7 @@ function filterSupportMaterials() {
         card.hidden = !matchesSearch || !matchesCategory;
         if (!card.hidden) visible += 1;
     });
-    if (supportMaterialsCount) supportMaterialsCount.textContent = `${visible} ${visible === 1 ? "material" : "materiales"}`;
+    if (supportMaterialsCount) supportMaterialsCount.textContent = `${visible} ${visible === 1 ? "resultado visible" : "resultados visibles"}`;
     if (supportMaterialsEmpty) supportMaterialsEmpty.hidden = visible !== 0;
 }
 
