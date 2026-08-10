@@ -426,6 +426,38 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
     background: rgba(239, 68, 68, .08);
     color: #dc2626;
 }
+.ar-icon-action:hover {
+    border-color: var(--blue);
+    color: var(--blue);
+}
+.ar-icon-action[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    z-index: 100;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    padding: 5px 9px;
+    border-radius: 7px;
+    background: #0f172a;
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .14s ease, transform .14s ease;
+    box-shadow: 0 6px 16px rgba(15,23,42,.24);
+}
+.ar-icon-action[data-tooltip]:hover::after,
+.ar-icon-action[data-tooltip]:focus-visible::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+.ar-project-card,
+.ar-material-card {
+    overflow: visible;
+}
 
 /* Resaltado de búsqueda igual al Admin */
 .ar-search-highlight {

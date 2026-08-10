@@ -195,6 +195,9 @@
                                 <a class="ar-primary-action" href="<?= e($project['detail_url']) ?>">
                                     <i class="fa-solid fa-diagram-project"></i> Abrir expediente
                                 </a>
+                                <a class="ar-icon-action" href="<?= e(route('repository-download') . '&id=' . (int) $project['id']) ?>" data-tooltip="Descargar ZIP" aria-label="Descargar ZIP completo de <?= e($project['title']) ?>">
+                                    <i class="fa-solid fa-download" aria-hidden="true"></i>
+                                </a>
                             </footer>
                         </article>
                     <?php endforeach; ?>
@@ -252,6 +255,9 @@
                                 </div>
                                 <footer>
                                     <a class="ar-primary-action" href="<?= e($document['detail_url']) ?>"><i class="fa-regular fa-eye"></i> Ver detalle</a>
+                                    <a class="ar-icon-action" href="<?= e(route('support-material-package-download') . '&material_id=' . (int) $document['id']) ?>" data-tooltip="Descargar ZIP" aria-label="Descargar ZIP completo de <?= e($document['title']) ?>">
+                                        <i class="fa-solid fa-download" aria-hidden="true"></i>
+                                    </a>
                                 </footer>
                             </article>
                         <?php endforeach; ?>

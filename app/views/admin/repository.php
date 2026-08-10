@@ -185,6 +185,9 @@ $formatDate = static function (?string $date): string {
                             <a class="ar-primary-action" href="<?= e(route('repository-detail') . '&id=' . (int) $project['id'] . '&tab=information&return=' . rawurlencode((string)($_SERVER['REQUEST_URI'] ?? route('admin-repository')))) ?>">
                                 <i class="fa-solid fa-diagram-project"></i> Abrir expediente
                             </a>
+                            <a class="ar-icon-action" href="<?= e(route('repository-download') . '&id=' . (int) $project['id']) ?>" data-tooltip="Descargar ZIP" aria-label="Descargar ZIP completo de <?= e($project['title']) ?>">
+                                <i class="fa-solid fa-download" aria-hidden="true"></i>
+                            </a>
                             <button class="ar-icon-action ar-availability-action" data-project-availability data-id="<?= (int) $project['id'] ?>" data-available="<?= !empty($project['is_available']) ? '1' : '0' ?>" data-tooltip="<?= !empty($project['is_available']) ? 'Marcar como no disponible' : 'Marcar como disponible' ?>" type="button" aria-label="<?= !empty($project['is_available']) ? 'Marcar proyecto como no disponible' : 'Marcar proyecto como disponible' ?>">
                                 <i class="fa-solid <?= !empty($project['is_available']) ? 'fa-ban' : 'fa-circle-check' ?>"></i>
                             </button>
@@ -256,6 +259,9 @@ $formatDate = static function (?string $date): string {
                         </div>
                         <footer>
                             <a class="ar-primary-action" href="<?= e(route('support-material-detail') . '&id=' . (int) $material['id']) ?>"><i class="fa-regular fa-eye"></i> Ver detalle</a>
+                            <a class="ar-icon-action" href="<?= e(route('support-material-package-download') . '&material_id=' . (int) $material['id']) ?>" data-tooltip="Descargar ZIP" aria-label="Descargar ZIP completo de <?= e($material['title']) ?>">
+                                <i class="fa-solid fa-download" aria-hidden="true"></i>
+                            </a>
                             <button class="ar-icon-action ar-availability-action" type="button" data-material-availability data-available="<?= !empty($material['is_available']) ? '1' : '0' ?>" aria-label="<?= !empty($material['is_available']) ? 'Marcar material como no disponible' : 'Marcar material como disponible' ?>" data-tooltip="<?= !empty($material['is_available']) ? 'Marcar como no disponible' : 'Marcar como disponible' ?>"><i class="fa-solid <?= !empty($material['is_available']) ? 'fa-ban' : 'fa-circle-check' ?>"></i></button>
                             <button class="ar-icon-action ar-withdraw-action" type="button" data-withdraw-material aria-label="Retirar del repositorio" data-tooltip="Retirar del repositorio"><i class="fa-solid fa-box-archive"></i></button>
                             <button class="ar-icon-action ar-trash-action" type="button" data-trash-material aria-label="Enviar a Papelera" data-tooltip="Enviar a Papelera"><i class="fa-solid fa-trash-can"></i></button>

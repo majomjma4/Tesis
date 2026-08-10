@@ -336,7 +336,7 @@ function bindProjectCardEvents() {
         const openProjectDetail = (event) => {
             if (event.type === "keydown" && !["Enter", " "].includes(event.key)) return;
             if (event.type === "keydown" && event.repeat) return;
-            if (event.target.closest("button")) return;
+            if (event.target.closest("button, a")) return;
             const projectUrl = card.dataset.projectUrl;
             if (!projectUrl) return;
             event.preventDefault();

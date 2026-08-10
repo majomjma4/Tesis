@@ -222,7 +222,7 @@ final class RepositoryModel
             ],
         ];
 
-        return array_merge($project, $detailData[$projectId], [
+        return array_merge($project, $detailData[$projectId] ?? [], [
             'archive' => [
                 'name' => 'Proyecto_' . $projectId . '_Final.zip',
                 'path' => ROOT_PATH . '/storage/repository/project_' . $projectId . '.zip',
