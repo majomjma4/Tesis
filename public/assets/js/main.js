@@ -514,7 +514,7 @@ if (temporaryPasswordWarning) {
             const panel = document.createElement("div"); panel.id = `customSelectPanel${index}`; panel.className = "custom-select-panel"; panel.setAttribute("role", embeddedSection ? "dialog" : "listbox"); panel.setAttribute("aria-label", select.getAttribute("aria-label") || "Opciones");
             const optionHost = embeddedSection ? document.createElement("div") : panel;
             if (embeddedSection) { optionHost.setAttribute("role", "listbox"); optionHost.setAttribute("aria-label", "Tipos de material"); panel.append(optionHost); }
-            const searchable = select.dataset.searchable === "true" || select.options.length > 8;
+            const searchable = select.dataset.searchable === "false" ? false : (select.dataset.searchable === "true" || select.options.length > 8);
             if (searchable) panel.classList.add("is-searchable");
             let searchInput = null, emptyMessage = null;
             if (searchable) {
