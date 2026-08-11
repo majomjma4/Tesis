@@ -266,6 +266,29 @@ INSERT INTO `observation_responses` VALUES (4,7,24,'La justificación fue incorp
 UNLOCK TABLES;
 
 --
+-- Table structure for table `project_defenses`
+--
+
+DROP TABLE IF EXISTS `project_defenses`;
+CREATE TABLE `project_defenses` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `project_id` bigint(20) unsigned NOT NULL,
+  `defense_date` date DEFAULT NULL,
+  `defense_time` time DEFAULT NULL,
+  `location` varchar(255) DEFAULT NULL,
+  `modality` enum('presential','virtual','hybrid') DEFAULT NULL,
+  `result` enum('approved','rejected') DEFAULT NULL,
+  `result_notes` varchar(2000) DEFAULT NULL,
+  `result_registered_by` bigint(20) unsigned DEFAULT NULL,
+  `result_registered_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`), UNIQUE KEY `uq_project_defenses_project` (`project_id`),
+  CONSTRAINT `fk_project_defenses_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_project_defenses_result_user` FOREIGN KEY (`result_registered_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
 -- Table structure for table `project_audit_log`
 --
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 /** Consulta la bandeja operativa de Titulación sin mutar el flujo académico. */
 final class ThesisManagementService
 {
-    private const ELIGIBLE_STATUSES = ['approved', 'defense', 'tribunal_approved'];
+    private const ELIGIBLE_STATUSES = ['approved', 'defense'];
 
     /** @return array{projects:list<array<string,mixed>>,periods:list<array{id:int,name:string}>,summary:array<string,int>} */
     public function listing(): array
@@ -13,12 +13,13 @@ final class ThesisManagementService
         $db = Database::connection();
         $rows = $db->query(
             "SELECT p.id,p.code,p.title,p.status,p.updated_at,p.approved_at,p.created_at,
-                    ap.id period_id,ap.name period_name,u.full_name tutor_name
+                    ap.id period_id,ap.name period_name,u.full_name tutor_name,pd.defense_date,pd.defense_time,pd.location defense_location,pd.modality defense_modality,pd.result defense_result,pd.result_notes
              FROM projects p
              INNER JOIN project_types pt ON pt.id=p.project_type_id AND pt.code='thesis'
              INNER JOIN academic_periods ap ON ap.id=p.academic_period_id
              LEFT JOIN users u ON u.id=p.tutor_id
-             WHERE p.deleted_at IS NULL AND p.status IN ('approved','defense','tribunal_approved')
+             LEFT JOIN project_defenses pd ON pd.project_id=p.id
+             WHERE p.deleted_at IS NULL AND p.status IN ('approved','defense')
              ORDER BY p.updated_at DESC,p.id DESC"
         )->fetchAll();
         if ($rows === []) return ['projects'=>[], 'periods'=>[], 'summary'=>$this->emptySummary()];
@@ -65,13 +66,12 @@ final class ThesisManagementService
     /** @return array{key:string,label:string,description:string,action:string} */
     private function situation(string $status, int $tribunalCount): array
     {
-        if ($status === 'approved' && !ThesisTribunalService::isValidMemberCount($tribunalCount)) return ['key'=>'pending_tribunal','label'=>'Tribunal requiere gestión','description'=>'Se requieren entre 3 y 5 miembros activos','action'=>'Gestionar Tribunal'];
-        if ($status === 'approved') return ['key'=>'tribunal_assigned','label'=>'Tribunal asignado','description'=>'Pendiente de continuar hacia defensa','action'=>'Gestionar Tribunal'];
+        if ($status === 'approved') return ['key'=>'pending_tribunal','label'=>'Pendiente de Tribunal','description'=>ThesisTribunalService::isValidMemberCount($tribunalCount)?'Tribunal listo para confirmar':'Se requieren entre 3 y 5 miembros activos','action'=>'Gestionar Tribunal'];
         if ($status === 'defense') return ['key'=>'defense','label'=>'Defensa en curso','description'=>'Proceso de evaluación en curso','action'=>'Ver proceso'];
         return ['key'=>'pending_publication','label'=>'Pendiente de publicación','description'=>'Aprobado por el Tribunal','action'=>'Continuar proceso'];
     }
 
     /** @return array<string,int> */
-    private function emptySummary(): array { return ['pending_tribunal'=>0,'tribunal_assigned'=>0,'defense'=>0,'pending_publication'=>0]; }
+    private function emptySummary(): array { return ['pending_tribunal'=>0,'defense'=>0]; }
     private function tutorLabel(string $tutor, array $cotutors): string { $names=array_filter(array_merge([$tutor],$cotutors)); return $names ? implode(' · ', $names) : 'Sin tutor asignado'; }
 }

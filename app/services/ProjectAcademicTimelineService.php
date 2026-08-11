@@ -91,7 +91,7 @@ UNION ALL
 SELECT CONCAT('academic:',l.id),l.action,'project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason)
 FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=? AND (
- (l.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished','project_publication_reverted','project_corrections_requested','project_status_changed','project_participants_updated','tribunal_assigned','tribunal_updated')
+ (l.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished','project_publication_reverted','project_corrections_requested','project_status_changed','project_participants_updated','tribunal_assigned','tribunal_updated','thesis_defense_information_updated','tribunal_result_registered')
   AND NOT (l.action='project_unpublished' AND EXISTS(SELECT 1 FROM project_audit_log semantic WHERE semantic.project_id=l.project_id AND semantic.action='project_publication_reverted' AND semantic.created_at=l.created_at)))
  OR (l.action='project_updated' AND (JSON_EXTRACT(l.new_state,'$.status') IS NOT NULL OR JSON_EXTRACT(l.new_state,'$.Estado') IS NOT NULL OR JSON_SEARCH(l.new_state,'one','Estado') IS NOT NULL)
   AND NOT EXISTS(SELECT 1 FROM project_audit_log semantic WHERE semantic.project_id=l.project_id AND semantic.created_at=l.created_at AND semantic.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_republished','project_publication_reverted','project_corrections_requested'))))
@@ -150,6 +150,8 @@ SQL;
             'project_published','project_republished'=>['Proyecto publicado','El expediente fue publicado institucionalmente.','publication'],
             'project_tribunal_approved','tribunal_approved'=>['Proyecto aprobado por el Tribunal',$this->transitionDescription($previous,$new),'tribunal-approval'],
             'tribunal_assigned','tribunal_updated','project_participants_updated'=>['Tribunal registrado','Se registró una asignación o modificación de Tribunal.','tribunal'],
+            'thesis_defense_information_updated'=>['Información de defensa actualizada','Se actualizó información organizativa de la defensa.','tribunal'],
+            'tribunal_result_registered'=>['Resultado del Tribunal registrado',($new['result']??'')==='approved'?'El Tribunal aprobó el proyecto.':'El Tribunal registró el proyecto como no aprobado.','tribunal'],
             'project_corrections_requested'=>['Tutor solicitó correcciones','El proyecto volvió a En desarrollo.','observation'],
             default=>[$this->statusTitle($new),$this->transitionDescription($previous,$new),'status'],
         };
