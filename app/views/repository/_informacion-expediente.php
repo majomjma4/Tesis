@@ -123,7 +123,18 @@ body.dark-mode .ed-form-state{color:#6ee7b7}body.dark-mode .ed-form-state.is-dir
         <?php if($adjustmentNotice):$latestAdjustment=(array)($adjustmentNotice['latest']??$adjustmentNotice['latest_request']??[]);$adjustmentDate=!empty($latestAdjustment['created_at'])?(new DateTimeImmutable((string)$latestAdjustment['created_at'],new DateTimeZone('UTC')))->setTimezone(new DateTimeZone('America/Guayaquil'))->format('d/m/Y H:i'):'';?><aside class="project-adjustment-banner" role="status" aria-labelledby="projectAdjustmentBannerTitle"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div><strong id="projectAdjustmentBannerTitle">Solicitud administrativa pendiente</strong><?php if(!empty($latestAdjustment['message'])):?><p><?=e((string)$latestAdjustment['message'])?></p><?php endif;?><?php if($adjustmentDate!==''||!empty($latestAdjustment['requested_by'])):?><small><?=e(trim((string)($latestAdjustment['requested_by']??'').' · '.$adjustmentDate,' ·'))?></small><?php endif;?></div><a href="<?=e((string)($adjustmentNotice['history_url']??'#'))?>">Ver en Historial</a></aside><?php endif;?>
         <?php if($reviewNotice): ?><aside class="ed-review-notice" role="status"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div><strong><?=e((string)$reviewNotice['message'])?></strong><?php if(!empty($reviewNotice['count'])):?><span><?=(int)$reviewNotice['count']?> observaciones pendientes.</span><?php endif;?></div></aside><?php endif;?>
     </div><?php endif;?>
-    <?php foreach ($sections as $section): $content = $section['content']; ?>
+    <?php
+    $projectColumnLayout = ($digitalRecord['entity']['type'] ?? '') === 'project'
+        && in_array((string) ($digitalRecord['context'] ?? ''), ['academic_management', 'academic'], true);
+    if ($projectColumnLayout) {
+        $sectionOrder = ['description'=>10, 'institutional'=>20, 'academic-progress'=>30, 'review-notice'=>35, 'participants'=>50, 'project-classification'=>60];
+        usort($sections, static fn (array $left, array $right): int => ($sectionOrder[$left['id'] ?? ''] ?? 90) <=> ($sectionOrder[$right['id'] ?? ''] ?? 90));
+    }
+    $projectColumnOpen = false;
+    foreach ($sections as $section): $content = $section['content']; $sectionId = (string) ($section['id'] ?? '');
+        if ($projectColumnLayout && $sectionId === 'institutional') { ?><div class="ed-information-column ed-information-column-left"><?php $projectColumnOpen = true; }
+        if ($projectColumnLayout && $sectionId === 'participants') { if ($projectColumnOpen) { ?></div><?php } ?><div class="ed-information-column ed-information-column-right"><?php $projectColumnOpen = true; }
+    ?>
         <section class="ed-document-section" data-information-section="<?= e($section['id']) ?>"<?= $section['type']==='project_participants'?' aria-label="Participantes"':($section['type']==='review_notice'?' aria-label="Aviso de observaciones pendientes"':' aria-labelledby="ed-section-'.e($section['id']).'"') ?>>
             <?php if(!in_array($section['type'],['project_participants','review_notice'],true)):?><header class="ed-document-section-header">
                 <h2 class="ed-document-heading" id="ed-section-<?= e($section['id']) ?>"><i class="fa-solid <?= e($section['icon']) ?>" aria-hidden="true"></i><?= e($section['title']) ?></h2>
@@ -178,6 +189,8 @@ body.dark-mode .ed-form-state{color:#6ee7b7}body.dark-mode .ed-form-state.is-dir
                 </div>
             <?php endif; ?>
         </section>
-    <?php endforeach; ?>
+        <?php if ($projectColumnLayout && $sectionId === 'participants' && $projectColumnOpen) { ?></div><?php $projectColumnOpen = false; }
+    endforeach;
+    if ($projectColumnLayout && $projectColumnOpen) { ?></div><?php } ?>
 </div>
 <?php endif; ?>

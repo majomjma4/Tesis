@@ -84,7 +84,12 @@ final class ProjectCapabilityService
             return $capabilities;
         }
 
-        if ($administrator || !$related || (!in_array('teacher', $roles, true) && !in_array('student', $roles, true))) return $capabilities;
+        $isTeacher = in_array('teacher', $roles, true);
+        $isStudent = in_array('student', $roles, true);
+        // Proyectos activos es una bandeja de seguimiento general para Docente:
+        // puede consultar cualquier expediente, sin recibir capacidades de mutación.
+        // El Estudiante conserva el requisito de relación directa con el proyecto.
+        if ($administrator || (!$isTeacher && (!$isStudent || !$related))) return $capabilities;
         $capabilities['view_project'] = true;
         $capabilities['view_academic_history'] = true;
         $capabilities['download_files'] = true;
@@ -94,9 +99,9 @@ final class ProjectCapabilityService
                 (int) ($participant['user_id'] ?? 0) === $userId
                 && in_array(strtolower((string) ($participant['role_code'] ?? '')), ['tutor','co_tutor','cotutor','co-tutor'], true)
             )) > 0;
-        $capabilities['review_documents'] = in_array('teacher', $roles, true) && $assignedTutor;
-        if (in_array('teacher', $roles, true) && $assignedTutor) $capabilities['view_adjustment_requests'] = true;
-        $isOwnerStudent = in_array('student', $roles, true) && count(array_filter($participants, static fn (array $participant): bool =>
+        $capabilities['review_documents'] = $isTeacher && $assignedTutor;
+        if ($isTeacher && $assignedTutor) $capabilities['view_adjustment_requests'] = true;
+        $isOwnerStudent = $isStudent && count(array_filter($participants, static fn (array $participant): bool =>
             (int) ($participant['user_id'] ?? 0) === $userId && strtolower((string) ($participant['role_code'] ?? '')) === 'student'
         )) > 0;
         if ($isOwnerStudent) {
