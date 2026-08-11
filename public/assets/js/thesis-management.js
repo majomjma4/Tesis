@@ -109,6 +109,17 @@
 })();
 
 (() => {
+  const modal = document.querySelector('[data-tribunal-modal]');
+  if (!modal) return;
+  const desired = modal.querySelector('[data-tribunal-desired]'), down = modal.querySelector('[data-tribunal-decrease]'), up = modal.querySelector('[data-tribunal-increase]'), selected = modal.querySelector('[data-tribunal-selected]'), count = modal.querySelector('[data-tribunal-count]'), confirm = modal.querySelector('[data-tribunal-save]'), reason = modal.querySelector('[data-tribunal-reason]'), reasonWrap = modal.querySelector('[data-tribunal-reason-wrap]');
+  let target = 3;
+  const redraw = () => { const members = [...selected.querySelectorAll('li')]; if (count) count.textContent = `${members.length} de ${target} seleccionados`; if (desired) desired.textContent = String(target); if (down) down.disabled = target <= 3 || target <= members.length; if (up) up.disabled = target >= 5; if (confirm) confirm.disabled = members.length !== target || (!reasonWrap.hidden && reason.value.trim().length < 5); members.forEach(member => { if (member.querySelector('button')) return; const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'tm-remove-member'; remove.textContent = 'Quitar'; remove.addEventListener('click', () => { const candidate = [...modal.querySelectorAll('[data-tribunal-candidates] .tm-candidate')].find(item => item.querySelector('strong')?.textContent === member.firstChild?.textContent); candidate?.querySelector('input')?.click(); }); member.append(remove); }); };
+  down?.addEventListener('click', () => { if (target > 3 && target > selected.querySelectorAll('li').length) { target--; redraw(); } });
+  up?.addEventListener('click', () => { if (target < 5) { target++; redraw(); } });
+  reason?.addEventListener('input', redraw); new MutationObserver(redraw).observe(selected, { childList: true }); redraw();
+})();
+
+(() => {
   const config = document.querySelector('#thesisDefenseConfig');
   const modal = document.querySelector('[data-new-attempt-modal]');
   if (!config || !modal) return;
