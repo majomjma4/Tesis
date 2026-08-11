@@ -109,6 +109,8 @@ match ($page) {
     'support-materials' => (new SupportMaterialController())->index(),
     'support-material-detail' => (new SupportMaterialController())->detail(),
     'support-material-evolution-events' => (new SupportMaterialController())->evolutionEvents(),
+    'support-material-manage-save' => (new AdminController())->saveSupportMaterial(),
+    'support-material-manage-file' => (new AdminController())->changeSupportMaterialFile(),
     'support-material-preview' => (new SupportMaterialController())->preview(),
     'support-material-preview-content' => (new SupportMaterialController())->previewContent(),
     'support-material-version-preview' => (new SupportMaterialController())->versionPreview(),

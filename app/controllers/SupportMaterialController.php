@@ -70,9 +70,11 @@ final class SupportMaterialController
                     }
                 }
             }
-            $documentEvolutionTotal = $materialModel->documentEvolutionEventCount((int) $material['id']);
-            $documentEvolutionEvents = $materialModel->documentEvolutionEvents((int) $material['id'], 16, 0);
-            $documentEvolutionEvents = array_slice($documentEvolutionEvents, 0, 15);
+            $documentEvolutionTotal = 0;
+            if ($isAdministrator) {
+                $documentEvolutionTotal = $materialModel->documentEvolutionEventCount((int) $material['id']);
+                $documentEvolutionEvents = array_slice($materialModel->documentEvolutionEvents((int) $material['id'], 16, 0), 0, 15);
+            }
             $evolutionFileIds = array_values(array_unique(array_filter(array_map(
                 static fn (array $event): int => (string) ($event['type'] ?? '') === 'file-replaced' ? (int) ($event['file_id'] ?? 0) : 0,
                 $documentEvolutionEvents
@@ -135,6 +137,7 @@ final class SupportMaterialController
         $materialId = filter_var($_GET['material_id'] ?? null, FILTER_VALIDATE_INT);
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
         $administrator = (new AuthSessionService())->hasAdminAccess();
+        if (!$administrator) { http_response_code(403); $this->sendJson(false, 'No tienes autorización para consultar la evolución documental.'); }
         $model = new SupportMaterialModel();
         $material = $materialId ? $model->findById((int) $materialId, $administrator) : null;
         if (!$material) { http_response_code(404); $this->sendJson(false, 'El material solicitado no está disponible.'); }

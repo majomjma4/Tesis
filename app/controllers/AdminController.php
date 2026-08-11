@@ -387,13 +387,16 @@ final class AdminController
         }
         if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La solicitud contiene un token CSRF inválido.',[],419);
         $id=(int)($_POST['id']??0);$title=$this->normalizeAuditText($_POST['title']??'');
+        $capabilities=new SupportMaterialCapabilityService();
         try{
-            $result=Database::transaction(function(PDO $database)use($id,$title,$session):array{
+            if($id===0)$capabilities->assertCanCreate($session);
+            $result=Database::transaction(function(PDO $database)use($id,$title,$session,$capabilities):array{
                 $model=new SupportMaterialModel();
                 $auditChanges=[];
                 if($id>0){
                     $current=$model->findByIdForUpdate($id);
                     if($current===null)throw new InvalidArgumentException('El material ya no está disponible.');
+                    $capabilities->assertCanManage($session,$current);
                     $submittedMaterialType=$model->resolveMaterialType($_POST,(string)($_POST['controlled_material_type']??'')==='1');
                     $resolvedKeywords=$model->resolveKeywords(
                         $_POST,
@@ -432,6 +435,7 @@ final class AdminController
             $saved=(int)$result['id'];
             $this->json(true,$id?'Material actualizado correctamente.':'Material creado correctamente.',['id'=>$saved]);
         }
+        catch(SupportMaterialAccessException $error){$this->json(false,$error->getMessage(),[],$error->httpStatus);}
         catch(InvalidArgumentException $error){$this->activityFailure($session,$id?'support_material.update_failed':'support_material.create_failed',$id?'Intentó editar material de apoyo':'Intentó crear material de apoyo','Repositorio','support_material',$id?:null,$title?:'Material de apoyo',$error);$this->json(false,$error->getMessage(),[],422);}
         catch(Throwable $error){$this->activityFailure($session,$id?'support_material.update_failed':'support_material.create_failed',$id?'Intentó editar material de apoyo':'Intentó crear material de apoyo','Repositorio','support_material',$id?:null,$title?:'Material de apoyo',$error);error_log('Support material save: '.$error->getMessage());$this->json(false,'No fue posible guardar el material.',[],500);}
     }
@@ -606,6 +610,7 @@ final class AdminController
         $materialId=(int)($_POST['material_id']??0);$action=(string)($_POST['action']??'add');
         try{
             $model=new SupportMaterialModel();
+            (new SupportMaterialCapabilityService())->assertCanManage($session,$model->findById($materialId,true));
             if($action==='list_restorable'){
                 if($model->findById($materialId,true)===null)$this->json(false,'El material ya no está disponible.',[],404);
                 $settings=(new SystemSettingModel())->all();
@@ -949,6 +954,7 @@ final class AdminController
                 :$addedCount.($addedCount===1?' archivo agregado correctamente.':' archivos agregados correctamente.');
             $this->json(true,$message,$data,$failedCount>0?207:200);
         }
+        catch(SupportMaterialAccessException $error){$this->json(false,$error->getMessage(),[],$error->httpStatus);}
         catch(InvalidArgumentException $error){$this->json(false,$error->getMessage(),[],422);}
         catch(Throwable $error){
             error_log(sprintf(
