@@ -20,8 +20,10 @@ const repositorySupportCategory = document.querySelector("#repositorySupportCate
 const repositoryCount = document.querySelector("#repositoryCount");
 const repositoryToast = document.querySelector("#repositoryToast");
 const repositorySupportCount = document.querySelector("#repositorySupportCount");
-const repositorySupportPrev = document.querySelector("#repositorySupportPrev");
-const repositorySupportNext = document.querySelector("#repositorySupportNext");
+const repositorySupportPagination = document.querySelector("#repositorySupportPagination");
+const repositorySupportPaginationSummary = document.querySelector("#repositorySupportPaginationSummary");
+const repositorySupportPaginationPages = document.querySelector("#repositorySupportPaginationPages");
+const repositorySupportPageSizeSelect = document.querySelector("#repositorySupportPageSize");
 
 const repositoryEmpty = document.querySelector("#repositoryEmpty");
 const repositoryEmptyTitle = document.querySelector("#repositoryEmptyTitle");
@@ -33,8 +35,7 @@ const repositoryPagePrevious = document.querySelector("#repositoryPagePrevious")
 const repositoryPageNext = document.querySelector("#repositoryPageNext");
 const repositoryPageInfo = document.querySelector("#repositoryPageInfo");
 
-const repositorySupportPageSize = 4;
-let repositorySupportCurrentPage = 0;
+const repositorySupportState = { page: 1, size: 10 };
 let repositoryToastTimer = null;
 const repositoryProjectsPerPage = 10;
 let repositoryCurrentPage = 1;
@@ -281,6 +282,8 @@ function showRepositoryToast(message) {
     }, 2200);
 }
 
+window.showRepositoryToast = showRepositoryToast;
+
 // Escuchar eventos en las tarjetas de proyecto (Favoritos y Navegación)
 function bindProjectCardEvents() {
     const cards = getProjectCards();
@@ -370,7 +373,14 @@ repositoryPageNext?.addEventListener("click", () => {
     document.querySelector("#readerProjectGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
-function filterRepositorySupportDocuments() {
+function supportPageTokens(page, total) {
+    if (total <= 5) return Array.from({ length: total }, (_, index) => index + 1);
+    if (page <= 3) return [1, 2, 3, "…", total];
+    if (page >= total - 2) return [1, "…", total - 2, total - 1, total];
+    return [1, "…", page - 1, page, page + 1, "…", total];
+}
+
+function filterRepositorySupportDocuments(resetPage = true) {
     const rawSearchValue = repositorySupportSearch?.value ?? "";
     const searchValue = normalizeRepositoryText(rawSearchValue);
     const searchTerms = searchValue.split(" ").filter(Boolean);
@@ -392,18 +402,34 @@ function filterRepositorySupportDocuments() {
         }
     });
 
-    repositorySupportCurrentPage = 0;
-    renderRepositorySupportCarousel(getRepositorySupportMatches());
+    if (resetPage) repositorySupportState.page = 1;
+    const matches = getRepositorySupportMatches();
+    const totalPages = Math.max(1, Math.ceil(matches.length / repositorySupportState.size));
+    repositorySupportState.page = Math.min(repositorySupportState.page, totalPages);
+    const start = (repositorySupportState.page - 1) * repositorySupportState.size;
+    const visible = new Set(matches.slice(start, start + repositorySupportState.size));
+    supportCards.forEach(card => { card.hidden = !visible.has(card); });
 
     if (repositorySupportCount) {
-        const totalMatches = supportCards.filter((card) => card.dataset.supportMatch === "true").length;
-        repositorySupportCount.textContent = `${totalMatches} ${totalMatches === 1 ? "resultado visible" : "resultados visibles"}`;
+        repositorySupportCount.textContent = `${matches.length} ${matches.length === 1 ? "resultado visible" : "resultados visibles"}`;
     }
 
     const repositorySupportEmpty = document.querySelector("#repositorySupportEmpty");
     if (repositorySupportEmpty) {
-        const totalMatches = supportCards.filter((card) => card.dataset.supportMatch === "true").length;
-        repositorySupportEmpty.hidden = totalMatches !== 0;
+        repositorySupportEmpty.hidden = matches.length !== 0;
+    }
+    const from = matches.length === 0 ? 0 : start + 1;
+    const to = Math.min(start + repositorySupportState.size, matches.length);
+    if (repositorySupportPaginationSummary) repositorySupportPaginationSummary.textContent = matches.length === 0 ? "Mostrando 0 de 0" : `Mostrando ${from}-${to} de ${matches.length}`;
+    if (repositorySupportPagination) repositorySupportPagination.hidden = matches.length <= repositorySupportState.size;
+    if (repositorySupportPaginationPages) {
+        repositorySupportPaginationPages.replaceChildren();
+        if (matches.length > repositorySupportState.size) {
+            const add = (label, target, disabled = false, active = false) => { const button = document.createElement("button"); button.type = "button"; button.textContent = label; button.disabled = disabled; button.classList.toggle("active", active); button.addEventListener("click", () => { repositorySupportState.page = target; filterRepositorySupportDocuments(false); }); repositorySupportPaginationPages.append(button); };
+            add("Anterior", Math.max(1, repositorySupportState.page - 1), repositorySupportState.page === 1);
+            supportPageTokens(repositorySupportState.page, totalPages).forEach(token => { if (typeof token === "number") add(String(token), token, false, token === repositorySupportState.page); else { const ellipsis = document.createElement("span"); ellipsis.textContent = token; repositorySupportPaginationPages.append(ellipsis); } });
+            add("Siguiente", Math.min(totalPages, repositorySupportState.page + 1), repositorySupportState.page === totalPages);
+        }
     }
 }
 
@@ -411,39 +437,7 @@ function getRepositorySupportMatches() {
     return getSupportCards().filter((card) => card.dataset.supportMatch === "true");
 }
 
-function renderRepositorySupportCarousel(documents = getRepositorySupportMatches()) {
-    const supportCards = getSupportCards();
-    const lastStartPosition = Math.max(0, documents.length - repositorySupportPageSize);
-    repositorySupportCurrentPage = Math.min(repositorySupportCurrentPage, lastStartPosition);
-    const pageStart = repositorySupportCurrentPage;
-    const pageDocuments = documents.slice(pageStart, pageStart + repositorySupportPageSize);
-
-    supportCards.forEach((card) => {
-        card.hidden = !pageDocuments.includes(card);
-    });
-
-    if (repositorySupportPrev) {
-        const hasPreviousPage = repositorySupportCurrentPage > 0 && documents.length > 0;
-        repositorySupportPrev.hidden = !hasPreviousPage;
-        repositorySupportPrev.disabled = !hasPreviousPage;
-    }
-    if (repositorySupportNext) {
-        const hasNextPage = repositorySupportCurrentPage < lastStartPosition && documents.length > 0;
-        repositorySupportNext.hidden = !hasNextPage;
-        repositorySupportNext.disabled = !hasNextPage;
-    }
-}
-
-repositorySupportPrev?.addEventListener("click", () => {
-    repositorySupportCurrentPage = Math.max(0, repositorySupportCurrentPage - 1);
-    renderRepositorySupportCarousel();
-});
-
-repositorySupportNext?.addEventListener("click", () => {
-    const lastStartPosition = Math.max(0, getRepositorySupportMatches().length - repositorySupportPageSize);
-    repositorySupportCurrentPage = Math.min(lastStartPosition, repositorySupportCurrentPage + 1);
-    renderRepositorySupportCarousel();
-});
+repositorySupportPageSizeSelect?.addEventListener("change", () => { repositorySupportState.size = Number(repositorySupportPageSizeSelect.value || 10); repositorySupportState.page = 1; filterRepositorySupportDocuments(false); });
 
 repositorySearch?.addEventListener("input", filterRepositoryProjects);
 repositorySearch?.addEventListener("keyup", filterRepositoryProjects);

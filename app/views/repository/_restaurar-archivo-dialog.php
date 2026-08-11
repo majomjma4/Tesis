@@ -1,4 +1,7 @@
-<?php $initialRestorableFiles = is_array($digitalRecord['restorable_files'] ?? null) ? $digitalRecord['restorable_files'] : []; ?>
+<?php
+$initialRestorableFiles = is_array($digitalRecord['restorable_files'] ?? null) ? $digitalRecord['restorable_files'] : [];
+$canPermanentlyDeleteFiles = !empty($digitalRecord['can_permanently_delete_files']);
+?>
 <div class="ed-file-remove-overlay" data-file-restore-dialog hidden>
     <section class="ed-file-remove-dialog ed-file-restore-dialog" role="dialog" aria-modal="true"
         aria-labelledby="fileRestoreTitle">
@@ -33,7 +36,7 @@
         </div>
         <footer>
             <button type="button" class="ed-file-remove-cancel" data-file-restore-back hidden>Volver</button>
-            <button type="button" class="ed-file-purge-open" data-file-purge-open disabled>Eliminar seleccionados</button>
+            <?php if ($canPermanentlyDeleteFiles): ?><button type="button" class="ed-file-purge-open" data-file-purge-open disabled>Eliminar seleccionados</button><?php endif; ?>
             <button type="button" class="ed-file-remove-cancel" data-file-restore-cancel>Cerrar</button>
             <button type="button" class="ed-file-remove-confirm ed-presentation-confirm-submit" data-file-restore-confirm hidden>Restaurar archivo</button>
         </footer>

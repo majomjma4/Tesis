@@ -225,15 +225,10 @@
             <section class="ar-panel" id="panelSupport" role="tabpanel" aria-labelledby="tabSupport" hidden>
                 <header class="ar-section-head">
                     <div><span>Recursos académicos</span><h2>Material de apoyo</h2></div>
-                    <p id="repositorySupportCount" aria-live="polite"><?= count($supportDocuments) ?> <?= count($supportDocuments) === 1 ? 'resultado visible' : 'resultados visibles' ?></p>
+                    <div style="display:flex;align-items:center;gap:10px"><p id="repositorySupportCount" aria-live="polite"><?= count($supportDocuments) ?> <?= count($supportDocuments) === 1 ? 'resultado visible' : 'resultados visibles' ?></p><?php if (!empty($canCreateSupportMaterial)): ?><button class="ar-primary-action" type="button" data-teacher-material-create><i class="fa-solid fa-plus"></i> Nuevo material</button><?php endif; ?></div>
                 </header>
 
-                <div class="repository-carousel-stage">
-                    <button class="repository-carousel-btn repository-carousel-prev" id="repositorySupportPrev" type="button" aria-label="Ver documentos anteriores">
-                        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
-                    </button>
-
-                    <div class="ar-grid" id="repositorySupportGrid">
+                <div class="ar-grid" id="repositorySupportGrid">
                         <?php foreach ($supportDocuments as $document): ?>
                             <article class="ar-material-card"
                                 data-category-slug="<?= e($document['category_slug']) ?>"
@@ -261,11 +256,6 @@
                                 </footer>
                             </article>
                         <?php endforeach; ?>
-                    </div>
-
-                    <button class="repository-carousel-btn repository-carousel-next" id="repositorySupportNext" type="button" aria-label="Ver documentos siguientes">
-                        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-                    </button>
                 </div>
 
                 <div class="ar-empty" id="repositorySupportEmpty" <?= $supportDocuments ? 'hidden' : '' ?>>
@@ -273,6 +263,7 @@
                     <h2>Aún no existen materiales de apoyo.</h2>
                     <p>Los recursos institucionales publicados aparecerán en esta sección.</p>
                 </div>
+                <footer class="ar-pagination" id="repositorySupportPagination" hidden><span id="repositorySupportPaginationSummary">Mostrando 0 de 0</span><label>Mostrar <select id="repositorySupportPageSize"><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="75">75</option><option value="100">100</option></select></label><nav id="repositorySupportPaginationPages" aria-label="Paginación de materiales de apoyo"></nav></footer>
             </section>
 
             <!-- Toast de notificaciones de favorito -->
@@ -280,3 +271,4 @@
         </main>
     </div>
 </div>
+<?php require __DIR__ . '/_teacher-material-modal.php'; ?>

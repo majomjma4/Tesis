@@ -11,12 +11,15 @@ final class SupportMaterialController
     public function index(): void
     {
         $this->ensureSession();
+        $session = new AuthSessionService();
+        $capabilities = new SupportMaterialCapabilityService();
+        $canCreate = !$session->hasAdminAccess() && $capabilities->canCreate($session);
         $downloadModel = new SupportMaterialDownloadModel();
         $materials = array_map(static function (array $material) use ($downloadModel): array {
             $material['downloads'] = $downloadModel->getTotal($material['id'], $material['downloads']);
             $material['detail_url'] = base_url('index.php?page=support-material-detail&id=' . rawurlencode((string) $material['id']));
             return $material;
-        }, (new SupportMaterialModel())->getAll());
+        }, $canCreate ? (new SupportMaterialModel())->getForTeacherManagement((int) $session->userId()) : (new SupportMaterialModel())->getAll());
 
         View::render('repository/materiales', [
             'currentPage' => 'repository',
@@ -25,6 +28,12 @@ final class SupportMaterialController
             'pageScript' => asset('js/support-materials.js'),
             'materials' => $materials,
             'repositoryUrl' => route('repository'),
+            'canCreateSupportMaterial' => $canCreate,
+            'supportMaterialCategories' => $canCreate ? (new SupportMaterialModel())->categories() : [],
+            'supportMaterialTypes' => $canCreate ? (new SupportMaterialModel())->materialTypeCatalog() : [],
+            'supportMaterialManageFileEndpoint' => $canCreate ? route('support-material-manage-file') : '',
+            'supportMaterialManageSaveEndpoint' => $canCreate ? route('support-material-manage-save') : '',
+            'supportMaterialCsrf' => $canCreate ? $session->csrfToken('admin_repository') : '',
         ]);
     }
 
@@ -33,9 +42,15 @@ final class SupportMaterialController
         $this->ensureSession();
         $session = new AuthSessionService();
         $isAdministrator = $session->hasAdminAccess();
+        $capabilities = new SupportMaterialCapabilityService();
         $materialId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
         $materialModel = new SupportMaterialModel();
         $material = $materialId === false || $materialId === null ? null : $materialModel->findById((int) $materialId, $isAdministrator);
+        if ($material === null && $materialId && !$isAdministrator) {
+            $candidate = $materialModel->findById((int) $materialId, true);
+            if ($capabilities->canManage($session, $candidate)) $material = $candidate;
+        }
+        $canManageMaterial = $capabilities->canManage($session, $material);
         $materialCategories = [];
         $restorableFiles = [];
         $documentEvolution = [];
@@ -85,12 +100,14 @@ final class SupportMaterialController
             $initialGroups=[];foreach($documentEvolution as $group)$initialGroups[(int)$group['file_id']]=$this->evolutionGroupUrls((int)$material['id'],$group);
             $documentEvolution=array_values($initialGroups);
             foreach($documentEvolutionEvents as &$event){$event['preview_url']='';$event['download_url']='';if(($event['file_state']??'')==='available'&&(int)($event['file_id']??0)>0){$query='&material_id='.(int)$material['id'].'&file_id='.(int)$event['file_id'];$event['download_url']=route('support-material-download').$query;if(in_array((string)($event['extension']??''),['pdf','docx','txt','png','jpg','jpeg','webp'],true))$event['preview_url']=route('support-material-preview').$query;}}unset($event);
-            if ($isAdministrator) {
+            if ($isAdministrator || $canManageMaterial) {
                 $materialCategories = $materialModel->categories();
-                $restorableFiles = $materialModel->restorableFiles((int) $material['id']);
+                if ($canManageMaterial) $restorableFiles = $materialModel->restorableFiles((int) $material['id']);
+                if ($isAdministrator) {
                 $hasUnreadAdministrativeActivity = (new AdminActivityModel())->hasUnreadSupportMaterialEvents(
                     (int) $session->userId(), (int) $material['id']
                 );
+                }
             }
         }
 
@@ -110,15 +127,16 @@ final class SupportMaterialController
             'zipEntryDownloadActionUrl' => route('support-material-zip-entry-download'),
             'packageDownloadActionUrl' => route('support-material-package-download'),
             'isAdministrator' => $isAdministrator,
-            'materialEditUrl' => $material === null ? '' : route('support-material-detail') . '&id=' . (int) $material['id'] . '&mode=edit&tab=information',
-            'materialSaveEndpoint' => route('admin-support-material-save'),
-            'materialFileEndpoint' => $isAdministrator ? route('admin-support-material-file') : '',
+            'canManageSupportMaterial' => $canManageMaterial,
+            'materialEditUrl' => !$canManageMaterial || $material === null ? '' : route('support-material-detail') . '&id=' . (int) $material['id'] . '&mode=edit&tab=information',
+            'materialSaveEndpoint' => $isAdministrator ? route('admin-support-material-save') : ($canManageMaterial ? route('support-material-manage-save') : ''),
+            'materialFileEndpoint' => $isAdministrator ? route('admin-support-material-file') : ($canManageMaterial ? route('support-material-manage-file') : ''),
             'materialStatusEndpoint' => $isAdministrator ? route('admin-support-material-status') : '',
             'materialHistoryEndpoint' => $isAdministrator ? route('admin-support-material-history') . '&id=' . (int) ($material['id'] ?? 0) : '',
             'materialHistoryCleanupEndpoint' => $isAdministrator ? route('admin-support-material-history-cleanup') : '',
-            'materialCsrfToken' => $isAdministrator ? $session->csrfToken('admin_repository') : '',
+            'materialCsrfToken' => ($isAdministrator || $canManageMaterial) ? $session->csrfToken('admin_repository') : '',
             'materialCategories' => $materialCategories,
-            'materialFileLimits' => $isAdministrator ? (new SupportMaterialFileService())->limits() : [],
+            'materialFileLimits' => ($isAdministrator || $canManageMaterial) ? (new SupportMaterialFileService())->limits() : [],
             'restorableFiles' => $restorableFiles,
             'documentEvolution' => $documentEvolution,
             'documentEvolutionEvents' => $documentEvolutionEvents,

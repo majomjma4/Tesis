@@ -14,6 +14,7 @@ final class RepositoryController
             header('Location: ' . route('admin-repository'));
             exit;
         }
+        $session = new AuthSessionService();
         $repositoryModel = new RepositoryModel();
         $favoriteModel = new FavoriteModel();
         $downloadModel = new DownloadModel();
@@ -32,6 +33,7 @@ final class RepositoryController
             'title' => 'Repositorio Institucional | Gestión Documental Académica',
             'pageStyles' => [asset('css/repository-reader.css')],
             'pageScript' => asset('js/repository.js'),
+            'pageScripts' => $this->teacherMaterialUi($session) ? [asset('js/teacher-support-materials.js')] : [],
             'projects' => $projects,
             'favoriteActionUrl' => route('repository-favorite'),
             'favoriteCsrfToken' => $this->getFavoriteCsrfToken(),
@@ -43,9 +45,20 @@ final class RepositoryController
             'supportDocuments' => array_map(static function (array $material): array {
                 $material['detail_url'] = base_url('index.php?page=support-material-detail&id=' . rawurlencode((string) $material['id']));
                 return $material;
-            }, (new SupportMaterialModel())->getAll()),
+            }, $this->teacherMaterialUi($session) ? (new SupportMaterialModel())->getForTeacherManagement((int) $session->userId()) : (new SupportMaterialModel())->getAll()),
             'supportMaterialsUrl' => route('support-materials'),
+            'canCreateSupportMaterial' => $this->teacherMaterialUi($session),
+            'supportMaterialCategories' => $this->teacherMaterialUi($session) ? (new SupportMaterialModel())->categories() : [],
+            'supportMaterialTypes' => $this->teacherMaterialUi($session) ? (new SupportMaterialModel())->materialTypeCatalog() : [],
+            'supportMaterialManageFileEndpoint' => $this->teacherMaterialUi($session) ? route('support-material-manage-file') : '',
+            'supportMaterialManageSaveEndpoint' => $this->teacherMaterialUi($session) ? route('support-material-manage-save') : '',
+            'supportMaterialCsrf' => $this->teacherMaterialUi($session) ? $session->csrfToken('admin_repository') : '',
         ]);
+    }
+
+    private function teacherMaterialUi(AuthSessionService $session): bool
+    {
+        return !$session->hasAdminAccess() && (new SupportMaterialCapabilityService())->canCreate($session);
     }
 
     public function detail(): void

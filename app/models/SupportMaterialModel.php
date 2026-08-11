@@ -26,6 +26,18 @@ final class SupportMaterialModel
         return $this->listing('published');
     }
 
+    public function getForTeacherManagement(int $teacherId): array
+    {
+        if ($teacherId < 1) return $this->getAll();
+        $statement = Database::connection()->prepare(
+            $this->baseQuery() . " WHERE sm.deleted_at IS NULL AND sm.purged_at IS NULL
+             AND (sm.status='published' OR (sm.status='draft' AND sm.created_by=:teacher))
+             ORDER BY sm.publication_date DESC,sm.id DESC"
+        );
+        $statement->execute(['teacher' => $teacherId]);
+        return array_map([$this, 'hydrate'], $statement->fetchAll());
+    }
+
     public function getWithdrawn(): array
     {
         $materials = $this->listing('withdrawn');
@@ -394,8 +406,8 @@ final class SupportMaterialModel
         $publicationDate = null;
         $keywords = [];
 
-        if ($title === '' || mb_strlen($title) > 220) {
-            throw new InvalidArgumentException('Ingresa un título válido de hasta 220 caracteres.');
+        if ($title === '' || mb_strlen($title) > 220 || count(array_filter(preg_split('/\s+/u', $title) ?: [])) < 3) {
+            throw new InvalidArgumentException('Ingresa un título válido de hasta 220 caracteres y al menos tres palabras.');
         }
         if ($type === '' || mb_strlen($type) > 100) {
             throw new InvalidArgumentException('Ingresa un tipo de material válido.');

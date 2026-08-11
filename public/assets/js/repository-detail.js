@@ -486,6 +486,7 @@ repositoryDetailFavorite?.addEventListener("click", async () => {
 
 // Inicio de interacciones visuales neutrales del Expediente Digital
 const digitalRecord = document.querySelector("[data-digital-record]");
+const canPermanentlyDeleteFiles = digitalRecord?.dataset.canPurgeFiles === "true";
 const digitalRecordMenu = digitalRecord?.querySelector("[data-record-menu]");
 const digitalRecordMenuTrigger = digitalRecordMenu?.querySelector("[data-record-menu-trigger]");
 const digitalRecordMenuPanel = digitalRecordMenu?.querySelector("[data-record-menu-panel]");
@@ -3767,6 +3768,8 @@ document.addEventListener("click", (event) => {
 const fileRemoveDialog = document.querySelector("[data-file-remove-dialog]");
 if (fileRemoveDialog && fileRemoveDialog.parentElement !== document.body) document.body.append(fileRemoveDialog);
 const fileRemoveConfig = fileRemoveDialog?.querySelector("[data-file-remove-config]");
+const isTeacherManagingSupportMaterial = digitalRecord?.dataset.entityType === "support_material"
+    && !canPermanentlyDeleteFiles && Boolean(fileRemoveConfig?.dataset.endpoint);
 const fileRestoreHours = Number(fileRemoveConfig?.dataset.restoreHours || 24);
 const fileRemoveTitle = fileRemoveDialog?.querySelector("[data-file-remove-title]");
 const fileRemoveDescription = fileRemoveDialog?.querySelector("[data-file-remove-description]");
@@ -3967,6 +3970,16 @@ function openPresentationConfirmDialog(target, origin) {
         presentationConfirmDescription.textContent = "Este archivo se mostrará automáticamente cuando una persona ingrese al Expediente Digital. Esta elección no cambia la importancia de los demás archivos.";
         presentationConfirmSubmit.textContent = "Establecer como presentación";
         if (presentationHistoryNote) presentationHistoryNote.textContent = "La selección de este archivo como presentación quedará registrada en el historial del expediente y podrá reflejarse en los reportes administrativos.";
+    }
+    if (isTeacherManagingSupportMaterial && presentationHistoryNote) {
+        presentationHistoryNote.textContent = "Esta acción quedará registrada en la auditoría del sistema.";
+    }
+    if (isTeacherManagingSupportMaterial && presentationConfirmDescription) {
+        presentationConfirmDescription.textContent = presentationConfirmMode === "remove"
+            ? "El material dejará de mostrar automáticamente un archivo al ingresar. Los documentos continuarán disponibles y podrán abrirse manualmente desde la lista."
+            : (presentationConfirmMode === "change"
+                ? "Este archivo reemplazará al archivo de presentación actual como vista inicial del material. El archivo anterior permanecerá disponible dentro de ‘Archivos del material’."
+                : "Este archivo se mostrará automáticamente cuando una persona ingrese al material. Esta elección no cambia la importancia de los demás archivos.");
     }
     const showChange = presentationConfirmMode === "change";
     presentationEstablishDetails.hidden = showChange;
@@ -4267,14 +4280,17 @@ function renderRestorableFiles() {
         const visual = getNeutralFileVisualType(file.extension);
         const item = document.createElement("article");
         item.className = "ed-file-restore-item";
+        item.classList.toggle("without-purge", !canPermanentlyDeleteFiles);
         item.dataset.restoreFileId = String(file.id);
-        const checkbox = document.createElement("input");
+        const checkbox = canPermanentlyDeleteFiles ? document.createElement("input") : null;
+        if (checkbox) {
         checkbox.type = "checkbox";
         checkbox.className = "ed-file-restore-select";
         checkbox.dataset.filePurgeSelect = "";
         checkbox.value = String(file.id);
         checkbox.checked = selectedRestorableFileIds.has(String(file.id));
         checkbox.setAttribute("aria-label", `Seleccionar ${file.name} para eliminación definitiva`);
+        }
         const icon = document.createElement("i");
         icon.className = `fa-solid ${visual.icon}`;
         icon.setAttribute("aria-hidden", "true");
@@ -4294,7 +4310,8 @@ function renderRestorableFiles() {
         restore.type = "button";
         restore.dataset.fileRestoreInspect = "";
         restore.textContent = "Restaurar";
-        item.append(checkbox, icon, details, restore);
+        if (checkbox) item.append(checkbox);
+        item.append(icon, details, restore);
         fileRestoreList.append(item);
     });
     if (fileRestoreEmpty) fileRestoreEmpty.hidden = restorableFiles.length > 0;
@@ -4349,7 +4366,7 @@ function showRestoreList() {
     if (fileRestoreList) fileRestoreList.hidden = false;
     if (fileRestoreEmpty) fileRestoreEmpty.hidden = restorableFiles.length > 0;
     if (fileRestoreBack) fileRestoreBack.hidden = true;
-    if (filePurgeOpen) {
+    if (canPermanentlyDeleteFiles && filePurgeOpen) {
         filePurgeOpen.hidden = false;
         filePurgeOpen.disabled = selectedRestorableFileIds.size === 0;
     }
@@ -4439,7 +4456,7 @@ async function inspectFileRestore(fileId) {
         fileRestoreFinal.closest("[data-file-restore-final-row]").hidden = !inspection.conflict;
         fileRestoreFinal.textContent = inspection.final_name || inspection.original_name || "Archivo";
         fileRestoreBack.hidden = false;
-        filePurgeOpen.hidden = true;
+        if (filePurgeOpen) filePurgeOpen.hidden = true;
         fileRestoreCancel.textContent = "Cancelar";
         fileRestoreConfirm.hidden = false;
         fileRestoreConfirm.textContent = "Restaurar archivo";
@@ -4810,6 +4827,12 @@ function openFileRemoveDialogForTargets(items, origin, bulk = false) {
             fileRemoveReplacementSelect.replaceChildren();
             fileRemoveReplacement.hidden = true;
         }
+    }
+    if (isTeacherManagingSupportMaterial) {
+        if (fileRemoveHistoryNote) fileRemoveHistoryNote.textContent = "Esta acción quedará registrada en la auditoría del sistema.";
+        if (fileRemoveDescription) fileRemoveDescription.textContent = multiple
+            ? "Los archivos dejarán de estar disponibles en el material, pero permanecerán almacenados. Para restaurarlos o eliminarlos definitivamente, comunícate con el administrador."
+            : "El archivo dejará de estar disponible en el material, pero permanecerá almacenado. Para restaurarlo o eliminarlo definitivamente, comunícate con el administrador.";
     }
     if (fileRemoveName) {
         fileRemoveName.textContent = bulk ? "" : names[0];

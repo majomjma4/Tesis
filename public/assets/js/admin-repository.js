@@ -725,7 +725,7 @@
                 : `Mostrando ${from}-${to} de ${total}`;
         }
         if (!controls?.pagination || !controls.pages) return;
-        controls.pagination.hidden = total <= 10;
+        controls.pagination.hidden = total <= state.size;
         controls.pages.replaceChildren();
         if (total <= 10) return;
 
