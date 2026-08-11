@@ -1,0 +1,25 @@
+<?php
+declare(strict_types=1);
+$projects = (array) ($thesisProjects ?? []); $hasProjects = $projects !== [];
+$summary = (array) ($thesisSummary ?? []); $periods = (array) ($thesisPeriods ?? []);
+$statusLabels=['approved'=>'Aprobado','defense'=>'En defensa','tribunal_approved'=>'Aprobado por el Tribunal'];
+$summaryCards=[['key'=>'pending_tribunal','title'=>'Pendientes de Tribunal','copy'=>'Aprobados académicamente sin tribunal asignado'],['key'=>'tribunal_assigned','title'=>'Tribunal asignado','copy'=>'Pendientes de continuar hacia defensa'],['key'=>'defense','title'=>'En defensa','copy'=>'Proceso de evaluación en curso'],['key'=>'pending_publication','title'=>'Pendientes de publicación','copy'=>'Aprobados por Tribunal']];
+?>
+<div class="assigned-projects-page__content"><section class="tm-page" id="thesisManagementPage">
+ <header class="tm-hero"><p>GESTIÓN ACADÉMICA</p><h1>Gestión de Titulación</h1><span>Administra los procesos de titulación que requieren conformación y seguimiento de tribunal.</span></header>
+ <?php if (!$hasProjects): ?><section class="tm-empty"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><h2>No hay procesos de titulación pendientes.</h2><p>Los proyectos aparecerán aquí cuando completen la revisión académica y avancen al proceso de Tribunal.</p></section>
+ <?php else: ?>
+ <section class="tm-summary" aria-label="Resumen de procesos"><?php foreach($summaryCards as $card): ?><button type="button" class="tm-summary-card is-<?=e($card['key'])?>" data-tm-quick-filter="<?=e($card['key'])?>"><strong><?= (int)($summary[$card['key']]??0) ?></strong><span><?=e($card['title'])?></span><small><?=e($card['copy'])?></small></button><?php endforeach; ?></section>
+ <section class="tm-catalog"><div class="tm-toolbar"><label class="tm-search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" data-tm-search placeholder="Buscar por código, título o estudiante…" autocomplete="off"></label>
+  <?php if(count($periods)===1): $period=$periods[0]; ?><div class="ar-fixed-filter"><i class="fa-regular fa-calendar" aria-hidden="true"></i><span><?=e((string)$period['name'])?></span></div><?php elseif(count($periods)>1): ?><label><span class="sr-only">Período académico</span><select data-tm-period><option value="">Todos los períodos</option><?php foreach($periods as $period): ?><option value="<?= (int)$period['id'] ?>"><?=e((string)$period['name'])?></option><?php endforeach;?></select></label><?php endif; ?>
+  <label><span class="sr-only">Situación</span><select data-tm-situation><option value="">Todas las situaciones</option><option value="pending_tribunal">Pendiente de Tribunal</option><option value="tribunal_assigned">Tribunal asignado</option><option value="defense">En defensa</option><option value="pending_publication">Pendiente de publicación</option></select></label></div>
+  <div class="tm-result-count" data-tm-count><?=count($projects)?> resultados visibles</div><div class="tm-list" data-tm-list>
+  <?php foreach($projects as $project): $s=(array)$project['situation']; $url=route('project-detail').'&id='.(int)$project['id']; ?>
+   <article class="tm-project" data-tm-item data-period="<?= (int)$project['period_id'] ?>" data-situation="<?=e((string)$s['key'])?>" data-search="<?=e(implode(' ',[(string)$project['code'],(string)$project['title'],(string)$project['students_label']]))?>">
+    <div class="tm-project-main"><div class="tm-project-top"><strong data-tm-highlight="code"><?=e((string)$project['code'])?></strong><span class="tm-situation is-<?=e((string)$s['key'])?>"><i class="fa-solid fa-circle" aria-hidden="true"></i><?=e((string)$s['label'])?></span></div><h2 data-tm-highlight="title"><?=e((string)$project['title'])?></h2><dl><div><dt>Estudiante(s)</dt><dd data-tm-highlight="students"><?=e((string)$project['students_label'])?></dd></div><div><dt>Tutor</dt><dd><?=e((string)$project['tutor_label'])?></dd></div><div><dt>Estado académico</dt><dd><span class="assigned-status is-<?=e((string)$project['status'])?>"><?=e($statusLabels[(string)$project['status']]??(string)$project['status'])?></span></dd></div><div><dt>Tribunal</dt><dd><?=e((string)$project['tribunal_label'])?></dd></div><div><dt>Período</dt><dd><?=e((string)$project['period_name'])?></dd></div></dl></div>
+     <div class="tm-project-actions"><a class="tm-primary-action" href="<?=e($url)?>"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i><?=e((string)$s['action'])?></a><a class="tm-link" href="<?=e($url)?>">Ver proyecto</a></div>
+   </article>
+  <?php endforeach; ?></div><section class="tm-filter-empty" data-tm-filter-empty hidden><h2>No se encontraron procesos con los filtros seleccionados.</h2></section>
+  <footer class="ar-pagination" data-tm-pagination hidden><span data-tm-summary>Mostrando 0 de 0</span><label>Mostrar <select data-tm-size><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="75">75</option><option value="100">100</option></select></label><nav data-tm-pages aria-label="Paginación de Titulación"></nav></footer>
+ </section><?php endif; ?>
+</section></div>

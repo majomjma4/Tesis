@@ -81,6 +81,7 @@ match ($page) {
     'calendar-events' => (new CalendarController())->events(),
     'projects', 'proyectos', 'mis-proyectos' => (new ProjectsController())->index(),
     'assigned-projects' => (new ProjectsController())->assigned(),
+    'thesis-management' => (new ProjectsController())->thesisManagement(),
     'project-detail', 'detalle-proyecto' => (new ProjectsController())->detail(),
     'project-academic-history-events' => (new ProjectsController())->academicHistoryEvents(),
     'project-file-preview' => (new ProjectsController())->filePreview(),

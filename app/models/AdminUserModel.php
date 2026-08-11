@@ -24,7 +24,7 @@ final class AdminUserModel
         elseif(in_array($filters['role']??'',['student','teacher'],true)){$where[]='r.code=:role';$params['role']=$filters['role'];}
         if(in_array($filters['status']??'',self::STATUSES,true)){$where[]='u.status=:status';$params['status']=$filters['status'];}
         $from=" FROM users u INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id LEFT JOIN student_profiles sp ON sp.user_id=u.id LEFT JOIN student_enrollments se ON se.student_id=u.id AND se.status='active' LEFT JOIN teacher_profiles tp ON tp.user_id=u.id".($where?' WHERE '.implode(' AND ',$where):'');
-        $sql="SELECT u.id,u.username,u.full_name,u.email,u.status,u.must_change_password,u.last_login_at,u.created_at,u.is_admin,u.is_initial_admin,r.code role_code,COALESCE(sp.institutional_code,tp.institutional_code,'') institutional_code,sp.career_id,se.academic_period_id,se.semester,tp.academic_title,tp.can_tutor".$from.' ORDER BY u.created_at DESC,u.full_name';
+        $sql="SELECT u.id,u.username,u.full_name,u.email,u.status,u.must_change_password,u.last_login_at,u.created_at,u.is_admin,u.is_initial_admin,r.code role_code,COALESCE(sp.institutional_code,tp.institutional_code,'') institutional_code,sp.career_id,se.academic_period_id,se.semester,tp.academic_title,tp.can_tutor,tp.can_manage_thesis".$from.' ORDER BY u.created_at DESC,u.full_name';
         return PaginationService::run(Database::connection(),'SELECT COUNT(DISTINCT u.id)'.$from,$sql,$params,$pagination?:PaginationService::request());
     }
 
@@ -47,9 +47,9 @@ final class AdminUserModel
         $data=$this->withInstitutionalDefaults($data);$this->validate($data,$id);
         $temporary=$this->temporaryPolicy();
         return Database::transaction(function(PDO $db)use($data,$id,$actorId,$temporary):array{
-            $previousRole=null;$previousAdmin=false;$initialAdmin=false;
+            $previous=[];$previousRole=null;$previousAdmin=false;$initialAdmin=false;
             if($id>0){
-                $read=$db->prepare("SELECT u.*,r.code role_code FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id WHERE u.id=:id LIMIT 1 FOR UPDATE");
+                $read=$db->prepare("SELECT u.*,r.code role_code,tp.can_manage_thesis FROM users u JOIN user_roles ur ON ur.user_id=u.id JOIN roles r ON r.id=ur.role_id LEFT JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.id=:id LIMIT 1 FOR UPDATE");
                 $read->execute(['id'=>$id]);$previous=$read->fetch();
                 if(!$previous)throw new InvalidArgumentException('El usuario ya no existe.');
                 $previousRole=(string)$previous['role_code'];$previousAdmin=(bool)$previous['is_admin'];$initialAdmin=(bool)$previous['is_initial_admin'];
@@ -76,11 +76,13 @@ final class AdminUserModel
                 $db->prepare('INSERT INTO student_profiles(user_id,institutional_code,career_id) VALUES(:id,:code,:career)')->execute(['id'=>$userId,'code'=>$data['institutional_code'],'career'=>$data['career_id']]);
                 $db->prepare("INSERT INTO student_enrollments(student_id,academic_period_id,career_id,semester,status) VALUES(:id,:period,:career,:semester,'active')")->execute(['id'=>$userId,'period'=>$data['academic_period_id'],'career'=>$data['career_id'],'semester'=>$data['semester']]);
             }elseif($data['role']==='teacher'){
-                $db->prepare('INSERT INTO teacher_profiles(user_id,institutional_code,academic_title,can_tutor) VALUES(:id,:code,:title,:tutor)')->execute(['id'=>$userId,'code'=>$data['institutional_code'],'title'=>$data['academic_title']?:null,'tutor'=>$data['can_tutor']]);
+                $db->prepare('INSERT INTO teacher_profiles(user_id,institutional_code,academic_title,can_tutor,can_manage_thesis) VALUES(:id,:code,:title,:tutor,:thesis)')->execute(['id'=>$userId,'code'=>$data['institutional_code'],'title'=>$data['academic_title']?:null,'tutor'=>$data['can_tutor'],'thesis'=>$data['can_manage_thesis']]);
             }
             $this->audit($db,$actorId,$action,$userId,['role'=>$data['role'],'status'=>$data['status']]);
             if($previousRole!==null&&$previousRole!==$data['role'])$this->audit($db,$actorId,'user_role_changed',$userId,['from'=>$previousRole,'to'=>$data['role']]);
             if($previousAdmin!==((bool)$data['is_admin']))$this->audit($db,$actorId,$data['is_admin']?'admin_access_granted':'admin_access_revoked',$userId,['role'=>$data['role']]);
+            $previousThesis=(int)($previous['can_manage_thesis']??0);
+            if($previousThesis!==$data['can_manage_thesis'])$this->audit($db,$actorId,$data['can_manage_thesis']?'thesis_management_granted':'thesis_management_revoked',$userId,['role'=>$data['role'],'can_manage_thesis'=>$data['can_manage_thesis']]);
             if($initialAdmin&&$data['status']!=='active')$this->audit($db,$actorId,'initial_admin_deactivated',$userId,['status'=>$data['status']]);
             return ['id'=>$userId];
         });
@@ -146,7 +148,7 @@ final class AdminUserModel
             $userRole=$db->prepare('INSERT INTO user_roles(user_id,role_id) VALUES(:user,:role)');
             $student=$db->prepare('INSERT INTO student_profiles(user_id,institutional_code,career_id) VALUES(:id,:code,:career)');
             $enrollment=$db->prepare("INSERT INTO student_enrollments(student_id,academic_period_id,career_id,semester,status) VALUES(:id,:period,:career,:semester,'active')");
-            $teacher=$db->prepare('INSERT INTO teacher_profiles(user_id,institutional_code,academic_title,can_tutor) VALUES(:id,:code,:title,:tutor)');
+            $teacher=$db->prepare('INSERT INTO teacher_profiles(user_id,institutional_code,academic_title,can_tutor,can_manage_thesis) VALUES(:id,:code,:title,:tutor,0)');
             $hash=password_hash($temporary['password'],PASSWORD_DEFAULT);
             foreach($preview['rows'] as $row){
                 $userInsert->execute(['email'=>$row['email'],'username'=>$row['username']?:null,'hash'=>$hash,'force'=>$temporary['force_change']?1:0,'name'=>$row['name']]);$id=(int)$db->lastInsertId();
@@ -195,7 +197,7 @@ final class AdminUserModel
     {
         $catalogs=$this->catalogs();
         if(!$catalogs['career']||!$catalogs['period'])throw new InvalidArgumentException('Configura la carrera Desarrollo de Software y un periodo académico activo antes de continuar.');
-        $data['career_id']=(int)$catalogs['career']['id'];$data['academic_period_id']=(int)$catalogs['period']['id'];$data['period_name']=(string)$catalogs['period']['name'];$data['is_admin']=!empty($data['is_admin'])?1:0;
+        $data['career_id']=(int)$catalogs['career']['id'];$data['academic_period_id']=(int)$catalogs['period']['id'];$data['period_name']=(string)$catalogs['period']['name'];$data['is_admin']=!empty($data['is_admin'])?1:0;$data['can_manage_thesis']=$data['role']==='teacher'&&!empty($data['can_manage_thesis'])?1:0;
         return $data;
     }
 
@@ -219,6 +221,8 @@ final class AdminUserModel
             'admin_access_granted'=>'Asignó acceso administrativo a '.$element,
             'admin_access_revoked'=>'Retiró el acceso administrativo de '.$element,
             'admin_access_reactivated'=>'Reactivó una cuenta con acceso administrativo: '.$element,
+            'thesis_management_granted'=>'Asignó Gestión de Titulación a '.$element,
+            'thesis_management_revoked'=>'Retiró Gestión de Titulación a '.$element,
             'initial_admin_deactivated'=>'Desactivó la cuenta administrativa inicial '.$element,
             'user_status_changed'=>($status==='blocked'?'Bloqueó':($status==='active'?'Desbloqueó':'Cambió el estado de')).' '.$element,
             'users_bulk_imported'=>'Creó '.(int)($details['count']??0).' usuarios mediante importación',

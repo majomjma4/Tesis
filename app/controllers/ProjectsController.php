@@ -44,6 +44,28 @@ final class ProjectsController
         ]);
     }
 
+    /** Pantalla base para el cargo especial de Gestión de Titulación. */
+    public function thesisManagement(): void
+    {
+        $thesisCapabilities = (new TeacherThesisCapabilityService())->capabilitiesForCurrentUser();
+        if (empty($thesisCapabilities['manage_thesis_process'])) {
+            (new AccountController())->forbidden();
+            return;
+        }
+        $listing = (new ThesisManagementService())->listing();
+
+        View::render('projects/thesis-management', [
+            'currentPage' => 'thesis-management',
+            'title' => 'Gestión de Titulación | Gestión Documental Académica',
+            'bodyClass' => 'assigned-projects-page',
+            'pageStyles' => [asset('css/repository-reader.css'), asset('css/assigned-projects.css'), asset('css/thesis-management.css')],
+            'pageScript' => asset('js/thesis-management.js'),
+            'thesisProjects' => $listing['projects'],
+            'thesisPeriods' => $listing['periods'],
+            'thesisSummary' => $listing['summary'],
+        ]);
+    }
+
     /**
      * Renderiza la pantalla principal de "Mis proyectos".
      */

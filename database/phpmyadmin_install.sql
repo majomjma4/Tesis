@@ -131,6 +131,8 @@ CREATE TABLE teacher_profiles (
   institutional_code VARCHAR(50) NOT NULL UNIQUE,
   academic_title VARCHAR(120) NULL,
   can_tutor TINYINT(1) NOT NULL DEFAULT 1,
+  can_manage_thesis TINYINT(1) NOT NULL DEFAULT 0,
+  KEY idx_teacher_profiles_manage_thesis (can_manage_thesis),
   CONSTRAINT fk_teacher_profile_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -1192,7 +1192,7 @@ final class AdminController
 
     private function userPayload(): array
     {
-        return ['full_name'=>trim((string)($_POST['full_name']??'')),'email'=>mb_strtolower(trim((string)($_POST['email']??''))),'username'=>trim((string)($_POST['username']??'')),'role'=>(string)($_POST['role']??''),'status'=>(string)($_POST['status']??'active'),'institutional_code'=>trim((string)($_POST['institutional_code']??'')),'career_id'=>(int)($_POST['career_id']??0),'academic_period_id'=>(int)($_POST['academic_period_id']??0),'semester'=>(int)($_POST['semester']??0),'academic_title'=>trim((string)($_POST['academic_title']??'')),'can_tutor'=>isset($_POST['can_tutor'])?1:0,'is_admin'=>isset($_POST['is_admin'])?1:0];
+        return ['full_name'=>trim((string)($_POST['full_name']??'')),'email'=>mb_strtolower(trim((string)($_POST['email']??''))),'username'=>trim((string)($_POST['username']??'')),'role'=>(string)($_POST['role']??''),'status'=>(string)($_POST['status']??'active'),'institutional_code'=>trim((string)($_POST['institutional_code']??'')),'career_id'=>(int)($_POST['career_id']??0),'academic_period_id'=>(int)($_POST['academic_period_id']??0),'semester'=>(int)($_POST['semester']??0),'academic_title'=>trim((string)($_POST['academic_title']??'')),'can_tutor'=>isset($_POST['can_tutor'])?1:0,'can_manage_thesis'=>isset($_POST['can_manage_thesis'])?1:0,'is_admin'=>isset($_POST['is_admin'])?1:0];
     }
     private function normalizeAuditText(mixed $value,bool $multiline=false):string
     {

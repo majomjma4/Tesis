@@ -69,6 +69,13 @@
                         <span class="menu-icon"><i class="fa-solid fa-clipboard-user"></i></span>
                         <span>Proyectos asignados</span>
                     </a>
+                    <?php if (!empty((new TeacherThesisCapabilityService())->capabilitiesForCurrentUser()['manage_thesis_process'])): ?>
+                        <a href="<?= e(route('thesis-management')) ?>"
+                            class="menu-item <?= ($currentPage ?? '') === 'thesis-management' ? 'active' : '' ?>">
+                            <span class="menu-icon"><i class="fa-solid fa-scale-balanced"></i></span>
+                            <span>Gestión de Titulación</span>
+                        </a>
+                    <?php endif; ?>
                 <?php endif; ?>
                 <?php if ($isAdministratorLayout): ?>
                     <a href="<?= e(route('admin-users')) ?>"

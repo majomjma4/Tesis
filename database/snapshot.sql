@@ -1335,8 +1335,10 @@ CREATE TABLE `teacher_profiles` (
   `institutional_code` varchar(50) NOT NULL,
   `academic_title` varchar(120) DEFAULT NULL,
   `can_tutor` tinyint(1) NOT NULL DEFAULT 1,
+  `can_manage_thesis` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `institutional_code` (`institutional_code`),
+  KEY `idx_teacher_profiles_manage_thesis` (`can_manage_thesis`),
   CONSTRAINT `fk_teacher_profile_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1347,7 +1349,7 @@ CREATE TABLE `teacher_profiles` (
 
 LOCK TABLES `teacher_profiles` WRITE;
 /*!40000 ALTER TABLE `teacher_profiles` DISABLE KEYS */;
-INSERT INTO `teacher_profiles` VALUES (26,'0202053801','Msc. (por confirmar)',1),(27,'0202053802','Msc. (por confirmar)',1),(28,'0202053803','Lic. (por confirmar)',1),(69,'0202053804','Msc. (por confirmar)',1),(70,'0202053805','Abg. (por confirmar)',1),(71,'0202053806','Msc. (por confirmar)',1);
+INSERT INTO `teacher_profiles` VALUES (26,'0202053801','Msc. (por confirmar)',1,0),(27,'0202053802','Msc. (por confirmar)',1,0),(28,'0202053803','Lic. (por confirmar)',1,0),(69,'0202053804','Msc. (por confirmar)',1,0),(70,'0202053805','Abg. (por confirmar)',1,0),(71,'0202053806','Msc. (por confirmar)',1,0);
 /*!40000 ALTER TABLE `teacher_profiles` ENABLE KEYS */;
 UNLOCK TABLES;
 
