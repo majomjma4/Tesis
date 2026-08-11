@@ -64,7 +64,7 @@ final class ProjectsController
             'thesisProjects' => $listing['projects'],
             'thesisPeriods' => $listing['periods'],
             'thesisSummary' => $listing['summary'],
-            'thesisTribunalConfig' => ['candidates'=>route('thesis-tribunal-candidates'),'save'=>route('thesis-tribunal-save'),'defense'=>route('thesis-send-to-defense'),'defenseInfo'=>route('thesis-defense-information-save'),'resultSave'=>route('thesis-tribunal-result-save'),'publish'=>route('thesis-publish'),'csrf'=>$session->csrfToken('thesis_management')],
+            'thesisTribunalConfig' => ['candidates'=>route('thesis-tribunal-candidates'),'save'=>route('thesis-tribunal-save'),'defenseInfo'=>route('thesis-defense-information-save'),'resultSave'=>route('thesis-tribunal-result-save'),'publish'=>route('thesis-publish'),'csrf'=>$session->csrfToken('thesis_management')],
         ]);
     }
 
@@ -79,15 +79,7 @@ final class ProjectsController
         if (($_SERVER['REQUEST_METHOD']??'GET')!=='POST') { http_response_code(405); $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]); }
         $session=new AuthSessionService();if(!(new TeacherThesisCapabilityService())->canManageCurrentUser()){http_response_code(403);$this->json(['success'=>false,'message'=>'No tienes autorización para gestionar Tribunal.','data'=>[]]);}
         if(!$session->validateCsrf('thesis_management',(string)($_POST['_csrf']??''))){http_response_code(419);$this->json(['success'=>false,'message'=>'La sesión del formulario venció.','data'=>[]]);}
-        try{$result=(new ThesisTribunalService())->save((int)($_POST['project_id']??0),(string)($_POST['expected_status']??''),(array)($_POST['member_ids']??[]),(string)($_POST['reason']??''),(int)$session->userId());$this->json(['success'=>true,'message'=>'Tribunal actualizado correctamente.','data'=>$result]);}catch(ThesisTribunalException $e){http_response_code($e->httpStatus());$this->json(['success'=>false,'message'=>$e->getMessage(),'data'=>[]]);}catch(Throwable $e){error_log('Thesis tribunal: '.$e->getMessage());http_response_code(500);$this->json(['success'=>false,'message'=>'No fue posible actualizar el Tribunal.','data'=>[]]);}
-    }
-
-    public function sendThesisToDefense(): void
-    {
-        if (($_SERVER['REQUEST_METHOD']??'GET')!=='POST') { http_response_code(405); $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]); }
-        $session=new AuthSessionService();if(!(new TeacherThesisCapabilityService())->canManageCurrentUser()){http_response_code(403);$this->json(['success'=>false,'message'=>'No tienes autorización para iniciar la defensa.','data'=>[]]);}
-        if(!$session->validateCsrf('thesis_management',(string)($_POST['_csrf']??''))){http_response_code(419);$this->json(['success'=>false,'message'=>'La sesión del formulario venció.','data'=>[]]);}
-        try{$result=(new ProjectStatusTransitionService())->transition((int)($_POST['project_id']??0),(string)($_POST['expected_status']??''),'defense','',(int)$session->userId(),'thesis_management');$this->json(['success'=>true,'message'=>'Proyecto enviado a Tribunal correctamente.','data'=>$result]);}catch(ProjectStatusTransitionException $e){http_response_code($e->httpStatus());$this->json(['success'=>false,'message'=>$e->getMessage(),'data'=>[]]);}catch(Throwable $e){error_log('Thesis defense: '.$e->getMessage());http_response_code(500);$this->json(['success'=>false,'message'=>'No fue posible iniciar la etapa de defensa.','data'=>[]]);}
+        try{$result=(new ThesisTribunalService())->save((int)($_POST['project_id']??0),(string)($_POST['expected_status']??''),(array)($_POST['member_ids']??[]),(string)($_POST['reason']??''),(int)$session->userId());$message=($result['status']??'')==='defense'&&(string)($_POST['expected_status']??'')==='approved'?'Tribunal conformado correctamente. El proyecto avanzó a la etapa de defensa.':'Tribunal actualizado correctamente.';$this->json(['success'=>true,'message'=>$message,'data'=>$result]);}catch(ThesisTribunalException|ProjectStatusTransitionException $e){http_response_code($e->httpStatus());$this->json(['success'=>false,'message'=>$e->getMessage(),'data'=>[]]);}catch(Throwable $e){error_log('Thesis tribunal: '.$e->getMessage());http_response_code(500);$this->json(['success'=>false,'message'=>'No fue posible actualizar el Tribunal.','data'=>[]]);}
     }
 
     public function saveThesisDefenseInformation(): void
@@ -99,6 +91,17 @@ final class ProjectsController
         try {$data=(new ThesisDefenseService())->save((int)($_POST['project_id']??0),$_POST,(int)$session->userId());$this->json(['success'=>true,'message'=>'Información de defensa guardada.','data'=>$data]);}
         catch(ThesisDefenseException $e){http_response_code($e->httpStatus());$this->json(['success'=>false,'message'=>$e->getMessage(),'data'=>[]]);}
         catch(Throwable $e){error_log('Defense info: '.$e->getMessage());http_response_code(500);$this->json(['success'=>false,'message'=>'No fue posible guardar la información de defensa.','data'=>[]]);}
+    }
+
+    public function startThesisDefenseAttempt(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') { http_response_code(405); $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]); return; }
+        $session = new AuthSessionService();
+        if (!(new TeacherThesisCapabilityService())->canManageCurrentUser()) { http_response_code(403); $this->json(['success'=>false,'message'=>'No tienes autorización para iniciar una nueva defensa.','data'=>[]]); return; }
+        if (!$session->validateCsrf('thesis_management',(string)($_POST['_csrf']??''))) { http_response_code(419); $this->json(['success'=>false,'message'=>'La sesión del formulario venció.','data'=>[]]); return; }
+        try {$data=(new ThesisDefenseService())->startNewAttempt((int)($_POST['project_id']??0),(string)($_POST['expected_status']??''),(int)$session->userId());$this->json(['success'=>true,'message'=>'Se habilitó un nuevo intento de defensa.','data'=>$data]);}
+        catch(ThesisDefenseException $e){http_response_code($e->httpStatus());$this->json(['success'=>false,'message'=>$e->getMessage(),'data'=>[]]);}
+        catch(Throwable $e){error_log('New defense attempt: '.$e->getMessage());http_response_code(500);$this->json(['success'=>false,'message'=>'No fue posible iniciar una nueva defensa.','data'=>[]]);}
     }
 
     public function saveThesisTribunalResult(): void

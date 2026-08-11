@@ -13,12 +13,13 @@ final class ThesisManagementService
         $db = Database::connection();
         $rows = $db->query(
             "SELECT p.id,p.code,p.title,p.status,p.updated_at,p.approved_at,p.created_at,
-                    ap.id period_id,ap.name period_name,u.full_name tutor_name,pd.defense_date,pd.defense_time,pd.location defense_location,pd.modality defense_modality,pd.result defense_result,pd.result_notes
+                    ap.id period_id,ap.name period_name,u.full_name tutor_name,pd.defense_date,pd.defense_time,pd.location defense_location,pd.modality defense_modality,pd.result defense_result,pd.result_notes,pd.attempt_number defense_attempt_number,(SELECT COUNT(*) FROM project_defenses pd3 WHERE pd3.project_id=p.id) defense_attempt_total
              FROM projects p
              INNER JOIN project_types pt ON pt.id=p.project_type_id AND pt.code='thesis'
              INNER JOIN academic_periods ap ON ap.id=p.academic_period_id
              LEFT JOIN users u ON u.id=p.tutor_id
              LEFT JOIN project_defenses pd ON pd.project_id=p.id
+               AND pd.attempt_number=(SELECT MAX(pd2.attempt_number) FROM project_defenses pd2 WHERE pd2.project_id=p.id)
              WHERE p.deleted_at IS NULL AND p.status IN ('approved','defense')
              ORDER BY p.updated_at DESC,p.id DESC"
         )->fetchAll();
