@@ -113,13 +113,25 @@ final class ProjectsController
             : null;
         $projectCapabilities = (new ProjectCapabilityService())->forCurrentUser($project, $projectContext);
         $adjustmentData = ['items' => [], 'summary' => ['has_pending_adjustments' => false, 'pending_count' => 0, 'latest' => null]];
-        if ($projectContext === 'academic' && $isStudentParticipant && !empty($projectCapabilities['view_adjustment_requests'])) {
+        if (!empty($projectCapabilities['view_adjustment_requests'])) {
             try {
-                $adjustmentData['summary'] = (new ProjectAdjustmentSituationService())->forProject((int) $project['id']);
+                $adjustmentData = (new ProjectAdjustmentRequestService())->listForProject(
+                    (int) $project['id'],
+                    (string) $project['status'],
+                    (int) $session->userId(),
+                    $projectContext
+                );
             } catch (ProjectAdjustmentRequestException $exception) {
                 error_log('Project adjustment UI: ' . $exception->getMessage());
             }
         }
+        $hasAdjustmentUi = (bool) array_filter([
+            $projectCapabilities['create_adjustment_request'] ?? false,
+            $projectCapabilities['view_adjustment_requests'] ?? false,
+            $projectCapabilities['respond_adjustment_request'] ?? false,
+            $projectCapabilities['address_adjustment_request'] ?? false,
+            $projectCapabilities['close_adjustment_request'] ?? false,
+        ]);
         $documentReview = null;
         if ($projectContext === 'academic_management' && (string)$project['status'] === 'development') {
             $documentReview = (new ProjectDocumentReviewService())->describeCurrentFiles((int)$project['id'], (array)$project['files']);
@@ -166,7 +178,7 @@ final class ProjectsController
             'pageScript' => asset('js/repository-detail.js'),
             'pageScripts' => array_values(array_filter([
                 $descriptionReminder ? asset('js/project-description.js') : null,
-                !empty($projectCapabilities['create_adjustment_request']) ? asset('js/project-adjustments.js') : null,
+                $hasAdjustmentUi ? asset('js/project-adjustments.js') : null,
                 $isAdministrator ? asset('js/admin-projects.js') : (!$isTeacher ? asset('js/student-project-workspace.js') : null),
                 $isAdministrator && $projectStatusTransitions !== [] ? asset('js/project-status-transition.js') : null,
             ])),

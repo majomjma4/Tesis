@@ -198,7 +198,7 @@ if ($project === null): ?>
     if ($publicContext && !empty($projectCapabilities['edit_information'])) {
         $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
     }
-    if ($isAcademicManagement && !empty($projectCapabilities['create_adjustment_request'])) $actions[]=['id'=>'adjustment','label'=>'Solicitar ajuste','kind'=>'secondary','icon'=>'fa-comment-dots','enabled'=>true,'url'=>'#projectAdjustmentDialog'];
+    if (!$publicContext && !empty($projectCapabilities['create_adjustment_request'])) $actions[]=['id'=>'adjustment','label'=>'Solicitar ajuste','kind'=>'secondary','icon'=>'fa-comment-dots','enabled'=>true,'url'=>'#projectAdjustmentDialog'];
     elseif (!$publicContext && !empty($projectCapabilities['register_delivery']) && $canDeliver) $actions[]=['id'=>'delivery','label'=>'Registrar entrega','kind'=>'primary','icon'=>'fa-upload','url'=>$detailUrl.'&tab=review','enabled'=>true];
     if (!$isAcademicManagement && empty($isTeacherContext) && !empty($projectCapabilities['download_files']) && !empty($headerPackage['available'])) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'],'enabled'=>true,'download'=>true];
     if($isAcademicManagement&&(string)$project['status']==='published')$actions[]=['id'=>'repository','label'=>'Ver en Repositorio','kind'=>'secondary','icon'=>'fa-book-open','url'=>route('repository-detail').'&id='.$projectId,'enabled'=>true];
@@ -417,7 +417,13 @@ if ($project === null): ?>
         .digital-record:is([data-record-context="academic_management"],[data-record-context="academic"]) .ed-information-column{grid-column:auto;gap:18px}
     }
     </style><?php endif;
-    if($isAcademicManagement) require __DIR__.'/_adjustment-requests.php';
+    if (!empty(array_filter([
+        $projectCapabilities['create_adjustment_request'] ?? false,
+        $projectCapabilities['view_adjustment_requests'] ?? false,
+        $projectCapabilities['respond_adjustment_request'] ?? false,
+        $projectCapabilities['address_adjustment_request'] ?? false,
+        $projectCapabilities['close_adjustment_request'] ?? false,
+    ]))) require __DIR__.'/_adjustment-requests.php';
     if(!empty($digitalRecord['status_transition']['enabled'])) require __DIR__.'/../repository/_project-status-transition-dialog.php';
     if($publicContext):?><style>@media(min-width:801px){.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr)}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-document-section[data-information-section="description"]{grid-column:1/-1}}</style><?php endif;
     if(!$publicContext&&!empty($descriptionReminder)) require __DIR__.'/_description-reminder.php';

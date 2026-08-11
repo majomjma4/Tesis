@@ -79,6 +79,8 @@ $isDevEnv = app_is_development();
         </div>
     </section>
 
+    <?php if (!empty($projectCapabilities['view_adjustment_requests'])) require __DIR__ . '/_adjustment-requests.php'; ?>
+
     <!-- 3. Línea Horizontal del Recorrido de Estados -->
     <section class="sw-timeline-card">
         <div class="sw-timeline-header">

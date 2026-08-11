@@ -100,7 +100,12 @@ final class ProjectCapabilityService
                 && in_array(strtolower((string) ($participant['role_code'] ?? '')), ['tutor','co_tutor','cotutor','co-tutor'], true)
             )) > 0;
         $capabilities['review_documents'] = $isTeacher && $assignedTutor;
-        if ($isTeacher && $assignedTutor) $capabilities['view_adjustment_requests'] = true;
+        // El seguimiento de Proyectos activos permite a cualquier Docente solicitar
+        // y consultar ajustes, sin concederle edición ni revisión formal.
+        if ($isTeacher) {
+            $capabilities['create_adjustment_request'] = true;
+            $capabilities['view_adjustment_requests'] = true;
+        }
         $isOwnerStudent = $isStudent && count(array_filter($participants, static fn (array $participant): bool =>
             (int) ($participant['user_id'] ?? 0) === $userId && strtolower((string) ($participant['role_code'] ?? '')) === 'student'
         )) > 0;
@@ -164,10 +169,10 @@ final class ProjectCapabilityService
         );
         $assignment->execute(['project'=>(int)$project['id'], 'user'=>$userId]);
         $projectRoles = array_map('strval', $assignment->fetchAll(PDO::FETCH_COLUMN));
-        $tutor = in_array('teacher', $roles, true) && ((int)($project['tutor_id'] ?? 0) === $userId
-            || array_intersect($projectRoles, ['tutor','co_tutor','cotutor','co-tutor']) !== []);
+        $teacher = in_array('teacher', $roles, true);
         $student = in_array('student', $roles, true) && in_array('student', $projectRoles, true);
-        if ($tutor || $student) $result['view_adjustment_requests'] = true;
+        if ($teacher || $student) $result['view_adjustment_requests'] = true;
+        if ($teacher) $result['create_adjustment_request'] = true;
         if ($student) {
             $result['respond_adjustment_request'] = true;
             $result['address_adjustment_request'] = true;
