@@ -4,6 +4,46 @@ declare(strict_types=1);
 
 final class ProjectsController
 {
+    /** Renderiza la maqueta visual de la bandeja docente de proyectos asignados. */
+    public function assigned(): void
+    {
+        $session = new AuthSessionService();
+        $access = new ProjectAccessService();
+        $isTeacher = !$session->hasAdminAccess() && in_array('teacher', $access->currentRoles(), true);
+        if (!$isTeacher) {
+            (new AccountController())->forbidden();
+            return;
+        }
+
+        $assigned = (new TeacherAssignedProjectService())->forTeacher($access->currentUserId());
+        $packages = new ProjectRepositoryPackageService();
+        foreach ($assigned['projects'] as &$project) {
+            $project['package'] = ['available'=>false,'download_url'=>'','file_count'=>0,'size'=>''];
+            if (empty((new ProjectCapabilityService())->forProjectId((int)$project['id'], 'academic')['download_files'])) continue;
+            try {
+                $project['package'] = $packages->prepareAcademic(
+                    (int)$project['id'],
+                    route('project-package-download') . '&id=' . (int)$project['id']
+                );
+            } catch (Throwable $error) {
+                error_log('Assigned project package: ' . $error->getMessage());
+            }
+        }
+        unset($project);
+
+        View::render('projects/assigned', [
+            'currentPage' => 'assigned-projects',
+            'title' => 'Proyectos asignados | Gestión Documental Académica',
+            'bodyClass' => 'assigned-projects-page',
+            'pageStyles' => [asset('css/repository-reader.css'), asset('css/assigned-projects.css')],
+            'pageScript' => asset('js/assigned-projects.js'),
+            'assignedProjects' => $assigned['projects'],
+            'assignedProjectTypes' => $assigned['types'],
+            'assignedProjectPeriods' => $assigned['periods'],
+            'assignedProjectRelations' => $assigned['relations'],
+        ]);
+    }
+
     /**
      * Renderiza la pantalla principal de "Mis proyectos".
      */

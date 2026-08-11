@@ -61,8 +61,15 @@
                 <a href="<?= e(route('projects')) ?>"
                     class="menu-item <?= ($currentPage ?? '') === 'projects' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-folder-open"></i></span>
-                    <span><?= $isAdministratorLayout ? 'Proyectos activos' : 'Proyectos' ?></span>
+                    <span><?= ($isAdministratorLayout || in_array('teacher', (array) ($layoutUserRoles ?? []), true)) ? 'Proyectos activos' : 'Proyectos' ?></span>
                 </a>
+                <?php if (!$isAdministratorLayout && in_array('teacher', (array) ($layoutUserRoles ?? []), true)): ?>
+                    <a href="<?= e(route('assigned-projects')) ?>"
+                        class="menu-item <?= ($currentPage ?? '') === 'assigned-projects' ? 'active' : '' ?>">
+                        <span class="menu-icon"><i class="fa-solid fa-clipboard-user"></i></span>
+                        <span>Proyectos asignados</span>
+                    </a>
+                <?php endif; ?>
                 <?php if ($isAdministratorLayout): ?>
                     <a href="<?= e(route('admin-users')) ?>"
                         class="menu-item <?= ($currentPage ?? '') === 'admin-users' ? 'active' : '' ?>"><span
