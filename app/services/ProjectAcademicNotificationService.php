@@ -35,6 +35,14 @@ final class ProjectAcademicNotificationService
         $this->forStudents($db,$projectId,'status_change','Proyecto '.mb_strtolower($statusLabel),'El proyecto '.$this->label($code,$title).' alcanzó el estado “'.$statusLabel.'”.','project-final-status:'.$projectId.':'.$status.':'.$auditId,$metadata,'Ver proyecto');
     }
 
+    public function defenseStarted(PDO $db,int $projectId,string $code,string $title,int $actorId): void
+    {
+        $metadata=$this->metadata($code,$title,['transition'=>'defense']);
+        $this->forStudents($db,$projectId,'tribunal','Etapa de defensa iniciada','El proyecto '.$this->label($code,$title).' fue enviado a Tribunal para su defensa.','project-defense-started-students:'.$projectId,$metadata,'Ver proyecto');
+        $q=$db->prepare("INSERT IGNORE INTO notifications(user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key) SELECT DISTINCT pp.user_id,:project,'tribunal','Etapa de defensa iniciada',:message,:url,'Ver proyecto',:metadata,CONCAT('project-defense-started-member:',:project,':',pp.user_id) FROM project_participants pp JOIN users u ON u.id=pp.user_id WHERE pp.project_id=:participants AND LOWER(pp.role_code) IN ('tribunal','jury') AND pp.status='active' AND pp.removed_at IS NULL AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL");
+        $q->execute(['project'=>$projectId,'message'=>'El proyecto '.$this->label($code,$title).' inició la etapa de defensa.','url'=>route('project-detail').'&id='.$projectId,'metadata'=>json_encode($metadata,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),'participants'=>$projectId]);
+    }
+
     private function forStudents(PDO $db,int $projectId,string $type,string $title,string $message,string $dedup,array $metadata,string $actionLabel,string $tab='summary'): void
     {
         $q=$db->prepare("INSERT IGNORE INTO notifications(user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key) SELECT DISTINCT pp.user_id,:project,:type,:title,:message,:url,:label,:metadata,:dedup FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id WHERE pp.project_id=:participants AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL");

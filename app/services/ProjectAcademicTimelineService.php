@@ -169,7 +169,7 @@ SQL;
     private function reviewDescription(array $state): string
     { return sprintf('Documentos revisados: %d. Aprobados: %d. En revisión: %d. Con correcciones: %d. Observaciones creadas: %d.',(int)($state['reviewed_documents']??0),(int)($state['approved']??0),(int)($state['under_review']??0),(int)($state['corrections_requested']??0),(int)($state['observation_count']??0)); }
     private function transitionDescription(array $previous,array $new): string { $from=$this->stateCode($previous);$to=$this->stateCode($new);return $from!==null&&$to!==null?$this->stateLabel($from)."\n↓\n".$this->stateLabel($to):''; }
-    private function statusTitle(array $new): string { return $this->stateCode($new)==='under_review'?'Proyecto enviado a revisión':($this->stateCode($new)==='approved'?'Proyecto aprobado':'Cambio de estado del proyecto'); }
+    private function statusTitle(array $new): string { return $this->stateCode($new)==='under_review'?'Proyecto enviado a revisión':($this->stateCode($new)==='approved'?'Proyecto aprobado':($this->stateCode($new)==='defense'?'Proyecto enviado a Tribunal':'Cambio de estado del proyecto')); }
     private function stateCode(array $state): ?string
     {
         $value=$state['status']??$state['project_status']??$state['Estado']??null;

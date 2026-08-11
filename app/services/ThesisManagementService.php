@@ -26,7 +26,7 @@ final class ThesisManagementService
         $ids = array_map(static fn(array $row): int => (int) $row['id'], $rows);
         $marks = implode(',', array_fill(0, count($ids), '?'));
         $people = $db->prepare(
-            "SELECT pp.project_id,pp.role_code,pp.is_leader,u.full_name
+            "SELECT pp.project_id,pp.user_id,pp.role_code,pp.is_leader,u.full_name
              FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id
              WHERE pp.project_id IN ($marks) AND pp.status='active' AND pp.removed_at IS NULL
                AND LOWER(pp.role_code) IN ('student','tutor','cotutor','co_tutor','co-tutor','tribunal','jury')
@@ -40,19 +40,19 @@ final class ThesisManagementService
         $projects = [];
         foreach ($rows as $row) {
             $members = $byProject[(int) $row['id']] ?? [];
-            $students=[]; $cotutors=[]; $tribunal=[];
+            $students=[]; $cotutors=[]; $tribunal=[]; $tribunalIds=[];
             foreach ($members as $member) {
                 $role = strtolower((string) $member['role_code']);
                 if ($role === 'student') $students[] = (string) $member['full_name'];
                 elseif (in_array($role, ['cotutor','co_tutor','co-tutor'], true)) $cotutors[] = (string) $member['full_name'];
-                elseif (in_array($role, ['tribunal','jury'], true)) $tribunal[] = (string) $member['full_name'];
+                elseif (in_array($role, ['tribunal','jury'], true)) {$tribunal[] = (string) $member['full_name']; $tribunalIds[]=(int)$member['user_id'];}
             }
             $situation = $this->situation((string) $row['status'], count($tribunal));
             $summary[$situation['key']]++;
             $projects[] = $row + [
                 'students'=>$students, 'students_label'=>implode(' · ', $students) ?: 'Sin estudiantes activos',
                 'cotutors'=>$cotutors, 'tutor_label'=>$this->tutorLabel((string) ($row['tutor_name'] ?? ''), $cotutors),
-                'tribunal_members'=>$tribunal, 'tribunal_count'=>count($tribunal),
+                'tribunal_members'=>$tribunal, 'tribunal_member_ids'=>$tribunalIds, 'tribunal_count'=>count($tribunal),
                 'tribunal_label'=>count($tribunal) ? count($tribunal).' '.(count($tribunal) === 1 ? 'miembro' : 'miembros') : 'Sin asignar',
                 'situation'=>$situation,
             ];
@@ -65,7 +65,7 @@ final class ThesisManagementService
     /** @return array{key:string,label:string,description:string,action:string} */
     private function situation(string $status, int $tribunalCount): array
     {
-        if ($status === 'approved' && $tribunalCount === 0) return ['key'=>'pending_tribunal','label'=>'Pendiente de asignación de Tribunal','description'=>'Aprobado académicamente','action'=>'Gestionar Tribunal'];
+        if ($status === 'approved' && !ThesisTribunalService::isValidMemberCount($tribunalCount)) return ['key'=>'pending_tribunal','label'=>'Tribunal requiere gestión','description'=>'Se requieren entre 3 y 5 miembros activos','action'=>'Gestionar Tribunal'];
         if ($status === 'approved') return ['key'=>'tribunal_assigned','label'=>'Tribunal asignado','description'=>'Pendiente de continuar hacia defensa','action'=>'Gestionar Tribunal'];
         if ($status === 'defense') return ['key'=>'defense','label'=>'Defensa en curso','description'=>'Proceso de evaluación en curso','action'=>'Ver proceso'];
         return ['key'=>'pending_publication','label'=>'Pendiente de publicación','description'=>'Aprobado por el Tribunal','action'=>'Continuar proceso'];

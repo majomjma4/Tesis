@@ -162,6 +162,7 @@ final class ProjectStatusTransitionService
             (new ProjectDescriptionService($db))->registerStatusReminder($projectId, $auditId);
 
             $labels = project_academic_labels($targetStatus);
+            if ($targetStatus === 'defense') (new ProjectAcademicNotificationService())->defenseStarted($db,$projectId,(string)$project['code'],(string)$project['title'],$actor);
             if ($recordCompletion) (new ProjectAcademicNotificationService())->finalApproval($db,$projectId,(string)$project['code'],(string)$project['title'],$targetStatus,(string)$labels['status'],$auditId);
             return [
                 'id' => $projectId, 'previous_status' => $expectedStatus, 'status' => $targetStatus,
@@ -183,8 +184,10 @@ final class ProjectStatusTransitionService
         $result = [];
         foreach ((array) ($definition['requirements'] ?? []) as $requirement) {
             if ($requirement === 'tribunal') {
-                $met = (int) ($project['tribunal_count'] ?? $this->participantCount($project, ['tribunal', 'jury'])) > 0;
-                $result[] = ['key' => 'tribunal', 'label' => 'Tribunal asignado', 'met' => $met, 'message' => 'Asigna al menos un integrante del Tribunal antes de continuar.'];
+                $count = (int) ($project['tribunal_count'] ?? $this->participantCount($project, ['tribunal', 'jury']));
+                $defenseStart = (string)($project['status']??'') === 'approved' && (string)($project['type_code']??'') === 'thesis';
+                $met = $defenseStart ? ThesisTribunalService::isValidMemberCount($count) : $count > 0;
+                $result[] = ['key' => 'tribunal', 'label' => 'Tribunal asignado', 'met' => $met, 'message' => $defenseStart ? 'El Tribunal debe tener entre '.ThesisTribunalService::memberRangeLabel().' miembros activos antes de iniciar la defensa.' : 'Asigna al menos un integrante del Tribunal antes de continuar.'];
             } elseif ($requirement === 'authors') {
                 $met = (int) ($project['author_count'] ?? $this->participantCount($project, ['student'])) > 0;
                 $result[] = ['key' => 'authors', 'label' => 'Autor o autores activos', 'met' => $met, 'message' => 'El proyecto debe conservar al menos un autor activo antes de publicarse.'];
