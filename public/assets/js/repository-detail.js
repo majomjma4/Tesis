@@ -3918,12 +3918,34 @@ function positionFileMenu(menu, anchor, boundary = neutralFileList) {
     menu.style.bottom = "auto";
 }
 
+function positionGlobalFileMenu() {
+    if (!globalFileMenu || !globalFileToggle) return;
+    // El menú global permanece dentro de su contenedor relativo. Forzarlo a
+    // `fixed` lo desvinculaba del botón cuando un ancestro establecía un
+    // containing block, por ejemplo mediante transform.
+    globalFileMenu.style.position = "";
+    globalFileMenu.style.left = "";
+    globalFileMenu.style.right = "";
+    globalFileMenu.style.top = "";
+    globalFileMenu.style.bottom = "";
+    globalFileMenu.classList.remove("opens-up");
+
+    const margin = 10;
+    const anchorRect = globalFileToggle.getBoundingClientRect();
+    const menuRect = globalFileMenu.getBoundingClientRect();
+    const canOpenUp = anchorRect.top - menuRect.height - 7 >= margin;
+    globalFileMenu.classList.toggle(
+        "opens-up",
+        menuRect.bottom > window.innerHeight - margin && canOpenUp
+    );
+}
+
 function openGlobalFileMenu() {
     if (!globalFileMenu || !globalFileToggle || fileSelectionMode) return;
     closeNeutralFileMenu();
     globalFileMenu.hidden = false;
     globalFileToggle.setAttribute("aria-expanded", "true");
-    positionFileMenu(globalFileMenu, globalFileToggle);
+    positionGlobalFileMenu();
     globalFileMenu.querySelector('[role="menuitem"]:not([disabled])')?.focus();
 }
 

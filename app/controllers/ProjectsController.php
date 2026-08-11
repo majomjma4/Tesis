@@ -282,6 +282,43 @@ final class ProjectsController
         [, $file, $stream] = $this->resolveFile(); session_write_close(); $this->stream($file,$stream,'attachment');
     }
 
+    /** Descarga el paquete privado de archivos activos de un expediente académico. */
+    public function downloadAcademicPackage(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') { http_response_code(405); exit; }
+        $session = new AuthSessionService();
+        $projectId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+        if (!$session->isAuthenticated() || !$projectId) { http_response_code(403); exit; }
+        $access = new ProjectAccessService();
+        $administrator = $session->hasAdminAccess();
+        $context = $administrator ? 'academic_management' : 'academic';
+        $capabilities = (new ProjectCapabilityService())->forProjectId((int)$projectId, $context);
+        if (empty($capabilities['download_files'])) { http_response_code(403); exit('No tienes autorización para descargar este paquete.'); }
+        $project = (new ProjectRecordModel())->find((int)$projectId, $access->currentUserId(), $administrator);
+        if ($project === null) { http_response_code(404); exit('El proyecto solicitado no está disponible.'); }
+        try {
+            $packages = new ProjectRepositoryPackageService();
+            $descriptor = $packages->prepareAcademic((int)$projectId, route('project-package-download') . '&id=' . (int)$projectId);
+            $path = ProjectRepositoryPackageService::academicPackagePath((int)$projectId);
+            if (empty($descriptor['available']) || !is_file($path) || !is_readable($path)) throw new RuntimeException('El paquete no está disponible.');
+            clearstatcache(true, $path);
+            $size = (int)(filesize($path) ?: 0);
+            if ($size < 1) throw new RuntimeException('El paquete no está disponible.');
+            session_write_close();
+            header('Content-Type: application/zip');
+            header('Content-Length: ' . $size);
+            header("Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode('proyecto-' . (string)$project['code'] . '.zip'));
+            header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: private, no-store, max-age=0');
+            readfile($path);
+            exit;
+        } catch (Throwable $exception) {
+            error_log('Academic project package: ' . $exception->getMessage());
+            http_response_code(500);
+            exit('No fue posible preparar el paquete de archivos.');
+        }
+    }
+
     public function zipList(): void
     {
         [$project,$file,$path,$temporary]=$this->resolveProjectArchive(true);

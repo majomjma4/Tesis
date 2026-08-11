@@ -10,6 +10,12 @@ final class ProjectRepositoryPackageService
         return ROOT_PATH . '/storage/repository/project_' . $projectId . '.zip';
     }
 
+    /** Paquete privado de seguimiento para un expediente aún no publicado. */
+    public static function academicPackagePath(int $projectId): string
+    {
+        return ROOT_PATH . '/storage/private/project-packages/project_' . $projectId . '.zip';
+    }
+
     /** @return array{available:bool,download_url:string,file_count:int,size_bytes:int,size:string,source:string} */
     public function describe(int $projectId, string $downloadUrl = ''): array
     {
@@ -34,6 +40,31 @@ final class ProjectRepositoryPackageService
         return $descriptor;
     }
 
+    /**
+     * Describe el paquete académico sin exigir publicación institucional.
+     * Nunca reutiliza la ruta pública del paquete del Repositorio.
+     *
+     * @return array{available:bool,download_url:string,file_count:int,size_bytes:int,size:string,source:string}
+     */
+    public function describeAcademic(int $projectId, string $downloadUrl = ''): array
+    {
+        return $this->describeAtPath($projectId, self::academicPackagePath($projectId), $downloadUrl, 'academic');
+    }
+
+    /** Genera o reconstruye el paquete privado de seguimiento. */
+    public function prepareAcademic(int $projectId, string $downloadUrl = ''): array
+    {
+        $descriptor = ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'academic'];
+        if ($projectId < 1) return $descriptor;
+        $this->buildPackage($projectId, self::academicPackagePath($projectId));
+        return $this->describeAcademic($projectId, $downloadUrl);
+    }
+
+    public function invalidateAcademic(int $projectId): void
+    {
+        $this->invalidateAtPath(self::academicPackagePath($projectId));
+    }
+
     /** Generates a package only for a published, non-deleted project. */
     public function sync(int $projectId): ?array
     {
@@ -52,15 +83,32 @@ final class ProjectRepositoryPackageService
 
     public function invalidate(int $projectId): void
     {
-        $path = self::packagePath($projectId);
-        if (is_file($path)) @unlink($path);
+        $this->invalidateAtPath(self::packagePath($projectId));
     }
 
-    private function buildPackage(int $projectId): ?array
+    private function describeAtPath(int $projectId, string $path, string $downloadUrl, string $source = 'stored'): array
     {
+        $descriptor = ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>$source];
+        if ($projectId < 1) return $descriptor;
+        $files = $this->activeFiles($projectId);
+        $descriptor['file_count'] = count($files);
+        $descriptor['download_url'] = $downloadUrl;
+        if ($files === [] || !is_file($path) || !is_readable($path)) return $descriptor;
+        clearstatcache(true, $path);
+        $size = (int)(filesize($path) ?: 0);
+        if ($size < 1 || !$this->matchesActiveFiles($path, $files)) return $descriptor;
+        $descriptor['available'] = true;
+        $descriptor['size_bytes'] = $size;
+        $descriptor['size'] = ArchiveService::formatBytes($size);
+        return $descriptor;
+    }
+
+    private function buildPackage(int $projectId, ?string $targetPath = null): ?array
+    {
+        $final = $targetPath ?? self::packagePath($projectId);
         $rows = $this->activeFiles($projectId);
         if ($rows === []) {
-            $this->invalidate($projectId);
+            $this->invalidateAtPath($final);
             return null;
         }
 
@@ -76,12 +124,12 @@ final class ProjectRepositoryPackageService
                 ];
             } catch (Throwable $error) {
                 // Never leave a stale ZIP downloadable after the active set changed.
-                $this->invalidate($projectId);
+                $this->invalidateAtPath($final);
                 throw new RuntimeException('No fue posible incorporar un archivo activo al paquete del proyecto.', 0, $error);
             }
         }
 
-        $targetDirectory = ROOT_PATH . '/storage/repository';
+        $targetDirectory = dirname($final);
         if (!is_dir($targetDirectory) && !mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
             throw new RuntimeException('No fue posible preparar el directorio del paquete institucional.');
         }
@@ -91,7 +139,6 @@ final class ProjectRepositoryPackageService
             static fn(array $file): ?string => is_file((string)($file['path'] ?? '')) ? (string)$file['path'] : null
         );
         $temporary = $targetDirectory . DIRECTORY_SEPARATOR . 'building_project_' . $projectId . '_' . bin2hex(random_bytes(8)) . '.tmp.zip';
-        $final = self::packagePath($projectId);
         (new ArchivePackageIntegrityService())->build($temporary, $entries);
 
         // Windows cannot always replace an existing file with rename(). Keep a recoverable backup.
@@ -111,10 +158,15 @@ final class ProjectRepositoryPackageService
         clearstatcache(true, $final);
         $size = (int)(filesize($final) ?: 0);
         if ($size < 1 || !$this->matchesActiveFiles($final, $rows)) {
-            $this->invalidate($projectId);
+            $this->invalidateAtPath($final);
             throw new RuntimeException('El paquete institucional generado no coincide con los archivos activos.');
         }
         return ['path'=>$final,'file_count'=>count($entries),'size_bytes'=>$size,'size'=>ArchiveService::formatBytes($size)];
+    }
+
+    private function invalidateAtPath(string $path): void
+    {
+        if (is_file($path)) @unlink($path);
     }
 
     /** @return list<array{id:int,original_name:string,size_bytes:int,storage_name:string}> */

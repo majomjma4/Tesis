@@ -79,10 +79,18 @@ if ($project === null): ?>
     }, $project['files']);
     $archives = array_values(array_filter($documents, static fn(array $file): bool => $file['extension']==='zip'));
     $documents = array_values(array_filter($documents, static fn(array $file): bool => $file['extension']!=='zip'));
-    // Single source of truth for the institutional package.
-    $headerPackage = $publicContext
-        ? (new ProjectRepositoryPackageService())->describe($projectId, route('repository-download') . '&id=' . $projectId)
-        : ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'stored'];
+    // Publication and academic follow-up use intentionally separate ZIP packages.
+    $packageService = new ProjectRepositoryPackageService();
+    try {
+        $headerPackage = $publicContext
+            ? $packageService->describe($projectId, route('repository-download') . '&id=' . $projectId)
+            : ($isAcademicManagement
+                ? $packageService->prepareAcademic($projectId, route('project-package-download') . '&id=' . $projectId)
+                : ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'academic']);
+    } catch (Throwable $packageError) {
+        error_log('Academic project package descriptor: ' . $packageError->getMessage());
+        $headerPackage = ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'academic'];
+    }
     $versions = [];
     foreach ($project['deliveries'] as $delivery) {
         $deliveryFiles = array_values(array_filter($project['files'], static fn(array $file): bool => (int)($file['delivery_id'] ?? 0)===(int)$delivery['id']));
@@ -241,9 +249,12 @@ if ($project === null): ?>
         'actions'=>$actions,'menu_actions'=>$menuActions,'tabs'=>$tabs,'active_tab'=>$activeTab,'information_sections'=>$informationSections,
         'adjustment_notice'=>$adjustmentNotice,
         'documents'=>$documents,'archives'=>$archives,'versions'=>$versions,
-        'can_manage_files'=>!empty($projectCapabilities['manage_files'])&&($publicContext||$isAcademicManagement)&&!empty($projectDocuments),
+        // Proyectos activos es una vista de seguimiento: la gestión documental
+        // institucional permanece disponible en sus contextos específicos, pero
+        // no se expone desde este detalle académico.
+        'can_manage_files'=>!empty($projectCapabilities['manage_files'])&&$publicContext&&!empty($projectDocuments),
         'restorable_files'=>(array)($projectDocuments['restorable']??[]),
-        'file_upload'=>!empty($projectCapabilities['manage_files'])&&!empty($projectDocuments)?['context'=>(string)($projectDocuments['context']??$projectContext),'endpoint'=>(string)$projectDocuments['endpoint'],'csrf_token'=>(string)$projectDocuments['csrf'],'limits'=>(array)$projectDocuments['limits']]:[],
+        'file_upload'=>!empty($projectCapabilities['manage_files'])&&$publicContext&&!empty($projectDocuments)?['context'=>(string)($projectDocuments['context']??$projectContext),'endpoint'=>(string)$projectDocuments['endpoint'],'csrf_token'=>(string)$projectDocuments['csrf'],'limits'=>(array)$projectDocuments['limits']]:[],
         'package'=>$headerPackage,
         'global_file_actions'=>[],
         'document_review'=>$isAcademicManagement&&(string)$project['status']==='development'?(array)($documentReview??[]):[],

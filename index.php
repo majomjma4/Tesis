@@ -85,6 +85,7 @@ match ($page) {
     'project-file-preview' => (new ProjectsController())->filePreview(),
     'project-file-content' => (new ProjectsController())->fileContent(),
     'project-file-download' => (new ProjectsController())->fileDownload(),
+    'project-package-download' => (new ProjectsController())->downloadAcademicPackage(),
     'project-zip-list' => (new ProjectsController())->zipList(),
     'project-zip-entry-preview' => (new ProjectsController())->zipEntryPreview(),
     'project-zip-entry-content' => (new ProjectsController())->zipEntryContent(),

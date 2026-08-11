@@ -30,7 +30,7 @@ final class ProjectDocumentController
                     try{$result=Database::transaction(fn(PDO $db):array=>(new ProjectFileVersionChangeService())->replaceInTransaction($db,$projectId,$fileId,(string)($_POST['expected_checksum']??''),$stored,$actor,'academic_management',$_POST));}
                     catch(ProjectDocumentVersionException $e){$storage->discardStored($stored);$this->json(false,$e->getMessage(),[],$e->httpStatus());}
                     catch(Throwable $e){$storage->discardStored($stored);throw $e;}
-                    $this->json(true,'Archivo reemplazado correctamente.',['file'=>$this->filePayload($result['file'],$projectId),'version_change'=>$result]);
+                    $this->json(true,'Archivo reemplazado correctamente.',['file'=>$this->filePayload($result['file'],$projectId),'version_change'=>$result,'package'=>$this->refreshRepositoryPackage($projectId,'replace')]);
                 }
                 try{$result=Database::transaction(function(PDO $db)use($model,$projectId,$fileId,$stored,$actor){$model->lockProject($projectId);$conflict=$model->activeFileConflict($projectId,(string)$stored['original_name'],(int)$stored['size_bytes'],(string)$stored['checksum_sha256'],$fileId);if($conflict!==null)throw new InvalidArgumentException(($conflict['conflict_type']??'')==='name_size'?'Ya existe otro archivo activo con el mismo nombre y tamaño.':'Ya existe otro archivo activo con el mismo contenido.');$current=$model->findActiveFile($projectId,$fileId,true);if(hash_equals((string)$current['checksum_sha256'],(string)$stored['checksum_sha256']))throw new InvalidArgumentException('El archivo seleccionado tiene el mismo contenido que la versión actual.');$result=$model->replace($projectId,$fileId,$stored,$actor,trim((string)($_POST['reason']??'')));$this->audit($db,$actor,'project.file_replaced','Reemplazó un archivo del proyecto',$projectId,$result['file'],['version_number'=>$result['version_number'],'previous_name'=>$result['old']['original_name']]);$this->notifyAuthors($db,$projectId,'Se reemplazó un archivo del proyecto','El archivo '.$result['old']['original_name'].' tiene una nueva versión en el expediente.');return $result;});}catch(Throwable $e){$storage->discardStored($stored);throw $e;}
                 $this->json(true,'Archivo reemplazado correctamente.',['file'=>$this->filePayload($result['file'],$projectId),'package'=>$this->refreshRepositoryPackage($projectId,'replace')]);
@@ -60,8 +60,11 @@ final class ProjectDocumentController
     /** @return array{available:bool,download_url:string,file_count:int,size_bytes:int,size:string,source:string} */
     private function refreshRepositoryPackage(int $projectId,string $operation):array
     {
-        if($this->documentContext!=='repository')return ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'stored'];
         $packages=new ProjectRepositoryPackageService();
+        if($this->documentContext==='academic_management'){
+            try{return $packages->prepareAcademic($projectId,route('project-package-download').'&id='.$projectId);}catch(Throwable $error){error_log('ProjectAcademicPackageService['.$operation.']: '.$error->getMessage());return ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'academic'];}
+        }
+        if($this->documentContext!=='repository')return ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'stored'];
         try{$packages->sync($projectId);}catch(Throwable $error){error_log('ProjectRepositoryPackageService['.$operation.']: '.$error->getMessage());}
         return $packages->describe($projectId,route('repository-download').'&id='.$projectId);
     }
