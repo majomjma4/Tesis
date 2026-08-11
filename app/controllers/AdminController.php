@@ -387,10 +387,30 @@ final class AdminController
         }
         if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La solicitud contiene un token CSRF inválido.',[],419);
         $id=(int)($_POST['id']??0);$title=$this->normalizeAuditText($_POST['title']??'');
+        if($id===0&&!$session->hasAdminAccess()){
+            $_POST['publisher']=trim((string)$session->name());
+        }
+        $initialUploads=[];
+        if($id===0&&isset($_FILES['initial_files']['name'])&&is_array($_FILES['initial_files']['name'])){
+            foreach(array_keys($_FILES['initial_files']['name']) as $index)$initialUploads[]=[
+                'name'=>$_FILES['initial_files']['name'][$index]??'',
+                'type'=>$_FILES['initial_files']['type'][$index]??'',
+                'tmp_name'=>$_FILES['initial_files']['tmp_name'][$index]??'',
+                'error'=>$_FILES['initial_files']['error'][$index]??UPLOAD_ERR_NO_FILE,
+                'size'=>$_FILES['initial_files']['size'][$index]??0,
+            ];
+        }
+        if($initialUploads!==[]){
+            $limits=(new SupportMaterialFileService())->limits();
+            if(count($initialUploads)>(int)$limits['max_operation_files'])$this->json(false,'Puedes agregar hasta '.$limits['max_operation_files'].' archivos por operaciÃ³n.',[],422);
+            if(array_sum(array_map(static fn(array $upload):int=>(int)($upload['size']??0),$initialUploads))>(int)$limits['max_operation_bytes'])$this->json(false,'La selecciÃ³n completa supera el lÃ­mite de '.$limits['max_operation_mb'].' MB por operaciÃ³n.',[],422);
+        }
         $capabilities=new SupportMaterialCapabilityService();
         try{
             if($id===0)$capabilities->assertCanCreate($session);
-            $result=Database::transaction(function(PDO $database)use($id,$title,$session,$capabilities):array{
+            $storedInitialFiles=[];
+            try{
+            $result=Database::transaction(function(PDO $database)use($id,$title,$session,$capabilities,$initialUploads,&$storedInitialFiles):array{
                 $model=new SupportMaterialModel();
                 $auditChanges=[];
                 if($id>0){
@@ -422,6 +442,21 @@ final class AdminController
                     if($auditChanges===[])return ['id'=>$id,'no_changes'=>true];
                 }
                 $saved=$model->save($_POST,(int)$session->userId());
+                if($id===0&&$initialUploads!==[]){
+                    $fileService=new SupportMaterialFileService();
+                    foreach($initialUploads as $upload){
+                        $stored=$fileService->store($saved,$upload);
+                        $storedInitialFiles[]=$stored;
+                        $fileId=$model->addFile($saved,$stored,(int)$session->userId());
+                        (new AdminActivityService($database))->record(
+                            (int)$session->userId(),'support_material.file_added','AgregÃ³ un archivo al material',
+                            'Repositorio','support_material',$saved,$stored['original_name'],'correct',[
+                                'file_id'=>$fileId,'name'=>$stored['original_name'],'extension'=>$stored['extension'],
+                                'mime_type'=>$stored['mime_type'],'size_bytes'=>$stored['size_bytes'],'is_package'=>false,
+                            ]
+                        );
+                    }
+                }
                 (new AdminActivityService($database))->record(
                     (int)$session->userId(),
                     $id?'support_material.updated':'support_material.created',
@@ -431,6 +466,13 @@ final class AdminController
                 );
                 return ['id'=>$saved,'no_changes'=>false];
             });
+            }catch(Throwable $error){
+                $fileService=new SupportMaterialFileService();
+                foreach($storedInitialFiles as $stored){
+                    if(!$fileService->discard($stored))error_log('Support material initial upload cleanup failed.');
+                }
+                throw $error;
+            }
             if($result['no_changes'])$this->json(true,'La información ya se encuentra actualizada.',['id'=>$result['id'],'no_changes'=>true]);
             $saved=(int)$result['id'];
             $this->json(true,$id?'Material actualizado correctamente.':'Material creado correctamente.',['id'=>$saved]);

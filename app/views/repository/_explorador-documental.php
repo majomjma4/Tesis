@@ -150,7 +150,7 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
 .ed-files-global-menu>a:hover,.ed-files-global-menu>button:not(:disabled):hover,.ed-file-menu>a:hover,.ed-file-menu>button:not(:disabled):hover{transform:translateX(2px)}
 .ed-files-global-menu .ed-package-size{flex:0 0 auto;margin-left:auto;padding-left:10px;color:var(--muted);font-size:11px;font-weight:800;white-space:nowrap}
 </style>
-<style>.ed-viewer-download[hidden]{display:none!important}.ed-file-restore-item.without-purge{grid-template-columns:38px minmax(0,1fr) auto}</style>
+<style>.ed-viewer-download[hidden]{display:none!important}.ed-file-restore-item.without-purge{grid-template-columns:38px minmax(0,1fr) auto}.ed-files-panel,.ed-files-panel>header,.ed-files-global-actions{overflow:visible}</style>
 <style>.ed-upload-picker.file-drag-zone{width:100%;font:inherit}.ed-upload-picker.file-drag-zone small{display:block;max-width:520px;line-height:1.5}.ed-upload-picker.file-drag-zone:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 28%,transparent);outline-offset:2px}.ed-upload-picker.file-drag-zone.dragover{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 7%,var(--surface));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--primary) 25%,transparent)}</style>
 <div class="ed-files-layout" data-record-files>
     <section class="ed-files-panel" aria-labelledby="recordFilesTitle">

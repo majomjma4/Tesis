@@ -3902,11 +3902,20 @@ function positionFileMenu(menu, anchor, boundary = neutralFileList) {
     const menuRect = menu.getBoundingClientRect();
     const anchorRect = anchor.getBoundingClientRect();
     const boundaryRect = boundary?.getBoundingClientRect();
-    const lowerLimit = Math.min(window.innerHeight - 8, boundaryRect?.bottom ?? window.innerHeight - 8);
-    const upperLimit = Math.max(8, boundaryRect?.top ?? 8);
-    if (menuRect.bottom > lowerLimit && anchorRect.top - menuRect.height - 7 >= upperLimit) {
-        menu.classList.add("opens-up");
-    }
+    const margin = 10;
+    const lowerLimit = Math.min(window.innerHeight - margin, boundaryRect?.bottom ?? window.innerHeight - margin);
+    const upperLimit = Math.max(margin, boundaryRect?.top ?? margin);
+    const opensUp = menuRect.bottom > lowerLimit && anchorRect.top - menuRect.height - 7 >= upperLimit;
+    menu.classList.toggle("opens-up", opensUp);
+    const left = Math.max(margin, Math.min(anchorRect.right - menuRect.width, window.innerWidth - menuRect.width - margin));
+    const top = opensUp
+        ? Math.max(margin, anchorRect.top - menuRect.height - 7)
+        : Math.min(anchorRect.bottom + 7, window.innerHeight - menuRect.height - margin);
+    menu.style.position = "fixed";
+    menu.style.left = `${left}px`;
+    menu.style.right = "auto";
+    menu.style.top = `${top}px`;
+    menu.style.bottom = "auto";
 }
 
 function openGlobalFileMenu() {

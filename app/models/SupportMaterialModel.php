@@ -31,10 +31,10 @@ final class SupportMaterialModel
         if ($teacherId < 1) return $this->getAll();
         $statement = Database::connection()->prepare(
             $this->baseQuery() . " WHERE sm.deleted_at IS NULL AND sm.purged_at IS NULL
-             AND (sm.status='published' OR (sm.status='draft' AND sm.created_by=:teacher))
+             AND sm.status IN ('published','draft')
              ORDER BY sm.publication_date DESC,sm.id DESC"
         );
-        $statement->execute(['teacher' => $teacherId]);
+        $statement->execute();
         return array_map([$this, 'hydrate'], $statement->fetchAll());
     }
 
@@ -411,6 +411,9 @@ final class SupportMaterialModel
         }
         if ($type === '' || mb_strlen($type) > 100) {
             throw new InvalidArgumentException('Ingresa un tipo de material válido.');
+        }
+        if ($id === 0 && !in_array($type, $this->materialTypeCatalog(), true)) {
+            throw new InvalidArgumentException('Selecciona un tipo de material válido.');
         }
         if ($description === '' || mb_strlen($description) > 500) {
             throw new InvalidArgumentException('Ingresa una descripción corta de hasta 500 caracteres.');
