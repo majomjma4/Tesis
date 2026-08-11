@@ -1030,7 +1030,6 @@
         noResults = document.createElement('div');
         noResults.className = 'ap-empty ap-search-empty';
         noResults.hidden = true;
-        noResults.innerHTML = '<i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><h2>Sin coincidencias</h2><p>Prueba con otro título, código o tutor.</p>';
         list.append(noResults);
     }
     const serverQuery = new URLSearchParams(location.search).get('search') || '';
@@ -1077,7 +1076,20 @@
             }
         });
         if (clear) clear.hidden = !search.value;
-        if (noResults) noResults.hidden = visible !== 0 || !query;
+        if (noResults) {
+            const hasDropdownFilter = selectedStatus || selectedType || selectedPeriod;
+            const isEmpty = visible === 0;
+            if (isEmpty) {
+                if (query && hasDropdownFilter) {
+                    noResults.innerHTML = '<i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><h2>Sin coincidencias</h2><p>Prueba cambiando el texto de búsqueda o los filtros seleccionados.</p>';
+                } else if (query) {
+                    noResults.innerHTML = '<i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><h2>Sin coincidencias</h2><p>Prueba con otro título, código o tutor.</p>';
+                } else {
+                    noResults.innerHTML = '<i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i><h2>No se encontraron proyectos</h2><p>Prueba cambiando o limpiando los filtros seleccionados.</p>';
+                }
+            }
+            noResults.hidden = !isEmpty;
+        }
     };
     const typeFilter = filters.querySelector('select[name="type_id"]');
     const statusFilter = filters.querySelector('select[name="status"]');

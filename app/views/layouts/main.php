@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es" class="dashboard-root">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,9 +18,25 @@
     <link rel="stylesheet" href="<?= e(asset('css/card-accents.css')) ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
-<?php $isAdministratorLayout = (bool)($layoutIsAdmin ?? false); ?>
-<body class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout app-page-loading' : ''))) ?>">
-    <noscript><style>.app-global-skeleton{display:none!important}.app-page-content{position:static!important;width:100%!important;height:auto!important;overflow:visible!important;opacity:1!important}</style></noscript>
+<?php $isAdministratorLayout = (bool) ($layoutIsAdmin ?? false); ?>
+
+<body
+    class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout app-page-loading' : ''))) ?>">
+    <noscript>
+        <style>
+            .app-global-skeleton {
+                display: none !important
+            }
+
+            .app-page-content {
+                position: static !important;
+                width: 100% !important;
+                height: auto !important;
+                overflow: visible !important;
+                opacity: 1 !important
+            }
+        </style>
+    </noscript>
     <!-- Inicio de capa para cerrar el menu movil -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <!-- Final de capa para cerrar el menu movil -->
@@ -36,34 +53,50 @@
             </div>
 
             <nav class="menu" aria-label="Navegacion principal">
-                <a href="<?= e(route('dashboard')) ?>" class="menu-item <?= ($currentPage ?? '') === 'dashboard' ? 'active' : '' ?>">
+                <a href="<?= e(route('dashboard')) ?>"
+                    class="menu-item <?= ($currentPage ?? '') === 'dashboard' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-house"></i></span>
                     <span>Inicio</span>
                 </a>
-                <a href="<?= e(route('projects')) ?>" class="menu-item <?= ($currentPage ?? '') === 'projects' ? 'active' : '' ?>">
+                <a href="<?= e(route('projects')) ?>"
+                    class="menu-item <?= ($currentPage ?? '') === 'projects' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-folder-open"></i></span>
                     <span><?= $isAdministratorLayout ? 'Proyectos activos' : 'Proyectos' ?></span>
                 </a>
                 <?php if ($isAdministratorLayout): ?>
-                <a href="<?= e(route('admin-users')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-users' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-users"></i></span><span>Usuarios</span></a>
-                <a href="<?= e(route('admin-academic')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-academic' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-graduation-cap"></i></span><span>Gestión académica</span></a>
+                    <a href="<?= e(route('admin-users')) ?>"
+                        class="menu-item <?= ($currentPage ?? '') === 'admin-users' ? 'active' : '' ?>"><span
+                            class="menu-icon"><i class="fa-solid fa-users"></i></span><span>Usuarios</span></a>
+                    <a href="<?= e(route('admin-academic')) ?>"
+                        class="menu-item <?= ($currentPage ?? '') === 'admin-academic' ? 'active' : '' ?>"><span
+                            class="menu-icon"><i class="fa-solid fa-graduation-cap"></i></span><span>Gestión
+                            académica</span></a>
                 <?php endif; ?>
-                <a href="<?= e(route($isAdministratorLayout ? 'admin-repository' : 'repository')) ?>" class="menu-item <?= ($currentPage ?? '') === 'repository' ? 'active' : '' ?>">
+                <a href="<?= e(route($isAdministratorLayout ? 'admin-repository' : 'repository')) ?>"
+                    class="menu-item <?= ($currentPage ?? '') === 'repository' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-book-open"></i></span>
                     <span>Repositorio</span>
                 </a>
-                <a href="<?= e(route('calendar')) ?>" class="menu-item <?= ($currentPage ?? '') === 'calendar' ? 'active' : '' ?>">
+                <a href="<?= e(route('calendar')) ?>"
+                    class="menu-item <?= ($currentPage ?? '') === 'calendar' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-calendar-days"></i></span>
                     <span>Calendario</span>
                 </a>
-                <a href="<?= e(route('notifications')) ?>" class="menu-item <?= ($currentPage ?? '') === 'notifications' ? 'active' : '' ?>">
+                <a href="<?= e(route('notifications')) ?>"
+                    class="menu-item <?= ($currentPage ?? '') === 'notifications' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-bell"></i></span>
                     <span>Notificaciones</span>
                 </a>
                 <?php if ($isAdministratorLayout): ?>
-                <a href="<?= e(route('admin-reports')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-reports' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-chart-column"></i></span><span>Reportes</span></a>
-                <a href="<?= e(route('admin-settings')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-settings' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-solid fa-gear"></i></span><span>Configuración</span></a>
-                <a href="<?= e(route('admin-trash')) ?>" class="menu-item <?= ($currentPage ?? '') === 'admin-trash' ? 'active' : '' ?>"><span class="menu-icon"><i class="fa-regular fa-trash-can"></i></span><span>Papelera</span></a>
+                    <a href="<?= e(route('admin-reports')) ?>"
+                        class="menu-item <?= ($currentPage ?? '') === 'admin-reports' ? 'active' : '' ?>"><span
+                            class="menu-icon"><i class="fa-solid fa-chart-column"></i></span><span>Reportes</span></a>
+                    <a href="<?= e(route('admin-settings')) ?>"
+                        class="menu-item <?= ($currentPage ?? '') === 'admin-settings' ? 'active' : '' ?>"><span
+                            class="menu-icon"><i class="fa-solid fa-gear"></i></span><span>Configuración</span></a>
+                    <a href="<?= e(route('admin-trash')) ?>"
+                        class="menu-item <?= ($currentPage ?? '') === 'admin-trash' ? 'active' : '' ?>"><span
+                            class="menu-icon"><i class="fa-regular fa-trash-can"></i></span><span>Papelera</span></a>
                 <?php endif; ?>
             </nav>
         </div>
@@ -87,43 +120,63 @@
 
             <div class="welcome">
                 <h2>Hola, <?= e(explode(' ', trim($layoutUserName ?? 'Usuario'))[0] ?: 'Usuario') ?></h2>
-                <p><?= $isAdministratorLayout ? 'Panel de administración del sistema.' : 'Continúa gestionando tus proyectos académicos.' ?></p>
+                <p><?= $isAdministratorLayout ? 'Panel de administración del sistema.' : 'Continúa gestionando tus proyectos académicos.' ?>
+                </p>
             </div>
 
             <div class="topbar-right">
-                <a class="topbar-action-btn" href="<?= e($isAdministratorLayout ? route('projects') . '&action=new' : route('new-project')) ?>">
+                <a class="topbar-action-btn"
+                    href="<?= e($isAdministratorLayout ? route('projects') . '&action=new' : route('new-project')) ?>">
                     <i class="fa-solid fa-plus"></i>
                     <span class="topbar-action-label">Nuevo proyecto</span>
                     <span class="topbar-action-label-short">Nuevo</span>
                 </a>
-                <button class="icon-btn theme-toggle" id="themeToggle" type="button" aria-label="Cambiar modo claro u oscuro">
+                <button class="icon-btn theme-toggle" id="themeToggle" type="button"
+                    aria-label="Cambiar modo claro u oscuro">
                     <i class="fa-solid fa-moon"></i>
                 </button>
                 <div class="topbar-notifications">
-                    <button class="notification-icon" id="topbarNotificationsButton" type="button" aria-label="Mostrar notificaciones recientes" aria-haspopup="dialog" aria-expanded="false" aria-controls="topbarNotificationsPanel" data-list-endpoint="<?= e(route('notifications/list')) ?>" data-counters-endpoint="<?= e(route('notifications/counters')) ?>" data-open-endpoint="<?= e($notificationOpenEndpoint ?? route('notifications/open')) ?>" data-csrf-token="<?= e($notificationCsrfToken ?? '') ?>">
+                    <button class="notification-icon" id="topbarNotificationsButton" type="button"
+                        aria-label="Mostrar notificaciones recientes" aria-haspopup="dialog" aria-expanded="false"
+                        aria-controls="topbarNotificationsPanel"
+                        data-list-endpoint="<?= e(route('notifications/list')) ?>"
+                        data-counters-endpoint="<?= e(route('notifications/counters')) ?>"
+                        data-open-endpoint="<?= e($notificationOpenEndpoint ?? route('notifications/open')) ?>"
+                        data-csrf-token="<?= e($notificationCsrfToken ?? '') ?>">
                         <i class="fa-solid fa-bell"></i>
                         <?php $topbarUnreadCount = max(0, (int) ($notificationUnreadCount ?? 0)); ?>
                         <span class="notification-count" <?= $topbarUnreadCount === 0 ? 'hidden aria-hidden="true"' : 'aria-label="' . e($topbarUnreadCount . ($topbarUnreadCount === 1 ? ' notificación no leída' : ' notificaciones no leídas')) . '"' ?>><?= $topbarUnreadCount === 0 ? '' : e($topbarUnreadCount >= 10 ? '9+' : (string) $topbarUnreadCount) ?></span>
                     </button>
-                    <section class="topbar-notifications-panel" id="topbarNotificationsPanel" aria-label="Notificaciones recientes" hidden>
-                        <header><div><span>Actividad reciente</span><h2>Notificaciones</h2></div><i class="fa-regular fa-bell"></i></header>
+                    <section class="topbar-notifications-panel" id="topbarNotificationsPanel"
+                        aria-label="Notificaciones recientes" hidden>
+                        <header>
+                            <div><span>Actividad reciente</span>
+                                <h2>Notificaciones</h2>
+                            </div><i class="fa-regular fa-bell"></i>
+                        </header>
                         <div class="topbar-notifications-list" id="topbarNotificationsList">
-                            <div class="topbar-notifications-loading"><i class="fa-solid fa-circle-notch fa-spin"></i><span>Cargando...</span></div>
+                            <div class="topbar-notifications-loading"><i
+                                    class="fa-solid fa-circle-notch fa-spin"></i><span>Cargando...</span></div>
                         </div>
-                        <footer><a href="<?= e(route('notifications')) ?>">Ver más notificaciones <i class="fa-solid fa-arrow-right"></i></a></footer>
+                        <footer><a href="<?= e(route('notifications')) ?>">Ver más notificaciones <i
+                                    class="fa-solid fa-arrow-right"></i></a></footer>
                     </section>
                 </div>
 
                 <div class="avatar-menu">
-                    <button class="user-avatar" id="avatarButton" type="button" aria-label="Abrir menu de usuario" aria-expanded="false">
-                        <?php if(!empty($layoutAvatarUrl)): ?><img src="<?= e((string) $layoutAvatarUrl) ?>" alt=""><?php else: ?><?= e(mb_strtoupper(mb_substr($layoutUserName ?? 'U', 0, 1, 'UTF-8'), 'UTF-8')) ?><?php endif; ?>
+                    <button class="user-avatar" id="avatarButton" type="button" aria-label="Abrir menu de usuario"
+                        aria-expanded="false">
+                        <?php if (!empty($layoutAvatarUrl)): ?><img src="<?= e((string) $layoutAvatarUrl) ?>"
+                                alt=""><?php else: ?><?= e(mb_strtoupper(mb_substr($layoutUserName ?? 'U', 0, 1, 'UTF-8'), 'UTF-8')) ?><?php endif; ?>
                     </button>
                     <div class="avatar-dropdown" id="avatarDropdown">
-                        <div class="avatar-dropdown-identity"><strong><?= e($layoutUserName ?? 'Usuario') ?></strong><small><?= e($layoutUserEmail ?? '') ?></small></div>
+                        <div class="avatar-dropdown-identity">
+                            <strong><?= e($layoutUserName ?? 'Usuario') ?></strong><small><?= e($layoutUserEmail ?? '') ?></small>
+                        </div>
                         <?php
-                            $currentUri = (string) ($_SERVER['REQUEST_URI'] ?? '');
-                            $isProfileRoute = str_contains($currentUri, 'page=profile');
-                            $isChangePasswordRoute = str_contains($currentUri, 'page=change-password');
+                        $currentUri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+                        $isProfileRoute = str_contains($currentUri, 'page=profile');
+                        $isChangePasswordRoute = str_contains($currentUri, 'page=change-password');
                         ?>
                         <?php if ($isProfileRoute): ?>
                             <span class="avatar-dropdown-active-item" aria-current="page">Mi perfil</span>
@@ -141,56 +194,68 @@
             </div>
         </header>
         <?php
-            $daysLeft = $layoutTemporaryPasswordRemainingDays ?? null;
-            $showWarning = !empty($layoutMustChangePassword) && !$isAdministratorLayout && $daysLeft !== null && $daysLeft > 0 && empty($layoutIsTemporaryPasswordDismissedToday);
+        $daysLeft = $layoutTemporaryPasswordRemainingDays ?? null;
+        $showWarning = !empty($layoutMustChangePassword) && !$isAdministratorLayout && $daysLeft !== null && $daysLeft > 0 && empty($layoutIsTemporaryPasswordDismissedToday);
         ?>
         <?php if ($showWarning): ?>
-        <?php
-            $daysText = match(true) {
+            <?php
+            $daysText = match (true) {
                 $daysLeft > 1 => "Tu contraseña temporal vence en {$daysLeft} días.",
                 $daysLeft === 1 => "Tu contraseña temporal vence mañana.",
                 default => "Tu contraseña temporal vence hoy."
             };
-        ?>
-        <aside class="password-warning-banner" role="status" data-password-warning>
-            <i class="fa-solid fa-clock" aria-hidden="true"></i>
-            <div>
-                <strong>Contraseña temporal</strong>
-                <span><?= e($daysText) ?> Por seguridad, crea una contraseña personal antes de que finalice el plazo.</span>
-            </div>
-            <div class="password-warning-actions">
-                <a href="<?= e(route('change-password')) ?>" class="as-btn-change">Cambiar ahora</a>
-                <button type="button" class="as-btn-dismiss" data-password-warning-dismiss>Omitir por hoy</button>
-            </div>
-        </aside>
-        <script>
-            document.addEventListener('click', function(e) {
-                var btn = e.target.closest('[data-password-warning-dismiss]');
-                if (!btn) return;
-                var banner = btn.closest('[data-password-warning]');
-                if (banner) banner.remove();
-                var data = new FormData();
-                data.set('_csrf', '<?= e($layoutTemporaryPasswordWarningCsrf ?? '') ?>');
-                fetch('index.php?page=dismiss-temp-password-warning', { method: 'POST', body: data, headers: { 'Accept': 'application/json' } }).catch(function(){});
-            });
-        </script>
+            ?>
+            <aside class="password-warning-banner" role="status" data-password-warning>
+                <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                <div>
+                    <strong>Contraseña temporal</strong>
+                    <span><?= e($daysText) ?> Por seguridad, crea una contraseña personal antes de que finalice el
+                        plazo.</span>
+                </div>
+                <div class="password-warning-actions">
+                    <a href="<?= e(route('change-password')) ?>" class="as-btn-change">Cambiar ahora</a>
+                    <button type="button" class="as-btn-dismiss" data-password-warning-dismiss>Omitir por hoy</button>
+                </div>
+            </aside>
+            <script>
+                document.addEventListener('click', function (e) {
+                    var btn = e.target.closest('[data-password-warning-dismiss]');
+                    if (!btn) return;
+                    var banner = btn.closest('[data-password-warning]');
+                    if (banner) banner.remove();
+                    var data = new FormData();
+                    data.set('_csrf', '<?= e($layoutTemporaryPasswordWarningCsrf ?? '') ?>');
+                    fetch('index.php?page=dismiss-temp-password-warning', { method: 'POST', body: data, headers: { 'Accept': 'application/json' } }).catch(function () { });
+                });
+            </script>
         <?php endif; ?>
         <!-- Final de barra superior -->
 
         <?php if ($isAdministratorLayout): ?>
-        <section class="app-global-skeleton" id="appGlobalSkeleton" aria-label="Cargando contenido" aria-live="polite">
-            <div class="app-skeleton-heading"><span class="app-skeleton-block kicker"></span><span class="app-skeleton-block title"></span><span class="app-skeleton-block subtitle"></span></div>
-            <div class="app-skeleton-toolbar"><span class="app-skeleton-block"></span><span class="app-skeleton-block"></span><span class="app-skeleton-block compact"></span></div>
-            <div class="app-skeleton-grid"><?php for ($i = 0; $i < 4; $i++): ?><article><span class="app-skeleton-block icon"></span><span class="app-skeleton-block line strong"></span><span class="app-skeleton-block line"></span><span class="app-skeleton-block line short"></span></article><?php endfor; ?></div>
-        </section>
+            <section class="app-global-skeleton" id="appGlobalSkeleton" aria-label="Cargando contenido" aria-live="polite">
+                <div class="app-skeleton-heading"><span class="app-skeleton-block kicker"></span><span
+                        class="app-skeleton-block title"></span><span class="app-skeleton-block subtitle"></span></div>
+                <div class="app-skeleton-toolbar"><span class="app-skeleton-block"></span><span
+                        class="app-skeleton-block"></span><span class="app-skeleton-block compact"></span></div>
+                <div class="app-skeleton-grid"><?php for ($i = 0; $i < 4; $i++): ?>
+                        <article><span class="app-skeleton-block icon"></span><span
+                                class="app-skeleton-block line strong"></span><span class="app-skeleton-block line"></span><span
+                                class="app-skeleton-block line short"></span></article><?php endfor; ?>
+                </div>
+            </section>
         <?php endif; ?>
-        <div class="app-page-content" id="appPageContent"><?= $content ?><?php if(!empty($pagePagination)): $pagination=$pagePagination;require APP_PATH.'/views/components/pagination.php';endif;?></div>
+        <div class="app-page-content" id="appPageContent">
+            <?= $content ?><?php if (!empty($pagePagination)):
+                  $pagination = $pagePagination;
+                  require APP_PATH . '/views/components/pagination.php'; endif; ?>
+        </div>
     </main>
     <!-- Final de contenido principal -->
 
     <!-- Inicio de confirmacion de cierre de sesion -->
     <div class="logout-modal-overlay" id="logoutModal" hidden>
-        <div class="logout-modal" role="dialog" aria-modal="true" aria-labelledby="logoutModalTitle" aria-describedby="logoutModalText">
+        <div class="logout-modal" role="dialog" aria-modal="true" aria-labelledby="logoutModalTitle"
+            aria-describedby="logoutModalText">
             <span class="logout-modal-icon" aria-hidden="true">
                 <i class="fa-solid fa-right-from-bracket"></i>
             </span>
@@ -198,7 +263,8 @@
             <p id="logoutModalText">¿Estás seguro de que deseas cerrar la sesión actual?</p>
             <div class="logout-modal-actions">
                 <button class="modal-cancel-btn" id="logoutCancelBtn" type="button">Cancelar</button>
-                <button class="modal-accept-btn" id="logoutAcceptBtn" type="button" data-logout-url="<?= e(route('logout')) ?>">Aceptar</button>
+                <button class="modal-accept-btn" id="logoutAcceptBtn" type="button"
+                    data-logout-url="<?= e(route('logout')) ?>">Aceptar</button>
             </div>
         </div>
     </div>
@@ -218,4 +284,5 @@
     <?php endif; ?>
     <!-- Final de scripts de pagina -->
 </body>
+
 </html>

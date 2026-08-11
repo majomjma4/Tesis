@@ -1044,16 +1044,26 @@ final class AdminController
     public function revertAcademicPeriod():void{$this->requirePost();$s=new AuthSessionService();if(!$s->validateCsrf('admin_academic',(string)($_POST['_csrf']??'')))$this->json(false,'La sesión venció.',[],419);$transitionId=(int)($_POST['transition_id']??0);try{$result=(new AdminAcademicModel())->reverseTransition($transitionId,(int)$s->userId());$this->json(true,'El cierre del período se revirtió correctamente.',$result);}catch(InvalidArgumentException $e){$this->activityFailure($s,'academic_period_closure_revert_failed','Intentó revertir el cierre de un período','Gestión académica','academic_period_transition',$transitionId?:null,'Transición académica #'.$transitionId,$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,'academic_period_closure_revert_failed','Intentó revertir el cierre de un período','Gestión académica','academic_period_transition',$transitionId?:null,'Transición académica #'.$transitionId,$e);error_log('Revert academic period: '.$e->getMessage());$this->json(false,'No fue posible revertir el cierre del período.',[],500);}}
     public function projects(): void
     {
+        $session=new AuthSessionService();
+        $access=new ProjectAccessService();
+        $isAdministrator=$session->hasAdminAccess();
+        $isTeacher=in_array('teacher',$access->currentRoles(),true);
+
+        if (!$isAdministrator && !$isTeacher) {
+            header('Location: ' . route('forbidden'));
+            exit;
+        }
+
         $requestedStatus=(string)($_GET['status']??'');
         $filters=['search'=>mb_substr(trim((string)($_GET['search']??'')),0,100),'status'=>$requestedStatus==='changes_required'?'':$requestedStatus,'type_id'=>(int)($_GET['type_id']??0),'period_id'=>(int)($_GET['period_id']??0),'group'=>(string)($_GET['group']??''),'review_situation'=>(string)($_GET['review_situation']??'')];
         $model=new AdminProjectModel();$error=null;
         try{$catalogs=$model->catalogs();if(count($catalogs['periods'])===1)$filters['period_id']=(int)$catalogs['periods'][0]['id'];$result=$model->listing($filters,PaginationService::request());$projects=$result['items'];$pagination=$result['pagination'];$summary=$model->summary($filters);}catch(Throwable $exception){error_log('Admin projects: '.$exception->getMessage());$error='No fue posible consultar los proyectos.';$projects=[];$pagination=['total'=>0];$summary=['total'=>0,'development'=>0,'review'=>0,'approved'=>0,'defense'=>0];$catalogs=['types'=>[],'careers'=>[],'periods'=>[],'teachers'=>[]];}
-        $session=new AuthSessionService();
         $transitionService=new ProjectStatusTransitionService();
         $publicationReversionService=new ProjectPublicationReversionService();
         $capabilityService=new ProjectCapabilityService();
+        $context=$isAdministrator?'academic_management':'academic';
         foreach($projects as &$project){
-            $capabilities=$capabilityService->forCurrentUser($project,'academic_management');
+            $capabilities=$capabilityService->forCurrentUser($project,$context);
             $labels=project_academic_labels((string)($project['status']??''));
             $project['status_label']=$labels['status'];
             $project['stage_label']=$labels['stage'];
@@ -1064,7 +1074,25 @@ final class AdminController
             $project['status_actions']=array_values(array_filter([...$project['status_transitions'],$correctionAction,$project['publication_reversion']['action']??null]));
         }
         unset($project);
-        View::render('admin/projects',['currentPage'=>'projects','title'=>'Proyectos activos | Administración','bodyClass'=>'admin-projects-page','pageStyles'=>[asset('css/admin-projects.css')],'pageScript'=>asset('js/admin-projects.js'),'pageScripts'=>[asset('js/project-status-transition.js')],'projects'=>$projects,'pagePagination'=>$pagination,'projectSummary'=>$summary,'catalogs'=>$catalogs,'filters'=>$filters,'projectError'=>$error,'projectCsrf'=>$session->csrfToken('admin_projects'),'projectEndpoints'=>['save'=>route('admin-project-save'),'trash'=>route('admin-project-trash')],'projectStatusDialog'=>['enabled'=>true,'endpoint'=>route('admin-project-save'),'csrf_token'=>$session->csrfToken('admin_projects'),'close_editor_on_success'=>true]]);
+        View::render('admin/projects',[
+            'currentPage'=>'projects',
+            'title'=>$isAdministrator ? 'Proyectos activos | Administración' : 'Proyectos activos | Gestión Académica',
+            'bodyClass'=>'admin-projects-page',
+            'layoutIsAdmin'=>$isAdministrator,
+            'isAdministrator'=>$isAdministrator,
+            'pageStyles'=>[asset('css/admin-projects.css')],
+            'pageScript'=>asset('js/admin-projects.js'),
+            'pageScripts'=>[asset('js/project-status-transition.js')],
+            'projects'=>$projects,
+            'pagePagination'=>$pagination,
+            'projectSummary'=>$summary,
+            'catalogs'=>$catalogs,
+            'filters'=>$filters,
+            'projectError'=>$error,
+            'projectCsrf'=>$isAdministrator ? $session->csrfToken('admin_projects') : '',
+            'projectEndpoints'=>$isAdministrator ? ['save'=>route('admin-project-save'),'trash'=>route('admin-project-trash')] : ['save'=>'','trash'=>''],
+            'projectStatusDialog'=>['enabled'=>$isAdministrator,'endpoint'=>$isAdministrator ? route('admin-project-save') : '','csrf_token'=>$isAdministrator ? $session->csrfToken('admin_projects') : '','close_editor_on_success'=>true]
+        ]);
     }
     public function saveProject():void
     {

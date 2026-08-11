@@ -9,12 +9,16 @@ final class ProjectsController
      */
     public function index(): void
     {
-        if ((new AuthSessionService())->hasAdminAccess()) {
+        $session = new AuthSessionService();
+        $access = new ProjectAccessService();
+        $roles = $access->currentRoles();
+
+        if ($session->hasAdminAccess() || in_array('teacher', $roles, true)) {
             (new AdminController())->projects();
             return;
         }
+
         $projectModel = new ProjectModel();
-        $access = new ProjectAccessService();
         $projects = $projectModel->getProjectsForUser($access->currentUserId());
 
         if (count($projects) === 1) {
