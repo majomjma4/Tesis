@@ -30,7 +30,7 @@ final class ThesisTribunalService
      * Solo lectura. $replacement permite solicitar un único sustituto de forma explícita.
      * @return array{project_id:int,desired_count:int,available_count:int,members:array<int,array<string,int|string|null>>}
      */
-    public function suggest(int $id, int $desiredCount, array $exclusions = [], bool $replacement = false): array
+    public function suggest(int $id, int $desiredCount, array $exclusions = [], bool $replacement = false, array $loadOverrides = []): array
     {
         if ($replacement) {
             if ($desiredCount !== 1) throw new ThesisTribunalException('La sugerencia de reemplazo debe solicitar un único docente.');
@@ -40,7 +40,7 @@ final class ThesisTribunalService
 
         $db = Database::connection();
         $project = $this->availableProject($db, $id);
-        $candidates = $this->candidatesWithLoadForProject($db, $project, $this->normalizeIds($exclusions));
+        $candidates = $this->candidatesWithLoadForProject($db, $project, $this->normalizeIds($exclusions), $loadOverrides);
         $available = count($candidates);
 
         if ($available < $desiredCount) {
@@ -98,7 +98,7 @@ final class ThesisTribunalService
     }
 
     /** @return array<int,array<string,int|string|null>> */
-    private function candidatesWithLoadForProject(PDO $db, array $project, array $additionalExclusions): array
+    private function candidatesWithLoadForProject(PDO $db, array $project, array $additionalExclusions, array $loadOverrides = []): array
     {
         $excluded = array_values(array_unique(array_merge($this->incompatibleIds($db, (int)$project['id'], (int)$project['tutor_id']), $additionalExclusions)));
         $active = "'" . implode("','", self::ACTIVE_PROJECT_STATUSES) . "'";
@@ -118,7 +118,8 @@ final class ThesisTribunalService
             LEFT JOIN (SELECT pp.user_id,COUNT(DISTINCT p.id) tribunal_projects_count FROM project_participants pp JOIN projects p ON p.id=pp.project_id WHERE pp.status='active' AND pp.removed_at IS NULL AND LOWER(pp.role_code) IN ('tribunal','jury') AND p.deleted_at IS NULL AND p.id<>:tribunal_project AND p.status IN ($active) GROUP BY pp.user_id) j ON j.user_id=u.id
             WHERE $where ORDER BY u.full_name";
         $query=$db->prepare($sql); $query->execute($params); $rows=$query->fetchAll();
-        foreach($rows as &$row){$row['user_id']=(int)$row['user_id'];$row['tutor_projects_count']=(int)$row['tutor_projects_count'];$row['cotutor_projects_count']=(int)$row['cotutor_projects_count'];$row['tribunal_projects_count']=(int)$row['tribunal_projects_count'];$row['total_active_assignments']=$row['tutor_projects_count']+$row['cotutor_projects_count']+$row['tribunal_projects_count'];$row['effective_load']=$row['total_active_assignments'];} unset($row);
+        $overrides = []; foreach ($loadOverrides as $userId => $value) { if (filter_var($userId, FILTER_VALIDATE_INT) !== false && is_numeric($value) && (int)$value >= 0 && (int)$value <= 99 && (string)(int)$value === (string)$value) $overrides[(int)$userId] = (int)$value; }
+        foreach($rows as &$row){$row['user_id']=(int)$row['user_id'];$row['tutor_projects_count']=(int)$row['tutor_projects_count'];$row['cotutor_projects_count']=(int)$row['cotutor_projects_count'];$row['tribunal_projects_count']=(int)$row['tribunal_projects_count'];$row['total_active_assignments']=$row['tutor_projects_count']+$row['cotutor_projects_count']+$row['tribunal_projects_count'];$row['calculated_load']=$row['total_active_assignments'];$row['has_temporary_override']=array_key_exists($row['user_id'],$overrides);$row['effective_load']=$overrides[$row['user_id']]??$row['calculated_load'];} unset($row);
         return $rows;
     }
 

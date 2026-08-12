@@ -90,7 +90,8 @@ final class ProjectsController
                 $projectId,
                 (int) ($_GET['desired_count'] ?? 0),
                 (array) ($_GET['exclude_user_ids'] ?? []),
-                $replacement
+                $replacement,
+                (array) ($_GET['load_overrides'] ?? [])
             );
             $this->json(['success'=>true,'message'=>'','data'=>$data]);
         } catch (ThesisTribunalException $e) {
