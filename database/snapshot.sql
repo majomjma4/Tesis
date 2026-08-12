@@ -1451,6 +1451,26 @@ INSERT INTO `users` VALUES (1,'tesisad@gmail.com',NULL,'$2y$10$.pvvdS7PcHlMOseQs
 UNLOCK TABLES;
 
 --
+-- Table structure for table `academic_defense_schedules`
+--
+
+DROP TABLE IF EXISTS `academic_defense_schedules`;
+CREATE TABLE `academic_defense_schedules` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `academic_period_id` smallint(5) unsigned NOT NULL,
+  `defense_date` date DEFAULT NULL,
+  `defense_time` time DEFAULT NULL,
+  `updated_by` bigint(20) unsigned DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_academic_defense_schedules_period` (`academic_period_id`),
+  KEY `idx_academic_defense_schedules_updated_by` (`updated_by`),
+  CONSTRAINT `fk_academic_defense_schedules_period` FOREIGN KEY (`academic_period_id`) REFERENCES `academic_periods` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_academic_defense_schedules_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
 -- Dumping events for database 'tesis'
 --
 

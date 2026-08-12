@@ -7,7 +7,7 @@ final class ThesisManagementService
 {
     private const ELIGIBLE_STATUSES = ['approved', 'defense'];
 
-    /** @return array{projects:list<array<string,mixed>>,periods:list<array{id:int,name:string}>,summary:array<string,int>} */
+    /** @return array{projects:list<array<string,mixed>>,periods:list<array{id:int,name:string}>,summary:array<string,int>,defenseSchedules:array<int,array<string,mixed>>} */
     public function listing(): array
     {
         $db = Database::connection();
@@ -23,12 +23,12 @@ final class ThesisManagementService
              WHERE p.deleted_at IS NULL AND p.status IN ('approved','defense')
              ORDER BY p.updated_at DESC,p.id DESC"
         )->fetchAll();
-        if ($rows === []) return ['projects'=>[], 'periods'=>[], 'summary'=>$this->emptySummary()];
+        if ($rows === []) return ['projects'=>[], 'periods'=>[], 'summary'=>$this->emptySummary(), 'defenseSchedules'=>[]];
 
         $ids = array_map(static fn(array $row): int => (int) $row['id'], $rows);
         $marks = implode(',', array_fill(0, count($ids), '?'));
         $people = $db->prepare(
-            "SELECT pp.project_id,pp.user_id,pp.role_code,pp.is_leader,u.full_name
+            "SELECT pp.project_id,pp.user_id,pp.role_code,pp.is_leader,u.full_name,u.email
              FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id
              WHERE pp.project_id IN ($marks) AND pp.status='active' AND pp.removed_at IS NULL
                AND LOWER(pp.role_code) IN ('student','tutor','cotutor','co_tutor','co-tutor','tribunal','jury')
@@ -42,26 +42,28 @@ final class ThesisManagementService
         $projects = [];
         foreach ($rows as $row) {
             $members = $byProject[(int) $row['id']] ?? [];
-            $students=[]; $cotutors=[]; $tribunal=[]; $tribunalIds=[];
+            $students=[]; $cotutors=[]; $tribunal=[]; $tribunalDetails=[]; $tribunalIds=[];
             foreach ($members as $member) {
                 $role = strtolower((string) $member['role_code']);
                 if ($role === 'student') $students[] = (string) $member['full_name'];
                 elseif (in_array($role, ['cotutor','co_tutor','co-tutor'], true)) $cotutors[] = (string) $member['full_name'];
-                elseif (in_array($role, ['tribunal','jury'], true)) {$tribunal[] = (string) $member['full_name']; $tribunalIds[]=(int)$member['user_id'];}
+                elseif (in_array($role, ['tribunal','jury'], true)) {$tribunal[] = (string) $member['full_name']; $tribunalDetails[]=['name'=>(string)$member['full_name'],'email'=>(string)($member['email']??'')]; $tribunalIds[]=(int)$member['user_id'];}
             }
             $situation = $this->situation((string) $row['status'], count($tribunal));
             $summary[$situation['key']]++;
             $projects[] = $row + [
                 'students'=>$students, 'students_label'=>implode(' · ', $students) ?: 'Sin estudiantes activos',
                 'cotutors'=>$cotutors, 'tutor_label'=>$this->tutorLabel((string) ($row['tutor_name'] ?? ''), $cotutors),
-                'tribunal_members'=>$tribunal, 'tribunal_member_ids'=>$tribunalIds, 'tribunal_count'=>count($tribunal),
+                'tribunal_members'=>$tribunal, 'tribunal_member_details'=>$tribunalDetails, 'tribunal_member_ids'=>$tribunalIds, 'tribunal_count'=>count($tribunal),
                 'tribunal_label'=>count($tribunal) ? count($tribunal).' '.(count($tribunal) === 1 ? 'miembro' : 'miembros') : 'Sin asignar',
                 'situation'=>$situation,
             ];
         }
         $periods=[];
         foreach ($rows as $row) $periods[(int)$row['period_id']] = ['id'=>(int)$row['period_id'], 'name'=>(string)$row['period_name']];
-        return ['projects'=>$projects, 'periods'=>array_values($periods), 'summary'=>$summary];
+        $periodList = array_values($periods);
+        $schedules = (new ThesisDefenseScheduleService())->forPeriods(array_keys($periods));
+        return ['projects'=>$projects, 'periods'=>$periodList, 'summary'=>$summary, 'defenseSchedules'=>$schedules];
     }
 
     /** @return array{key:string,label:string,description:string,action:string} */

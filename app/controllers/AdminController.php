@@ -402,8 +402,8 @@ final class AdminController
         }
         if($initialUploads!==[]){
             $limits=(new SupportMaterialFileService())->limits();
-            if(count($initialUploads)>(int)$limits['max_operation_files'])$this->json(false,'Puedes agregar hasta '.$limits['max_operation_files'].' archivos por operaciÃ³n.',[],422);
-            if(array_sum(array_map(static fn(array $upload):int=>(int)($upload['size']??0),$initialUploads))>(int)$limits['max_operation_bytes'])$this->json(false,'La selecciÃ³n completa supera el lÃ­mite de '.$limits['max_operation_mb'].' MB por operaciÃ³n.',[],422);
+            if(count($initialUploads)>(int)$limits['max_operation_files'])$this->json(false,'Puedes agregar hasta '.$limits['max_operation_files'].' archivos por operación.',[],422);
+            if(array_sum(array_map(static fn(array $upload):int=>(int)($upload['size']??0),$initialUploads))>(int)$limits['max_operation_bytes'])$this->json(false,'La selección completa supera el límite de '.$limits['max_operation_mb'].' MB por operación.',[],422);
         }
         $capabilities=new SupportMaterialCapabilityService();
         try{
@@ -449,7 +449,7 @@ final class AdminController
                         $storedInitialFiles[]=$stored;
                         $fileId=$model->addFile($saved,$stored,(int)$session->userId());
                         (new AdminActivityService($database))->record(
-                            (int)$session->userId(),'support_material.file_added','AgregÃ³ un archivo al material',
+                            (int)$session->userId(),'support_material.file_added','Agregó un archivo al material',
                             'Repositorio','support_material',$saved,$stored['original_name'],'correct',[
                                 'file_id'=>$fileId,'name'=>$stored['original_name'],'extension'=>$stored['extension'],
                                 'mime_type'=>$stored['mime_type'],'size_bytes'=>$stored['size_bytes'],'is_package'=>false,

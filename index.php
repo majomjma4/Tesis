@@ -85,6 +85,7 @@ match ($page) {
     'thesis-tribunal-suggest' => (new ProjectsController())->suggestThesisTribunal(),
     'thesis-tribunal-save' => (new ProjectsController())->saveThesisTribunal(),
     'thesis-defense-information-save' => (new ProjectsController())->saveThesisDefenseInformation(),
+    'thesis-defense-schedule-save' => (new ProjectsController())->saveThesisDefenseSchedule(),
     'thesis-defense-new-attempt' => (new ProjectsController())->startThesisDefenseAttempt(),
     'thesis-tribunal-result-save' => (new ProjectsController())->saveThesisTribunalResult(),
     'thesis-publish' => (new ProjectsController())->publishThesis(),

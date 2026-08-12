@@ -64,7 +64,8 @@ final class ProjectsController
             'thesisProjects' => $listing['projects'],
             'thesisPeriods' => $listing['periods'],
             'thesisSummary' => $listing['summary'],
-            'thesisTribunalConfig' => ['suggest'=>route('thesis-tribunal-suggest'),'save'=>route('thesis-tribunal-save'),'defenseInfo'=>route('thesis-defense-information-save'),'resultSave'=>route('thesis-tribunal-result-save'),'publish'=>route('thesis-publish'),'csrf'=>$session->csrfToken('thesis_management')],
+            'thesisDefenseSchedules' => $listing['defenseSchedules'],
+            'thesisTribunalConfig' => ['suggest'=>route('thesis-tribunal-suggest'),'save'=>route('thesis-tribunal-save'),'defenseInfo'=>route('thesis-defense-information-save'),'scheduleSave'=>route('thesis-defense-schedule-save'),'resultSave'=>route('thesis-tribunal-result-save'),'publish'=>route('thesis-publish'),'csrf'=>$session->csrfToken('thesis_management')],
         ]);
     }
 
@@ -121,6 +122,26 @@ final class ProjectsController
         try {$data=(new ThesisDefenseService())->save((int)($_POST['project_id']??0),$_POST,(int)$session->userId());$this->json(['success'=>true,'message'=>'Información de defensa guardada.','data'=>$data]);}
         catch(ThesisDefenseException $e){http_response_code($e->httpStatus());$this->json(['success'=>false,'message'=>$e->getMessage(),'data'=>[]]);}
         catch(Throwable $e){error_log('Defense info: '.$e->getMessage());http_response_code(500);$this->json(['success'=>false,'message'=>'No fue posible guardar la información de defensa.','data'=>[]]);}
+    }
+
+    public function saveThesisDefenseSchedule(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') { http_response_code(405); $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]); }
+        $session = new AuthSessionService();
+        if (!(new TeacherThesisCapabilityService())->canManageCurrentUser()) { http_response_code(403); $this->json(['success'=>false,'message'=>'No tienes autorización para programar defensas.','data'=>[]]); }
+        if (!$session->validateCsrf('thesis_management', (string) ($_POST['_csrf'] ?? ''))) { http_response_code(419); $this->json(['success'=>false,'message'=>'La sesión del formulario venció.','data'=>[]]); }
+        try {
+            $data = (new ThesisDefenseScheduleService())->save((int) ($_POST['academic_period_id'] ?? 0), $_POST, (int) $session->userId());
+            $messages = ['created'=>'Programación global de defensa guardada.', 'updated'=>'Programación global de defensa actualizada.', 'cleared'=>'Programación global de defensa eliminada.', 'unchanged'=>'La programación no tiene cambios.'];
+            $this->json(['success'=>true,'message'=>$messages[$data['action']] ?? 'Programación guardada.','data'=>$data]);
+        } catch (ThesisDefenseScheduleException $e) {
+            http_response_code($e->httpStatus());
+            $this->json(['success'=>false,'message'=>$e->getMessage(),'data'=>[]]);
+        } catch (Throwable $e) {
+            error_log('Thesis defense schedule: ' . $e->getMessage());
+            http_response_code(500);
+            $this->json(['success'=>false,'message'=>'No fue posible guardar la programación global de defensa.','data'=>[]]);
+        }
     }
 
     public function startThesisDefenseAttempt(): void
