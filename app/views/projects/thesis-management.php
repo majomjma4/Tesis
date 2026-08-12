@@ -48,9 +48,9 @@ if ($byStatus['rejected'] !== []) $tabs['rejected'] = ['label' => 'No aprobados'
                     <button type="button" class="tm-search-clear" data-tm-clear-search aria-label="Limpiar búsqueda" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                 </label>
                 <?php if (count($periods) === 1): $period = $periods[0]; ?>
-                    <div class="ar-filter-control ar-fixed-filter"><span>Período acad</span><div><i class="fa-regular fa-calendar" aria-hidden="true"></i><strong><?= e((string) $period['name']) ?></strong></div></div>
+                    <div class="ar-filter-control ar-fixed-filter"><span>Período Académico</span><div><i class="fa-regular fa-calendar" aria-hidden="true"></i><strong><?= e((string) $period['name']) ?></strong></div></div>
                 <?php elseif (count($periods) > 1): ?>
-                    <label class="ar-filter-control"><span>Período acad</span><select data-tm-period><option value="">Todos</option><?php foreach ($periods as $period): ?><option value="<?= (int) $period['id'] ?>"><?= e((string) $period['name']) ?></option><?php endforeach; ?></select></label>
+                    <label class="ar-filter-control"><span>Período Académico</span><select data-tm-period><option value="">Todos</option><?php foreach ($periods as $period): ?><option value="<?= (int) $period['id'] ?>"><?= e((string) $period['name']) ?></option><?php endforeach; ?></select></label>
                 <?php endif; ?>
             </div>
 
@@ -62,7 +62,7 @@ if ($byStatus['rejected'] !== []) $tabs['rejected'] = ['label' => 'No aprobados'
                             <input type="hidden" name="academic_period_id" value="<?= (int) $schedulePeriod['id'] ?>" data-defense-schedule-period>
                             <p data-defense-schedule-period-label><?= e((string) $schedulePeriod['name']) ?></p>
                         <?php else: ?>
-                            <label>Período acad<select name="academic_period_id" data-defense-schedule-period><?php foreach ($periods as $period): ?><option value="<?= (int) $period['id'] ?>" <?= (int) $period['id'] === (int) $schedulePeriod['id'] ? 'selected' : '' ?>><?= e((string) $period['name']) ?></option><?php endforeach; ?></select></label>
+                            <label>Período Académico<select name="academic_period_id" data-defense-schedule-period><?php foreach ($periods as $period): ?><option value="<?= (int) $period['id'] ?>" <?= (int) $period['id'] === (int) $schedulePeriod['id'] ? 'selected' : '' ?>><?= e((string) $period['name']) ?></option><?php endforeach; ?></select></label>
                         <?php endif; ?>
                         <label>Fecha de defensa<input type="date" name="defense_date" value="<?= e((string) ($schedule['defense_date'] ?? '')) ?>"></label>
                         <label>Hora de defensa<input type="time" name="defense_time" value="<?= e(substr((string) ($schedule['defense_time'] ?? ''), 0, 5)) ?>"></label>
@@ -96,7 +96,7 @@ if ($byStatus['rejected'] !== []) $tabs['rejected'] = ['label' => 'No aprobados'
                                     <dl>
                                         <div><dt>Estudiante(s)</dt><dd data-tm-highlight><?= e((string) $project['students_label']) ?></dd></div>
                                         <div><dt>Tutor</dt><dd><?= e((string) $project['tutor_label']) ?></dd></div>
-                                        <div><dt>Estado acad</dt><dd><span class="assigned-status is-<?= e((string) $project['status']) ?>"><?= e($statusLabels[(string) $project['status']]) ?></span></dd></div>
+                                        <div><dt>Estado Académico</dt><dd><span class="assigned-status is-<?= e((string) $project['status']) ?>"><?= e($statusLabels[(string) $project['status']]) ?></span></dd></div>
                                         <div><dt>Tribunal</dt><dd><?= e((string) $project['tribunal_label']) ?></dd></div>
                                         <div><dt>Período</dt><dd><?= e((string) $project['period_name']) ?></dd></div>
                                         <?php if ($status !== 'approved'): ?><div><dt>Información de defensa</dt><dd><?= $hasDefenseInfo ? e(trim(implode(' \u00b7 ', array_filter([(string) ($project['defense_date'] ?? ''), (string) ($project['defense_time'] ?? ''), (string) ($project['defense_location'] ?? '')]))) ?: 'Registrada') : 'No registrada' ?></dd></div><?php endif; ?>

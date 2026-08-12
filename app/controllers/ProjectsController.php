@@ -611,6 +611,100 @@ final class ProjectsController
     private function stream(array $file,$stream,string $disposition,?string $verifiedMime=null):never{$stat=fstat($stream);$size=is_array($stat)?(int)($stat['size']??$file['size_bytes']):(int)$file['size_bytes'];header('Content-Type: '.($verifiedMime?:((string)$file['mime_type'])));header('Content-Length: '.$size);header("Content-Disposition: {$disposition}; filename*=UTF-8''".rawurlencode((string)$file['original_name']));header('X-Content-Type-Options: nosniff');if($disposition==='inline')header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");header('Cache-Control: private, no-store, max-age=0');fpassthru($stream);fclose($stream);exit;}
     private function json(array $payload):never{header('Content-Type: application/json; charset=UTF-8');echo json_encode($payload,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);exit;}
 
+    public function saveProjectDraft(): void
+    {
+        [$session, $access] = $this->draftRequest(); $userId = $access->currentUserId();
+        try {
+            $draftService = new ProjectDraftService(); $catalogs = $draftService->catalogs($userId, $access->projectCreationPolicy());
+            $draft = $draftService->normalize($_POST, $access->projectCreationPolicy(), $catalogs); $errors = $draftService->validateForStorage($draft, $access->projectCreationPolicy(), $catalogs);
+            if ($errors !== []) $this->json(['success'=>false,'message'=>reset($errors),'data'=>['errors'=>$errors]]);
+            $payload = $this->draftPayload($draft, $catalogs, (string) ($_POST['current_step'] ?? 'type'));
+            $saved = (new ProjectDraftStorageService())->save($userId, $payload);
+            $this->json(['success'=>true,'message'=>'Cambios guardados temporalmente.','data'=>['draft'=>$saved]]);
+        } catch (Throwable $exception) { error_log('Project draft save: ' . $exception->getMessage()); http_response_code(500); $this->json(['success'=>false,'message'=>'No fue posible guardar el borrador.','data'=>[]]); }
+    }
+
+    public function uploadProjectDraftFile(): void
+    {
+        [, $access] = $this->draftRequest(); $userId = $access->currentUserId();
+        try {
+            $catalogs = (new ProjectDraftService())->catalogs($userId, $access->projectCreationPolicy());
+            if ($catalogs['active_period'] === null || $catalogs['student'] === null) throw new InvalidArgumentException((string) $catalogs['availability_message']);
+            $uploads = $this->draftUploads($_FILES['files'] ?? []); if ($uploads === []) throw new InvalidArgumentException('Selecciona al menos un archivo.');
+            $storage = new ProjectDraftStorageService(); $added = []; $failed = [];
+            foreach ($uploads as $upload) try { $added[] = $storage->addUpload($userId, $upload, (bool) ((int) ($_POST['replace'] ?? 0))); }
+            catch (ProjectDraftFileConflictException $exception) { $failed[] = ['name'=>(string)($upload['name'] ?? 'Archivo'),'message'=>$exception->getMessage(),'replace_file_id'=>$exception->fileId]; }
+            catch (Throwable $exception) { $failed[] = ['name'=>(string)($upload['name'] ?? 'Archivo'),'message'=>$exception instanceof InvalidArgumentException ? $exception->getMessage() : 'No se pudo subir el archivo.']; }
+            $draft = $storage->active($userId); $status = $added === [] ? 422 : ($failed === [] ? 200 : 207);
+            http_response_code($status); $this->json(['success'=>$added !== [],'message'=>$added === [] ? 'No se pudo subir ningún archivo.' : 'Archivo temporal agregado.','data'=>['added'=>$added,'failed'=>$failed,'draft'=>$draft]]);
+        } catch (Throwable $exception) { error_log('Project draft upload: ' . $exception->getMessage()); http_response_code(422); $this->json(['success'=>false,'message'=>$exception instanceof InvalidArgumentException ? $exception->getMessage() : 'No se pudo subir el archivo.','data'=>[]]); }
+    }
+
+    public function removeProjectDraftFile(): void
+    {
+        [, $access] = $this->draftRequest();
+        try { (new ProjectDraftStorageService())->removeFile($access->currentUserId(), (int) ($_POST['file_id'] ?? 0)); $this->json(['success'=>true,'message'=>'Archivo eliminado.','data'=>['draft'=>(new ProjectDraftStorageService())->active($access->currentUserId())]]); }
+        catch (Throwable $exception) { http_response_code(422); $this->json(['success'=>false,'message'=>$exception instanceof InvalidArgumentException ? $exception->getMessage() : 'No se pudo eliminar el archivo.','data'=>[]]); }
+    }
+
+    public function resetProjectDraft(): void
+    {
+        [, $access] = $this->draftRequest();
+        try { (new ProjectDraftStorageService())->delete($access->currentUserId()); $this->json(['success'=>true,'message'=>'Borrador eliminado correctamente.','data'=>[]]); }
+        catch (Throwable $exception) { error_log('Project draft reset: ' . $exception->getMessage()); http_response_code(500); $this->json(['success'=>false,'message'=>'No fue posible eliminar el borrador.','data'=>[]]); }
+    }
+
+    /** Revalida el borrador temporal; no registra ni promueve datos definitivos. */
+    public function preflightProjectDraft(): void
+    {
+        [, $access] = $this->draftRequest();
+        $userId = $access->currentUserId();
+        try {
+            $draftService = new ProjectDraftService();
+            $catalogs = $draftService->catalogs($userId, $access->projectCreationPolicy());
+            $stored = (new ProjectDraftStorageService())->active($userId);
+            if ($stored === null) throw new InvalidArgumentException('No se encontró un borrador temporal para revisar.');
+            $payload = is_array($stored['payload'] ?? null) ? $stored['payload'] : [];
+            $draft = $draftService->normalize($payload, $access->projectCreationPolicy(), $catalogs);
+            $errors = $draftService->validate($draft, $access->projectCreationPolicy(), $catalogs);
+            foreach ((array) ($stored['files'] ?? []) as $file) {
+                if (($file['available'] ?? false) !== true) {
+                    $errors['files'] = 'Uno o más archivos temporales ya no están disponibles. Quítalos o vuelve a subirlos.';
+                    break;
+                }
+            }
+            if ($errors !== []) {
+                http_response_code(422);
+                $this->json(['success'=>false,'message'=>'Revisa la información indicada antes de registrar el proyecto.','data'=>['errors'=>$errors,'draft'=>$stored]]);
+            }
+            $this->json(['success'=>true,'message'=>'El borrador está listo para confirmar.','data'=>['draft'=>$stored,'summary'=>$draftService->confirmation($draft, (array) ($stored['files'] ?? []), $catalogs)]]);
+        } catch (Throwable $exception) {
+            error_log('Project draft preflight: ' . $exception->getMessage());
+            http_response_code($exception instanceof InvalidArgumentException ? 422 : 500);
+            $this->json(['success'=>false,'message'=>$exception instanceof InvalidArgumentException ? $exception->getMessage() : 'No fue posible validar el borrador.','data'=>[]]);
+        }
+    }
+
+    private function draftRequest(): array
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') { http_response_code(405); $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]); }
+        $session = new AuthSessionService(); $access = new ProjectAccessService();
+        if (!$access->can('project.create')) { http_response_code(403); $this->json(['success'=>false,'message'=>'No tienes autorización para gestionar este borrador.','data'=>[]]); }
+        if (!$session->validateCsrf('project_draft', (string) ($_POST['_csrf'] ?? ''))) { http_response_code(419); $this->json(['success'=>false,'message'=>'Tu sesión expiró. Inicia sesión nuevamente para continuar.','data'=>[]]); }
+        return [$session, $access];
+    }
+
+    private function draftPayload(array $draft, array $catalogs, string $step): array
+    {
+        return ['type'=>$draft['type'],'title'=>$draft['title'],'description'=>$draft['description'],'period'=>(string)($catalogs['active_period']['code'] ?? ''),'career_id'=>(int)($catalogs['student']['career_id'] ?? 0),'semester'=>(int)($catalogs['student']['semester'] ?? 0),'modality'=>$draft['modality'],'research_line'=>$draft['research_line'],'tutor_id'=>$draft['tutor_id'],'members'=>$draft['members'],'leader_id'=>$draft['leader_id'],'tags'=>$draft['tags'],'current_step'=>in_array($step,['type','details','team','files','confirm'],true)?$step:'type'];
+    }
+
+    private function draftUploads(array $files): array
+    {
+        if (!is_array($files['name'] ?? null)) return $files ? [$files] : [];
+        $out = []; foreach ($files['name'] as $index => $name) $out[] = ['name'=>$name,'type'=>$files['type'][$index] ?? '','tmp_name'=>$files['tmp_name'][$index] ?? '','error'=>$files['error'][$index] ?? UPLOAD_ERR_NO_FILE,'size'=>$files['size'][$index] ?? 0]; return $out;
+    }
+
     /** Mantiene accesible la ruta global mientras se construye el formulario definitivo. */
     public function create(): void
     {
@@ -621,14 +715,23 @@ final class ProjectsController
         if (!isset($_SESSION['project_draft_csrf'])) $_SESSION['project_draft_csrf'] = bin2hex(random_bytes(32));
         $draftService = new ProjectDraftService();
         $fileService = new PrivateProjectFileService();
-        $draft = $draftService->normalize([], $policy); $errors = []; $validated = false; $confirmation = null;
+        $userId = $access->currentUserId();
+        try {
+            $catalogs = $draftService->catalogs($userId, $policy);
+        } catch (Throwable $exception) {
+            error_log('ProjectDraftService catalogs: ' . $exception->getMessage());
+            $catalogs = ['types'=>[], 'active_period'=>null, 'student'=>null, 'availability_message'=>'No fue posible cargar la información académica. Inténtalo nuevamente.', 'modalities'=>['individual'=>'Individual','group'=>'Grupal'], 'research_lines'=>[], 'teachers'=>[], 'students'=>[], 'keywords'=>[]];
+        }
+        try { $storedDraft = (new ProjectDraftStorageService())->active($userId); }
+        catch (Throwable $exception) { error_log('Project draft load: ' . $exception->getMessage()); $storedDraft = null; }
+        $draft = $draftService->normalize([], $policy, $catalogs); $errors = []; $validated = false; $confirmation = null;
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && $policy['can_create']) {
-            $draft = $draftService->normalize($_POST, $policy);
+            $draft = $draftService->normalize($_POST, $policy, $catalogs);
             if (!hash_equals((string) $_SESSION['project_draft_csrf'], (string) ($_POST['_csrf'] ?? ''))) $errors['_form'] = 'La sesión del formulario venció. Recarga la página e inténtalo nuevamente.';
-            $errors += $draftService->validate($draft, $policy);
+            $errors += $draftService->validate($draft, $policy, $catalogs);
             $fileResult = $draftService->validateFiles($_FILES['files'] ?? [], $fileService);
             $errors += $fileResult['errors'];
-            if ($errors === []) { $validated = true; $confirmation = $draftService->confirmation($draft, $fileResult['valid']); }
+            if ($errors === []) { $validated = true; $confirmation = $draftService->confirmation($draft, $fileResult['valid'], $catalogs); }
         }
         View::render('projects/new', [
             'currentPage' => 'projects',
@@ -636,9 +739,11 @@ final class ProjectsController
             'bodyClass' => 'project-wizard-page',
             'pageStyles' => [asset('css/project-wizard.css')],
             'pageScript' => asset('js/project-wizard.js'),
-            'creationPolicy' => $policy, 'catalogs' => $draftService->catalogs(), 'fieldContract' => $draftService->fieldContract(),
+            'creationPolicy' => $policy, 'catalogs' => $catalogs, 'fieldContract' => $draftService->fieldContract($catalogs),
             'fileLimits' => $fileService->limits(), 'draft' => $draft, 'errors' => $errors, 'draftValidated' => $validated,
-            'confirmation' => $confirmation, 'projectDraftCsrf' => (string) $_SESSION['project_draft_csrf'],
+            'confirmation' => $confirmation, 'projectDraftCsrf' => (string) $_SESSION['project_draft_csrf'], 'draftStorageKey' => 'academic_project_draft_v1_' . $userId,
+            'storedDraft' => $storedDraft, 'projectDraftApiCsrf' => (new AuthSessionService())->csrfToken('project_draft'),
+            'projectDraftEndpoints' => ['save'=>route('project-draft-save'),'upload'=>route('project-draft-upload'),'remove'=>route('project-draft-file-remove'),'reset'=>route('project-draft-reset'),'preflight'=>route('project-draft-preflight')],
         ]);
     }
 }
