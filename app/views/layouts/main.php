@@ -209,7 +209,7 @@
         </header>
         <?php
         $daysLeft = $layoutTemporaryPasswordRemainingDays ?? null;
-        $showWarning = !empty($layoutMustChangePassword) && !$isAdministratorLayout && $daysLeft !== null && $daysLeft > 0 && empty($layoutIsTemporaryPasswordDismissedToday);
+        $showWarning = !empty($layoutHasTemporaryPassword) && !$isAdministratorLayout && $daysLeft !== null && $daysLeft > 0 && empty($layoutIsTemporaryPasswordDismissedToday);
         ?>
         <?php if ($showWarning): ?>
             <?php

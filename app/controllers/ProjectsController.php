@@ -81,8 +81,13 @@ final class ProjectsController
         if (!(new TeacherThesisCapabilityService())->canManageCurrentUser()) { http_response_code(403); $this->json(['success'=>false,'message'=>'No tienes autorización para gestionar Tribunal.','data'=>[]]); }
         $replacement = (string) ($_GET['mode'] ?? '') === 'replacement';
         try {
-            $data = (new ThesisTribunalService())->suggest(
-                (int) ($_GET['project_id'] ?? 0),
+            $service = new ThesisTribunalService();
+            $projectId = (int) ($_GET['project_id'] ?? 0);
+            if ((string) ($_GET['mode'] ?? '') === 'catalog') {
+                $this->json(['success'=>true,'message'=>'','data'=>['items'=>$service->availableWithLoad($projectId)]]);
+            }
+            $data = $service->suggest(
+                $projectId,
                 (int) ($_GET['desired_count'] ?? 0),
                 (array) ($_GET['exclude_user_ids'] ?? []),
                 $replacement

@@ -1,4 +1,16 @@
 (() => {
+    const modal = document.querySelector('[data-password-change-modal]');
+    const forced = modal?.dataset.passwordForced === '1';
+    const dialog = modal?.querySelector('.admin-access-card');
+    const closeButton = modal?.querySelector('[data-password-modal-close]');
+    const openerElement = document.querySelector('[href*="change-password"]');
+    const closeVoluntary = () => { if (forced || !modal) return; modal.hidden = true; if (openerElement) openerElement.focus(); else window.location.assign(modal.dataset.passwordCloseUrl || '/'); };
+    if (!forced && modal) {
+        closeButton?.addEventListener('click', closeVoluntary);
+        modal.addEventListener('click', event => { if (event.target === modal) closeVoluntary(); });
+        document.addEventListener('keydown', event => { if (event.key === 'Escape' && !modal.hidden) closeVoluntary(); });
+        dialog?.focus();
+    }
     const form = document.getElementById('changePasswordForm');
     const currentInput = document.getElementById('currentPassword');
     const newPassInput = document.getElementById('newPassword');

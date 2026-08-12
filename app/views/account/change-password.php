@@ -1,11 +1,12 @@
-<main class="admin-access-shell<?= $forcedPasswordChange ? ' forced-password-shell' : '' ?>">
+<main class="admin-access-shell<?= $forcedPasswordChange ? ' forced-password-shell' : ' voluntary-password-modal' ?>" data-password-change-modal data-password-forced="<?= $forcedPasswordChange ? '1' : '0' ?>" data-password-close-url="<?= e(route('dashboard')) ?>">
     <?php if (!$forcedPasswordChange): ?>
         <nav aria-label="Migas de pan"><a href="<?= e(route('dashboard')) ?>">Inicio</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span>Cambiar contraseña</span></nav>
     <?php endif; ?>
-    <section class="admin-access-card">
+    <section class="admin-access-card" role="dialog" aria-modal="true" aria-labelledby="changePasswordTitle" tabindex="-1">
+        <?php if (!$forcedPasswordChange): ?><button type="button" class="password-modal-close" data-password-modal-close aria-label="Cerrar"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><?php endif; ?>
         <span class="admin-access-icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
         <p class="admin-access-eyebrow">Seguridad de la cuenta</p>
-        <h1><?= $forcedPasswordChange ? 'Actualiza tu contraseña para continuar' : 'Cambiar contraseña' ?></h1>
+        <h1 id="changePasswordTitle"><?= $forcedPasswordChange ? 'Actualiza tu contraseña para continuar' : 'Cambiar contraseña' ?></h1>
         <p><?= $forcedPasswordChange ? 'La contraseña temporal llegó a su límite de avisos o venció.' : 'El cambio cerrará las demás sesiones abiertas de tu cuenta.' ?></p>
 
         <?php if($passwordError): ?>

@@ -74,6 +74,7 @@ final class View
             'layoutIsInitialAdmin' => (new AuthSessionService())->isInitialAdmin(),
             'layoutPasswordWarningCount' => (new AuthSessionService())->passwordWarningCount(),
             'layoutMustChangePassword' => (new AuthSessionService())->mustChangePassword(),
+            'layoutHasTemporaryPassword' => (new AuthSessionService())->hasTemporaryPassword(),
             'layoutTemporaryPasswordRemainingDays' => (new AuthSessionService())->temporaryPasswordRemainingDays(),
             'layoutIsTemporaryPasswordDismissedToday' => (new AuthSessionService())->isTemporaryPasswordWarningDismissedToday(),
             'layoutTemporaryPasswordWarningCsrf' => $session->csrfToken('dismiss_temp_password_warning'),

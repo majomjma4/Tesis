@@ -146,7 +146,15 @@ final class AuthSessionService
     public function avatarPath(): ?string { $this->start(); $path=$_SESSION['avatar_path']??null; return is_string($path)&&$path!==''?$path:null; }
     public function avatarUpdatedAt(): ?string { $this->start(); $value=$_SESSION['avatar_updated_at']??null; return is_string($value)&&$value!==''?$value:null; }
     public function passwordWarningCount(): int { $this->start(); return (int)($_SESSION['password_warning_count']??0); }
-    public function mustChangePassword(): bool { $this->start(); return (bool)($_SESSION['must_change_password']??false); }
+    /** Bloqueo efectivo: una clave temporal marcada no fuerza el cambio hasta vencer. */
+    public function mustChangePassword(): bool
+    {
+        $this->start();
+        if (!(bool) ($_SESSION['must_change_password'] ?? false)) return false;
+        $expires = $_SESSION['temporary_password_expires_at'] ?? null;
+        return is_string($expires) && $expires !== '' && strtotime($expires) <= time();
+    }
+    public function hasTemporaryPassword(): bool { $this->start(); return (bool) ($_SESSION['must_change_password'] ?? false); }
     public function temporaryPasswordExpiresAt(): ?string { $this->start(); return isset($_SESSION['temporary_password_expires_at']) ? (string)$_SESSION['temporary_password_expires_at'] : null; }
     public function temporaryPasswordRemainingDays(): ?int
     {

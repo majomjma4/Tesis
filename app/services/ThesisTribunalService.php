@@ -61,6 +61,14 @@ final class ThesisTribunalService
         return ['project_id' => (int) $project['id'], 'desired_count' => $desiredCount, 'available_count' => $available, 'members' => array_slice($ordered, 0, $desiredCount)];
     }
 
+    /** Catálogo de docentes elegibles con carga, sin selección ni persistencia. */
+    public function availableWithLoad(int $id): array
+    {
+        $db = Database::connection();
+        $project = $this->availableProject($db, $id);
+        return $this->candidatesWithLoadForProject($db, $project, []);
+    }
+
     public function save(int $id, string $expected, array $memberIds, string $reason, int $actor): array
     {
         return Database::transaction(fn(PDO $db) => $this->saveInTransaction($db, $id, $expected, $memberIds, $reason, $actor));
