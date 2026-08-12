@@ -49,7 +49,7 @@ final class ThesisManagementService
                 elseif (in_array($role, ['cotutor','co_tutor','co-tutor'], true)) $cotutors[] = (string) $member['full_name'];
                 elseif (in_array($role, ['tribunal','jury'], true)) {$tribunal[] = (string) $member['full_name']; $tribunalDetails[]=['name'=>(string)$member['full_name'],'email'=>(string)($member['email']??'')]; $tribunalIds[]=(int)$member['user_id'];}
             }
-            $situation = $this->situation((string) $row['status'], count($tribunal));
+            $situation = $this->situation((string) $row['status'], count($tribunal), (string) ($row['defense_result'] ?? ''));
             $summary[$situation['key']]++;
             $projects[] = $row + [
                 'students'=>$students, 'students_label'=>implode(' · ', $students) ?: 'Sin estudiantes activos',
@@ -67,14 +67,15 @@ final class ThesisManagementService
     }
 
     /** @return array{key:string,label:string,description:string,action:string} */
-    private function situation(string $status, int $tribunalCount): array
+    private function situation(string $status, int $tribunalCount, string $latestDefenseResult = ''): array
     {
+        if ($status === 'defense' && $latestDefenseResult === 'rejected') return ['key'=>'rejected','label'=>'No aprobado','description'=>'El último intento de defensa no fue aprobado','action'=>'Cambiar Tribunal'];
         if ($status === 'approved') return ['key'=>'pending_tribunal','label'=>'Pendiente de Tribunal','description'=>ThesisTribunalService::isValidMemberCount($tribunalCount)?'Tribunal listo para confirmar':'Se requieren entre 3 y 5 miembros activos','action'=>'Gestionar Tribunal'];
         if ($status === 'defense') return ['key'=>'defense','label'=>'Defensa en curso','description'=>'Proceso de evaluación en curso','action'=>'Ver proceso'];
         return ['key'=>'pending_publication','label'=>'Pendiente de publicación','description'=>'Aprobado por el Tribunal','action'=>'Continuar proceso'];
     }
 
     /** @return array<string,int> */
-    private function emptySummary(): array { return ['pending_tribunal'=>0,'defense'=>0]; }
+    private function emptySummary(): array { return ['pending_tribunal'=>0,'defense'=>0,'rejected'=>0]; }
     private function tutorLabel(string $tutor, array $cotutors): string { $names=array_filter(array_merge([$tutor],$cotutors)); return $names ? implode(' · ', $names) : 'Sin tutor asignado'; }
 }
