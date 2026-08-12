@@ -58,7 +58,7 @@ final class RouteAccessService
 
     private function isSupportMaterialFileJsonRequest(string $page): bool
     {
-        return in_array($page,['dismiss-temp-password-warning','profile-avatar-update','profile-avatar-remove','admin-support-material-file','support-material-manage-save','support-material-manage-file','admin-project-file','admin-trash-restore','admin-trash-restore-batch','admin-trash-restore-all','admin-trash-delete','admin-trash-delete-batch','admin-trash-empty-category','project-document-review-save','project-adjustment-create','project-adjustment-respond','project-adjustment-address','project-adjustment-close','project-adjustment-list','thesis-tribunal-candidates','thesis-tribunal-save','thesis-defense-new-attempt'],true);
+        return in_array($page,['dismiss-temp-password-warning','profile-avatar-update','profile-avatar-remove','admin-support-material-file','support-material-manage-save','support-material-manage-file','admin-project-file','admin-trash-restore','admin-trash-restore-batch','admin-trash-delete','admin-trash-delete-batch','admin-trash-empty-category','project-document-review-save','project-adjustment-create','project-adjustment-respond','project-adjustment-address','project-adjustment-close','project-adjustment-list','thesis-tribunal-suggest','thesis-tribunal-save','thesis-defense-new-attempt'],true);
     }
 
     private function denyJson(string $message, int $status = 401): never

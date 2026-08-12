@@ -64,7 +64,7 @@ final class ProjectRecordModel
         if (!$project) return null;
 
         $project['participants'] = $this->rows($db, "SELECT pp.user_id,pp.role_code,pp.permission_level,pp.is_leader,pp.assigned_at,
-                   u.username,u.full_name,u.email,sp.institutional_code,(tp.user_id IS NOT NULL) AS is_teacher,(sp.user_id IS NOT NULL) AS is_student
+                    u.username,u.full_name,u.email,tp.academic_title,sp.institutional_code,(tp.user_id IS NOT NULL) AS is_teacher,(sp.user_id IS NOT NULL) AS is_student
             FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id
             LEFT JOIN teacher_profiles tp ON tp.user_id=u.id
             LEFT JOIN student_profiles sp ON sp.user_id=u.id

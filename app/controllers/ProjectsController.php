@@ -64,7 +64,7 @@ final class ProjectsController
             'thesisProjects' => $listing['projects'],
             'thesisPeriods' => $listing['periods'],
             'thesisSummary' => $listing['summary'],
-            'thesisTribunalConfig' => ['candidates'=>route('thesis-tribunal-candidates'),'save'=>route('thesis-tribunal-save'),'defenseInfo'=>route('thesis-defense-information-save'),'resultSave'=>route('thesis-tribunal-result-save'),'publish'=>route('thesis-publish'),'csrf'=>$session->csrfToken('thesis_management')],
+            'thesisTribunalConfig' => ['suggest'=>route('thesis-tribunal-suggest'),'save'=>route('thesis-tribunal-save'),'defenseInfo'=>route('thesis-defense-information-save'),'resultSave'=>route('thesis-tribunal-result-save'),'publish'=>route('thesis-publish'),'csrf'=>$session->csrfToken('thesis_management')],
         ]);
     }
 
@@ -72,6 +72,30 @@ final class ProjectsController
     {
         if (!(new TeacherThesisCapabilityService())->canManageCurrentUser()) { http_response_code(403); $this->json(['success'=>false,'message'=>'No tienes autorización para gestionar Tribunal.','data'=>[]]); }
         $id=(int)($_GET['project_id']??0);try{$items=(new ThesisTribunalService())->candidates($id);$this->json(['success'=>true,'message'=>'','data'=>['items'=>$items]]);}catch(ThesisTribunalException $e){http_response_code($e->httpStatus());$this->json(['success'=>false,'message'=>$e->getMessage(),'data'=>[]]);}
+    }
+
+    /** Genera una propuesta de Tribunal sin persistir cambios. */
+    public function suggestThesisTribunal(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') { http_response_code(405); $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]); }
+        if (!(new TeacherThesisCapabilityService())->canManageCurrentUser()) { http_response_code(403); $this->json(['success'=>false,'message'=>'No tienes autorización para gestionar Tribunal.','data'=>[]]); }
+        $replacement = (string) ($_GET['mode'] ?? '') === 'replacement';
+        try {
+            $data = (new ThesisTribunalService())->suggest(
+                (int) ($_GET['project_id'] ?? 0),
+                (int) ($_GET['desired_count'] ?? 0),
+                (array) ($_GET['exclude_user_ids'] ?? []),
+                $replacement
+            );
+            $this->json(['success'=>true,'message'=>'','data'=>$data]);
+        } catch (ThesisTribunalException $e) {
+            http_response_code($e->httpStatus());
+            $this->json(['success'=>false,'message'=>$e->getMessage(),'data'=>[]]);
+        } catch (Throwable $e) {
+            error_log('Thesis tribunal suggestion: ' . $e->getMessage());
+            http_response_code(500);
+            $this->json(['success'=>false,'message'=>'No fue posible generar la propuesta de Tribunal.','data'=>[]]);
+        }
     }
 
     public function saveThesisTribunal(): void

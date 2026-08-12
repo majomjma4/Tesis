@@ -82,7 +82,7 @@ match ($page) {
     'projects', 'proyectos', 'mis-proyectos' => (new ProjectsController())->index(),
     'assigned-projects' => (new ProjectsController())->assigned(),
     'thesis-management' => (new ProjectsController())->thesisManagement(),
-    'thesis-tribunal-candidates' => (new ProjectsController())->thesisTribunalCandidates(),
+    'thesis-tribunal-suggest' => (new ProjectsController())->suggestThesisTribunal(),
     'thesis-tribunal-save' => (new ProjectsController())->saveThesisTribunal(),
     'thesis-defense-information-save' => (new ProjectsController())->saveThesisDefenseInformation(),
     'thesis-defense-new-attempt' => (new ProjectsController())->startThesisDefenseAttempt(),

@@ -162,7 +162,7 @@ final class ProjectStatusTransitionService
             (new ProjectDescriptionService($db))->registerStatusReminder($projectId, $auditId);
 
             $labels = project_academic_labels($targetStatus);
-            if ($targetStatus === 'defense') (new ProjectAcademicNotificationService())->defenseStarted($db,$projectId,(string)$project['code'],(string)$project['title'],$actor);
+            if ($targetStatus === 'defense' && $context !== 'thesis_tribunal_assignment') (new ProjectAcademicNotificationService())->defenseStarted($db,$projectId,(string)$project['code'],(string)$project['title'],$actor);
             if ($recordCompletion) (new ProjectAcademicNotificationService())->finalApproval($db,$projectId,(string)$project['code'],(string)$project['title'],$targetStatus,(string)$labels['status'],$auditId);
             return [
                 'id' => $projectId, 'previous_status' => $expectedStatus, 'status' => $targetStatus,

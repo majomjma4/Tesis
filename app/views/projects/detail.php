@@ -44,7 +44,7 @@ if ($project === null): ?>
     $participantRows = static function (array $rows) use ($roleLabels, $dateLabel): array {
         return array_map(static fn (array $row): array => [
             'label' => ($roleLabels[$row['role_code']] ?? ucfirst((string) $row['role_code'])) . (!empty($row['is_leader']) ? ' líder' : ''),
-            'value' => (string) $row['full_name'],
+            'value' => trim((string) ($row['academic_title'] ?? '') . ' ' . (string) $row['full_name']),
         ], $rows);
     };
     $authorMetadata = null;
