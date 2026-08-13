@@ -284,17 +284,25 @@ function notificationIcon(type) {
 }
 
 function safeRecentNotificationUrl(actionUrl) {
-    const notificationsUrl = topbarNotificationsPanel?.querySelector("footer a")?.href || "index.php?page=notifications";
-    if (!actionUrl) return notificationsUrl;
+    const fallback = new URL(topbarNotificationsPanel?.querySelector("footer a")?.href || "index.php?page=notifications", window.location.href);
+    const applicationRoot = new URL(topbarNotificationsButton?.dataset.listEndpoint || "index.php?page=notifications", window.location.href).pathname.replace(/index\.php$/, "");
+    const frontController = `${applicationRoot}index.php`;
+    if (!actionUrl) return fallback.href;
 
     try {
         const destination = new URL(actionUrl, window.location.href);
-        const applicationRoot = new URL(topbarNotificationsButton.dataset.listEndpoint, window.location.href).pathname.replace(/index\.php$/, "");
-        const isInternal = destination.origin === window.location.origin && destination.pathname.startsWith(applicationRoot);
-        return isInternal ? destination.href : notificationsUrl;
+        if (destination.origin !== window.location.origin) return fallback.href;
+
+        // Solo se permite el front controller real. Las URLs históricas de
+        // /scripts/index.php se reconstruyen conservando únicamente query/hash.
+        if (destination.pathname === frontController) return destination.href;
+        if (destination.pathname === `${applicationRoot}scripts/index.php`) {
+            return new URL(`index.php${destination.search}${destination.hash}`, `${window.location.origin}${applicationRoot}`).href;
+        }
     } catch {
-        return notificationsUrl;
+        // El fallback evita exponer rutas internas o una página 403/404.
     }
+    return fallback.href;
 }
 
 function renderRecentNotifications(groups) {
@@ -365,7 +373,7 @@ async function openRecentNotification(item) {
     const endpoint = topbarNotificationsButton?.dataset.openEndpoint;
     const token = topbarNotificationsButton?.dataset.csrfToken;
     const notificationId = item.dataset.notificationId;
-    const fallbackUrl = item.href;
+    const fallbackUrl = safeRecentNotificationUrl(item.href);
     if (!endpoint || !token || !notificationId) {
         window.location.assign(fallbackUrl);
         return;
@@ -381,7 +389,7 @@ async function openRecentNotification(item) {
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || "No fue posible abrir la notificacion.");
     updateTopbarNotificationCount(payload.data.counters.unread);
-    window.location.assign(payload.data?.url || fallbackUrl);
+    window.location.assign(safeRecentNotificationUrl(payload.data?.url) || fallbackUrl);
 }
 
 async function loadRecentNotifications() {
