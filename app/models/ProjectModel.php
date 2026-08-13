@@ -13,7 +13,10 @@ final class ProjectModel
     {
         if (!Database::isEnabled()) return [];
         $statement=Database::connection()->prepare("SELECT DISTINCT p.id,p.code,p.title,p.subtitle,p.status,p.current_stage,p.updated_at,
-            pt.code AS type_key,pt.name AS type,c.name AS career,ap.name AS period,t.full_name AS tutor
+            pt.code AS type_key,pt.name AS type,c.name AS career,ap.name AS period,t.full_name AS tutor,
+            (SELECT pd.version_number FROM project_deliveries pd WHERE pd.project_id=p.id ORDER BY pd.submitted_at DESC,pd.id DESC LIMIT 1) AS latest_delivery_version,
+            (SELECT COUNT(*) FROM project_observations po WHERE po.project_id=p.id) AS observation_count,
+            (SELECT COUNT(*) FROM project_files pf WHERE pf.project_id=p.id AND pf.deleted_at IS NULL) AS final_document_count
             FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id INNER JOIN careers c ON c.id=p.career_id
             INNER JOIN academic_periods ap ON ap.id=p.academic_period_id LEFT JOIN users t ON t.id=p.tutor_id
             LEFT JOIN project_participants pp ON pp.project_id=p.id AND pp.status='active' AND pp.removed_at IS NULL
@@ -21,16 +24,27 @@ final class ProjectModel
         $statement->execute(['created_by_user'=>$userId,'participant_user'=>$userId]);
         $rows=$statement->fetchAll();
         $situations=(new ProjectReviewSituationService())->forProjects(array_map('intval',array_column($rows,'id')));
-        return array_map(static function(array $row)use($situations):array{
+        $totalRows=count($rows);
+        return array_map(static function(array $row,int $index)use($situations,$totalRows):array{
             $status=(string)$row['status'];
             $labels=project_academic_labels($status);
+            $latestDelivery=$row['latest_delivery_version']===null?null:['version'=>'v'.(int)$row['latest_delivery_version']];
+            $finalDocumentCount=$status==='published'?(int)($row['final_document_count']??0):0;
+            $situation=$situations[(int)$row['id']]??ProjectReviewSituationService::emptySituation();
+            $stage=(string)($row['current_stage']??'registration');
+            $statusKey=$status==='under_review'?'review':$status;
+            $progress=match($status){'published','tribunal_approved'=>100,'approved'=>76,'defense'=>91,'under_review'=>58,default=>25};
             return ['id'=>(int)$row['id'],'code'=>(string)$row['code'],'title'=>(string)$row['title'],'subtitle'=>(string)($row['subtitle']??''),
                 'status'=>$labels['status'],'status_key'=>$status,'type'=>(string)$row['type'],'type_key'=>(string)$row['type_key'],
                 'career'=>(string)$row['career'],'period'=>(string)$row['period'],'tutor'=>(string)($row['tutor']??''),'stage'=>(string)$row['current_stage'],
                 'last_activity'=>'Actualización del expediente · '.date('d/m/Y',strtotime((string)$row['updated_at'])),
                 'metric_bucket'=>in_array($status,['published','tribunal_approved'],true)?'finished':($status==='under_review'?'review':'active'),
-                'review_situation'=>$situations[(int)$row['id']]??ProjectReviewSituationService::emptySituation()];
-        },$rows);
+                'review_situation'=>$situation,
+                'observations'=>array_fill(0,(int)($row['observation_count']??0),[]),
+                'final_documents'=>array_fill(0,$finalDocumentCount,[]),
+                'latest_delivery'=>$latestDelivery,'key_dates'=>[['label'=>'Inicio del expediente','value'=>'Registrado'],['label'=>'Última actividad','value'=>date('d/m/Y',strtotime((string)$row['updated_at']))],['label'=>'Próximo hito','value'=>'Por definir']],
+                'progress'=>$progress,'activity_order'=>$totalRows-$index,'tags'=>[],'technologies'=>[]];
+        },$rows,array_keys($rows));
     }
 
     /** Busca un expediente comprobando temporalmente su pertenencia. */

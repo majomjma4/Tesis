@@ -16,7 +16,9 @@
 
 /* Tipos de proyecto documentados. */
 .app-page-content .projects-card[data-type="thesis"]{--card-accent:var(--project-thesis)}
-.app-page-content .projects-card[data-type="integrator"]{--card-accent:var(--project-pis)}
+.app-page-content .projects-card[data-type="thesis_profile"]{--card-accent:var(--project-profile)}
+.app-page-content .projects-card[data-type="practice"]{--card-accent:var(--project-practices)}
+.app-page-content .projects-card[data-type="pis"],.app-page-content .projects-card[data-type="integrator"]{--card-accent:var(--project-pis)}
 .app-page-content .projects-card[data-type="community"]{--card-accent:var(--project-linkage)}
 .repository-project-card--tesis{--card-accent:var(--project-thesis)}
 .repository-project-card--perfil-tesis{--card-accent:var(--project-profile)}
@@ -107,3 +109,13 @@
 @media print{
     .app-page-content :is(article,section,div,a)[class$="-card"]{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* Mis proyectos: el borde superior identifica el tipo, independiente del estado.
+ * Se conserva la especificidad de la regla genérica anterior para que el tipo gane
+ * sin recurrir a !important. */
+.app-page-content .projects-card[data-type="thesis"]:not(.status-card):not(.repository-card):not(.ar-project-card):not(.ar-material-card){border-top-color:rgb(var(--project-thesis))}
+.app-page-content .projects-card[data-type="thesis_profile"]:not(.status-card):not(.repository-card):not(.ar-project-card):not(.ar-material-card){border-top-color:rgb(var(--project-profile))}
+.app-page-content .projects-card[data-type="practice"]:not(.status-card):not(.repository-card):not(.ar-project-card):not(.ar-material-card){border-top-color:rgb(var(--project-practices))}
+.app-page-content .projects-card[data-type="pis"]:not(.status-card):not(.repository-card):not(.ar-project-card):not(.ar-material-card),
+.app-page-content .projects-card[data-type="integrator"]:not(.status-card):not(.repository-card):not(.ar-project-card):not(.ar-material-card){border-top-color:rgb(var(--project-pis))}
+.app-page-content .projects-card[data-type="community"]:not(.status-card):not(.repository-card):not(.ar-project-card):not(.ar-material-card){border-top-color:rgb(var(--project-linkage))}
