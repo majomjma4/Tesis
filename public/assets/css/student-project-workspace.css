@@ -16,6 +16,20 @@
     margin: 0 auto;
 }
 
+/* Opt-in only for the student's real project detail route. */
+body.app-student-workspace-fullscreen .sidebar { display:none; }
+body.app-student-workspace-fullscreen .sidebar-overlay { display:none !important; }
+body.app-student-workspace-fullscreen .main { margin-left:0; width:100%; min-height:100vh; }
+body.app-student-workspace-fullscreen .topbar { display:none; }
+body.app-student-workspace-fullscreen .app-page-content { width:100%; max-width:none; padding:clamp(.75rem,2vw,2rem) clamp(1rem,3vw,3.5rem) 3rem; }
+body.app-student-workspace-fullscreen .student-workspace { max-width:none; }
+.sw-tabs-more { display:none; position:relative; }
+.sw-tabs-more summary { list-style:none; cursor:pointer; }
+.sw-tabs-more summary::-webkit-details-marker { display:none; }
+.sw-tabs-more > div { position:absolute; z-index:20; right:0; top:calc(100% + .35rem); min-width:180px; padding:.35rem; border:1px solid var(--sw-border); border-radius:10px; background:var(--surface); box-shadow:0 12px 28px rgba(15,23,42,.16); }
+.sw-tabs-more a { display:flex; align-items:center; gap:.45rem; padding:.55rem .65rem; border-radius:7px; color:var(--sw-text); text-decoration:none; font-size:.8rem; }
+.sw-tabs-more a:hover,.sw-tabs-more a:focus { background:var(--sw-bg-soft); }
+
 /* Encabezado del proyecto */
 .sw-header-card {
     background: var(--surface, #ffffff);
@@ -315,6 +329,8 @@
 .student-workspace .sw-record span,.student-workspace .sw-record small,.student-workspace .sw-history-event small { color:var(--sw-text-muted); font-size:.78rem; }
 .student-workspace .sw-record p,.student-workspace .sw-history-event p { margin:.15rem 0; font-size:.88rem; color:var(--sw-text); white-space:pre-line; }
 .student-workspace .sw-tree-item { width:100%; text-align:left; background:transparent; }
+.student-workspace .sw-tree-item-info { min-width:0; flex:1 1 auto; }
+.student-workspace .sw-tree-item-info span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .student-workspace .sw-viewer-doc-info span { display:block; color:var(--sw-text-muted); font-size:.75rem; margin-top:.15rem; }
 .student-workspace .sw-add-files,.student-workspace .sw-viewer-download { display:inline-flex;align-items:center;justify-content:center;gap:.45rem;border:1px solid var(--sw-primary);background:var(--sw-primary);color:#fff;border-radius:7px;padding:.5rem .7rem;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer;text-decoration:none; }
 .student-workspace .sw-add-files:disabled { opacity:.65;cursor:wait; }
@@ -369,6 +385,16 @@
     min-height: 600px;
     align-items: stretch;
 }
+.sw-panel-reopen { align-self:flex-start; border:1px solid var(--sw-border); background:#fff; color:var(--sw-text); border-radius:8px; padding:.65rem; cursor:pointer; }
+.sw-panel-reopen[hidden] { display:none; }
+.student-workspace .sw-panel-reopen { position:absolute; z-index:8; top:.75rem; }
+.student-workspace .sw-panel-reopen-explorer { left:.5rem; }
+.student-workspace .sw-panel-reopen-observations { right:.5rem; }
+.student-workspace .sw-doc-workspace { position:relative; display:grid; grid-template-columns:minmax(240px,clamp(240px,19vw,300px)) minmax(0,1fr) minmax(280px,clamp(280px,22vw,340px)); gap:clamp(.65rem,1.4vw,1.25rem); }
+.student-workspace .sw-explorer-panel,.student-workspace .sw-viewer-panel,.student-workspace .sw-observations-panel { min-width:0; }
+.student-workspace .sw-explorer-panel { grid-column:1; }
+.student-workspace .sw-viewer-panel { grid-column:2; }
+.student-workspace .sw-observations-panel { grid-column:3; }
 
 /* Panel Explorador (22%) */
 .sw-explorer-panel {
@@ -471,6 +497,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-width: 0;
 }
 
 .sw-viewer-toolbar {
@@ -504,7 +531,7 @@
 
 .sw-viewer-canvas {
     flex: 1;
-    padding: 2rem;
+    padding: clamp(.5rem, 2vw, 2rem);
     background: #f1f5f9;
     overflow-y: auto;
     display: flex;
@@ -742,4 +769,24 @@
         flex: 1 1 100%;
         min-width: 100%;
     }
+    .sw-explorer-panel.is-collapsed,
+    .sw-observations-panel.is-collapsed {
+        flex: 0 0 45px;
+        min-width: 45px;
+        width: 45px;
+    }
+}
+@media (max-width: 760px) {
+    .student-workspace .sw-tabs-nav { position:relative; display:flex; flex-wrap:nowrap; overflow:visible; }
+    .student-workspace .sw-tabs-nav .sw-tab-secondary { display:none; }
+    .student-workspace .sw-tabs-more { display:block; margin-left:auto; }
+    .student-workspace .sw-doc-workspace { display:flex; flex-direction:column; }
+    .student-workspace .sw-explorer-panel,.student-workspace .sw-viewer-panel,.student-workspace .sw-observations-panel { width:100%; min-width:0; }
+    .student-workspace .sw-explorer-panel.is-collapsed,.student-workspace .sw-observations-panel.is-collapsed { flex:0 0 45px; width:45px; min-width:45px; }
+    .student-workspace .sw-viewer-panel { order:2; }
+    .student-workspace .sw-explorer-panel { order:1; }
+    .student-workspace .sw-observations-panel { order:3; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .student-workspace * { transition:none !important; }
 }

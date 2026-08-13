@@ -344,7 +344,8 @@ final class ProjectsController
             'title' => ($isAdministrator || $isTeacher)
                 ? (string) $project['code'] . ' · Gestión académica'
                 : ($project['title'] ?? 'Proyecto no encontrado') . ' | Gestión Académica',
-            'bodyClass' => 'project-detail-page',
+            'bodyClass' => 'project-detail-page' . (!$isAdministrator && !$isTeacher ? ' student-project-workspace-page workspace-fullscreen' : ''),
+            'studentWorkspaceFullscreen' => !$isAdministrator && !$isTeacher,
             'isTeacherContext' => $isTeacher,
             'pageStyles' => array_values(array_filter([
                 asset('css/project-simplified.css'), asset('css/project-description.css'),
@@ -356,7 +357,6 @@ final class ProjectsController
                 $descriptionReminder ? asset('js/project-description.js') : null,
                 $hasAdjustmentUi ? asset('js/project-adjustments.js') : null,
                 (!$isAdministrator && !$isTeacher) ? asset('vendor/jszip/3.10.1/jszip.min.js') : null,
-                (!$isAdministrator && !$isTeacher) ? asset('vendor/docx-preview/0.4.0/docx-preview.min.js') : null,
                 $isAdministrator ? asset('js/admin-projects.js') : (!$isTeacher ? asset('js/student-project-workspace.js') : null),
                 $isAdministrator && $projectStatusTransitions !== [] ? asset('js/project-status-transition.js') : null,
             ])),
@@ -467,12 +467,28 @@ final class ProjectsController
 
     public function filePreview(): void
     {
-        [$project, $file, $stream] = $this->resolveFile(true);
+        [$project, $file, $stream, $source] = $this->resolveFile(true);
         $query='&project_id='.(int)$project['id'].'&file_id='.(int)$file['id'];
         $scope=(string)($_GET['scope']??'')==='repository'?'&scope=repository':((string)($_GET['context']??'')==='academic_management'?'&context=academic_management':'');
         $version=!empty($file['checksum_sha256'])?'&v='.rawurlencode(substr((string)$file['checksum_sha256'],0,16)):'';
-        $preview=(new FilePreviewService())->prepare($this->previewFile($file,$stream),route('project-file-content').$query.$scope.$version,route('project-file-download').$query.$scope);
+        if (strtolower((string)$file['extension']) === 'docx') {
+            $preview = $this->docxPreview($project, $file, $source, (string)$file['checksum_sha256'], route('project-file-preview-pdf').$query.$scope.$version);
+        } else {
+            $preview=(new FilePreviewService())->prepare($this->previewFile($file,$stream),route('project-file-content').$query.$scope.$version,route('project-file-download').$query.$scope);
+        }
         fclose($stream);header('Cache-Control: private, no-store, max-age=0');$this->json(['success'=>true,'message'=>$preview['message'],'data'=>['preview'=>$preview]]);
+    }
+
+    /** Streams only a current, authorized, private DOCX-derived PDF; physical preview paths stay hidden. */
+    public function filePreviewPdf(): void
+    {
+        [$project, $file, $stream] = $this->resolveFile(); fclose($stream);
+        $checksum = (string)$file['checksum_sha256'];
+        if (!hash_equals($checksum, (string)($_GET['v'] ?? $checksum)) && !hash_equals(substr($checksum, 0, 16), (string)($_GET['v'] ?? ''))) { http_response_code(404); exit; }
+        $path = (new DocumentPreviewConversionService())->cachedPath((int)$project['id'], (int)$file['id'], $checksum);
+        if ($path === null) { http_response_code(404); exit('La vista previa no está disponible.'); }
+        $pdf = fopen($path, 'rb'); if ($pdf === false) { http_response_code(404); exit; }
+        $this->stream(['original_name'=>(string)$file['original_name'].'.pdf','size_bytes'=>(int)filesize($path),'mime_type'=>'application/pdf'], $pdf, 'inline', 'application/pdf');
     }
 
     public function fileContent(): void
@@ -539,9 +555,28 @@ final class ProjectsController
     {
         [$project,$file,$entry]=$this->resolveProjectArchiveEntry(true);
         $query=$this->projectArchiveQuery($project,$file,(string)$entry['path']);
-        try{$preview=(new FilePreviewService())->prepare($entry,route('project-zip-entry-content').$query,route('project-zip-entry-download').$query);}
+        try {
+            if (strtolower(pathinfo((string)$entry['name'], PATHINFO_EXTENSION)) === 'docx') {
+                $identity = $this->zipPreviewIdentity($file, $entry);
+                $preview = $this->docxPreviewStream($project, $file, $entry, $identity, route('project-zip-entry-preview-pdf').$query . '&v=' . rawurlencode(substr($identity, 0, 16)));
+            } else $preview=(new FilePreviewService())->prepare($entry,route('project-zip-entry-content').$query,route('project-zip-entry-download').$query);
+        }
         finally{$this->closeProjectArchiveEntry($entry);}
         $this->json(['success'=>true,'message'=>$preview['message'],'data'=>['preview'=>$preview]]);
+    }
+
+    public function zipEntryPreviewPdf(): void
+    {
+        [$project,$file,$entry]=$this->resolveProjectArchiveEntry();
+        try {
+            if (strtolower(pathinfo((string)$entry['name'], PATHINFO_EXTENSION)) !== 'docx') { http_response_code(404); exit; }
+            $identity = $this->zipPreviewIdentity($file, $entry);
+            if (!hash_equals(substr($identity, 0, 16), (string)($_GET['v'] ?? ''))) { http_response_code(404); exit; }
+            $path = (new DocumentPreviewConversionService())->cachedPath((int)$project['id'], (int)$file['id'], $identity);
+            if ($path === null) { http_response_code(404); exit('La vista previa no está disponible.'); }
+            $pdf = fopen($path, 'rb'); if ($pdf === false) { http_response_code(404); exit; }
+            $this->stream(['original_name'=>(string)$entry['name'].'.pdf','size_bytes'=>(int)filesize($path),'mime_type'=>'application/pdf'], $pdf, 'inline', 'application/pdf');
+        } finally { $this->closeProjectArchiveEntry($entry); }
     }
 
     public function zipEntryContent(): void
@@ -627,8 +662,24 @@ final class ProjectsController
         if(!$project||!$file){http_response_code(404);if($json)$this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);exit('El archivo solicitado no está disponible.');}
         try{$fileStorage=$admin||$teacher||$repositoryScope?new ProjectDocumentFileService():new PrivateProjectFileService();$path=$fileStorage->resolveStoredFile((int)$projectId,(string)$file['storage_name']);$stream=fopen($path,'rb');}catch(Throwable){$stream=false;}
         if($stream===false){http_response_code(404);if($json)$this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);exit('El archivo solicitado no está disponible.');}
-        return [$project,$file,$stream];
+        return [$project,$file,$stream,$path];
     }
+
+    private function docxPreview(array $project, array $file, string $source, string $identity, string $url): array
+    {
+        try { $result=(new DocumentPreviewConversionService())->convertFile($source,(int)$project['id'],(int)$file['id'],$identity); return $this->docxPdfPayload($file,$url,$result); }
+        catch (Throwable $error) { error_log('Project DOCX preview: project='.(int)$project['id'].' file='.(int)$file['id'].' checksum='.$identity.' error='.$error->getMessage()); return $this->docxPreviewFailure($file); }
+    }
+
+    private function docxPreviewStream(array $project, array $file, array $entry, string $identity, string $url): array
+    {
+        try { $result=(new DocumentPreviewConversionService())->convertStream($entry['stream'],(int)$project['id'],(int)$file['id'],$identity); return $this->docxPdfPayload(['original_name'=>$entry['name'],'size_bytes'=>$entry['size']],$url,$result); }
+        catch (Throwable $error) { error_log('Project ZIP DOCX preview: project='.(int)$project['id'].' file='.(int)$file['id'].' entry='.$entry['path'].' error='.$error->getMessage()); return $this->docxPreviewFailure(['original_name'=>$entry['name'],'size_bytes'=>$entry['size']]); }
+    }
+
+    private function docxPdfPayload(array $file, string $url, array $result): array { return ['status'=>'ready','message'=>'','name'=>(string)$file['original_name'],'path'=>(string)$file['original_name'],'size'=>ArchiveService::formatBytes((int)$file['size_bytes']),'size_bytes'=>(int)$file['size_bytes'],'extension'=>'docx','mime'=>'application/vnd.openxmlformats-officedocument.wordprocessingml.document','download_url'=>'','content_url'=>$url,'preview_type'=>'pdf','type_label'=>'Documento de Word','review_representation'=>true,'cached'=>(bool)($result['cached']??false),'blocks'=>[],'truncated'=>false]; }
+    private function docxPreviewFailure(array $file): array { return ['status'=>'unavailable','message'=>'No fue posible generar la vista previa de este documento.','name'=>(string)$file['original_name'],'size'=>ArchiveService::formatBytes((int)$file['size_bytes']),'extension'=>'docx','preview_type'=>'docx','type_label'=>'Documento de Word','content_url'=>'','blocks'=>[],'truncated'=>false]; }
+    private function zipPreviewIdentity(array $file, array $entry): string { rewind($entry['stream']); $entryHash=hash('sha256', stream_get_contents($entry['stream']) ?: ''); rewind($entry['stream']); return hash('sha256',(string)$file['checksum_sha256']."\0".(string)$entry['path']."\0".$entryHash); }
 
     private function previewFile(array $file,$stream):array{return ['name'=>(string)$file['original_name'],'path'=>(string)$file['original_name'],'size'=>(int)$file['size_bytes'],'stream'=>$stream];}
     private function stream(array $file,$stream,string $disposition,?string $verifiedMime=null):never{$stat=fstat($stream);$size=is_array($stat)?(int)($stat['size']??$file['size_bytes']):(int)$file['size_bytes'];header('Content-Type: '.($verifiedMime?:((string)$file['mime_type'])));header('Content-Length: '.$size);header("Content-Disposition: {$disposition}; filename*=UTF-8''".rawurlencode((string)$file['original_name']));header('X-Content-Type-Options: nosniff');if($disposition==='inline')header("Content-Security-Policy: default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");header('Cache-Control: private, no-store, max-age=0');fpassthru($stream);fclose($stream);exit;}

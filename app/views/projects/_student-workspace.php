@@ -71,7 +71,8 @@ $formatDate = static function (?string $date, bool $time = false): string { if (
     </section>
 
     <nav class="sw-tabs-nav" aria-label="Secciones de Mi proyecto" role="tablist">
-        <?php foreach ($tabs as $key => [$label,$icon]): ?><a class="sw-tab-btn<?= $activeTab === $key ? ' is-active' : '' ?>" href="<?= e($detailUrl . '&tab=' . $key) ?>" role="tab" aria-selected="<?= $activeTab === $key ? 'true' : 'false' ?>" data-sw-tab="<?= e($key) ?>"><i class="fa-solid <?= e($icon) ?>" aria-hidden="true"></i><?= e($label) ?></a><?php endforeach; ?>
+        <?php $primaryTabKeys = ['summary','documents','observations']; foreach ($tabs as $key => [$label,$icon]): ?><a class="sw-tab-btn<?= $activeTab === $key ? ' is-active' : '' ?><?= in_array($key, $primaryTabKeys, true) ? '' : ' sw-tab-secondary' ?>" href="<?= e($detailUrl . '&tab=' . $key) ?>" role="tab" aria-selected="<?= $activeTab === $key ? 'true' : 'false' ?>" data-sw-tab="<?= e($key) ?>"><i class="fa-solid <?= e($icon) ?>" aria-hidden="true"></i><?= e($label) ?></a><?php endforeach; ?>
+        <details class="sw-tabs-more"><summary><i class="fa-solid fa-ellipsis" aria-hidden="true"></i> Más</summary><div><?php foreach ($tabs as $key => [$label,$icon]): if (in_array($key, $primaryTabKeys, true)) continue; ?><a href="<?= e($detailUrl . '&tab=' . $key) ?>" data-sw-tab="<?= e($key) ?>"><i class="fa-solid <?= e($icon) ?>" aria-hidden="true"></i><?= e($label) ?></a><?php endforeach; ?></div></details>
     </nav>
     <main>
         <?php foreach (array_keys($tabs) as $key): ?><section class="sw-tab-pane<?= $activeTab === $key ? ' is-active' : '' ?>" id="swTab-<?= e($key) ?>" role="tabpanel"><?php require __DIR__ . '/student-workspace/_' . $key . '.php'; ?></section><?php endforeach; ?>

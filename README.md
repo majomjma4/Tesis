@@ -8,6 +8,10 @@ El proyecto busca centralizar el proceso de entrega, revisión, observaciones, c
 
 Para habilitar la capacidad máxima de la aplicación (500 MB por archivo y 1 GB por operación), el administrador técnico del servidor debe configurar PHP con valores al menos equivalentes a `upload_max_filesize = 512M` y `post_max_size = 1100M`, y reiniciar el servicio web. La aplicación detecta la capacidad real del servidor y reduce automáticamente los máximos configurables cuando el entorno admite menos.
 
+## Previsualización DOCX
+
+El servidor requiere LibreOffice para generar de forma privada las vistas de revisión PDF de archivos DOCX. Configure `LIBREOFFICE_PATH` (por ejemplo, `C:\Program Files\LibreOffice\program\soffice.exe` en Windows o `/usr/bin/libreoffice` en Linux). El DOCX original permanece como el archivo académico oficial.
+
 # Objetivo
 
 Desarrollar una plataforma web que permita administrar de forma organizada los proyectos académicos de la institución, facilitando la comunicación entre estudiantes, docentes, tutores y jurados mediante un sistema de seguimiento documental con historial y repositorio institucional.

@@ -14,6 +14,9 @@ $config = [
     'auth_required' => filter_var(getenv('AUTH_REQUIRED') ?: 'false', FILTER_VALIDATE_BOOL),
     'timezone' => getenv('APP_TIMEZONE') ?: 'America/Guayaquil',
     'settings_encryption_key' => getenv('APP_SETTINGS_ENCRYPTION_KEY') ?: '',
+    // Server dependency for private DOCX review previews. Never expose this path to browsers.
+    'libreoffice_path' => getenv('LIBREOFFICE_PATH') ?: '',
+    'libreoffice_timeout_seconds' => (int) (getenv('LIBREOFFICE_TIMEOUT_SECONDS') ?: 45),
 ];
 
 $localFile = __DIR__ . '/app.local.php';

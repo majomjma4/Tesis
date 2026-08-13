@@ -18,10 +18,10 @@
     <link rel="stylesheet" href="<?= e(asset('css/card-accents.css')) ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
-<?php $isAdministratorLayout = (bool) ($layoutIsAdmin ?? false); ?>
+<?php $isAdministratorLayout = (bool) ($layoutIsAdmin ?? false); $isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen); ?>
 
 <body
-    class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout app-page-loading' : ''))) ?>">
+    class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout app-page-loading' : '') . ($isStudentWorkspaceFullscreen ? ' app-student-workspace-fullscreen' : ''))) ?>">
     <noscript>
         <style>
             .app-global-skeleton {

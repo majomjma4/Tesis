@@ -9,4 +9,8 @@ return [
     'timezone' => 'America/Guayaquil',
     // Actívalo solo después de importar las migraciones y crear el primer administrador.
     'auth_required' => true,
+    // LibreOffice is a server dependency. Windows: C:\\Program Files\\LibreOffice\\program\\soffice.exe
+    // Linux: /usr/bin/libreoffice or /usr/bin/soffice
+    'libreoffice_path' => '',
+    'libreoffice_timeout_seconds' => 45,
 ];
