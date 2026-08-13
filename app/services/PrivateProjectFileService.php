@@ -11,5 +11,24 @@ final class PrivateProjectFileService
     }
     public function limits():array{try{$model=new SystemSettingModel();$settings=$model->all();$policy=$model->fileUploadPolicy();}catch(Throwable){$settings=(new SystemSettingModel())->defaults();$policy=['max_mb'=>20,'total_max_mb'=>35,'max_bytes'=>20*1024*1024,'max_total_bytes'=>35*1024*1024];}$configuredPrivate=$settings['file_extensions_private']??$settings['file_extensions'];$extensions=array_values(array_intersect(array_keys(self::MIME_BY_EXTENSION),(array)$configuredPrivate));$mimes=[];foreach($extensions as $extension)$mimes=[...$mimes,...self::MIME_BY_EXTENSION[$extension]];return ['extensions'=>$extensions,'mime_types'=>array_values(array_unique($mimes)),'max_bytes'=>$policy['max_bytes'],'max_total_bytes'=>$policy['max_total_bytes'],'max_mb'=>$policy['max_mb'],'max_total_mb'=>$policy['total_max_mb']];}
     public function projectDirectory(int $projectId):string{if($projectId<1)throw new InvalidArgumentException('Identificador inválido.');return $this->root.DIRECTORY_SEPARATOR.$projectId;}
+    /** Valida un archivo privado que ya fue recibido y almacenado temporalmente. */
+    public function validateStoredFile(string $path,array $metadata):array
+    {
+        $limits=$this->limits();$extension=mb_strtolower((string)($metadata['extension']??''));
+        if(!is_file($path)||!is_readable($path))throw new RuntimeException('El archivo temporal no está disponible.');
+        if(!in_array($extension,$limits['extensions'],true)||!isset(self::MIME_BY_EXTENSION[$extension]))throw new InvalidArgumentException('El formato del archivo no está permitido.');
+        $size=filesize($path);if($size===false||$size<1||$size>(int)$limits['max_bytes']||$size!==(int)($metadata['size_bytes']??-1))throw new InvalidArgumentException('El tamaño del archivo temporal no es válido.');
+        $mime=(string)(new finfo(FILEINFO_MIME_TYPE))->file($path);if(!in_array($mime,self::MIME_BY_EXTENSION[$extension],true)||$mime!==(string)($metadata['mime_type']??''))throw new InvalidArgumentException('El contenido del archivo temporal no coincide con su formato.');
+        $hash=hash_file('sha256',$path);if(!is_string($hash)||!hash_equals((string)($metadata['checksum_sha256']??''),$hash))throw new InvalidArgumentException('La integridad del archivo temporal no es válida.');
+        return ['extension'=>$extension,'mime_type'=>$mime,'size_bytes'=>(int)$size,'checksum_sha256'=>$hash];
+    }
+    /** Promueve un archivo ya validado al directorio privado definitivo. */
+    public function promoteStoredFile(int $projectId,string $source,string $extension):array
+    {
+        $directory=$this->projectDirectory($projectId);if(!is_dir($directory)&&!mkdir($directory,0775,true)&&!is_dir($directory))throw new RuntimeException('No fue posible preparar el almacenamiento definitivo.');
+        $storage=bin2hex(random_bytes(32)).'.'.$extension;$destination=$directory.DIRECTORY_SEPARATOR.$storage;
+        if(!@rename($source,$destination))throw new RuntimeException('No fue posible promover el archivo temporal.');
+        return ['storage_name'=>$storage,'storage_path'=>'storage/private/projects/'.$projectId.'/'.$storage,'absolute_path'=>$destination];
+    }
     public function resolveStoredFile(int $projectId,string $storageName):string{$extensions=implode('|',array_map(static fn(string $value):string=>preg_quote($value,'/'),array_keys(self::MIME_BY_EXTENSION)));if(!preg_match('/^[a-f0-9]{32,64}\.('.$extensions.')$/',$storageName))throw new InvalidArgumentException('Nombre de almacenamiento inválido.');$directory=$this->projectDirectory($projectId);$candidate=$directory.DIRECTORY_SEPARATOR.$storageName;$resolvedDirectory=realpath($directory);$resolvedFile=realpath($candidate);if($resolvedDirectory===false||$resolvedFile===false||!str_starts_with($resolvedFile,$resolvedDirectory.DIRECTORY_SEPARATOR))throw new RuntimeException('El archivo privado no existe.');return $resolvedFile;}
 }

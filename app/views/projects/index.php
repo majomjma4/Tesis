@@ -30,7 +30,7 @@
 
         <section class="projects-grid" data-project-grid aria-label="Catálogo de proyectos">
             <?php foreach ($projects as $project):
-                $search = mb_strtolower(implode(' ', array_merge([$project['title'], $project['subtitle'], $project['type'], $project['tutor'], $project['period'], $project['career']], $project['tags'], $project['technologies'])), 'UTF-8');
+                $search = mb_strtolower(implode(' ', array_merge([$project['title'] ?? '', $project['subtitle'] ?? '', $project['type'] ?? '', $project['tutor'] ?? '', $project['period'] ?? '', $project['career'] ?? ''], (array) ($project['tags'] ?? []), (array) ($project['technologies'] ?? []))), 'UTF-8');
                 $actionUrl = route('project-detail') . '&id=' . (int) $project['id'];
                 $cardAction = 'Abrir proyecto';
                 $phaseContext = [];

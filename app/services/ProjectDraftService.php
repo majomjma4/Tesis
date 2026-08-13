@@ -4,6 +4,8 @@ declare(strict_types=1);
 /** Prepara y valida el borrador previo al registro definitivo. */
 final class ProjectDraftService
 {
+    private const INDIVIDUAL_ONLY_TYPES = ['practice'];
+
     private const TYPE_RULES = [
         'thesis' => ['prefix' => 'TIT', 'additional' => ['research_line'], 'semesters' => [4], 'availability' => 'Disponible para 4.º semestre.'],
         'thesis_profile' => ['prefix' => 'PFT', 'additional' => ['research_line'], 'semesters' => [4], 'availability' => 'Disponible para 4.º semestre.'],
@@ -27,10 +29,11 @@ final class ProjectDraftService
                 ? 'No existe un periodo académico activo. Comunícate con la administración.'
                 : ($policy['actor_type'] === 'student' && $student === null ? 'No se encontró una matrícula activa para el periodo académico actual.' : ''),
             'modalities' => ['individual' => 'Individual', 'group' => 'Grupal'],
-            'research_lines' => $this->researchLines($db),
+            'research_lines' => $student === null ? [] : $this->researchLines($db, (int) $student['career_id']),
             'teachers' => $this->teachers($db),
             'students' => $activePeriod !== null && $student !== null ? $this->students($db, (int) $activePeriod['id'], (int) $student['career_id']) : [],
             'keywords' => $this->keywords($db),
+            'keywords_by_type' => $this->keywordsByType($db),
         ];
     }
 
@@ -45,6 +48,7 @@ final class ProjectDraftService
                 'default_title' => $type['default_title'] ?? '',
                 'default_description' => $type['default_description'] ?? '',
                 'allows_cross_semester_members' => in_array($code, ['thesis', 'thesis_profile', 'community'], true),
+                'allows_additional_members' => !in_array($code, self::INDIVIDUAL_ONLY_TYPES, true),
             ];
         }
         return $contract;
@@ -87,7 +91,7 @@ final class ProjectDraftService
         }
         if ($draft['type'] === 'thesis' && !in_array($draft['modality'], ['individual', 'group'], true)) $errors['modality'] = 'Selecciona una modalidad válida.';
         if (in_array($draft['type'], ['thesis', 'thesis_profile'], true) && !isset(array_column($catalogs['research_lines'], null, 'id')[(int) $draft['research_line']])) $errors['research_line'] = 'Selecciona una línea de investigación válida.';
-        if ($draft['type'] === 'thesis' && $draft['modality'] === 'individual' && count($draft['members']) > 1) $errors['members'] = 'La modalidad individual solo admite un estudiante.';
+        if ($this->requiresIndividualTeam($draft['type'], $draft['modality']) && count($draft['members']) > 1) $errors['members'] = 'Este tipo de proyecto solo admite a la persona creadora.';
         if ($draft['raw_member_count'] !== count($draft['members'])) $errors['members'] = 'No puedes agregar el mismo integrante más de una vez.';
 
         $teachers = array_column($catalogs['teachers'], null, 'id');
@@ -122,6 +126,7 @@ final class ProjectDraftService
         $teachers = array_column($catalogs['teachers'], null, 'id');
         if ($draft['tutor_id'] !== '' && !isset($teachers[(int) $draft['tutor_id']])) $errors['tutor_id'] = 'El tutor seleccionado ya no se encuentra disponible. Selecciona otro tutor.';
         if ($draft['research_line'] !== '' && !isset(array_column($catalogs['research_lines'], null, 'id')[(int) $draft['research_line']])) $errors['research_line'] = 'Selecciona una línea de investigación válida.';
+        if ($this->requiresIndividualTeam($draft['type'], $draft['modality']) && count($draft['members']) > 1) $errors['members'] = 'Este tipo de proyecto solo admite a la persona creadora.';
         $students = array_column($catalogs['students'], null, 'id');
         if ($draft['raw_member_count'] !== count($draft['members'])) $errors['members'] = 'No puedes agregar el mismo integrante más de una vez.';
         foreach ($draft['members'] as $memberId) if (!isset($students[(int) $memberId])) { $errors['members'] = 'Uno o más integrantes ya no están disponibles para este proyecto.'; break; }
@@ -193,13 +198,13 @@ final class ProjectDraftService
             INNER JOIN student_profiles sp ON sp.user_id=u.id INNER JOIN student_enrollments se ON se.student_id=u.id
             INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id AND r.code='student'
             WHERE u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL AND se.status='active'
-              AND se.academic_period_id=:period AND se.career_id=:enrollment_career AND sp.career_id=:profile_career ORDER BY se.semester,u.full_name");
+              AND se.academic_period_id=:period AND se.career_id=:enrollment_career AND sp.career_id=:profile_career AND se.semester BETWEEN 1 AND 4 ORDER BY se.semester,u.full_name");
         $q->execute(['period' => $periodId, 'enrollment_career' => $careerId, 'profile_career' => $careerId]); return $q->fetchAll();
     }
 
-    private function researchLines(PDO $db): array
+    private function researchLines(PDO $db, int $careerId): array
     {
-        try { return $db->query("SELECT id,name FROM research_lines WHERE is_active=1 ORDER BY name")->fetchAll(); } catch (Throwable) { return []; }
+        try { $q = $db->prepare("SELECT id,name FROM research_lines WHERE is_active=1 AND (career_id=:career OR career_id IS NULL) ORDER BY name"); $q->execute(['career' => $careerId]); return $q->fetchAll(); } catch (Throwable) { return []; }
     }
 
     private function keywords(PDO $db): array
@@ -207,7 +212,20 @@ final class ProjectDraftService
         return $db->query("SELECT id,name,normalized_name FROM keywords WHERE is_active=1 ORDER BY name")->fetchAll();
     }
 
+    private function keywordsByType(PDO $db): array
+    {
+        try {
+            $rows = $db->query("SELECT pt.code,k.name FROM project_type_keywords ptk INNER JOIN project_types pt ON pt.id=ptk.project_type_id AND pt.is_active=1 INNER JOIN keywords k ON k.id=ptk.keyword_id AND k.is_active=1 ORDER BY pt.id,k.name")->fetchAll();
+            $out = []; foreach ($rows as $row) $out[(string) $row['code']][] = (string) $row['name']; return $out;
+        } catch (Throwable) { return []; }
+    }
+
     private function allowsCrossSemester(string $type): bool { return in_array($type, ['thesis', 'thesis_profile', 'community'], true); }
+
+    private function requiresIndividualTeam(string $type, string $modality): bool
+    {
+        return in_array($type, self::INDIVIDUAL_ONLY_TYPES, true) || ($type === 'thesis' && $modality === 'individual');
+    }
 
     private function validateTags(array $tags, array $keywords, int $rawCount): array
     {

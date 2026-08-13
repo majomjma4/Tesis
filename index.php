@@ -112,6 +112,7 @@ match ($page) {
     'project-draft-file-remove' => (new ProjectsController())->removeProjectDraftFile(),
     'project-draft-reset' => (new ProjectsController())->resetProjectDraft(),
     'project-draft-preflight' => (new ProjectsController())->preflightProjectDraft(),
+    'project-draft-register' => (new ProjectsController())->registerProjectDraft(),
     'new-project', 'nuevo-proyecto' => (new ProjectsController())->create(),
     'repository', 'repositorio' => (new RepositoryController())->index(),
     'repository-detail', 'detalle-repositorio' => (new RepositoryController())->detail(),

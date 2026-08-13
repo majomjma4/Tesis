@@ -44,26 +44,31 @@ final class ProjectDraftStorageService
 
     public function addUpload(int $userId, array $upload, bool $replace = false): array
     {
+        $stage = 'draft_resolution'; $draftId = ''; $metadata = null; $directory = ''; $path = ''; $storedSize = null; $cleanup = 'not_required';
+        try {
         $this->cleanupExpired();
         $draft = $this->active($userId) ?? $this->save($userId, []);
         $draftId = (string) $draft['id'];
-        $validator = new PrivateProjectFileService();
+        $stage = 'initial_validation'; $validator = new PrivateProjectFileService();
         $metadata = $validator->validateUpload($upload);
         $tmp = (string) ($upload['tmp_name'] ?? '');
-        if (!is_uploaded_file($tmp)) throw new InvalidArgumentException('El archivo no se recibió correctamente.');
-        $hash = hash_file('sha256', $tmp);
+        $stage = 'is_uploaded_file'; if (!is_uploaded_file($tmp)) throw new InvalidArgumentException('El archivo no se recibió correctamente.');
+        $stage = 'hash_file_sha256'; $hash = hash_file('sha256', $tmp);
         if (!is_string($hash) || !preg_match('/^[a-f0-9]{64}$/', $hash)) throw new RuntimeException('No fue posible validar la integridad del archivo.');
         $existing = $this->findConflict($draftId, $userId, $metadata['original_name'], (int) $metadata['size_bytes'], $hash);
         if ($existing !== null && !$replace) {
             if ((string) $existing['checksum_sha256'] === $hash) throw new InvalidArgumentException('Este archivo ya fue agregado.');
             throw new ProjectDraftFileConflictException((int) $existing['id'], 'Ya existe un archivo con este nombre. ¿Deseas reemplazarlo?');
         }
-        $directory = $this->directory($userId, $draftId); $this->ensureDirectory($directory);
+        $stage = 'temporary_directory'; $directory = $this->directory($userId, $draftId); $this->ensureDirectory($directory);
         $storageName = bin2hex(random_bytes(32)) . '.' . $metadata['extension']; $path = $directory . DIRECTORY_SEPARATOR . $storageName;
-        if (!move_uploaded_file($tmp, $path)) throw new RuntimeException('No se pudo subir ' . $metadata['original_name'] . '.');
+        $stage = 'move_uploaded_file'; if (!move_uploaded_file($tmp, $path)) throw new RuntimeException('No se pudo subir ' . $metadata['original_name'] . '.');
+        $stage = 'file_exists_after_move'; $existsAfterMove = is_file($path);
+        $stage = 'filesize_after_move'; $storedSize = $existsAfterMove ? @filesize($path) : false;
         $zip = null;
         try {
-            if ($metadata['extension'] === 'zip') $zip = $this->inspectZip($path);
+            $stage = 'post_storage_metadata'; if ($metadata['extension'] === 'zip') $zip = $this->inspectZip($path);
+            $stage = 'insert_project_draft_files';
             $result = Database::transaction(function(PDO $db) use ($replace, $existing, $draftId, $userId, $metadata, $storageName, $path, $hash, $zip): array {
                 if ($replace && $existing !== null) {
                     $delete = $db->prepare('DELETE FROM project_draft_files WHERE id=:id AND draft_id=:draft AND user_id=:user');
@@ -72,16 +77,22 @@ final class ProjectDraftStorageService
                 $this->assertTotalLimit($db, $draftId, (int) $metadata['size_bytes']);
                 $insert = $db->prepare('INSERT INTO project_draft_files(draft_id,user_id,original_name,storage_name,storage_path,mime_type,extension,size_bytes,checksum_sha256,zip_meta) VALUES(:draft,:user,:name,:storage,:path,:mime,:extension,:size,:hash,:zip)');
                 $insert->execute(['draft' => $draftId, 'user' => $userId, 'name' => $metadata['original_name'], 'storage' => $storageName, 'path' => $this->relativePath($userId, $draftId, $storageName), 'mime' => $metadata['mime_type'], 'extension' => $metadata['extension'], 'size' => $metadata['size_bytes'], 'hash' => $hash, 'zip' => $zip === null ? null : json_encode($zip, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)]);
+                $fileId = (int) $db->lastInsertId();
                 $touch = $db->prepare('UPDATE project_drafts SET expires_at=DATE_ADD(UTC_TIMESTAMP(), INTERVAL ' . self::EXPIRATION_DAYS . ' DAY) WHERE id=:draft AND user_id=:user');
                 $touch->execute(['draft' => $draftId, 'user' => $userId]);
-                return $this->file((int) $db->lastInsertId(), $draftId, $userId, $db);
+                return $this->file($fileId, $draftId, $userId, $db);
             });
         } catch (Throwable $exception) {
-            if (is_file($path)) @unlink($path);
+            $cleanup = is_file($path) ? (@unlink($path) ? 'rollback_cleanup_removed' : 'rollback_cleanup_failed') : 'rollback_cleanup_not_needed';
             throw $exception;
         }
         if ($replace && $existing !== null) $this->discardFile($userId, $draftId, (string) $existing['storage_name']);
+        $stage = 'commit_complete';
         return $result;
+        } catch (Throwable $exception) {
+            $this->logUploadFailure($exception, $stage, $userId, $draftId, $upload, $metadata, $directory, $path, $storedSize, $cleanup);
+            throw $exception;
+        }
     }
 
     public function removeFile(int $userId, int $fileId): void
@@ -101,6 +112,21 @@ final class ProjectDraftStorageService
         Database::transaction(function(PDO $db) use ($userId, $draft): void { $q = $db->prepare('DELETE FROM project_drafts WHERE id=:id AND user_id=:user'); $q->execute(['id' => $draft['id'], 'user' => $userId]); });
         $this->discardDirectory($this->directory($userId, (string) $draft['id']));
         $this->discardEmptyUserDirectory($userId);
+    }
+
+    /** Resuelve de forma segura un archivo de borrador ya registrado. */
+    public function resolveStoredFile(int $userId,string $draftId,string $storageName): string
+    {
+        if(!preg_match('/^[a-f0-9]{64}\.(pdf|docx|zip)$/',$storageName))throw new InvalidArgumentException('Nombre de almacenamiento inválido.');
+        $directory=$this->directory($userId,$draftId);$base=realpath($directory);$path=realpath($directory.DIRECTORY_SEPARATOR.$storageName);
+        if($base===false||$path===false||!is_file($path)||!str_starts_with(strtolower($path),strtolower($base.DIRECTORY_SEPARATOR)))throw new RuntimeException('El archivo temporal no está disponible.');
+        return $path;
+    }
+
+    /** Limpia el directorio de un borrador ya consumido sin afectar otros borradores. */
+    public function cleanupConsumedDirectory(int $userId,string $draftId): void
+    {
+        $this->discardDirectory($this->directory($userId,$draftId));$this->discardEmptyUserDirectory($userId);
     }
 
     /** Ejecutable de manera oportunista; puede llamarse también desde una tarea programada. */
@@ -187,6 +213,31 @@ final class ProjectDraftStorageService
             }
             return $entries;
         } finally { fclose($handle); }
+    }
+
+    /** Registra diagnóstico seguro del servidor; nunca se envía al navegador. */
+    private function logUploadFailure(Throwable $exception, string $stage, int $userId, string $draftId, array $upload, ?array $metadata, string $directory, string $path, mixed $storedSize, string $cleanup): void
+    {
+        $context = [
+            'stage'=>$stage,
+            'exception_class'=>$exception::class,
+            'exception_message'=>$exception->getMessage(),
+            'exception_file'=>basename($exception->getFile()),
+            'exception_line'=>$exception->getLine(),
+            'user_id'=>$userId,
+            'draft_id'=>$draftId !== '' ? $draftId : null,
+            'extension'=>$metadata['extension'] ?? mb_strtolower(pathinfo((string)($upload['name'] ?? ''), PATHINFO_EXTENSION)),
+            'size_bytes'=>$metadata['size_bytes'] ?? (int)($upload['size'] ?? 0),
+            'mime_type'=>$metadata['mime_type'] ?? null,
+            'upload_error'=>(int)($upload['error'] ?? UPLOAD_ERR_NO_FILE),
+            'is_uploaded_file'=>($tmp = (string)($upload['tmp_name'] ?? '')) !== '' && is_uploaded_file($tmp),
+            'destination_exists'=>$path !== '' && is_file($path),
+            'destination_directory_exists'=>$directory !== '' && is_dir($directory),
+            'destination_directory_writable'=>$directory !== '' && is_writable($directory),
+            'stored_size_bytes'=>$storedSize === false ? null : $storedSize,
+            'cleanup'=>$cleanup,
+        ];
+        error_log('Project draft upload failure: ' . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
     private function connection(): PDO { return $this->db ?? Database::connection(); }

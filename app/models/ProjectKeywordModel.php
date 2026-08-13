@@ -5,7 +5,7 @@ declare(strict_types=1);
 /** Catálogo y asociaciones estructurales de palabras clave de proyectos. */
 final class ProjectKeywordModel
 {
-    public const MAX_PER_PROJECT = 4;
+    public const MAX_PER_PROJECT = 8;
 
     public function create(PDO $db, string $name): int
     {
@@ -52,7 +52,7 @@ final class ProjectKeywordModel
         if (!$keywordIds) return;
         $existing = array_map('intval', array_column($this->forProject($projectId, $db), 'id'));
         if (count(array_unique(array_merge($existing, $keywordIds))) > self::MAX_PER_PROJECT) {
-            throw new InvalidArgumentException('Un proyecto puede tener como máximo cuatro palabras clave.');
+            throw new InvalidArgumentException('Un proyecto puede tener como máximo ocho palabras clave.');
         }
         $insert = $db->prepare('INSERT IGNORE INTO project_keywords(project_id,keyword_id) VALUES(:project_id,:keyword_id)');
         foreach ($keywordIds as $keywordId) $insert->execute(['project_id' => $projectId, 'keyword_id' => $keywordId]);
@@ -62,7 +62,7 @@ final class ProjectKeywordModel
     {
         if ($projectId < 1) throw new InvalidArgumentException('El proyecto no es válido.');
         $keywordIds = $this->validatedActiveIds($db, $keywordIds);
-        if (count($keywordIds) > self::MAX_PER_PROJECT) throw new InvalidArgumentException('Un proyecto puede tener como máximo cuatro palabras clave.');
+        if (count($keywordIds) > self::MAX_PER_PROJECT) throw new InvalidArgumentException('Un proyecto puede tener como máximo ocho palabras clave.');
         $db->prepare('DELETE FROM project_keywords WHERE project_id=:project_id')->execute(['project_id' => $projectId]);
         $this->attach($db, $projectId, $keywordIds);
     }
@@ -91,7 +91,7 @@ final class ProjectKeywordModel
             if (!isset($allowed[$key])) throw new InvalidArgumentException('La selección contiene una etiqueta de clasificación no permitida.');
             $requested[$key] = $allowed[$key];
         }
-        if (count($requested) > self::MAX_PER_PROJECT) throw new InvalidArgumentException('Un proyecto puede tener como máximo cuatro palabras clave.');
+        if (count($requested) > self::MAX_PER_PROJECT) throw new InvalidArgumentException('Un proyecto puede tener como máximo ocho palabras clave.');
 
         $selectedIds = [];
         $selectedNames = [];

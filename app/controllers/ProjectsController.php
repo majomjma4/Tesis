@@ -631,10 +631,12 @@ final class ProjectsController
             $catalogs = (new ProjectDraftService())->catalogs($userId, $access->projectCreationPolicy());
             if ($catalogs['active_period'] === null || $catalogs['student'] === null) throw new InvalidArgumentException((string) $catalogs['availability_message']);
             $uploads = $this->draftUploads($_FILES['files'] ?? []); if ($uploads === []) throw new InvalidArgumentException('Selecciona al menos un archivo.');
-            $storage = new ProjectDraftStorageService(); $added = []; $failed = [];
+            $storage = new ProjectDraftStorageService(); $activeDraft = $storage->active($userId); $draftId = (string) ($activeDraft['id'] ?? ''); $added = []; $failed = [];
             foreach ($uploads as $upload) try { $added[] = $storage->addUpload($userId, $upload, (bool) ((int) ($_POST['replace'] ?? 0))); }
             catch (ProjectDraftFileConflictException $exception) { $failed[] = ['name'=>(string)($upload['name'] ?? 'Archivo'),'message'=>$exception->getMessage(),'replace_file_id'=>$exception->fileId]; }
-            catch (Throwable $exception) { $failed[] = ['name'=>(string)($upload['name'] ?? 'Archivo'),'message'=>$exception instanceof InvalidArgumentException ? $exception->getMessage() : 'No se pudo subir el archivo.']; }
+            catch (Throwable $exception) {
+                $failed[] = ['name'=>(string)($upload['name'] ?? 'Archivo'),'message'=>$exception instanceof InvalidArgumentException ? $exception->getMessage() : 'No se pudo subir el archivo.'];
+            }
             $draft = $storage->active($userId); $status = $added === [] ? 422 : ($failed === [] ? 200 : 207);
             http_response_code($status); $this->json(['success'=>$added !== [],'message'=>$added === [] ? 'No se pudo subir ningún archivo.' : 'Archivo temporal agregado.','data'=>['added'=>$added,'failed'=>$failed,'draft'=>$draft]]);
         } catch (Throwable $exception) { error_log('Project draft upload: ' . $exception->getMessage()); http_response_code(422); $this->json(['success'=>false,'message'=>$exception instanceof InvalidArgumentException ? $exception->getMessage() : 'No se pudo subir el archivo.','data'=>[]]); }
@@ -682,6 +684,24 @@ final class ProjectsController
             error_log('Project draft preflight: ' . $exception->getMessage());
             http_response_code($exception instanceof InvalidArgumentException ? 422 : 500);
             $this->json(['success'=>false,'message'=>$exception instanceof InvalidArgumentException ? $exception->getMessage() : 'No fue posible validar el borrador.','data'=>[]]);
+        }
+    }
+
+    /** Consume un borrador revalidado y crea el proyecto definitivo. */
+    public function registerProjectDraft(): void
+    {
+        [, $access] = $this->draftRequest();
+        $userId = $access->currentUserId();
+        try {
+            $result = (new ProjectDraftRegistrationService())->register($userId, $access->projectCreationPolicy(), (string) ($_POST['draft_id'] ?? ''));
+            $this->json(['success'=>true,'message'=>'Proyecto registrado correctamente.','data'=>$result]);
+        } catch (ProjectDraftRegistrationException $exception) {
+            http_response_code(422);
+            $this->json(['success'=>false,'message'=>$exception->getMessage(),'data'=>['errors'=>$exception->errors]]);
+        } catch (Throwable $exception) {
+            error_log('Project draft registration: '.$exception->getMessage());
+            http_response_code(500);
+            $this->json(['success'=>false,'message'=>'No fue posible registrar el proyecto. Tu borrador continúa disponible.','data'=>[]]);
         }
     }
 
@@ -743,7 +763,7 @@ final class ProjectsController
             'fileLimits' => $fileService->limits(), 'draft' => $draft, 'errors' => $errors, 'draftValidated' => $validated,
             'confirmation' => $confirmation, 'projectDraftCsrf' => (string) $_SESSION['project_draft_csrf'], 'draftStorageKey' => 'academic_project_draft_v1_' . $userId,
             'storedDraft' => $storedDraft, 'projectDraftApiCsrf' => (new AuthSessionService())->csrfToken('project_draft'),
-            'projectDraftEndpoints' => ['save'=>route('project-draft-save'),'upload'=>route('project-draft-upload'),'remove'=>route('project-draft-file-remove'),'reset'=>route('project-draft-reset'),'preflight'=>route('project-draft-preflight')],
+            'projectDraftEndpoints' => ['save'=>route('project-draft-save'),'upload'=>route('project-draft-upload'),'remove'=>route('project-draft-file-remove'),'reset'=>route('project-draft-reset'),'preflight'=>route('project-draft-preflight'),'register'=>route('project-draft-register')],
         ]);
     }
 }

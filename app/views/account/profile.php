@@ -52,6 +52,7 @@ $avatarUrl = $hasAvatar ? (route('profile-avatar') . '&v=' . rawurlencode((strin
             <h2>Resumen de la cuenta</h2>
             <dl>
                 <div><dt>Rol</dt><dd><?= e(implode(', ',array_map(fn($role)=>$roleLabels[$role]??$role,$profile['roles']))) ?></dd></div>
+                <?php if (in_array('student', $profile['roles'], true)): ?><div><dt>Semestre actual</dt><dd><?= !empty($profile['current_semester']) ? e((string) $profile['current_semester'] . '.º semestre') : 'No disponible' ?></dd></div><?php endif; ?>
                 <div><dt>Cuenta creada</dt><dd><?= e($formatDate($profile['created_at'])) ?></dd></div>
                 <div><dt>Último acceso</dt><dd><?= e($formatDate($profile['last_login_at'],'Aún no disponible')) ?></dd></div>
                 <div><dt>Último cambio de contraseña</dt><dd><?= e($formatDate($profile['password_changed_at'],'Aún no disponible')) ?></dd></div>
