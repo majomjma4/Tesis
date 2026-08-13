@@ -10,7 +10,7 @@ final class ProjectCapabilityService
         'view_admin_history', 'change_status', 'manage_participants', 'manage_tutoring',
         'manage_tribunal', 'manage_publication', 'register_delivery', 'review_delivery',
         'create_observation', 'respond_observation', 'request_corrections', 'download_files',
-        'review_documents',
+        'review_documents', 'publish_project',
         'create_adjustment_request', 'view_adjustment_requests', 'respond_adjustment_request',
         'address_adjustment_request', 'close_adjustment_request',
     ];
@@ -113,6 +113,10 @@ final class ProjectCapabilityService
             $capabilities['view_adjustment_requests'] = true;
             $capabilities['respond_adjustment_request'] = true;
             $capabilities['address_adjustment_request'] = true;
+            $type = (string) ($project['type_code'] ?? '');
+            $status = (string) ($project['status'] ?? '');
+            $capabilities['publish_project'] = ($type === 'thesis' && $status === 'tribunal_approved')
+                || ($type !== 'thesis' && $status === 'approved');
         }
 
         // Los permisos académicos globales existen, pero esta pantalla aún no tiene endpoints operativos.
@@ -142,6 +146,25 @@ final class ProjectCapabilityService
         );
         $assignment->execute(['project'=>(int)$project['id'], 'user'=>$userId]);
         return (bool) $assignment->fetchColumn();
+    }
+
+    /** Confirma en datos bloqueados que el actor es estudiante participante activo. */
+    public function canPublishAsActiveStudentInTransaction(PDO $db, int $projectId, int $userId): bool
+    {
+        if ($projectId < 1 || $userId < 1) return false;
+        $statement = $db->prepare(
+            "SELECT 1
+             FROM users u
+             INNER JOIN user_roles ur ON ur.user_id=u.id
+             INNER JOIN roles r ON r.id=ur.role_id AND r.code='student'
+             INNER JOIN project_participants pp ON pp.user_id=u.id
+             WHERE u.id=:user AND pp.project_id=:project
+               AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL
+               AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL
+             LIMIT 1"
+        );
+        $statement->execute(['user'=>$userId, 'project'=>$projectId]);
+        return (bool) $statement->fetchColumn();
     }
 
     /** @return array<string,bool> Capacidades de ajustes recalculadas con identidad persistida. */

@@ -58,7 +58,7 @@ final class RouteAccessService
 
     private function isSupportMaterialFileJsonRequest(string $page): bool
     {
-        if (in_array($page, ['project-draft-preflight','project-draft-register'], true)) return true;
+        if (in_array($page, ['project-draft-preflight','project-draft-register','student-project-publish'], true)) return true;
         return in_array($page,['dismiss-temp-password-warning','profile-avatar-update','profile-avatar-remove','admin-support-material-file','support-material-manage-save','support-material-manage-file','admin-project-file','admin-trash-restore','admin-trash-restore-batch','admin-trash-delete','admin-trash-delete-batch','admin-trash-empty-category','project-document-review-save','project-adjustment-create','project-adjustment-respond','project-adjustment-address','project-adjustment-close','project-adjustment-list','thesis-tribunal-suggest','thesis-tribunal-save','thesis-defense-schedule-save','thesis-defense-new-attempt','project-draft-save','project-draft-upload','project-draft-file-remove','project-draft-reset'],true);
     }
 

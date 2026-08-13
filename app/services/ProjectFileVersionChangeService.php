@@ -5,6 +5,22 @@ declare(strict_types=1);
 /** Caso de uso transaccional para reemplazos académicos con declaración estructurada. */
 final class ProjectFileVersionChangeService
 {
+    /** Reemplazo final previo a publicación: conserva historial sin reiniciar la revisión académica. */
+    public function replaceForPublicationInTransaction(PDO $db,int $projectId,int $fileId,string $expectedChecksum,array $stored,int $actor):array
+    {
+        $model=new ProjectDocumentModel($db);$project=$model->lockProject($projectId);
+        if(!(new ProjectCapabilityService())->canPublishAsActiveStudentInTransaction($db,$projectId,$actor))throw new ProjectDocumentVersionException('No tienes autorización para actualizar archivos de esta publicación.',403);
+        $current=$model->findActiveFile($projectId,$fileId,true);if(!preg_match('/^[a-f0-9]{64}$/',$expectedChecksum)||!hash_equals((string)$current['checksum_sha256'],$expectedChecksum))$this->conflict();
+        $newChecksum=(string)($stored['checksum_sha256']??'');if(!preg_match('/^[a-f0-9]{64}$/',$newChecksum))throw new ProjectDocumentVersionException('No fue posible validar la integridad del archivo nuevo.');if(hash_equals($expectedChecksum,$newChecksum))throw new ProjectDocumentVersionException('Este archivo es idéntico a la versión actual. No es necesario reemplazarlo.');
+        $conflict=$model->activeFileConflict($projectId,(string)$stored['original_name'],(int)$stored['size_bytes'],$newChecksum,$fileId);if($conflict!==null)throw new ProjectDocumentVersionException('Ya existe otro archivo activo con el mismo contenido.');
+        $previousStatus=$this->documentStatus($db,$projectId,$fileId,$expectedChecksum);$reason='Actualización final previa a publicación.';$summary='Versión final preparada por un participante activo antes de la publicación institucional.';$replacement=$model->replace($projectId,$fileId,$stored,$actor,$reason);$previousNumber=(int)$replacement['version_number'];$newNumber=$previousNumber+1;
+        $insert=$db->prepare("INSERT INTO project_file_version_changes(project_id,file_id,previous_version_id,previous_checksum,new_checksum,previous_version_number,new_version_number,changed_by,reason,declared_summary,sections_json,previous_document_status,new_document_status) VALUES(:project,:file,:previous_version,:previous_checksum,:new_checksum,:previous_number,:new_number,:actor,:reason,:summary,NULL,:previous_status,'approved')");
+        $insert->execute(['project'=>$projectId,'file'=>$fileId,'previous_version'=>(int)$replacement['previous_version_id'],'previous_checksum'=>$expectedChecksum,'new_checksum'=>$newChecksum,'previous_number'=>$previousNumber,'new_number'=>$newNumber,'actor'=>$actor,'reason'=>$reason,'summary'=>$summary,'previous_status'=>$previousStatus]);$changeId=(int)$db->lastInsertId();
+        (new ProjectDocumentReviewService($db))->recordCurrentStatus($projectId,$fileId,$newChecksum,'approved',$actor);
+        (new ProjectAuditService($db))->record($projectId,$actor,'project_publication_file_replaced','project_file_version_change',$changeId,['checksum'=>$expectedChecksum,'version_number'=>$previousNumber],['change_id'=>$changeId,'file_id'=>$fileId,'previous_checksum'=>$expectedChecksum,'new_checksum'=>$newChecksum,'previous_version_number'=>$previousNumber,'new_version_number'=>$newNumber,'publication_final'=>true],$reason);
+        return ['change_id'=>$changeId,'file'=>$replacement['file'],'previous_version_id'=>(int)$replacement['previous_version_id'],'previous_version_number'=>$previousNumber,'new_version_number'=>$newNumber];
+    }
+
     public function replaceInTransaction(PDO $db,int $projectId,int $fileId,string $expectedChecksum,array $stored,int $actor,string $context,array $input):array
     {
         $model=new ProjectDocumentModel($db);$project=$model->lockProject($projectId);$this->authorize($db,$project,$actor,$context);

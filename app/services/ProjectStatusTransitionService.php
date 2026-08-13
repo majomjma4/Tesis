@@ -146,24 +146,17 @@ final class ProjectStatusTransitionService
             $auditId = (new ProjectAuditService($db))->record(
                 $projectId, $actor, $action, 'project', $projectId,
                 ['status' => $expectedStatus],
-                ['status' => $targetStatus, 'context' => $context === 'repository' ? 'repository' : 'academic_management'],
+                ['status' => $targetStatus, 'context' => in_array($context, ['repository','student_publication'], true) ? $context : 'academic_management'],
                 $reason !== '' ? $reason : null
             );
             if ($publishes) (new ProjectDocumentArchiveService())->archiveHistoricalVersionsForProjectInTransaction($db,$projectId,$actor,'Publicación institucional del proyecto.');
-            if ($publishes) {
-                try {
-                    (new ProjectRepositoryPackageService())->buildForProject($projectId);
-                } catch (Throwable $zipError) {
-                    // El ZIP se puede regenerar después con el script de mantenimiento.
-                    // No interrumpimos la publicación por un fallo del sistema de archivos.
-                    error_log('ProjectRepositoryPackageService: no se pudo generar el ZIP al publicar el proyecto ' . $projectId . ': ' . $zipError->getMessage());
-                }
-            }
+            if ($publishes) (new ProjectRepositoryPackageService())->buildForProject($projectId);
             (new ProjectDescriptionService($db))->registerStatusReminder($projectId, $auditId);
 
             $labels = project_academic_labels($targetStatus);
             if ($targetStatus === 'defense' && $context !== 'thesis_tribunal_assignment') (new ProjectAcademicNotificationService())->defenseStarted($db,$projectId,(string)$project['code'],(string)$project['title'],$actor);
             if ($recordCompletion) (new ProjectAcademicNotificationService())->finalApproval($db,$projectId,(string)$project['code'],(string)$project['title'],$targetStatus,(string)$labels['status'],$auditId);
+            if ($publishes) (new ProjectAcademicNotificationService())->projectPublished($db,$projectId,(string)$project['code'],(string)$project['title'],$auditId);
             return [
                 'id' => $projectId, 'previous_status' => $expectedStatus, 'status' => $targetStatus,
                 'status_label' => $labels['status'], 'stage_label' => $labels['stage'],

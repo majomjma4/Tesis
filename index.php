@@ -113,6 +113,7 @@ match ($page) {
     'project-draft-reset' => (new ProjectsController())->resetProjectDraft(),
     'project-draft-preflight' => (new ProjectsController())->preflightProjectDraft(),
     'project-draft-register' => (new ProjectsController())->registerProjectDraft(),
+    'student-project-publish' => (new ProjectsController())->publishProjectAsStudent(),
     'new-project', 'nuevo-proyecto' => (new ProjectsController())->create(),
     'repository', 'repositorio' => (new RepositoryController())->index(),
     'repository-detail', 'detalle-repositorio' => (new RepositoryController())->detail(),

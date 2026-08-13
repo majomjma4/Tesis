@@ -194,6 +194,8 @@ final class ProjectsController
             'pageStyles' => [asset('css/projects.css'), asset('css/projects-catalog.css'), asset('css/project-simplified.css')],
             'pageScript' => asset('js/projects.js'),
             'projects' => $projects,
+            'studentProjectPublishEndpoint' => route('student-project-publish'),
+            'studentProjectPublishCsrf' => $session->csrfToken('student_project_publish'),
         ]);
     }
 
@@ -702,6 +704,64 @@ final class ProjectsController
             error_log('Project draft registration: '.$exception->getMessage());
             http_response_code(500);
             $this->json(['success'=>false,'message'=>'No fue posible registrar el proyecto. Tu borrador continúa disponible.','data'=>[]]);
+        }
+    }
+
+    /** Publica un expediente elegible a petición de un estudiante participante activo. */
+    public function publishProjectAsStudent(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]);
+        }
+        $session = new AuthSessionService();
+        $access = new ProjectAccessService();
+        if (!$access->can('project.view') || !$session->validateCsrf('student_project_publish', (string) ($_POST['_csrf'] ?? ''))) {
+            http_response_code($access->can('project.view') ? 419 : 403);
+            $this->json(['success'=>false,'message'=>$access->can('project.view') ? 'Tu sesión expiró. Inicia sesión nuevamente para continuar.' : 'No tienes autorización para publicar proyectos.','data'=>[]]);
+        }
+        $projectId = filter_var($_POST['project_id'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+        if ($projectId === false || $projectId === null) {
+            http_response_code(422);
+            $this->json(['success'=>false,'message'=>'El proyecto solicitado no es válido.','data'=>[]]);
+        }
+        try {
+            $service = new ProjectStudentPublicationService();
+            $mode = (string) ($_POST['mode'] ?? 'preview');
+            if ($mode === 'preview') {
+                $this->json(['success'=>true,'message'=>'El proyecto está listo para publicar.','data'=>$service->preview((int)$projectId, $access->currentUserId())]);
+            }
+            $preparations = new ProjectPublicationPreparationService();
+            if ($mode === 'prepare') $this->json(['success'=>true,'message'=>'Puedes preparar los archivos finales.','data'=>$preparations->begin((int)$projectId,$access->currentUserId())]);
+            $preparationId = (string) ($_POST['preparation_id'] ?? '');
+            if ($mode === 'prepare-add') $this->json(['success'=>true,'message'=>'Archivo agregado a la preparación.','data'=>$preparations->add((int)$projectId,$access->currentUserId(),$preparationId,$_FILES['file'] ?? [])]);
+            if ($mode === 'prepare-replace') {
+                $fileId=filter_var($_POST['file_id'] ?? null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);if($fileId===false||$fileId===null)throw new ProjectStudentPublicationException('El archivo seleccionado no es válido.',422);
+                $this->json(['success'=>true,'message'=>'Archivo actualizado en la preparación.','data'=>$preparations->replace((int)$projectId,$access->currentUserId(),$preparationId,(int)$fileId,$_FILES['file'] ?? [])]);
+            }
+            if ($mode === 'prepare-include') {
+                $fileId=filter_var($_POST['file_id'] ?? null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);if($fileId===false||$fileId===null)throw new ProjectStudentPublicationException('El archivo seleccionado no es válido.',422);
+                $included=filter_var($_POST['included'] ?? null,FILTER_VALIDATE_BOOLEAN,FILTER_NULL_ON_FAILURE);if($included===null)throw new ProjectStudentPublicationException('La acción solicitada no es válida.',422);
+                $this->json(['success'=>true,'message'=>$included?'Archivo incluido en la preparación.':'El archivo no se incluirá en la publicación final.','data'=>$preparations->setIncluded((int)$projectId,$access->currentUserId(),$preparationId,(int)$fileId,$included)]);
+            }
+            if ($mode === 'prepare-remove-add') $this->json(['success'=>true,'message'=>'Archivo retirado de la preparación.','data'=>$preparations->removeAddition((int)$projectId,$access->currentUserId(),$preparationId,(string)($_POST['file_key'] ?? ''))]);
+            if ($mode === 'prepare-cancel') {$preparations->cancel((int)$projectId,$access->currentUserId(),$preparationId);$this->json(['success'=>true,'message'=>'Preparación cancelada.','data'=>[]]);}
+            if ($mode !== 'publish') throw new ProjectStudentPublicationException('La operación de publicación no es válida.', 422);
+            $data=$preparationId!==''?$service->publishPrepared((int)$projectId,$access->currentUserId(),$preparationId):$service->publish((int)$projectId, $access->currentUserId());
+            $this->json(['success'=>true,'message'=>'Proyecto publicado correctamente.','data'=>$data]);
+        } catch (ProjectStudentPublicationException $exception) {
+            http_response_code($exception->getCode() >= 400 && $exception->getCode() < 600 ? $exception->getCode() : 422);
+            $this->json(['success'=>false,'message'=>$exception->getMessage(),'data'=>[]]);
+        } catch (ProjectStatusTransitionException $exception) {
+            http_response_code(422);
+            $this->json(['success'=>false,'message'=>$exception->getMessage(),'data'=>[]]);
+        } catch (ProjectDocumentVersionException|InvalidArgumentException $exception) {
+            http_response_code(422);
+            $this->json(['success'=>false,'message'=>$exception->getMessage(),'data'=>[]]);
+        } catch (Throwable $exception) {
+            error_log('Student project publication: '.$exception->getMessage());
+            http_response_code(500);
+            $this->json(['success'=>false,'message'=>'No fue posible publicar el proyecto. Inténtalo nuevamente.','data'=>[]]);
         }
     }
 

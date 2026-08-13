@@ -43,7 +43,8 @@ final class ProjectModel
                 'observations'=>array_fill(0,(int)($row['observation_count']??0),[]),
                 'final_documents'=>array_fill(0,$finalDocumentCount,[]),
                 'latest_delivery'=>$latestDelivery,'key_dates'=>[['label'=>'Inicio del expediente','value'=>'Registrado'],['label'=>'Última actividad','value'=>date('d/m/Y',strtotime((string)$row['updated_at']))],['label'=>'Próximo hito','value'=>'Por definir']],
-                'progress'=>$progress,'activity_order'=>$totalRows-$index,'tags'=>[],'technologies'=>[]];
+                'progress'=>$progress,'activity_order'=>$totalRows-$index,'tags'=>[],'technologies'=>[],
+                'repository_id'=>$status==='published'?(int)$row['id']:null];
         },$rows,array_keys($rows));
     }
 
