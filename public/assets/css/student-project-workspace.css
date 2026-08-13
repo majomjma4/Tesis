@@ -1,5 +1,5 @@
 /* Estilos de Workspace de Proyecto - Estudiante */
-:root {
+.student-workspace {
     --sw-primary: var(--blue, #2563eb);
     --sw-primary-hover: var(--blue-dark, #1d4ed8);
     --sw-bg-soft: var(--surface-soft, #f8fafc);
@@ -107,10 +107,10 @@
 }
 
 .sw-badge-status.is-development { background: #e0f2fe; color: #0369a1; }
-.sw-badge-status.is-review { background: #fef3c7; color: #b45309; }
-.sw-badge-status.is-corrections { background: #ffedd5; color: #c2410c; }
+.sw-badge-status.is-under_review { background: #fef3c7; color: #b45309; }
 .sw-badge-status.is-approved { background: #dcfce7; color: #15803d; }
 .sw-badge-status.is-tribunal { background: #f3e8ff; color: #6b21a8; }
+.sw-badge-status.is-defense,.sw-badge-status.is-tribunal_approved { background: #f3e8ff; color: #6b21a8; }
 .sw-badge-status.is-published { background: #ccfbf1; color: #0f766e; }
 
 /* Bloque Acción Recomendada */
@@ -291,6 +291,76 @@
 .sw-tab-pane.is-active {
     display: block;
 }
+
+.student-workspace .sw-header-actions { display:flex; gap:.75rem; flex-wrap:wrap; }
+.student-workspace .sw-primary-link,.student-workspace .sw-secondary-link { display:inline-flex; align-items:center; gap:.45rem; border-radius:8px; padding:.55rem .85rem; font-size:.85rem; font-weight:700; text-decoration:none; }
+.student-workspace .sw-primary-link { background:var(--sw-primary); color:#fff; }
+.student-workspace .sw-secondary-link { color:var(--sw-text); background:var(--sw-bg-soft); border:1px solid var(--sw-border); }
+.student-workspace .sw-toggle-btn,.student-workspace .sw-panel-toggle { border:1px solid var(--sw-border); background:#fff; color:var(--sw-text); border-radius:6px; cursor:pointer; padding:.35rem .55rem; }
+.student-workspace .sw-card { background:var(--surface,#fff); border:1px solid var(--sw-border); border-radius:12px; padding:1.25rem; }
+.student-workspace .sw-section-heading { margin-bottom:1rem; }
+.student-workspace .sw-section-heading h2 { margin:0; font-size:1.1rem; color:var(--sw-text); }
+.student-workspace .sw-section-heading p { margin:.25rem 0 0; color:var(--sw-text-muted); font-size:.85rem; }
+.student-workspace .sw-summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:1rem; }
+.student-workspace .sw-summary-grid div { background:var(--sw-bg-soft); border:1px solid var(--sw-border); border-radius:8px; padding:.8rem; }
+.student-workspace .sw-summary-grid dt { color:var(--sw-text-muted); font-size:.72rem; font-weight:700; text-transform:uppercase; }
+.student-workspace .sw-summary-grid dd { margin:.3rem 0 0; color:var(--sw-text); font-size:.9rem; font-weight:700; }
+.student-workspace .sw-metrics { display:flex; gap:1rem; flex-wrap:wrap; margin-top:1rem; }
+.student-workspace .sw-metrics div { display:flex; align-items:baseline; gap:.4rem; color:var(--sw-text-muted); font-size:.82rem; }
+.student-workspace .sw-metrics strong { font-size:1.15rem; color:var(--sw-text); }
+.student-workspace .sw-empty-state { color:var(--sw-text-muted); font-size:.9rem; margin:0; padding:.75rem 0; }
+.student-workspace .sw-record-list,.student-workspace .sw-history-list { display:grid; gap:.75rem; }
+.student-workspace .sw-record,.student-workspace .sw-history-event { border:1px solid var(--sw-border); border-radius:8px; background:var(--sw-bg-soft); padding:.85rem; display:grid; gap:.35rem; }
+.student-workspace .sw-record div { display:flex; align-items:baseline; justify-content:space-between; gap:.75rem; }
+.student-workspace .sw-record span,.student-workspace .sw-record small,.student-workspace .sw-history-event small { color:var(--sw-text-muted); font-size:.78rem; }
+.student-workspace .sw-record p,.student-workspace .sw-history-event p { margin:.15rem 0; font-size:.88rem; color:var(--sw-text); white-space:pre-line; }
+.student-workspace .sw-tree-item { width:100%; text-align:left; background:transparent; }
+.student-workspace .sw-viewer-doc-info span { display:block; color:var(--sw-text-muted); font-size:.75rem; margin-top:.15rem; }
+.student-workspace .sw-add-files,.student-workspace .sw-viewer-download { display:inline-flex;align-items:center;justify-content:center;gap:.45rem;border:1px solid var(--sw-primary);background:var(--sw-primary);color:#fff;border-radius:7px;padding:.5rem .7rem;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer;text-decoration:none; }
+.student-workspace .sw-add-files:disabled { opacity:.65;cursor:wait; }
+.student-workspace .sw-file-row { position:relative;display:flex;align-items:center;gap:.25rem; }
+.student-workspace .sw-archive-node { min-width:0; }
+.student-workspace .sw-file-row>.sw-tree-item { flex:1 1 auto;min-width:0; }
+.student-workspace .sw-file-row-actions { display:flex;align-items:center;gap:.15rem;position:relative; }
+.student-workspace .sw-file-download,.student-workspace .sw-file-menu-trigger { display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:6px;background:transparent;color:var(--sw-text-muted);cursor:pointer;text-decoration:none; }
+.student-workspace .sw-file-download:hover,.student-workspace .sw-file-menu-trigger:hover { background:var(--sw-bg-soft);color:var(--sw-primary); }
+.student-workspace .sw-file-menu { position:absolute;z-index:30;right:0;top:calc(100% + 4px);min-width:160px;padding:5px;border:1px solid var(--sw-border);border-radius:8px;background:#fff;box-shadow:0 10px 25px rgba(15,23,42,.16);display:grid; }
+.student-workspace .sw-file-menu[hidden] { display:none; }
+.student-workspace .sw-file-menu button,.student-workspace .sw-file-menu a { border:0;background:transparent;color:var(--sw-text);text-align:left;padding:.55rem .65rem;border-radius:5px;font:inherit;font-size:.8rem;text-decoration:none;cursor:pointer; }
+.student-workspace .sw-file-menu button:hover,.student-workspace .sw-file-menu a:hover { background:var(--sw-bg-soft); }
+.student-workspace .sw-protected-label { color:#92400e;background:#fef3c7;border-radius:5px;padding:.2rem .35rem;font-size:.65rem;font-weight:700; }
+.student-workspace .is-dragging { outline:2px dashed var(--sw-primary);outline-offset:5px;border-radius:12px; }
+.student-workspace .sw-zip-tree { list-style:none;margin:.2rem 0 .3rem .85rem;padding:0 0 0 .55rem;border-left:1px solid var(--sw-border);display:grid;gap:.12rem; }
+.student-workspace .sw-zip-tree[hidden] { display:none; }
+.student-workspace .sw-zip-entry { width:100%;display:flex;align-items:center;gap:.35rem;min-width:0;border:0;border-radius:6px;background:transparent;color:var(--sw-text);padding:.36rem .45rem;text-align:left;font:inherit;font-size:.78rem;cursor:pointer;overflow:hidden; }
+.student-workspace .sw-zip-entry:hover,.student-workspace .sw-zip-entry.is-selected { background:var(--sw-bg-soft);color:var(--sw-primary); }
+.student-workspace .sw-zip-entry span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.student-workspace .sw-zip-entry .sw-zip-toggle { flex:0 0 1rem;color:var(--sw-text-muted); }
+.student-workspace .sw-preview-stage { align-self:stretch;width:100%;min-height:min(56vh,620px);background:#fff;border:1px solid var(--sw-border);border-radius:8px;overflow:auto; }
+.student-workspace .sw-preview-message { display:grid;place-items:center;min-height:220px;margin:0;padding:1rem;color:var(--sw-text-muted);text-align:center; }
+.student-workspace .sw-preview-message.is-error { color:#b91c1c; }
+.student-workspace .sw-preview-pdf { width:100%;height:min(70vh,720px);border:0;background:#fff; }
+.student-workspace .sw-preview-image { display:block;max-width:100%;max-height:min(68vh,720px);margin:auto;object-fit:contain; }
+.student-workspace .sw-preview-text { margin:0;padding:1rem;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--sw-text);font:13px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
+.student-workspace .sw-preview-text.is-code { background:#0f172a;color:#e2e8f0;min-height:320px; }
+.student-workspace .sw-docx-notice { margin:0;padding:.7rem 1rem;background:#eff6ff;border-bottom:1px solid #bfdbfe;color:#1e40af;font-size:.8rem; }
+.student-workspace .sw-preview-docx,.student-workspace .sw-preview-docx-content { box-sizing:border-box;width:100%;padding:1rem;overflow:auto;background:#e2e8f0; }
+.student-workspace .sw-preview-docx .docx-wrapper { box-sizing:border-box;display:block;width:100%;max-width:100%;padding:0;background:transparent;overflow:hidden; }
+.student-workspace .sw-preview-docx section.docx { box-sizing:border-box;width:min(100%,816px)!important;max-width:100%!important;min-width:0!important;height:auto!important;margin:0 auto 1rem!important;padding:clamp(1rem,4vw,2.5rem)!important;box-shadow:0 2px 10px rgba(15,23,42,.18); }
+.student-workspace .sw-preview-docx-content { background:#fff;color:var(--sw-text);line-height:1.6; }
+.student-workspace .sw-preview-docx-content table { width:100%;border-collapse:collapse;margin:1rem 0; }
+.student-workspace .sw-preview-docx-content td { border:1px solid var(--sw-border);padding:.45rem;vertical-align:top; }
+.student-workspace .sw-operation-modal { position:fixed;z-index:10050;inset:0;background:rgba(15,23,42,.55);display:grid;place-items:center;padding:1rem; }
+.student-workspace .sw-operation-modal[hidden] { display:none; }
+.student-workspace .sw-operation-modal section { width:min(440px,100%);background:#fff;border-radius:12px;box-shadow:0 24px 55px rgba(15,23,42,.3);overflow:hidden; }
+.student-workspace .sw-operation-modal header,.student-workspace .sw-operation-modal footer { padding:1rem 1.15rem;display:flex;justify-content:space-between;align-items:center;gap:.75rem;border-bottom:1px solid var(--sw-border); }
+.student-workspace .sw-operation-modal header h2 { margin:0;font-size:1rem;color:var(--sw-text); }
+.student-workspace .sw-operation-modal header button { border:0;background:transparent;font:inherit;cursor:pointer; }
+.student-workspace .sw-operation-modal>section>div { padding:1rem 1.15rem;color:var(--sw-text);font-size:.9rem; }
+.student-workspace .sw-operation-modal footer { justify-content:flex-end;border-top:1px solid var(--sw-border);border-bottom:0; }
+.student-workspace .sw-operation-modal footer button { border:1px solid var(--sw-border);background:#fff;color:var(--sw-text);border-radius:7px;padding:.45rem .7rem;font:inherit;font-size:.82rem;font-weight:700;cursor:pointer; }
+.student-workspace .sw-operation-modal footer .is-danger { border-color:#b91c1c;background:#b91c1c;color:#fff; }
+.student-workspace .sw-modal-file-summary { white-space:pre-line;color:var(--sw-text-muted);font-size:.8rem; }
 
 /* Workspace Documental (3 Columnas Flexibles) */
 .sw-doc-workspace {

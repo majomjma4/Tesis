@@ -203,16 +203,11 @@ final class ProjectsController
     public function detail(): void
     {
         $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $legacyTabs = ['summary'=>'information','deliveries' => 'files', 'documents'=>'files','final-documents' => 'files', 'observations' => 'information', 'comments' => 'information', 'review'=>'information', 'history' => 'information', 'calendar' => 'information', 'activity'=>'information', 'participants' => 'information', 'more' => 'information'];
-        $allowedTabs = ['information', 'files', 'evolution'];
-        $requestedTab = strtolower(trim((string) ($_GET['tab'] ?? 'information')));
-        $tab = $legacyTabs[$requestedTab] ?? $requestedTab;
-        $tab = in_array($tab, $allowedTabs, true) ? $tab : 'information';
+        $requestedTab = strtolower(trim((string) ($_GET['tab'] ?? 'summary')));
         $access = new ProjectAccessService();
         $session = new AuthSessionService();
         $isAdministrator = $session->hasAdminAccess();
         $isTeacher = !$isAdministrator && in_array('teacher', $access->currentRoles(), true);
-        $isDevDemo = !empty($_GET['demo']) && app_is_development();
         // El Docente accede a cualquier proyecto activo desde Proyectos activos (no solo a los suyos).
         // Se consulta el registro con acceso amplio (como administrador) pero las capacidades
         // se calculan en contexto 'academic', que restringe las acciones disponibles.
@@ -221,7 +216,13 @@ final class ProjectsController
             ? (new ProjectRecordModel())->find((int)$id, $access->currentUserId(), $findAsAdmin)
             : null;
 
-        if ($project === null && $isDevDemo) {
+        if ($project === null) {
+            (new ErrorController())->notFound();
+            return;
+        }
+
+        /* Legacy visual demo intentionally disabled from the real project route. */
+        if (false) {
             $project = [
                 'id' => 999,
                 'code' => 'PRA-2026-001',
@@ -242,11 +243,14 @@ final class ProjectsController
             ];
         }
 
-        if ($project === null) {
-            (new ErrorController())->notFound();
-            return;
-        }
         $projectContext = $isAdministrator ? 'academic_management' : 'academic';
+        $studentTabs = ['summary','documents','observations','versions','history','tribunal'];
+        $studentTabAliases = ['files'=>'documents','deliveries'=>'documents','final-documents'=>'documents','review'=>'observations','comments'=>'observations','information'=>'summary','activity'=>'history','calendar'=>'history','participants'=>'summary','more'=>'summary'];
+        $studentTab = $studentTabAliases[$requestedTab] ?? $requestedTab;
+        $studentTab = in_array($studentTab, $studentTabs, true) ? $studentTab : 'summary';
+        $legacyTabs = ['summary'=>'information','deliveries'=>'files','documents'=>'files','final-documents'=>'files','observations'=>'information','comments'=>'information','review'=>'information','history'=>'information','calendar'=>'information','activity'=>'information','participants'=>'information','more'=>'information'];
+        $tab = $legacyTabs[$requestedTab] ?? $requestedTab;
+        $tab = in_array($tab, ['information','files','evolution'], true) ? $tab : 'information';
         $project['review_situation']=(new ProjectReviewSituationService())->forProject((int)$project['id']);
         $academicPage = (new ProjectAcademicTimelineService())->page((int) $project['id']);
         foreach ($academicPage['events'] as &$academicEvent) {
@@ -300,6 +304,15 @@ final class ProjectsController
             $documentReview = (new ProjectDocumentReviewService())->describeCurrentFiles((int)$project['id'], (array)$project['files']);
             $project['files'] = $documentReview['files'];
         }
+        $studentDocumentReview = null;
+        $studentVersions = [];
+        $studentDefense = null;
+        if (!$isAdministrator && !$isTeacher) {
+            $studentDocumentReview = (new ProjectDocumentReviewService())->describeCurrentFiles((int) $project['id'], (array) $project['files']);
+            $project['files'] = $studentDocumentReview['files'];
+            $studentVersions = (new ProjectDocumentModel())->versions((int) $project['id']);
+            if ((string) $project['type_code'] === 'thesis') $studentDefense = (new ThesisDefenseService())->current((int) $project['id']);
+        }
         $returnUrl = ($isAdministrator || $isTeacher)
             ? $this->academicManagementReturnUrl((string) ($_GET['return'] ?? ''))
             : route('projects');
@@ -342,11 +355,19 @@ final class ProjectsController
             'pageScripts' => array_values(array_filter([
                 $descriptionReminder ? asset('js/project-description.js') : null,
                 $hasAdjustmentUi ? asset('js/project-adjustments.js') : null,
+                (!$isAdministrator && !$isTeacher) ? asset('vendor/jszip/3.10.1/jszip.min.js') : null,
+                (!$isAdministrator && !$isTeacher) ? asset('vendor/docx-preview/0.4.0/docx-preview.min.js') : null,
                 $isAdministrator ? asset('js/admin-projects.js') : (!$isTeacher ? asset('js/student-project-workspace.js') : null),
                 $isAdministrator && $projectStatusTransitions !== [] ? asset('js/project-status-transition.js') : null,
             ])),
             'project' => $project,
             'activeTab' => $tab,
+            'studentActiveTab' => $studentTab,
+            'studentDocumentReview' => $studentDocumentReview,
+            'studentVersions' => $studentVersions,
+            'studentDefense' => $studentDefense,
+            'studentDocumentEndpoint' => route('student-project-document'),
+            'studentDocumentCsrf' => $session->csrfToken('student_project_documents'),
             'isAdministrator' => $isAdministrator,
             'publicContext' => false,
             'projectContext' => $projectContext,

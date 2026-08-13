@@ -11,6 +11,7 @@ final class ProjectCapabilityService
         'manage_tribunal', 'manage_publication', 'register_delivery', 'review_delivery',
         'create_observation', 'respond_observation', 'request_corrections', 'download_files',
         'review_documents', 'publish_project',
+        'manage_workspace_files',
         'create_adjustment_request', 'view_adjustment_requests', 'respond_adjustment_request',
         'address_adjustment_request', 'close_adjustment_request',
     ];
@@ -117,6 +118,7 @@ final class ProjectCapabilityService
             $status = (string) ($project['status'] ?? '');
             $capabilities['publish_project'] = ($type === 'thesis' && $status === 'tribunal_approved')
                 || ($type !== 'thesis' && $status === 'approved');
+            $capabilities['manage_workspace_files'] = $status === 'development';
         }
 
         // Los permisos académicos globales existen, pero esta pantalla aún no tiene endpoints operativos.

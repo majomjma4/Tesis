@@ -100,6 +100,7 @@ match ($page) {
     'project-zip-entry-content' => (new ProjectsController())->zipEntryContent(),
     'project-zip-entry-download' => (new ProjectsController())->zipEntryDownload(),
     'admin-project-file' => (new ProjectDocumentController())->change(),
+    'student-project-document' => (new ProjectStudentDocumentController())->change(),
     'project-document-review-save' => (new ProjectDocumentReviewController())->save(),
     'project-adjustment-create' => (new ProjectAdjustmentController())->create(),
     'project-adjustment-respond' => (new ProjectAdjustmentController())->respond(),

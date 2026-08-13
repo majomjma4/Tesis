@@ -1,137 +1,54 @@
-/**
- * Interacciones y prototipado visual para "Mi proyecto" (Estudiante)
- */
-document.addEventListener("DOMContentLoaded", () => {
-    // 1. Manejo de Pestañas
-    const tabButtons = document.querySelectorAll("[data-sw-tab]");
-    const tabPanes = document.querySelectorAll(".sw-tab-pane");
+document.addEventListener('DOMContentLoaded', () => {
+    const workspace = document.querySelector('[data-student-workspace]');
+    if (!workspace) return;
+    const toast = (message, error = false) => typeof window.showToast === 'function' ? window.showToast(message, error) : console[error ? 'error' : 'info'](message);
+    const tabs = [...workspace.querySelectorAll('[data-sw-tab]')];
+    const panes = [...workspace.querySelectorAll('.sw-tab-pane')];
+    tabs.forEach((tab) => tab.addEventListener('click', (event) => { event.preventDefault(); const pane = workspace.querySelector(`#swTab-${CSS.escape(tab.dataset.swTab)}`); if (!pane) return; tabs.forEach((item) => { const active=item===tab; item.classList.toggle('is-active',active); item.setAttribute('aria-selected',active?'true':'false'); }); panes.forEach((item) => item.classList.toggle('is-active',item===pane)); const url=new URL(workspace.dataset.projectUrl,window.location.origin); url.searchParams.set('tab',tab.dataset.swTab); window.history.pushState({},'',url); }));
+    const fullTimeline=workspace.querySelector('[data-sw-full-timeline]'), timelineToggle=workspace.querySelector('[data-sw-toggle-timeline]');
+    if (fullTimeline && timelineToggle) timelineToggle.addEventListener('click', () => { const open=fullTimeline.hidden; fullTimeline.hidden=!open; timelineToggle.setAttribute('aria-expanded',open?'true':'false'); timelineToggle.textContent=open?'Ocultar recorrido':'Ver recorrido completo'; });
+    const togglePanel=(panelSelector,triggerSelector) => { const panel=workspace.querySelector(panelSelector), trigger=workspace.querySelector(triggerSelector); if(panel&&trigger) trigger.addEventListener('click',()=>{const collapsed=panel.classList.toggle('is-collapsed'); trigger.setAttribute('aria-expanded',collapsed?'false':'true');}); };
+    togglePanel('[data-sw-explorer]','[data-sw-toggle-explorer]'); togglePanel('[data-sw-observations]','[data-sw-toggle-observations]');
 
-    tabButtons.forEach(btn => {
-        btn.addEventListener("click", () => {
-            const targetTab = btn.dataset.swTab;
-            tabButtons.forEach(b => b.classList.remove("is-active"));
-            tabPanes.forEach(p => p.classList.remove("is-active"));
+    const manager=workspace.querySelector('[data-sw-document-manager]'); if (!manager) return;
+    const endpoint=manager.dataset.endpoint, csrf=manager.dataset.csrf, projectId=manager.dataset.projectId;
+    const fileInput=manager.querySelector('[data-sw-file-input]'), addButton=manager.querySelector('[data-sw-add-files]');
+    const viewerName=manager.querySelector('[data-sw-viewer-name]'), viewerMeta=manager.querySelector('[data-sw-viewer-meta]'), viewerDownload=manager.querySelector('[data-sw-viewer-download]'), viewerEmpty=manager.querySelector('[data-sw-viewer-empty]'), previewStage=manager.querySelector('[data-sw-preview-stage]'), observationPanel=manager.querySelector('[data-sw-file-observations]');
+    const modal=manager.querySelector('[data-sw-operation-modal]'), modalTitle=manager.querySelector('[data-sw-modal-title]'), modalMessage=manager.querySelector('[data-sw-modal-message]'), modalSummary=manager.querySelector('[data-sw-modal-summary]'), modalConfirm=manager.querySelector('[data-sw-modal-confirm]'); let modalAction=null;
+    const closeMenus=()=>manager.querySelectorAll('[data-sw-file-menu]').forEach((menu)=>{menu.hidden=true;menu.previousElementSibling?.setAttribute('aria-expanded','false');});
+    const closeModal=()=>{ modal.hidden=true; modalAction=null; };
+    manager.querySelectorAll('[data-sw-modal-cancel]').forEach((button)=>button.addEventListener('click',closeModal));
+    modal?.addEventListener('click',(event)=>{if(event.target===modal)closeModal();});
+    document.addEventListener('keydown',(event)=>{if(event.key==='Escape'){closeModal();closeMenus();}});
+    const confirm=(title,message,summary,destructive,callback)=>{modalTitle.textContent=title;modalMessage.textContent=message;modalSummary.hidden=!summary;modalSummary.textContent=summary||'';modalConfirm.textContent=destructive?'Quitar':'Reemplazar';modalConfirm.classList.toggle('is-danger',destructive);modalAction=callback;modal.hidden=false;modalConfirm.focus();};
+    modalConfirm?.addEventListener('click',async()=>{if(!modalAction)return;const action=modalAction;modalConfirm.disabled=true;try{await action();}finally{modalConfirm.disabled=false;}});
+    const request=async(action,file,extra={})=>{const body=new FormData();body.set('_csrf',csrf);body.set('project_id',projectId);body.set('action',action);Object.entries(extra).forEach(([key,value])=>body.set(key,value));if(file)body.set('file',file);const response=await fetch(endpoint,{method:'POST',body,credentials:'same-origin'});let payload={};try{payload=await response.json();}catch(_){throw new Error('No fue posible completar la operación.');}if(!response.ok||!payload.success){const error=new Error(payload.message||'No fue posible completar la operación.');error.status=response.status;throw error;}return payload;};
+    const reloadDocuments=()=>{const url=new URL(workspace.dataset.projectUrl,window.location.origin);url.searchParams.set('tab','documents');window.location.assign(url);};
+    const existingByName=(name)=>[...manager.querySelectorAll('[data-sw-file]')].find((item)=>item.dataset.fileName===name);
+    const replaceFile=async(file,fileId,checksum)=>{try{toast('Subiendo archivo…');await request('replace',file,{file_id:fileId,expected_checksum:checksum});toast('Archivo reemplazado correctamente.');reloadDocuments();}catch(error){toast(error.message||'No fue posible completar la operación.',true);}};
+    const upload=async(file)=>{try{if(addButton)addButton.disabled=true;toast(`Subiendo ${file.name}…`);await request('add',file);toast('Archivo agregado correctamente.');return true;}catch(error){const existing=existingByName(file.name);if(error.status===409&&existing&&/existe/i.test(error.message)){const replace=existing.closest('.sw-file-row')?.querySelector('[data-sw-replace]');if(replace){confirm('Ya existe este archivo',`Ya existe un archivo llamado “${file.name}”. ¿Deseas reemplazarlo?`,`Archivo actual: ${file.name}\nNuevo archivo: ${file.name}`,false,async()=>{closeModal();await replaceFile(file,replace.dataset.fileId,replace.dataset.fileChecksum);});return false;}}toast(error.message||'No fue posible agregar el archivo.',true);return false;}finally{if(addButton)addButton.disabled=false;}};
+    addButton?.addEventListener('click',()=>fileInput?.click());
+    fileInput?.addEventListener('change',async()=>{let changed=false;for(const file of [...fileInput.files])changed=(await upload(file))||changed;fileInput.value='';if(changed)reloadDocuments();});
+    const externalFiles=(event)=>{const transfer=event.dataTransfer;if(!transfer||!transfer.files||transfer.files.length===0)return [];return [...transfer.files].filter((file)=>file instanceof File&&file.size>=0);};
+    manager.addEventListener('dragover',(event)=>{if(!fileInput||externalFiles(event).length===0)return;event.preventDefault();manager.classList.add('is-dragging');}); manager.addEventListener('dragleave',()=>manager.classList.remove('is-dragging'));
+    manager.addEventListener('drop',async(event)=>{const files=externalFiles(event);if(files.length===0)return;event.preventDefault();manager.classList.remove('is-dragging');let changed=false;for(const file of files)changed=(await upload(file))||changed;if(changed)reloadDocuments();});
+    manager.querySelectorAll('[data-sw-menu-trigger]').forEach((trigger)=>trigger.addEventListener('click',(event)=>{event.stopPropagation();const menu=trigger.nextElementSibling,open=!menu.hidden;closeMenus();menu.hidden=open;trigger.setAttribute('aria-expanded',open?'false':'true');}));
+    document.addEventListener('click',(event)=>{if(!manager.contains(event.target))closeMenus();});
+    manager.querySelectorAll('[data-sw-replace]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();const chooser=document.createElement('input');chooser.type='file';chooser.hidden=true;document.body.appendChild(chooser);chooser.addEventListener('change',()=>{const file=chooser.files?.[0];chooser.remove();if(!file)return;confirm('Reemplazar archivo','Se conservará el historial técnico del archivo anterior.',`Archivo actual: ${button.dataset.fileName}\nNuevo archivo: ${file.name}`,false,async()=>{closeModal();await replaceFile(file,button.dataset.fileId,button.dataset.fileChecksum);});});chooser.click();}));
+    manager.querySelectorAll('[data-sw-remove]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();confirm('Quitar archivo','Este archivo dejará de formar parte del espacio de trabajo actual.',button.dataset.fileName,true,async()=>{try{await request('remove',null,{file_id:button.dataset.fileId});closeModal();toast('Archivo quitado.');reloadDocuments();}catch(error){toast(error.message||'No fue posible completar la operación.',true);}});}));
 
-            btn.classList.add("is-active");
-            const targetPane = document.getElementById(`swTab-${targetTab}`);
-            if (targetPane) targetPane.classList.add("is-active");
-        });
-    });
-
-    // 2. Colapsar / Expandir Paneles (Explorador y Observaciones)
-    const toggleExplorerBtn = document.getElementById("swToggleExplorer");
-    const explorerPanel = document.getElementById("swExplorerPanel");
-    if (toggleExplorerBtn && explorerPanel) {
-        toggleExplorerBtn.addEventListener("click", () => {
-            explorerPanel.classList.toggle("is-collapsed");
-        });
-    }
-
-    const toggleObsBtn = document.getElementById("swToggleObs");
-    const obsPanel = document.getElementById("swObsPanel");
-    if (toggleObsBtn && obsPanel) {
-        toggleObsBtn.addEventListener("click", () => {
-            obsPanel.classList.toggle("is-collapsed");
-        });
-    }
-
-    // 3. Recorrido completo desplegable
-    const toggleTimelineBtn = document.getElementById("swToggleTimeline");
-    const verticalTimeline = document.getElementById("swVerticalTimeline");
-    if (toggleTimelineBtn && verticalTimeline) {
-        toggleTimelineBtn.addEventListener("click", () => {
-            const isHidden = verticalTimeline.hidden;
-            verticalTimeline.hidden = !isHidden;
-            toggleTimelineBtn.querySelector("span").textContent = isHidden ? "Ocultar recorrido" : "Ver recorrido completo";
-        });
-    }
-
-    // 4. Selección bidireccional entre marcadores DOCX/PDF y Observaciones
-    const obsCards = document.querySelectorAll("[data-obs-id]");
-    const docMarkers = document.querySelectorAll("[data-marker-id]");
-
-    function highlightObs(obsId) {
-        obsCards.forEach(c => c.classList.toggle("is-selected", c.dataset.obsId === obsId));
-        docMarkers.forEach(m => m.classList.toggle("is-active", m.dataset.markerId === obsId));
-    }
-
-    obsCards.forEach(card => {
-        card.addEventListener("click", () => highlightObs(card.dataset.obsId));
-        
-        // Checklist local de tareas ☐ Hecha
-        const checkbox = card.querySelector(".sw-obs-check");
-        if (checkbox) {
-            checkbox.addEventListener("change", (e) => {
-                e.stopPropagation();
-                card.classList.toggle("is-done", checkbox.checked);
-            });
-        }
-    });
-
-    docMarkers.forEach(marker => {
-        marker.addEventListener("click", () => highlightObs(marker.dataset.markerId));
-    });
-
-    // 5. Modales Simulados
-    function openModal(id) {
-        const modal = document.getElementById(id);
-        if (modal) modal.hidden = false;
-    }
-    function closeModal(id) {
-        const modal = document.getElementById(id);
-        if (modal) modal.hidden = true;
-    }
-
-    document.querySelectorAll("[data-sw-modal-open]").forEach(btn => {
-        btn.addEventListener("click", () => openModal(btn.dataset.swModalOpen));
-    });
-    document.querySelectorAll("[data-sw-modal-close]").forEach(btn => {
-        btn.addEventListener("click", () => closeModal(btn.dataset.swModalClose));
-    });
-
-    // Toast informativo de simulación
-    function showToast(msg) {
-        if (typeof window.showToast === "function") {
-            window.showToast(msg);
-        } else {
-            alert(msg);
-        }
-    }
-
-    // Modal Enviar a revisión
-    const confirmSendBtn = document.getElementById("swConfirmSend");
-    if (confirmSendBtn) {
-        confirmSendBtn.addEventListener("click", () => {
-            closeModal("swModalSendReview");
-            showToast("Proyecto enviado a revisión correctamente.");
-            // Actualización visual simulada
-            const statusBadge = document.querySelector(".sw-badge-status");
-            if (statusBadge) {
-                statusBadge.className = "sw-badge-status is-review";
-                statusBadge.innerHTML = '<i class="fa-solid fa-clock"></i> En revisión';
-            }
-        });
-    }
-
-    // Modal Trabajar en Word
-    const confirmWordBtn = document.getElementById("swConfirmWordDownload");
-    if (confirmWordBtn) {
-        confirmWordBtn.addEventListener("click", () => {
-            closeModal("swModalWorkWord");
-            showToast("Descargando versión actualizada para Word...");
-        });
-    }
-
-    // 6. Selector Flotante de Simulación en Entorno DEV
-    const devSelector = document.getElementById("swDevScenarioSelector");
-    if (devSelector) {
-        devSelector.addEventListener("change", () => {
-            const scenario = devSelector.value;
-            showToast(`Simulando escenario visual: ${scenario}`);
-            // Recargar o cambiar banderas estéticas locales
-            document.querySelectorAll("[data-scenario]").forEach(el => {
-                el.hidden = el.dataset.scenario !== scenario && el.dataset.scenario !== "all";
-            });
-        });
-    }
+    const objectUrls=new Set();
+    const clearPreview=()=>{objectUrls.forEach((url)=>URL.revokeObjectURL(url));objectUrls.clear();previewStage?.replaceChildren();if(previewStage)previewStage.hidden=true;};
+    const previewMessage=(message,kind='')=>{clearPreview();if(!previewStage)return;const state=document.createElement('p');state.className=`sw-preview-message ${kind}`;state.textContent=message;previewStage.append(state);previewStage.hidden=false;};
+    const renderBlocks=(blocks)=>{const content=document.createElement('div');content.className='sw-preview-docx-content';(blocks||[]).forEach((block)=>{if(block.type==='table'){const table=document.createElement('table');(block.rows||[]).forEach((row)=>{const tr=document.createElement('tr');row.forEach((cell)=>{const td=document.createElement('td');td.textContent=cell;tr.append(td);});table.append(tr);});content.append(table);}else{const node=document.createElement(block.type==='heading'?`h${Math.min(6,Math.max(1,block.level||2))}`:'p');node.textContent=block.text||'';content.append(node);}});previewStage.append(content);};
+    const previewErrorMessage=(type)=>type==='image'?'No fue posible mostrar esta imagen.':(type==='pdf'?'No fue posible abrir este PDF.':'No fue posible generar la vista previa de este documento.');
+    const renderImage=async(preview)=>{const response=await fetch(preview.content_url,{credentials:'same-origin'}),contentType=response.headers.get('content-type')||'';if(!response.ok||!contentType.startsWith('image/'))throw new Error('Respuesta de imagen no válida.');const url=URL.createObjectURL(await response.blob()),image=document.createElement('img');objectUrls.add(url);image.src=url;image.alt=preview.name;image.draggable=false;image.className='sw-preview-image';await new Promise((resolve,reject)=>{image.addEventListener('load',resolve,{once:true});image.addEventListener('error',reject,{once:true});previewStage.append(image);});};
+    const renderPreview=async(preview)=>{clearPreview();if(!previewStage)return;if(preview.status!=='ready'){previewMessage(preview.message||'Vista previa no disponible para este archivo.','is-error');return;}const type=preview.preview_type;if(type==='pdf'){const frame=document.createElement('iframe');frame.src=preview.content_url;frame.title=`Vista previa de ${preview.name}`;frame.className='sw-preview-pdf';previewStage.append(frame);}else if(type==='image'){await renderImage(preview);}else if(type==='text'||type==='code'){const pre=document.createElement('pre');pre.className=`sw-preview-text ${type==='code'?'is-code':''}`;pre.textContent=preview.content||'';pre.draggable=false;previewStage.append(pre);}else if(type==='docx'){const note=document.createElement('p');note.className='sw-docx-notice';note.textContent='Vista previa del contenido. Descarga el archivo para consultar el formato completo.';previewStage.append(note);if(!window.JSZip||typeof window.docx?.renderAsync!=='function'||!preview.content_url){renderBlocks(preview.blocks);previewStage.hidden=false;return;}const response=await fetch(preview.content_url,{credentials:'same-origin'}),contentType=response.headers.get('content-type')||'';if(!response.ok||!/application\/(vnd\.openxmlformats-officedocument\.wordprocessingml\.document|zip|octet-stream)/i.test(contentType))throw new Error('Respuesta DOCX no válida.');const data=await response.arrayBuffer(),host=document.createElement('div');host.className='sw-preview-docx';host.draggable=false;previewStage.append(host);await window.docx.renderAsync(data,host,null,{inWrapper:true,ignoreLastRenderedPageBreak:false,renderHeaders:true,renderFooters:true});}else previewMessage(preview.message||'Vista previa no disponible para este archivo.');previewStage.hidden=false;};
+    const loadPreview=async(url)=>{if(!url)return previewMessage('Vista previa no disponible para este archivo.');previewMessage('Cargando vista previa…');let type='';try{const response=await fetch(url,{credentials:'same-origin'});const payload=await response.json();type=payload?.data?.preview?.preview_type||'';if(!response.ok||!payload.success)throw new Error(payload.message||'No fue posible cargar la vista previa.');await renderPreview(payload.data.preview);}catch(error){console.error('No fue posible cargar la vista previa.',error);previewMessage(previewErrorMessage(type),'is-error');}};
+    const selectItem=(item)=>manager.querySelectorAll('[data-sw-file], [data-sw-zip-entry]').forEach((entry)=>entry.classList.toggle('is-selected',entry===item));
+    const setViewer=(name,extension,size,downloadUrl)=>{viewerName.textContent=name||'Archivo';viewerMeta.textContent=`${extension||'Archivo'} · ${size||'Tamaño no disponible'}`;viewerEmpty.hidden=true;viewerDownload.hidden=!downloadUrl;viewerDownload.href=downloadUrl||'#';};
+    const zipEntryUrl=(baseUrl,path)=>{const target=new URL(baseUrl,window.location.origin);target.searchParams.set('path',path);return target.toString();};
+    const renderZipTree=(tree,archive,rootButton)=>{tree.replaceChildren();(archive.items||[]).forEach((item)=>{const entry=document.createElement('li'),button=document.createElement('button'),icon=document.createElement('i'),name=document.createElement('span'),isDirectory=item.kind==='folder';button.type='button';button.className='sw-zip-entry';button.dataset.swZipEntry='';button.title=item.path||item.name||'';icon.className=isDirectory?'fa-solid fa-folder':'fa-regular fa-file';icon.setAttribute('aria-hidden','true');name.textContent=item.name||item.path;button.append(icon,name);entry.append(button);if(isDirectory){const child=document.createElement('ul');child.className='sw-zip-tree';child.hidden=true;button.addEventListener('click',()=>loadZipDirectory(rootButton,item.path,child));entry.append(child);}else button.addEventListener('click',()=>{selectItem(button);setViewer(item.name||item.path,(item.extension||item.type||'Archivo').toUpperCase(),item.size||'Tamaño no disponible',zipEntryUrl(rootButton.dataset.fileZipDownloadUrl,item.path));observationPanel.innerHTML='<p class="sw-empty-state">Las observaciones de archivos internos se consultarán cuando estén vinculadas al archivo principal.</p>';loadPreview(zipEntryUrl(rootButton.dataset.fileZipPreviewUrl,item.path));});tree.append(entry);});};
+    const loadZipDirectory=async(rootButton,path,tree)=>{if(!tree)return;if(tree.dataset.loaded==='true'){tree.hidden=!tree.hidden;return;}tree.hidden=false;tree.textContent='Cargando…';try{const target=new URL(rootButton.dataset.fileZipUrl,window.location.origin);if(path)target.searchParams.set('path',path);const response=await fetch(target,{credentials:'same-origin'}),payload=await response.json();if(!response.ok||!payload.success)throw new Error(payload.message||'No fue posible abrir el ZIP.');renderZipTree(tree,payload.data.archive,rootButton);tree.dataset.loaded='true';}catch(error){console.error('No fue posible cargar la estructura del ZIP.',error);tree.textContent='No fue posible abrir esta carpeta.';}};
+    manager.querySelectorAll('[data-sw-file]').forEach((button)=>button.addEventListener('click',()=>{selectItem(button);setViewer(button.dataset.fileName,button.dataset.fileExtension,button.dataset.fileSize,button.dataset.fileDownload);const count=Number(button.dataset.fileObservations||0);observationPanel.innerHTML=`<p class="sw-empty-state">${count?`${count} observación${count===1?'':'es'} registrada${count===1?'':'s'} para este archivo.`:'No hay observaciones registradas para este archivo.'}</p>`;if(button.dataset.fileZipUrl){previewMessage('Archivo ZIP seleccionado. Usa el explorador para navegar por su contenido.');loadZipDirectory(button,'',button.closest('.sw-archive-node')?.querySelector('[data-sw-zip-tree]'));}else loadPreview(button.dataset.filePreview);}));
 });

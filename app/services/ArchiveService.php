@@ -495,6 +495,7 @@ final class ArchiveService
     {
         return match ($extension) {
             'pdf' => 'application/pdf',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'txt', 'log', 'ini', 'md', 'markdown' => 'text/plain; charset=UTF-8',
             'json' => 'application/json; charset=UTF-8',
             'xml' => 'application/xml; charset=UTF-8',
