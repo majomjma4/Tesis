@@ -22,3 +22,6 @@
 /dist/
 storage/private/avatars/*
 !storage/private/avatars/.gitkeep
+/storage/private/project-review-representations/*
+!/storage/private/project-review-representations/.gitkeep
+scratch_*

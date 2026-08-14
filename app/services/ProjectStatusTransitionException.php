@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 final class ProjectStatusTransitionException extends InvalidArgumentException
 {
-    public function __construct(string $message, private readonly int $httpStatus = 422)
+    public function __construct(string $message, private readonly int $httpStatus = 422, private readonly array $details = [])
     {
         parent::__construct($message);
     }
@@ -13,4 +13,6 @@ final class ProjectStatusTransitionException extends InvalidArgumentException
     {
         return $this->httpStatus;
     }
+
+    public function details(): array { return $this->details; }
 }

@@ -96,16 +96,23 @@ final class ProjectReviewService
             $delivery = $this->lockDelivery($db, $projectId, $deliveryId);
             $insert = $db->prepare(
                 "INSERT INTO project_observations
-                 (project_id,delivery_id,file_id,author_id,category,location_reference,body,status)
-                 VALUES (:project_id,:delivery_id,:file_id,:author_id,:category,:location_reference,:body,'pending')"
+                 (project_id,delivery_id,file_id,file_checksum_sha256,author_id,category,location_reference,body,status)
+                 VALUES (:project_id,:delivery_id,:file_id,:checksum,:author_id,:category,:location_reference,:body,'pending')"
             );
             $observationIds = [];
             foreach ($normalized as $observation) {
                 $this->assertFileBelongsToProject($db, $projectId, $observation['file_id']);
+                $checksum = null;
+                if ($observation['file_id'] !== null) {
+                    $fileQuery = $db->prepare('SELECT checksum_sha256 FROM project_files WHERE id=:file AND project_id=:project AND deleted_at IS NULL AND purged_at IS NULL FOR UPDATE');
+                    $fileQuery->execute(['file'=>(int)$observation['file_id'], 'project'=>$projectId]);
+                    $checksum = $fileQuery->fetchColumn() ?: null;
+                }
                 $insert->execute([
                     'project_id' => $projectId,
                     'delivery_id' => $delivery['id'] ?? null,
                     'file_id' => $observation['file_id'],
+                    'checksum' => $checksum,
                     'author_id' => $actor,
                     'category' => $observation['category'],
                     'location_reference' => $observation['location_reference'],

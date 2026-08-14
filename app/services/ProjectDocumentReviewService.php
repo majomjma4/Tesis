@@ -5,6 +5,12 @@ declare(strict_types=1);
 /** Lee el estado de revisión de la versión vigente de cada archivo sin consultas por elemento. */
 final class ProjectDocumentReviewService
 {
+    public function observationsForRevision(int $projectId, int $fileId, string $checksum): array
+    {
+        $q = ($this->db ?? Database::connection())->prepare('SELECT po.*, u.full_name author_name FROM project_observations po JOIN users u ON u.id=po.author_id WHERE po.project_id=:project AND po.file_id=:file AND po.file_checksum_sha256=:checksum ORDER BY po.created_at,po.id');
+        $q->execute(['project'=>$projectId,'file'=>$fileId,'checksum'=>$checksum]);
+        return $q->fetchAll() ?: [];
+    }
     public const STATUSES = ['development', 'under_review', 'approved', 'corrections_requested'];
 
     public function __construct(private readonly ?PDO $db = null) {}

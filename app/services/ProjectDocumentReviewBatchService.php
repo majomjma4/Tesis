@@ -75,15 +75,15 @@ final class ProjectDocumentReviewBatchService
 
         $observationInsert = $db->prepare(
             "INSERT INTO project_observations
-             (project_id,delivery_id,file_id,author_id,category,location_reference,body,status)
-             VALUES (:project,NULL,:file,:actor,:category,:location,:body,'pending')"
+             (project_id,delivery_id,file_id,file_checksum_sha256,author_id,category,location_reference,body,status)
+             VALUES (:project,NULL,:file,:checksum,:actor,:category,:location,:body,'pending')"
         );
         $observationCount = 0;
         $auditDocuments = [];
         foreach ($normalized as $decision) {
             foreach ($decision['observations'] as $observation) {
                 $observationInsert->execute([
-                    'project'=>$projectId, 'file'=>$decision['file_id'], 'actor'=>$actor,
+                    'project'=>$projectId, 'file'=>$decision['file_id'], 'checksum'=>(string)$file['checksum_sha256'], 'actor'=>$actor,
                     'category'=>$observation['category'], 'location'=>$observation['location_reference'], 'body'=>$observation['body'],
                 ]);
                 $observationCount++;

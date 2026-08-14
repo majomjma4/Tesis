@@ -306,11 +306,17 @@ final class ProjectsController
         }
         $studentDocumentReview = null;
         $studentVersions = [];
+        $historicalVersion = null;
         $studentDefense = null;
         if (!$isAdministrator && !$isTeacher) {
             $studentDocumentReview = (new ProjectDocumentReviewService())->describeCurrentFiles((int) $project['id'], (array) $project['files']);
             $project['files'] = $studentDocumentReview['files'];
             $studentVersions = (new ProjectDocumentModel())->versions((int) $project['id']);
+            $historicalId = (int)($_GET['version_id'] ?? 0);
+            if ($historicalId > 0) {
+                try { $historicalVersion = (new ProjectFileVersionHistoryService())->accessibleVersion((int)$project['id'], $historicalId, $access->currentUserId(), 'academic'); }
+                catch (Throwable $exception) { error_log('Historical workspace version: '.$exception->getMessage()); }
+            }
             if ((string) $project['type_code'] === 'thesis') $studentDefense = (new ThesisDefenseService())->current((int) $project['id']);
         }
         $returnUrl = ($isAdministrator || $isTeacher)
@@ -365,6 +371,7 @@ final class ProjectsController
             'studentActiveTab' => $studentTab,
             'studentDocumentReview' => $studentDocumentReview,
             'studentVersions' => $studentVersions,
+            'historicalVersion' => $historicalVersion,
             'studentDefense' => $studentDefense,
             'studentDocumentEndpoint' => route('student-project-document'),
             'studentDocumentCsrf' => $session->csrfToken('student_project_documents'),
@@ -471,8 +478,10 @@ final class ProjectsController
         $query='&project_id='.(int)$project['id'].'&file_id='.(int)$file['id'];
         $scope=(string)($_GET['scope']??'')==='repository'?'&scope=repository':((string)($_GET['context']??'')==='academic_management'?'&context=academic_management':'');
         $version=!empty($file['checksum_sha256'])?'&v='.rawurlencode(substr((string)$file['checksum_sha256'],0,16)):'';
+        $forceRetry = !empty($_GET['retry_preview']) || !empty($_GET['retry']);
+        if (session_status() === PHP_SESSION_ACTIVE) { session_write_close(); }
         if (strtolower((string)$file['extension']) === 'docx') {
-            $preview = $this->docxPreview($project, $file, $source, (string)$file['checksum_sha256'], route('project-file-preview-pdf').$query.$scope.$version);
+            $preview = $this->docxPreview($project, $file, $source, (string)$file['checksum_sha256'], route('project-file-preview-pdf').$query.$scope.$version, $forceRetry);
         } else {
             $preview=(new FilePreviewService())->prepare($this->previewFile($file,$stream),route('project-file-content').$query.$scope.$version,route('project-file-download').$query.$scope);
         }
@@ -485,10 +494,48 @@ final class ProjectsController
         [$project, $file, $stream] = $this->resolveFile(); fclose($stream);
         $checksum = (string)$file['checksum_sha256'];
         if (!hash_equals($checksum, (string)($_GET['v'] ?? $checksum)) && !hash_equals(substr($checksum, 0, 16), (string)($_GET['v'] ?? ''))) { http_response_code(404); exit; }
-        $path = (new DocumentPreviewConversionService())->cachedPath((int)$project['id'], (int)$file['id'], $checksum);
+        $path = strtolower((string)$file['extension']) === 'docx'
+            ? ((new ProjectReviewRepresentationService())->supplementalPath((int)$project['id'], (int)$file['id'], $checksum) ?? (new DocumentPreviewConversionService())->cachedPath((int)$project['id'], (int)$file['id'], $checksum))
+            : (new DocumentPreviewConversionService())->cachedPath((int)$project['id'], (int)$file['id'], $checksum);
         if ($path === null) { http_response_code(404); exit('La vista previa no está disponible.'); }
         $pdf = fopen($path, 'rb'); if ($pdf === false) { http_response_code(404); exit; }
         $this->stream(['original_name'=>(string)$file['original_name'].'.pdf','size_bytes'=>(int)filesize($path),'mime_type'=>'application/pdf'], $pdf, 'inline', 'application/pdf');
+    }
+
+    public function fileVersionPreview(): void
+    {
+        try {
+            $version=$this->historicalVersion();
+            $url=route('project-file-version-preview-pdf').'&project_id='.(int)$version['project_id'].'&version_id='.(int)$version['id'].'&v='.rawurlencode(substr((string)$version['checksum_sha256'],0,16));
+            $observations=(new ProjectDocumentReviewService())->observationsForRevision((int)$version['project_id'],(int)$version['file_id'],(string)$version['checksum_sha256']);
+            $this->json(['success'=>true,'message'=>'Vista histórica disponible.','data'=>['preview'=>['preview_type'=>'pdf','review_representation'=>true,'content_url'=>$url,'original_name'=>$version['original_name'],'size_bytes'=>(int)$version['size_bytes'],'historical'=>true,'version_number'=>(int)$version['version_number'],'checksum_sha256'=>$version['checksum_sha256'],'observations'=>$observations]]]);
+        } catch (Throwable $e) { error_log('Historical preview metadata: '.$e->getMessage()); http_response_code(404); $this->json(['success'=>false,'message'=>'La versión histórica no está disponible.','data'=>[]]); }
+    }
+
+    public function fileVersionPreviewPdf(): void
+    {
+        try {
+            $version=$this->historicalVersion(); $verified=(new ProjectDocumentStorageService())->verifyHistoricalBinary($version);
+            if (empty($verified['verified'])) throw new RuntimeException((string)($verified['reason']??'Binario no verificable.'));
+            $path=(new ProjectDocumentFileService())->resolveStoredFile((int)$version['project_id'],(string)$version['storage_name']);
+            if (session_status() === PHP_SESSION_ACTIVE) { session_write_close(); }
+            if (strtolower((string)$version['extension'])==='docx') {
+                $supplemental=(new ProjectReviewRepresentationService())->supplementalPath((int)$version['project_id'],(int)$version['file_id'],(string)$version['checksum_sha256']);
+                $path=$supplemental??(new DocumentPreviewConversionService())->convertFile($path,(int)$version['project_id'],(int)$version['file_id'],(string)$version['checksum_sha256'])['path'];
+            }
+            $stream=fopen($path,'rb'); if ($stream===false) throw new RuntimeException('Preview no disponible.');
+            $this->stream(['original_name'=>(string)$version['original_name'].'.pdf','size_bytes'=>(int)filesize($path),'mime_type'=>'application/pdf'],$stream,'inline','application/pdf');
+        } catch (Throwable $e) { error_log('Historical preview PDF: '.$e->getMessage()); http_response_code(404); exit('La vista previa histórica no está disponible.'); }
+    }
+
+    private function historicalVersion(): array
+    {
+        $session=new AuthSessionService(); $projectId=(int)($_GET['project_id']??0); $versionId=(int)($_GET['version_id']??0);
+        if (!$session->isAuthenticated()||$projectId<1||$versionId<1) throw new InvalidArgumentException('Solicitud no válida.');
+        $context=$session->hasAdminAccess()?'academic_management':'academic';
+        $version=(new ProjectFileVersionHistoryService())->accessibleVersion($projectId,$versionId,(new ProjectAccessService())->currentUserId(),$context);
+        $v=(string)($_GET['v']??''); if ($v!==''&&!hash_equals(substr((string)$version['checksum_sha256'],0,16),$v)) throw new InvalidArgumentException('Versión no válida.');
+        return $version;
     }
 
     public function fileContent(): void
@@ -555,10 +602,12 @@ final class ProjectsController
     {
         [$project,$file,$entry]=$this->resolveProjectArchiveEntry(true);
         $query=$this->projectArchiveQuery($project,$file,(string)$entry['path']);
+        $forceRetry = !empty($_GET['retry_preview']) || !empty($_GET['retry']);
         try {
+            if (session_status() === PHP_SESSION_ACTIVE) { session_write_close(); }
             if (strtolower(pathinfo((string)$entry['name'], PATHINFO_EXTENSION)) === 'docx') {
                 $identity = $this->zipPreviewIdentity($file, $entry);
-                $preview = $this->docxPreviewStream($project, $file, $entry, $identity, route('project-zip-entry-preview-pdf').$query . '&v=' . rawurlencode(substr($identity, 0, 16)));
+                $preview = $this->docxPreviewStream($project, $file, $entry, $identity, route('project-zip-entry-preview-pdf').$query . '&v=' . rawurlencode(substr($identity, 0, 16)), $forceRetry);
             } else $preview=(new FilePreviewService())->prepare($entry,route('project-zip-entry-content').$query,route('project-zip-entry-download').$query);
         }
         finally{$this->closeProjectArchiveEntry($entry);}
@@ -665,20 +714,43 @@ final class ProjectsController
         return [$project,$file,$stream,$path];
     }
 
-    private function docxPreview(array $project, array $file, string $source, string $identity, string $url): array
+    private function docxPreview(array $project, array $file, string $source, string $identity, string $url, bool $forceRetry = false): array
     {
-        try { $result=(new DocumentPreviewConversionService())->convertFile($source,(int)$project['id'],(int)$file['id'],$identity); return $this->docxPdfPayload($file,$url,$result); }
-        catch (Throwable $error) { error_log('Project DOCX preview: project='.(int)$project['id'].' file='.(int)$file['id'].' checksum='.$identity.' error='.$error->getMessage()); return $this->docxPreviewFailure($file); }
+        try {
+            $representation = new ProjectReviewRepresentationService();
+            if ($representation->supplementalPath((int)$project['id'], (int)$file['id'], $identity) !== null) return $this->docxPdfPayload($file, $url, ['cached'=>true], 'supplemental_pdf');
+            $service = new DocumentPreviewConversionService();
+            if ($forceRetry) { $service->clearFailure((int)$project['id'], (int)$file['id'], $identity); }
+            $result = $service->convertFile($source, (int)$project['id'], (int)$file['id'], $identity);
+            (new ProjectReviewRepresentationService())->forFile($file, false);
+            return $this->docxPdfPayload($file, $url, $result, 'libreoffice_pdf');
+        }
+        catch (Throwable $error) {
+            error_log('Project DOCX preview: project='.(int)$project['id'].' file='.(int)$file['id'].' checksum='.$identity.' error='.$error->getMessage());
+            return $this->docxPreviewFailure($file, $error->getMessage());
+        }
     }
 
-    private function docxPreviewStream(array $project, array $file, array $entry, string $identity, string $url): array
+    private function docxPreviewStream(array $project, array $file, array $entry, string $identity, string $url, bool $forceRetry = false): array
     {
-        try { $result=(new DocumentPreviewConversionService())->convertStream($entry['stream'],(int)$project['id'],(int)$file['id'],$identity); return $this->docxPdfPayload(['original_name'=>$entry['name'],'size_bytes'=>$entry['size']],$url,$result); }
-        catch (Throwable $error) { error_log('Project ZIP DOCX preview: project='.(int)$project['id'].' file='.(int)$file['id'].' entry='.$entry['path'].' error='.$error->getMessage()); return $this->docxPreviewFailure(['original_name'=>$entry['name'],'size_bytes'=>$entry['size']]); }
+        try {
+            $service = new DocumentPreviewConversionService();
+            if ($forceRetry) { $service->clearFailure((int)$project['id'], (int)$file['id'], $identity); }
+            $result = $service->convertStream($entry['stream'], (int)$project['id'], (int)$file['id'], $identity);
+            return $this->docxPdfPayload(['original_name'=>$entry['name'],'size_bytes'=>$entry['size']], $url, $result);
+        }
+        catch (Throwable $error) {
+            error_log('Project ZIP DOCX preview: project='.(int)$project['id'].' file='.(int)$file['id'].' entry='.$entry['path'].' error='.$error->getMessage());
+            return $this->docxPreviewFailure(['original_name'=>$entry['name'],'size_bytes'=>$entry['size']], $error->getMessage());
+        }
     }
 
-    private function docxPdfPayload(array $file, string $url, array $result): array { return ['status'=>'ready','message'=>'','name'=>(string)$file['original_name'],'path'=>(string)$file['original_name'],'size'=>ArchiveService::formatBytes((int)$file['size_bytes']),'size_bytes'=>(int)$file['size_bytes'],'extension'=>'docx','mime'=>'application/vnd.openxmlformats-officedocument.wordprocessingml.document','download_url'=>'','content_url'=>$url,'preview_type'=>'pdf','type_label'=>'Documento de Word','review_representation'=>true,'cached'=>(bool)($result['cached']??false),'blocks'=>[],'truncated'=>false]; }
-    private function docxPreviewFailure(array $file): array { return ['status'=>'unavailable','message'=>'No fue posible generar la vista previa de este documento.','name'=>(string)$file['original_name'],'size'=>ArchiveService::formatBytes((int)$file['size_bytes']),'extension'=>'docx','preview_type'=>'docx','type_label'=>'Documento de Word','content_url'=>'','blocks'=>[],'truncated'=>false]; }
+    private function docxPdfPayload(array $file, string $url, array $result, string $source = 'libreoffice_pdf'): array { return ['status'=>'ready','message'=>'','name'=>(string)$file['original_name'],'path'=>(string)$file['original_name'],'size'=>ArchiveService::formatBytes((int)($file['size_bytes']??0)),'size_bytes'=>(int)($file['size_bytes']??0),'extension'=>'docx','mime'=>'application/vnd.openxmlformats-officedocument.wordprocessingml.document','download_url'=>'','content_url'=>$url,'preview_type'=>'pdf','type_label'=>'Documento de Word','review_representation'=>true,'review_representation_source'=>$source,'review_representation_label'=>$source==='supplemental_pdf'?'Vista PDF proporcionada para revisión':'','cached'=>(bool)($result['cached']??false),'blocks'=>[],'truncated'=>false]; }
+    private function docxPreviewFailure(array $file, string $reason = ''): array
+    {
+        $message = str_contains($reason, 'en proceso') ? 'La vista previa ya se está preparando.' : 'No fue posible generar la vista previa de este documento.';
+        return ['status'=>'unavailable','message'=>$message,'name'=>(string)$file['original_name'],'size'=>ArchiveService::formatBytes((int)($file['size_bytes']??0)),'extension'=>'docx','preview_type'=>'docx','type_label'=>'Documento de Word','content_url'=>'','blocks'=>[],'truncated'=>false,'manual_pdf_required'=>isset($file['id'],$file['project_id'],$file['checksum_sha256']),'file_id'=>(int)($file['id']??0),'checksum_sha256'=>(string)($file['checksum_sha256']??'')];
+    }
     private function zipPreviewIdentity(array $file, array $entry): string { rewind($entry['stream']); $entryHash=hash('sha256', stream_get_contents($entry['stream']) ?: ''); rewind($entry['stream']); return hash('sha256',(string)$file['checksum_sha256']."\0".(string)$entry['path']."\0".$entryHash); }
 
     private function previewFile(array $file,$stream):array{return ['name'=>(string)$file['original_name'],'path'=>(string)$file['original_name'],'size'=>(int)$file['size_bytes'],'stream'=>$stream];}
@@ -767,6 +839,7 @@ final class ProjectsController
         [, $access] = $this->draftRequest();
         $userId = $access->currentUserId();
         try {
+            if (session_status() === PHP_SESSION_ACTIVE) { session_write_close(); }
             $result = (new ProjectDraftRegistrationService())->register($userId, $access->projectCreationPolicy(), (string) ($_POST['draft_id'] ?? ''));
             $this->json(['success'=>true,'message'=>'Proyecto registrado correctamente.','data'=>$result]);
         } catch (ProjectDraftRegistrationException $exception) {

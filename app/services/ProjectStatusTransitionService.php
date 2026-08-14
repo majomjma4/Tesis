@@ -13,6 +13,7 @@ final class ProjectStatusTransitionService
             'under_review' => [
                 'label' => 'Enviar a revisión', 'icon' => 'fa-paper-plane',
                 'effect' => 'El proyecto ingresará a revisión académica.',
+                'requirements' => ['review_representations'],
             ],
         ],
         'under_review' => [
@@ -59,6 +60,7 @@ final class ProjectStatusTransitionService
         $result = [];
         foreach (self::TRANSITIONS[$current] ?? [] as $target => $definition) {
             if (!$this->appliesToType($definition, $type)) continue;
+            if ($target === 'under_review' && !array_key_exists('review_representation_summary', $project)) $project['review_representation_summary']=(new ProjectReviewReadinessService())->check((int)($project['id']??0),false);
             $requirements = $this->requirements($definition, $project);
             $fromLabels = project_academic_labels($current);
             $toLabels = project_academic_labels($target);
@@ -84,6 +86,10 @@ final class ProjectStatusTransitionService
     public function transition(int $projectId, string $expectedStatus, string $targetStatus, string $reason, int $actor, string $context = 'academic_management'): array
     {
         if ($projectId < 1 || $actor < 1) throw new ProjectStatusTransitionException('La solicitud de cambio de estado no es válida.');
+        if ($expectedStatus === 'development' && $targetStatus === 'under_review') {
+            $readiness=(new ProjectReviewReadinessService())->check($projectId,true);
+            if (empty($readiness['ready'])) throw new ProjectStatusTransitionException('Hay documentos que aún no están listos para revisión.',422,$readiness);
+        }
         $reason = trim($reason);
         return Database::transaction(fn (PDO $db): array => $this->transitionInTransaction($db, $projectId, $expectedStatus, $targetStatus, $reason, $actor, $context));
     }
@@ -198,6 +204,9 @@ final class ProjectStatusTransitionService
                     ? 'El proyecto no puede aprobarse porque no contiene documentos activos.'
                     : 'El proyecto no puede aprobarse hasta que todos sus documentos vigentes estén aprobados.';
                 $result[] = ['key'=>'documents_approved', 'label'=>'Documentos vigentes aprobados', 'met'=>$met, 'message'=>$message];
+            } elseif ($requirement === 'review_representations') {
+                $summary=(array)($project['review_representation_summary']??[]);$met=!empty($summary['ready']);
+                $result[]=['key'=>'review_representations','label'=>'Representaciones PDF de revisión disponibles','met'=>$met,'message'=>'Todos los documentos que requieren revisión deben tener una representación PDF válida.'];
             }
         }
         return $result;
@@ -219,6 +228,7 @@ final class ProjectStatusTransitionService
             'tribunal_count'=>(int)($row['tribunal_count'] ?? 0),
             'active_file_count'=>(int)($row['active_file_count'] ?? 0),
             'document_review_summary'=>(new ProjectDocumentReviewService($db))->approvalSummaryForProject($projectId),
+            'review_representation_summary'=>(new ProjectReviewReadinessService())->check($projectId,false),
         ];
     }
 
