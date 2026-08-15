@@ -9,8 +9,20 @@ $historicalPreviewUrl = $historical ? route('project-file-version-preview').'&pr
 $docLimits = (new ProjectDocumentFileService())->limits();
 ?>
 <script type="application/json" data-sw-observations-json><?= e(json_encode($observations, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)) ?></script>
-<section class="sw-doc-workspace<?= $historical ? ' is-historical' : '' ?>" data-sw-document-manager data-endpoint="<?= e($documentEndpoint) ?>" data-csrf="<?= e($documentCsrf) ?>" data-max-file-bytes="<?= (int) $docLimits['max_file_bytes'] ?>" data-max-file-mb="<?= (int) $docLimits['max_file_mb'] ?>" data-review-representation-endpoint="<?= e(route('student-project-review-representation')) ?>" data-review-representation-csrf="<?= e((new AuthSessionService())->csrfToken('student_project_review_representation')) ?>" data-project-id="<?= (int) $projectId ?>" data-historical-preview="<?= e($historicalPreviewUrl) ?>" data-pdfjs-url="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.mjs')) ?>" data-pdfjs-worker="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.worker.mjs')) ?>" data-pdfjs-fonts="<?= e(asset('vendor/pdfjs/4.10.38/web/standard_fonts/')) ?>">
+<section class="sw-doc-workspace<?= $historical ? ' is-historical' : '' ?>" data-sw-document-manager data-sw-active-tab="explorer" data-endpoint="<?= e($documentEndpoint) ?>" data-csrf="<?= e($documentCsrf) ?>" data-max-file-bytes="<?= (int) $docLimits['max_file_bytes'] ?>" data-max-file-mb="<?= (int) $docLimits['max_file_mb'] ?>" data-review-representation-endpoint="<?= e(route('student-project-review-representation')) ?>" data-review-representation-csrf="<?= e((new AuthSessionService())->csrfToken('student_project_review_representation')) ?>" data-project-id="<?= (int) $projectId ?>" data-historical-preview="<?= e($historicalPreviewUrl) ?>" data-pdfjs-url="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.mjs')) ?>" data-pdfjs-worker="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.worker.mjs')) ?>" data-pdfjs-fonts="<?= e(asset('vendor/pdfjs/4.10.38/web/standard_fonts/')) ?>">
     <?php if ($historical): ?><div class="sw-historical-banner" role="status"><strong>Versión <?= (int)$historical['version_number'] ?> · Historial</strong><span>Estás consultando una versión anterior de este documento.</span><a href="<?= e($detailUrl.'&tab=documents') ?>">Volver a versión actual</a></div><?php endif; ?>
+    <nav class="sw-mobile-switcher" data-sw-mobile-switcher aria-label="Navegación móvil del espacio de trabajo">
+        <button type="button" class="sw-mobile-tab is-active" data-sw-mobile-tab="explorer">
+            <i class="fa-solid fa-folder-open" aria-hidden="true"></i> <span>Archivos</span>
+        </button>
+        <button type="button" class="sw-mobile-tab" data-sw-mobile-tab="viewer">
+            <i class="fa-solid fa-file-lines" aria-hidden="true"></i> <span>Documento</span>
+        </button>
+        <button type="button" class="sw-mobile-tab" data-sw-mobile-tab="observations">
+            <i class="fa-solid fa-comments" aria-hidden="true"></i> <span>Observaciones</span>
+            <span class="sw-mobile-badge" data-sw-mobile-obs-badge hidden>0</span>
+        </button>
+    </nav>
     <aside class="sw-explorer-panel" data-sw-explorer id="swExplorerPanel">
         <button type="button" class="sw-panel-reopen-btn" data-sw-open-explorer hidden aria-label="Abrir panel de archivos" title="Abrir panel de archivos"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
         <header class="sw-explorer-header"><span class="sw-explorer-title"><i class="fa-solid fa-folder-open" aria-hidden="true"></i> Archivos</span><button type="button" class="sw-panel-toggle" data-sw-toggle-explorer aria-controls="swExplorerPanel" aria-label="Contraer panel de archivos" aria-expanded="true"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button></header>
@@ -62,7 +74,7 @@ $docLimits = (new ProjectDocumentFileService())->limits();
         <header class="sw-obs-header"><span class="sw-obs-title"><i class="fa-solid fa-comments" aria-hidden="true"></i> Observaciones</span><button type="button" class="sw-panel-toggle" data-sw-toggle-observations aria-controls="swObservationsPanel" aria-label="Contraer panel de observaciones" aria-expanded="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></header>
         <div data-sw-file-observations><p class="sw-empty-state">Selecciona un archivo para consultar sus observaciones.</p></div>
         <footer class="sw-obs-footer">
-            <button type="button" class="sw-obs-action-btn" disabled title="El envío documental aún no está habilitado en esta arquitectura"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Enviar pendientes a revisión</button>
+            <button type="button" class="sw-obs-action-btn" disabled title="El envío documental aún no está habilitado en esta arquitectura"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Enviar a revisión</button>
         </footer>
     </aside>
     <div class="sw-operation-modal" data-sw-operation-modal hidden><section role="dialog" aria-modal="true" aria-labelledby="swOperationTitle"><header><h2 data-sw-modal-title id="swOperationTitle">Confirmar acción</h2><button type="button" data-sw-modal-cancel aria-label="Cerrar"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header><div><p data-sw-modal-message></p><p class="sw-modal-file-summary" data-sw-modal-summary hidden></p></div><footer><button type="button" data-sw-modal-cancel>Cancelar</button><button type="button" class="is-danger" data-sw-modal-confirm>Confirmar</button></footer></section></div>

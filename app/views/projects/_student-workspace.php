@@ -78,6 +78,11 @@ $formatDate = static function (?string $date, bool $time = false): string { if (
                 <h1 class="sw-title" title="<?= e((string) ($project['title'] ?? 'Sin título')) ?>"><?= e((string) ($project['title'] ?? 'Sin título')) ?></h1>
             </div>
             <div class="sw-header-right">
+                <?php if (!empty($projectCapabilities['edit_information'])): ?>
+                    <button type="button" class="sw-edit-info-btn" data-sw-edit-info-open aria-label="Editar información del proyecto">
+                        <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> <span>Editar información</span>
+                    </button>
+                <?php endif; ?>
                 <span class="sw-badge-status is-<?= e($status) ?>"><i class="fa-solid fa-circle-dot" aria-hidden="true"></i><?= e($statusLabel) ?></span>
             </div>
         </div>
@@ -102,10 +107,10 @@ $formatDate = static function (?string $date, bool $time = false): string { if (
             </div>
         </div>
 
-        <div class="sw-compact-timeline" aria-label="Recorrido de estados del proyecto">
-            <div class="sw-ct-track">
+        <div class="sw-compact-timeline" data-sw-timeline aria-label="Recorrido de estados del proyecto">
+            <div class="sw-ct-track" data-sw-timeline-track>
                 <?php foreach ($compactTimeline as $step): ?>
-                    <div class="sw-ct-step<?= $step['is_current'] ? ' is-current' : ($step['is_completed'] ? ' is-completed' : ' is-pending') ?>">
+                    <div class="sw-ct-step<?= $step['is_current'] ? ' is-current' : ($step['is_completed'] ? ' is-completed' : ' is-pending') ?>" data-sw-timeline-step>
                         <span class="sw-ct-node">
                             <i class="fa-solid <?= $step['is_current'] ? 'fa-circle-dot' : ($step['is_completed'] ? 'fa-circle-check' : 'fa-circle') ?>" aria-hidden="true"></i>
                             <?= e($step['label']) ?>
@@ -116,6 +121,9 @@ $formatDate = static function (?string $date, bool $time = false): string { if (
                     </div>
                 <?php endforeach; ?>
             </div>
+            <button type="button" class="sw-ct-expand-btn" data-sw-timeline-toggle hidden aria-label="Ver Recorrido Completo" title="Ver recorrido completo de estados">
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </button>
         </div>
     </header>
 
@@ -125,4 +133,7 @@ $formatDate = static function (?string $date, bool $time = false): string { if (
     <main>
         <?php foreach (array_keys($tabs) as $key): ?><section class="sw-tab-pane<?= $activeTab === $key ? ' is-active' : '' ?>" id="swTab-<?= e($key) ?>" role="tabpanel"><?php require __DIR__ . '/student-workspace/_' . $key . '.php'; ?></section><?php endforeach; ?>
     </main>
+    <?php if (!empty($projectCapabilities['edit_information'])): ?>
+        <?php require __DIR__ . '/student-workspace/_edit-information-modal.php'; ?>
+    <?php endif; ?>
 </div>

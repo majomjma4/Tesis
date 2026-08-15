@@ -93,7 +93,7 @@ SELECT CONCAT('academic:',l.id),l.action,'project_audit_log',l.id,l.created_at,u
 FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=? AND (
  (l.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished','project_publication_reverted','project_corrections_requested','project_status_changed','project_participants_updated','tribunal_assigned','tribunal_updated','thesis_defense_information_updated','tribunal_result_registered','defense_attempt_started')
   AND NOT (l.action='project_unpublished' AND EXISTS(SELECT 1 FROM project_audit_log semantic WHERE semantic.project_id=l.project_id AND semantic.action='project_publication_reverted' AND semantic.created_at=l.created_at)))
- OR (l.action='project_updated' AND (JSON_EXTRACT(l.new_state,'$.status') IS NOT NULL OR JSON_EXTRACT(l.new_state,'$.Estado') IS NOT NULL OR JSON_SEARCH(l.new_state,'one','Estado') IS NOT NULL)
+ OR (l.action='project_updated'
   AND NOT EXISTS(SELECT 1 FROM project_audit_log semantic WHERE semantic.project_id=l.project_id AND semantic.created_at=l.created_at AND semantic.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_republished','project_publication_reverted','project_corrections_requested'))))
 UNION ALL
 SELECT CONCAT('publication-fallback:',p.id),'project_published','project',p.id,p.published_at,NULL,NULL,NULL,JSON_OBJECT('status','published'),
@@ -154,6 +154,7 @@ SQL;
             'defense_attempt_started'=>['Nueva defensa iniciada','Se habilitó un nuevo intento de defensa'.(!empty($new['attempt'])?' (Intento '.(int)$new['attempt'].').':'.'),'tribunal'],
             'tribunal_result_registered'=>['Resultado del Tribunal registrado',($new['result']??'')==='approved'?'El Tribunal aprobó el proyecto.':'El Tribunal registró el proyecto como no aprobado.','tribunal'],
             'project_corrections_requested'=>['Tutor solicitó correcciones','El proyecto volvió a En desarrollo.','observation'],
+            'project_updated'=>['Información del proyecto actualizada',$this->projectInformationDescription($new),'project'],
             default=>[$this->statusTitle($new),$this->transitionDescription($previous,$new),'status'],
         };
     }
@@ -171,6 +172,7 @@ SQL;
 
     private function reviewDescription(array $state): string
     { return sprintf('Documentos revisados: %d. Aprobados: %d. En revisión: %d. Con correcciones: %d. Observaciones creadas: %d.',(int)($state['reviewed_documents']??0),(int)($state['approved']??0),(int)($state['under_review']??0),(int)($state['corrections_requested']??0),(int)($state['observation_count']??0)); }
+    private function projectInformationDescription(array $state): string { $changes=(array)($state['_history_changes']??[]); if($changes===[])return 'Se actualizaron datos académicos del proyecto.'; return implode('; ',array_map(static fn(array $change):string => (string)($change['field']??'Información').' actualizado', $changes)).'.'; }
     private function transitionDescription(array $previous,array $new): string { $from=$this->stateCode($previous);$to=$this->stateCode($new);return $from!==null&&$to!==null?$this->stateLabel($from)."\n↓\n".$this->stateLabel($to):''; }
     private function statusTitle(array $new): string { return $this->stateCode($new)==='under_review'?'Proyecto enviado a revisión':($this->stateCode($new)==='approved'?'Proyecto aprobado':($this->stateCode($new)==='defense'?'Proyecto enviado a Tribunal':'Cambio de estado del proyecto')); }
     private function stateCode(array $state): ?string

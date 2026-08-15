@@ -85,10 +85,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const MIN_OBS_WIDTH = 210;
     const MIN_VIEWER_WIDTH = 380;
 
-    let lastExplorerWidth = DEFAULT_EXPLORER_WIDTH;
-    let lastObsWidth = DEFAULT_OBS_WIDTH;
+    let preferredExplorerWidth = DEFAULT_EXPLORER_WIDTH;
+    let preferredObsWidth = DEFAULT_OBS_WIDTH;
 
     const clamp = (val, min, max) => Math.round(Math.max(min, Math.min(max, val)));
+
+    const updateWorkspacePanelWidths = () => {
+        const docWorkspace = workspace.querySelector('.sw-doc-workspace');
+        if (!docWorkspace) return;
+        if (window.innerWidth > 768) {
+            const containerW = docWorkspace.getBoundingClientRect().width;
+            if (containerW > 0) {
+                const maxExplorerW = Math.min(containerW * 0.35, Math.max(MIN_EXPLORER_WIDTH, containerW - MIN_VIEWER_WIDTH - MIN_OBS_WIDTH));
+                const maxObsW = Math.min(containerW * 0.35, Math.max(MIN_OBS_WIDTH, containerW - MIN_VIEWER_WIDTH - MIN_EXPLORER_WIDTH));
+
+                const effectiveExplorerW = clamp(preferredExplorerWidth, MIN_EXPLORER_WIDTH, maxExplorerW);
+                const effectiveObsW = clamp(preferredObsWidth, MIN_OBS_WIDTH, maxObsW);
+
+                workspace.style.setProperty('--sw-explorer-w', `${effectiveExplorerW}px`);
+                workspace.style.setProperty('--sw-obs-w', `${effectiveObsW}px`);
+            }
+        } else {
+            workspace.style.removeProperty('--sw-explorer-w');
+            workspace.style.removeProperty('--sw-obs-w');
+        }
+    };
 
     const togglePanel=(panelSelector,triggerSelector,reopenSelector) => {
         const panel=workspace.querySelector(panelSelector),
@@ -101,11 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
             trigger.setAttribute('aria-expanded',collapsed?'false':'true');
             if(reopen)reopen.hidden=!collapsed;
             if (!collapsed) {
-                if (panelSelector.includes('explorer')) {
-                    workspace.style.setProperty('--sw-explorer-w', `${lastExplorerWidth}px`);
-                } else {
-                    workspace.style.setProperty('--sw-obs-w', `${lastObsWidth}px`);
-                }
+                updateWorkspacePanelWidths();
             }
             window.dispatchEvent(new Event('resize'));
         };
@@ -130,33 +147,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const storedObs = parseInt(localStorage.getItem(STORAGE_OBS_KEY) || '', 10);
 
         if (!isNaN(storedExplorer) && storedExplorer >= MIN_EXPLORER_WIDTH) {
-            lastExplorerWidth = storedExplorer;
+            preferredExplorerWidth = storedExplorer;
         }
         if (!isNaN(storedObs) && storedObs >= MIN_OBS_WIDTH) {
-            lastObsWidth = storedObs;
+            preferredObsWidth = storedObs;
         }
 
-        const applyWidths = () => {
-            if (window.innerWidth > 760) {
-                const containerW = docWorkspace.getBoundingClientRect().width;
-                if (containerW > 0) {
-                    const maxExplorerW = Math.min(containerW * 0.35, Math.max(MIN_EXPLORER_WIDTH, containerW - MIN_VIEWER_WIDTH - MIN_OBS_WIDTH));
-                    const maxObsW = Math.min(containerW * 0.35, Math.max(MIN_OBS_WIDTH, containerW - MIN_VIEWER_WIDTH - MIN_EXPLORER_WIDTH));
-
-                    lastExplorerWidth = clamp(lastExplorerWidth, MIN_EXPLORER_WIDTH, maxExplorerW);
-                    lastObsWidth = clamp(lastObsWidth, MIN_OBS_WIDTH, maxObsW);
-
-                    workspace.style.setProperty('--sw-explorer-w', `${lastExplorerWidth}px`);
-                    workspace.style.setProperty('--sw-obs-w', `${lastObsWidth}px`);
-                }
-            } else {
-                workspace.style.removeProperty('--sw-explorer-w');
-                workspace.style.removeProperty('--sw-obs-w');
-            }
-        };
-
-        applyWidths();
-        window.addEventListener('resize', applyWidths);
+        updateWorkspacePanelWidths();
+        window.addEventListener('resize', updateWorkspacePanelWidths);
 
         const attachResizer = (resizerEl, type) => {
             if (!resizerEl) return;
@@ -177,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 startX = event.clientX;
                 const panel = type === 'explorer' ? explorerPanel : obsPanel;
-                startWidth = panel ? panel.getBoundingClientRect().width : (type === 'explorer' ? lastExplorerWidth : lastObsWidth);
+                startWidth = panel ? panel.getBoundingClientRect().width : (type === 'explorer' ? preferredExplorerWidth : preferredObsWidth);
             };
 
             const onPointerMove = (event) => {
@@ -191,14 +189,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const obsW = obsPanel && !obsPanel.classList.contains('is-collapsed') ? obsPanel.getBoundingClientRect().width : 40;
                     const maxW = Math.min(containerW * 0.35, Math.max(MIN_EXPLORER_WIDTH, containerW - obsW - MIN_VIEWER_WIDTH));
                     const clampedW = clamp(newW, MIN_EXPLORER_WIDTH, maxW);
-                    lastExplorerWidth = clampedW;
+                    preferredExplorerWidth = clampedW;
                     workspace.style.setProperty('--sw-explorer-w', `${clampedW}px`);
                 } else {
                     const newW = startWidth - delta;
                     const explorerW = explorerPanel && !explorerPanel.classList.contains('is-collapsed') ? explorerPanel.getBoundingClientRect().width : 40;
                     const maxW = Math.min(containerW * 0.35, Math.max(MIN_OBS_WIDTH, containerW - explorerW - MIN_VIEWER_WIDTH));
                     const clampedW = clamp(newW, MIN_OBS_WIDTH, maxW);
-                    lastObsWidth = clampedW;
+                    preferredObsWidth = clampedW;
                     workspace.style.setProperty('--sw-obs-w', `${clampedW}px`);
                 }
             };
@@ -216,9 +214,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.body.style.userSelect = '';
 
                 if (type === 'explorer') {
-                    localStorage.setItem(STORAGE_EXPLORER_KEY, String(lastExplorerWidth));
+                    localStorage.setItem(STORAGE_EXPLORER_KEY, String(preferredExplorerWidth));
                 } else {
-                    localStorage.setItem(STORAGE_OBS_KEY, String(lastObsWidth));
+                    localStorage.setItem(STORAGE_OBS_KEY, String(preferredObsWidth));
                 }
 
                 window.dispatchEvent(new Event('resize'));
@@ -231,11 +229,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             resizerEl.addEventListener('dblclick', () => {
                 if (type === 'explorer') {
-                    lastExplorerWidth = DEFAULT_EXPLORER_WIDTH;
+                    preferredExplorerWidth = DEFAULT_EXPLORER_WIDTH;
                     localStorage.removeItem(STORAGE_EXPLORER_KEY);
                     workspace.style.setProperty('--sw-explorer-w', `${DEFAULT_EXPLORER_WIDTH}px`);
                 } else {
-                    lastObsWidth = DEFAULT_OBS_WIDTH;
+                    preferredObsWidth = DEFAULT_OBS_WIDTH;
                     localStorage.removeItem(STORAGE_OBS_KEY);
                     workspace.style.setProperty('--sw-obs-w', `${DEFAULT_OBS_WIDTH}px`);
                 }
@@ -248,13 +246,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     const step = (event.key === 'ArrowRight' ? 15 : -15) * (type === 'explorer' ? 1 : -1);
                     const containerW = docWorkspace.getBoundingClientRect().width;
                     if (type === 'explorer') {
-                        lastExplorerWidth = clamp(lastExplorerWidth + step, MIN_EXPLORER_WIDTH, Math.min(containerW * 0.35, 400));
-                        workspace.style.setProperty('--sw-explorer-w', `${lastExplorerWidth}px`);
-                        localStorage.setItem(STORAGE_EXPLORER_KEY, String(lastExplorerWidth));
+                        preferredExplorerWidth = clamp(preferredExplorerWidth + step, MIN_EXPLORER_WIDTH, Math.min(containerW * 0.35, 400));
+                        workspace.style.setProperty('--sw-explorer-w', `${preferredExplorerWidth}px`);
+                        localStorage.setItem(STORAGE_EXPLORER_KEY, String(preferredExplorerWidth));
                     } else {
-                        lastObsWidth = clamp(lastObsWidth + step, MIN_OBS_WIDTH, Math.min(containerW * 0.35, 400));
-                        workspace.style.setProperty('--sw-obs-w', `${lastObsWidth}px`);
-                        localStorage.setItem(STORAGE_OBS_KEY, String(lastObsWidth));
+                        preferredObsWidth = clamp(preferredObsWidth + step, MIN_OBS_WIDTH, Math.min(containerW * 0.35, 400));
+                        workspace.style.setProperty('--sw-obs-w', `${preferredObsWidth}px`);
+                        localStorage.setItem(STORAGE_OBS_KEY, String(preferredObsWidth));
                     }
                     window.dispatchEvent(new Event('resize'));
                 }
@@ -363,11 +361,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const readJsonResponse=async(response)=>{const redirectedToLogin=response.redirected&&/([?&]page=login)(?:&|$)/i.test(response.url||'');if(response.status===401||redirectedToLogin){const error=new Error('Tu sesión ha expirado. Vuelve a iniciar sesión.');error.status=401;error.code='session_expired';throw error;}const contentType=(response.headers.get('content-type')||'').toLowerCase();if(!contentType.includes('application/json')){const error=new Error('Respuesta inesperada del servidor.');error.status=response.status;error.code='unexpected_response';throw error;}const payload=await response.json();if(!response.ok){const error=new Error(payload.message||'No fue posible completar la operación.');error.status=response.status;throw error;}return payload;};
     const fileInput=manager.querySelector('[data-sw-file-input]'), addButton=manager.querySelector('[data-sw-add-files]');
     const viewerName=manager.querySelector('[data-sw-viewer-name]'), viewerMeta=manager.querySelector('[data-sw-viewer-meta]'), viewerDownload=manager.querySelector('[data-sw-viewer-download]'), viewerEmpty=manager.querySelector('[data-sw-viewer-empty]'), previewStage=manager.querySelector('[data-sw-preview-stage]'), observationPanel=manager.querySelector('[data-sw-file-observations]');
+    const mobileObsBadge=manager.querySelector('[data-sw-mobile-obs-badge]');
+    const mobileTabButtons=manager.querySelectorAll('[data-sw-mobile-tab]');
+    const switchMobileTab=(tabName)=>{
+        if(!tabName)return;
+        manager.dataset.swActiveTab=tabName;
+        mobileTabButtons.forEach((btn)=>{
+            const isActive=btn.dataset.swMobileTab===tabName;
+            btn.classList.toggle('is-active',isActive);
+            btn.setAttribute('aria-selected',isActive?'true':'false');
+        });
+        if(tabName==='viewer'&&activePdfPreview){
+            setTimeout(()=>{ try{ void renderPdfPoc(activePdfPreview); }catch(e){} },50);
+        }
+    };
+    mobileTabButtons.forEach((btn)=>btn.addEventListener('click',()=>switchMobileTab(btn.dataset.swMobileTab)));
     let allStudentObservations=[]; try { allStudentObservations=JSON.parse(manager.parentElement?.querySelector('[data-sw-observations-json]')?.textContent||'[]'); } catch (error) { console.error('No fue posible leer las observaciones del proyecto.',error); }
     let observationFilter='all', selectedObservationFileId=0;
     const observationIsAddressed=(item)=>['addressed','resolved'].includes(String(item.status||'').toLowerCase());
     const observationTone=(item,index)=>['amber','blue','green','violet','rose'][(Number(item.id||index)||index)%5];
-    const renderStudentObservations=()=>{if(!observationPanel)return;const items=allStudentObservations.filter((item)=>Number(item.file_id||0)===selectedObservationFileId);const pending=items.filter((item)=>!observationIsAddressed(item)).length;const addressed=items.length-pending;observationPanel.replaceChildren();const header=document.createElement('div');header.className='sw-obs-summary';[['Total',items.length,'total'],['Pendientes',pending,'pending'],['Atendidas',addressed,'addressed']].forEach(([label,count,tone])=>{const card=document.createElement('div');card.className=`sw-obs-counter is-${tone}`;card.innerHTML=`<strong>${count}</strong><span>${label}</span>`;header.append(card);});const filters=document.createElement('div');filters.className='sw-obs-filters';[['all','Todas',items.length],['pending','Pendientes',pending],['addressed','Atendidas',addressed]].forEach(([key,label,count])=>{const button=document.createElement('button');button.type='button';button.className=`sw-obs-filter${observationFilter===key?' is-active':''}`;button.textContent=`${label} (${count})`;button.addEventListener('click',()=>{observationFilter=key;renderStudentObservations();});filters.append(button);});observationPanel.append(header,filters);const visible=items.filter((item)=>observationFilter==='all'||(observationFilter==='addressed'?observationIsAddressed(item):!observationIsAddressed(item)));if(!visible.length){const empty=document.createElement('div');empty.className='sw-obs-empty';const emptySubtitle=selectedObservationFileId===0?'Selecciona un archivo para consultar sus observaciones.':'Cuando el docente registre comentarios sobre este archivo aparecerán aquí.';empty.innerHTML=`<i class="fa-regular fa-comments" aria-hidden="true"></i><strong>Sin observaciones</strong><span>${emptySubtitle}</span>`;observationPanel.append(empty);return;}const list=document.createElement('div');list.className='sw-obs-list';visible.forEach((item,index)=>{const card=document.createElement('article');card.className=`sw-obs-card is-${observationTone(item,index)}`;const marker=document.createElement('span');marker.className='sw-obs-marker';marker.textContent=String(index+1);const content=document.createElement('div');content.className='sw-obs-card-content';const meta=document.createElement('div');meta.className='sw-obs-card-meta';meta.innerHTML=`<span>${item.location_reference||item.category||'Observación general'}</span><b class="sw-obs-status ${observationIsAddressed(item)?'is-addressed':'is-pending'}">${observationIsAddressed(item)?'Atendida':'Pendiente'}</b>`;const body=document.createElement('p');body.textContent=String(item.body||'');const author=document.createElement('small');author.textContent=`${item.author_name||'Docente'} · ${item.created_at||''}`;content.append(meta,body,author);card.append(marker,content);list.append(card);});observationPanel.append(list);};
+    const renderStudentObservations=()=>{if(!observationPanel)return;const items=allStudentObservations.filter((item)=>Number(item.file_id||0)===selectedObservationFileId);const pending=items.filter((item)=>!observationIsAddressed(item)).length;const addressed=items.length-pending;if(mobileObsBadge){mobileObsBadge.textContent=String(items.length);mobileObsBadge.hidden=items.length===0;}observationPanel.replaceChildren();const filters=document.createElement('div');filters.className='sw-obs-filters';[['all','Todas',items.length,'is-all'],['pending','Pendientes',pending,'is-pending'],['addressed','Atendidas',addressed,'is-addressed']].forEach(([key,label,count,toneClass])=>{const button=document.createElement('button');button.type='button';const isActive=observationFilter===key;button.className=`sw-obs-filter ${toneClass}${isActive?' is-active':''}`;button.setAttribute('aria-pressed',isActive?'true':'false');button.textContent=`${label} (${count})`;button.addEventListener('click',()=>{observationFilter=key;renderStudentObservations();});filters.append(button);});observationPanel.append(filters);const visible=items.filter((item)=>observationFilter==='all'||(observationFilter==='addressed'?observationIsAddressed(item):!observationIsAddressed(item)));if(!visible.length){const empty=document.createElement('div');empty.className='sw-obs-empty';const emptySubtitle=selectedObservationFileId===0?'Selecciona un archivo para consultar sus observaciones.':'Cuando el docente registre comentarios sobre este archivo aparecerán aquí.';empty.innerHTML=`<i class="fa-regular fa-comments" aria-hidden="true"></i><strong>Sin observaciones</strong><span>${emptySubtitle}</span>`;observationPanel.append(empty);return;}const list=document.createElement('div');list.className='sw-obs-list';visible.forEach((item,index)=>{const card=document.createElement('article');card.className=`sw-obs-card is-${observationTone(item,index)}`;const marker=document.createElement('span');marker.className='sw-obs-marker';marker.textContent=String(index+1);const content=document.createElement('div');content.className='sw-obs-card-content';const meta=document.createElement('div');meta.className='sw-obs-card-meta';meta.innerHTML=`<span>${item.location_reference||item.category||'Observación general'}</span><b class="sw-obs-status ${observationIsAddressed(item)?'is-addressed':'is-pending'}">${observationIsAddressed(item)?'Atendida':'Pendiente'}</b>`;const body=document.createElement('p');body.textContent=String(item.body||'');const author=document.createElement('small');author.textContent=`${item.author_name||'Docente'} · ${item.created_at||''}`;content.append(meta,body,author);card.append(marker,content);list.append(card);});observationPanel.append(list);};
+    const formatObservationFilters=()=>observationPanel?.querySelectorAll('.sw-obs-filter').forEach((button)=>{if(button.dataset.formatted==='true')return;const match=button.textContent.trim().match(/^(.+?)\s*\((\d+)\)$/);if(!match)return;button.replaceChildren();const label=document.createElement('span');label.className='sw-obs-filter-label';label.textContent=match[1];const count=document.createElement('span');count.className='sw-obs-filter-count';count.textContent=`(${match[2]})`;button.append(label,count);button.dataset.formatted='true';});
+    const observationFilterObserver=observationPanel&&typeof MutationObserver==='function'?new MutationObserver(formatObservationFilters):null; observationFilterObserver?.observe(observationPanel,{childList:true,subtree:true}); formatObservationFilters();
     const viewerToolbar=manager.querySelector('.sw-viewer-toolbar');
     const printButton=manager.querySelector('[data-sw-print]');
     let printFrame=null, printCleanupTimer=null, printObjectUrl='', printRequest=0;
@@ -1066,6 +1081,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     renderStudentObservations();
                     updateSelectedFileHeader(`${rootButton.dataset.fileName} → ${node.name}`,node.extension||'',sizeLabel,node.download_url||zipEntryUrl(rootButton.dataset.fileZipDownloadUrl, node.path));
                     currentPreviewUrl=previewUrl;
+                    if(node.type!=='directory'&&window.innerWidth<=768){ switchMobileTab('viewer'); }
                     void loadPreview(previewUrl);
                 });
                 entry.append(button);
@@ -1075,11 +1091,179 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(updateAllZipNames, 0);
     };
     const loadZipDirectory=async(rootButton,path,tree)=>{if(!tree)return;if(tree.dataset.loaded==='true'){tree.hidden=!tree.hidden;return;}tree.hidden=false;tree.textContent='Cargando…';try{const target=new URL(rootButton.dataset.fileZipUrl,window.location.origin);if(path)target.searchParams.set('path',path);const payload=await readJsonResponse(await fetch(target,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible abrir el ZIP.');renderZipTree(tree,payload.data?.archive?.items||payload.data?.archive||[],rootButton);tree.dataset.loaded='true';}catch(error){console.error('No fue posible cargar la estructura del ZIP.',error);tree.textContent=error.code==='session_expired'?error.message:'No fue posible abrir esta carpeta.';}};
-    const selectFile=(button)=>{cancelPreviewRequest();selectItem(button);selectedObservationFileId=Number(button.dataset.fileId||0);observationFilter='all';renderStudentObservations();updateSelectedFileHeader(button.dataset.fileName,button.dataset.fileExtension,button.dataset.fileSize,button.dataset.fileDownload);if(button.dataset.fileZipUrl){currentPreviewUrl='';renderPreviewState({type:'empty',title:'Archivo ZIP seleccionado',message:'Usa el explorador de archivos para desplegar y consultar el contenido del ZIP.'});void loadZipDirectory(button,'',button.closest('.sw-archive-node')?.querySelector('[data-sw-zip-tree]'));return;}currentPreviewUrl=button.dataset.filePreview;void loadPreview(button.dataset.filePreview);};
+    const selectFile=(button)=>{
+        cancelPreviewRequest();
+        selectItem(button);
+        selectedObservationFileId=Number(button.dataset.fileId||0);
+        observationFilter='all';
+        renderStudentObservations();
+        updateSelectedFileHeader(button.dataset.fileName,button.dataset.fileExtension,button.dataset.fileSize,button.dataset.fileDownload);
+        if(button.dataset.fileZipUrl){
+            currentPreviewUrl='';
+            renderPreviewState({type:'empty',title:'Archivo ZIP seleccionado',message:'Usa el explorador de archivos para desplegar y consultar el contenido del ZIP.'});
+            void loadZipDirectory(button,'',button.closest('.sw-archive-node')?.querySelector('[data-sw-zip-tree]'));
+            return;
+        }
+        if(window.innerWidth<=768){ switchMobileTab('viewer'); }
+        currentPreviewUrl=button.dataset.filePreview;
+        void loadPreview(button.dataset.filePreview);
+    };
     manager.querySelectorAll('[data-sw-file]').forEach((button)=>button.addEventListener('click',(event)=>{event.preventDefault();selectFile(event.currentTarget);}));
     const drawPocAnnotations=()=>{previewStage?.querySelectorAll('[data-poc-overlay]').forEach((node)=>node.remove());if(!annotationsVisible)return;pocAnnotations.forEach((annotation,index)=>{const page=previewStage?.querySelector(`[data-poc-page="${annotation.page}"]`);if(!page)return;annotation.rects.forEach((rect)=>{const overlay=document.createElement('span');overlay.dataset.pocOverlay='';overlay.className=`sw-poc-annotation is-${annotation.style}`;Object.assign(overlay.style,{left:`${rect.x*100}%`,top:`${rect.y*100}%`,width:`${rect.width*100}%`,height:`${rect.height*100}%`});page.append(overlay);});const marker=document.createElement('button');marker.type='button';marker.dataset.pocOverlay='';marker.className='sw-poc-marker';marker.textContent=String(index+1);marker.setAttribute('aria-label',`Abrir observación ${index+1}`);Object.assign(marker.style,{left:`${annotation.rects[0].x*100}%`,top:`${annotation.rects[0].y*100}%`});marker.addEventListener('click',()=>page.scrollIntoView({behavior:'smooth',block:'center'}));page.append(marker);});};
     const renderPocPanel=()=>{};
-    let pdfResizeTimer=null;window.addEventListener('resize',()=>{if(!activePdfPreview)return;clearTimeout(pdfResizeTimer);pdfResizeTimer=setTimeout(async()=>{const restore={top:previewStage.scrollTop/Math.max(1,previewStage.scrollHeight-previewStage.clientHeight),left:previewStage.scrollLeft/Math.max(1,previewStage.scrollWidth-previewStage.clientWidth)};try{await renderPdfPoc(activePdfPreview,restore);}catch(error){console.error('No fue posible re-renderizar la vista previa en resize.',error);}},100);});
+
+    // Timeline adaptativo
+    const workspaceRoot = manager.closest('.student-workspace') || document.querySelector('.student-workspace');
+    const timelineContainer = workspaceRoot?.querySelector('[data-sw-timeline]');
+    const timelineTrack = timelineContainer?.querySelector('[data-sw-timeline-track]');
+    const timelineSteps = Array.from(timelineTrack?.querySelectorAll('[data-sw-timeline-step]') || []);
+    const timelineToggleBtn = timelineContainer?.querySelector('[data-sw-timeline-toggle]');
+
+    const updateAdaptiveTimeline = () => {
+        if (!timelineContainer || !timelineTrack || !timelineSteps.length) return;
+        if (timelineContainer.classList.contains('is-expanded')) return;
+
+        timelineTrack.classList.remove('is-vertical');
+        timelineSteps.forEach(step => { step.style.display = ''; });
+
+        const containerWidth = timelineContainer.clientWidth;
+        if (containerWidth <= 0) return;
+
+        let totalStepsWidth = 0;
+        timelineSteps.forEach(step => {
+            totalStepsWidth += (step.offsetWidth || 100);
+        });
+
+        if (totalStepsWidth <= containerWidth) {
+            timelineSteps.forEach(step => { step.style.display = ''; });
+            if (timelineToggleBtn) {
+                timelineToggleBtn.hidden = true;
+                timelineToggleBtn.setAttribute('aria-expanded', 'false');
+                timelineToggleBtn.innerHTML = '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
+            }
+            return;
+        }
+
+        const btnWidth = 44;
+        const availableWidth = Math.max(80, containerWidth - btnWidth);
+        let currentWidth = 0;
+        let visibleCount = 0;
+
+        for (let i = 0; i < timelineSteps.length; i++) {
+            const stepWidth = timelineSteps[i].offsetWidth || 100;
+            if (currentWidth + stepWidth <= availableWidth) {
+                currentWidth += stepWidth;
+                visibleCount++;
+            } else {
+                break;
+            }
+        }
+
+        if (visibleCount === 0) visibleCount = 1;
+
+        timelineSteps.forEach((step, idx) => {
+            step.style.display = idx < visibleCount ? '' : 'none';
+        });
+
+        if (timelineToggleBtn) {
+            timelineToggleBtn.hidden = false;
+            timelineToggleBtn.setAttribute('aria-expanded', 'false');
+            timelineToggleBtn.setAttribute('aria-label', 'Ver todos los estados');
+            timelineToggleBtn.innerHTML = '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
+            timelineToggleBtn.title = 'Ver recorrido completo de estados';
+        }
+    };
+
+    timelineToggleBtn?.addEventListener('click', () => {
+        if (!timelineContainer) return;
+        const isExpanded = timelineContainer.classList.toggle('is-expanded');
+        timelineTrack?.classList.toggle('is-vertical', isExpanded);
+
+        if (isExpanded) {
+            timelineSteps.forEach((step) => { step.style.display = ''; });
+            timelineToggleBtn.setAttribute('aria-expanded', 'true');
+            timelineToggleBtn.setAttribute('aria-label', 'Ocultar recorrido completo');
+            timelineToggleBtn.innerHTML = '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i>';
+            timelineToggleBtn.title = 'Ocultar recorrido completo de estados';
+        } else {
+            timelineToggleBtn.setAttribute('aria-expanded', 'false');
+            timelineToggleBtn.setAttribute('aria-label', 'Ver todos los estados');
+            timelineToggleBtn.innerHTML = '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
+            timelineToggleBtn.title = 'Ver recorrido completo de estados';
+            timelineTrack?.classList.remove('is-vertical');
+            updateAdaptiveTimeline();
+        }
+    });
+
+    if (timelineContainer && typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(() => {
+            if (!timelineContainer.classList.contains('is-expanded')) {
+                updateAdaptiveTimeline();
+            }
+        });
+        ro.observe(timelineContainer);
+    }
+
+    // Reset Handler de Breakpoints (Desktop <-> Mobile sin reload)
+    let currentMode = window.innerWidth > 768 ? 'desktop' : 'mobile';
+
+    const handleBreakpointTransition = () => {
+        const newWidth = window.innerWidth;
+        const newMode = newWidth > 768 ? 'desktop' : 'mobile';
+
+        if (newMode !== currentMode) {
+            currentMode = newMode;
+            if (newMode === 'desktop') {
+                delete manager.dataset.swActiveTab;
+                const explorerPanel = manager.querySelector('#swExplorerPanel');
+                const obsPanel = manager.querySelector('#swObservationsPanel');
+                if (explorerPanel) explorerPanel.style.width = '';
+                if (obsPanel) obsPanel.style.width = '';
+                updateWorkspacePanelWidths();
+            } else if (newMode === 'mobile') {
+                const explorerPanel = workspace.querySelector('#swExplorerPanel');
+                const obsPanel = workspace.querySelector('#swObservationsPanel');
+                explorerPanel?.classList.remove('is-collapsed');
+                obsPanel?.classList.remove('is-collapsed');
+                workspace.classList.remove('sw-explorer-collapsed', 'sw-observations-collapsed');
+
+                const openExplorerBtn = workspace.querySelector('[data-sw-open-explorer]');
+                const openObsBtn = workspace.querySelector('[data-sw-open-observations]');
+                if (openExplorerBtn) openExplorerBtn.hidden = true;
+                if (openObsBtn) openObsBtn.hidden = true;
+
+                const targetTab = manager.dataset.swActiveTab || 'explorer';
+                switchMobileTab(targetTab);
+            }
+        }
+
+        updateAdaptiveTimeline();
+
+        if (activePdfPreview) {
+            const restore = {
+                top: previewStage.scrollTop / Math.max(1, previewStage.scrollHeight - previewStage.clientHeight),
+                left: previewStage.scrollLeft / Math.max(1, previewStage.scrollWidth - previewStage.clientWidth)
+            };
+            try { void renderPdfPoc(activePdfPreview, restore); } catch (e) {}
+        }
+    };
+
+    let pdfResizeTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(pdfResizeTimer);
+        pdfResizeTimer = setTimeout(handleBreakpointTransition, 80);
+    });
+
+    if (window.ResizeObserver) {
+        const workspaceObserver = new ResizeObserver(() => {
+            requestAnimationFrame(handleBreakpointTransition);
+        });
+        workspaceObserver.observe(manager);
+        if (timelineContainer) workspaceObserver.observe(timelineContainer);
+    }
+
+    setTimeout(updateAdaptiveTimeline, 100);
+
     if (historicalPreview) {
         (async()=>{try{const payload=await readJsonResponse(await fetch(historicalPreview,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible cargar la versión.');const preview=payload.data.preview;updateSelectedFileHeader(preview.original_name,`Versión ${preview.version_number}`,'Historial','');await renderPreview({status:'ready',preview_type:'pdf',content_url:preview.content_url,name:preview.original_name});const items=preview.observations||[];observationPanel.innerHTML=items.length?items.map((item)=>`<article class="sw-record"><strong>${String(item.category||'Observación')}</strong><p>${String(item.body||'')}</p></article>`).join(''):'<p class="sw-empty-state">No hay observaciones registradas para esta versión.</p>';}catch(error){console.error(error);previewMessage(error.code==='session_expired'?error.message:'No fue posible cargar la versión histórica.','is-error');}})();
     } else {
@@ -1090,4 +1274,663 @@ document.addEventListener('DOMContentLoaded', () => {
             message: 'Selecciona un documento del panel Archivos para consultarlo aquí.'
         });
     }
+
+    // ==========================================================================
+    // FASE 3: EDITOR DE INFORMACIÓN DEL PROYECTO DEL ESTUDIANTE
+    // ==========================================================================
+    const initStudentProjectEditor = () => {
+        const modal = document.querySelector('#swEditProjectModal');
+        const openBtn = document.querySelector('[data-sw-edit-info-open]');
+        const confirmModal = document.querySelector('#swUnsavedChangesConfirm');
+        const form = document.querySelector('#swEditProjectForm');
+        const titleInput = document.querySelector('#swEditProjectTitleInput');
+        const summaryInput = document.querySelector('#swEditProjectSummaryInput');
+        const alertEl = document.querySelector('#swEditProjectAlert');
+        const dirtyIndicator = document.querySelector('[data-sw-dirty-indicator]');
+        const submitBtn = document.querySelector('[data-sw-edit-submit]');
+        const config = document.querySelector('#swStudentProjectEditorConfig');
+
+        if (!modal || !openBtn || !form || !config) return;
+
+        const teachersCatalogNode = document.querySelector('#swStudentTeachersCatalog');
+        const authorsCatalogNode = document.querySelector('#swStudentAuthorsCatalog');
+        const initialPayloadNode = document.querySelector('#swStudentProjectInitialPayload');
+
+        let teachersCatalog = [];
+        let studentsCatalog = [];
+        let initialPayload = null;
+
+        try { teachersCatalog = JSON.parse(teachersCatalogNode?.textContent || '[]'); } catch { teachersCatalog = []; }
+        try { studentsCatalog = JSON.parse(authorsCatalogNode?.textContent || '[]'); } catch { studentsCatalog = []; }
+        try { initialPayload = JSON.parse(initialPayloadNode?.textContent || '{}'); } catch { initialPayload = {}; }
+
+        const currentUserId = parseInt(config.dataset.currentUserId || '0', 10);
+        const saveEndpoint = config.dataset.save || '';
+        const projectId = parseInt(config.dataset.projectId || '0', 10);
+
+        let activeState = {
+            title: '',
+            summary: '',
+            tutoring_user_ids: [],
+            tutoring_primary_id: 0,
+            author_user_ids: [],
+            author_leader_id: 0,
+        };
+
+        let initialStateString = '';
+        let isSaving = false;
+        let selectedTutors = [];
+        let selectedAuthors = [];
+
+        // Elements for Tutoring
+        const tutorAddBtn = form.querySelector('[data-sw-tutor-add-trigger]');
+        const tutorPickerPanel = form.querySelector('[data-sw-tutor-picker]');
+        const tutorSearchInput = form.querySelector('[data-sw-tutor-search]');
+        const tutorPickerOptions = form.querySelector('[data-sw-tutor-picker-options]');
+        const tutorsList = form.querySelector('[data-sw-tutors-list]');
+
+        // Elements for Authors
+        const authorAddBtn = form.querySelector('[data-sw-author-add-trigger]');
+        const authorPickerPanel = form.querySelector('[data-sw-author-picker]');
+        const authorSearchInput = form.querySelector('[data-sw-author-search]');
+        const authorPickerOptions = form.querySelector('[data-sw-author-picker-options]');
+        const authorsList = form.querySelector('[data-sw-authors-list]');
+
+        const showAlert = (message, isError = true) => {
+            if (!alertEl) return;
+            alertEl.textContent = message;
+            alertEl.className = `sw-edit-project-alert ${isError ? 'error' : 'success'}`;
+            alertEl.hidden = !message;
+        };
+
+        const hideAlert = () => {
+            if (!alertEl) return;
+            alertEl.hidden = true;
+            alertEl.textContent = '';
+        };
+
+        const getComparableState = () => {
+            const tutorIds = [...selectedTutors.map(t => parseInt(t.user_id, 10))].sort((a, b) => a - b);
+            const authorIds = [...selectedAuthors.map(a => parseInt(a.user_id, 10))].sort((a, b) => a - b);
+            const primaryTutor = parseInt(activeState.tutoring_primary_id || '0', 10);
+            const leaderAuthor = parseInt(activeState.author_leader_id || '0', 10);
+
+            return JSON.stringify([
+                (titleInput.value || '').trim().normalize('NFC'),
+                (summaryInput.value || '').trim().normalize('NFC'),
+                tutorIds,
+                primaryTutor,
+                authorIds,
+                leaderAuthor
+            ]);
+        };
+
+        const syncChangeState = () => {
+            const currentState = getComparableState();
+            const isDirty = Boolean(initialStateString) && currentState !== initialStateString;
+
+            if (dirtyIndicator) dirtyIndicator.hidden = !isDirty;
+            if (submitBtn) submitBtn.disabled = !isDirty || isSaving;
+            return isDirty;
+        };
+
+        // Render Tutors List
+        const renderTutorsList = () => {
+            if (!tutorsList) return;
+            tutorsList.replaceChildren();
+
+            const primaryId = parseInt(activeState.tutoring_primary_id || '0', 10);
+
+            selectedTutors.forEach((tutor) => {
+                const uId = parseInt(tutor.user_id, 10);
+                const isPrimary = uId === primaryId;
+
+                const card = document.createElement('div');
+                card.className = 'sw-edit-project-card';
+
+                const main = document.createElement('div');
+                main.className = 'sw-edit-project-card-main';
+
+                const avatar = document.createElement('span');
+                avatar.className = 'sw-edit-project-avatar';
+                const initials = (tutor.full_name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+                avatar.textContent = initials;
+
+                const details = document.createElement('div');
+                details.className = 'sw-edit-project-card-details';
+                const name = document.createElement('strong');
+                name.textContent = tutor.full_name || 'Docente';
+                const meta = document.createElement('small');
+                meta.textContent = tutor.email || 'Tutor del proyecto';
+                details.append(name, meta);
+                main.append(avatar, details);
+
+                const actions = document.createElement('div');
+                actions.className = 'sw-edit-project-card-actions';
+
+                if (isPrimary) {
+                    const badge = document.createElement('span');
+                    badge.className = 'sw-edit-project-badge-leader';
+                    badge.innerHTML = '<i class="fa-solid fa-star" aria-hidden="true"></i> Principal';
+                    actions.append(badge);
+                } else {
+                    const makePrimaryBtn = document.createElement('button');
+                    makePrimaryBtn.type = 'button';
+                    makePrimaryBtn.className = 'sw-edit-project-add-btn';
+                    makePrimaryBtn.textContent = 'Hacer principal';
+                    makePrimaryBtn.addEventListener('click', () => {
+                        activeState.tutoring_primary_id = uId;
+                        renderTutorsList();
+                        syncChangeState();
+                    });
+                    actions.append(makePrimaryBtn);
+                }
+
+                if (selectedTutors.length > 1) {
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'sw-edit-project-btn-icon';
+                    removeBtn.setAttribute('aria-label', `Quitar tutor ${tutor.full_name}`);
+                    removeBtn.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
+                    removeBtn.addEventListener('click', () => {
+                        selectedTutors = selectedTutors.filter(t => parseInt(t.user_id, 10) !== uId);
+                        if (isPrimary && selectedTutors.length > 0) {
+                            activeState.tutoring_primary_id = parseInt(selectedTutors[0].user_id, 10);
+                        }
+                        renderTutorsList();
+                        syncChangeState();
+                    });
+                    actions.append(removeBtn);
+                }
+
+                card.append(main, actions);
+                tutorsList.append(card);
+            });
+        };
+
+        // Render Authors List
+        const renderAuthorsList = () => {
+            if (!authorsList) return;
+            authorsList.replaceChildren();
+
+            const leaderId = parseInt(activeState.author_leader_id || '0', 10);
+
+            selectedAuthors.forEach((author) => {
+                const uId = parseInt(author.user_id, 10);
+                const isLeader = uId === leaderId;
+                const isSelf = uId === currentUserId;
+
+                const card = document.createElement('div');
+                card.className = 'sw-edit-project-card';
+
+                const main = document.createElement('div');
+                main.className = 'sw-edit-project-card-main';
+
+                const avatar = document.createElement('span');
+                avatar.className = 'sw-edit-project-avatar';
+                const initials = (author.full_name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+                avatar.textContent = initials;
+
+                const details = document.createElement('div');
+                details.className = 'sw-edit-project-card-details';
+                const name = document.createElement('strong');
+                name.textContent = author.full_name || 'Estudiante';
+                const meta = document.createElement('small');
+                meta.textContent = [author.institutional_code, author.username && `@${author.username}`].filter(Boolean).join(' · ') || 'Estudiante integrante';
+                details.append(name, meta);
+                main.append(avatar, details);
+
+                const actions = document.createElement('div');
+                actions.className = 'sw-edit-project-card-actions';
+
+                if (isSelf) {
+                    const selfBadge = document.createElement('span');
+                    selfBadge.className = 'sw-edit-project-badge-self';
+                    selfBadge.textContent = 'Tú';
+                    actions.append(selfBadge);
+                }
+
+                if (isLeader) {
+                    const badge = document.createElement('span');
+                    badge.className = 'sw-edit-project-badge-leader';
+                    badge.innerHTML = '<i class="fa-solid fa-crown" aria-hidden="true"></i> Líder';
+                    actions.append(badge);
+                } else {
+                    const makeLeaderBtn = document.createElement('button');
+                    makeLeaderBtn.type = 'button';
+                    makeLeaderBtn.className = 'sw-edit-project-add-btn';
+                    makeLeaderBtn.textContent = 'Hacer líder';
+                    makeLeaderBtn.addEventListener('click', () => {
+                        activeState.author_leader_id = uId;
+                        renderAuthorsList();
+                        syncChangeState();
+                    });
+                    actions.append(makeLeaderBtn);
+                }
+
+                // REGLA 0 y 6: El estudiante propio NO se puede eliminar
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'sw-edit-project-btn-icon';
+                removeBtn.setAttribute('aria-label', `Quitar integrante ${author.full_name}`);
+                removeBtn.innerHTML = '<i class="fa-solid fa-trash-can" aria-hidden="true"></i>';
+
+                if (isSelf) {
+                    removeBtn.disabled = true;
+                    removeBtn.title = 'No puedes retirarte a ti mismo del proyecto';
+                } else {
+                    removeBtn.addEventListener('click', () => {
+                        selectedAuthors = selectedAuthors.filter(a => parseInt(a.user_id, 10) !== uId);
+                        if (isLeader && selectedAuthors.length > 0) {
+                            activeState.author_leader_id = parseInt(selectedAuthors[0].user_id, 10);
+                        }
+                        renderAuthorsList();
+                        syncChangeState();
+                    });
+                }
+                actions.append(removeBtn);
+
+                card.append(main, actions);
+                authorsList.append(card);
+            });
+        };
+
+        // Render Tutor Picker Options
+        const renderTutorPickerOptions = () => {
+            if (!tutorPickerOptions) return;
+            tutorPickerOptions.replaceChildren();
+
+            const query = (tutorSearchInput?.value || '').trim().toLowerCase();
+            const selectedIds = new Set(selectedTutors.map(t => parseInt(t.user_id, 10)));
+
+            const available = teachersCatalog.filter(t => {
+                const uId = parseInt(t.id || t.user_id, 10);
+                if (selectedIds.has(uId)) return false;
+                if (!query) return true;
+                const searchable = `${t.full_name} ${t.email} ${t.username}`.toLowerCase();
+                return searchable.includes(query);
+            });
+
+            if (available.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'sw-edit-project-picker-option';
+                empty.style.color = '#94a3b8';
+                empty.style.cursor = 'default';
+                empty.textContent = query ? 'No se encontraron docentes.' : 'Todos los docentes disponibles han sido añadidos.';
+                tutorPickerOptions.append(empty);
+                return;
+            }
+
+            available.forEach((teacher) => {
+                const uId = parseInt(teacher.id || teacher.user_id, 10);
+                const option = document.createElement('button');
+                option.type = 'button';
+                option.className = 'sw-edit-project-picker-option';
+                option.setAttribute('role', 'option');
+
+                const info = document.createElement('div');
+                info.className = 'info';
+                const name = document.createElement('strong');
+                name.textContent = teacher.full_name || 'Docente';
+                const meta = document.createElement('small');
+                meta.textContent = teacher.email || (teacher.username ? `@${teacher.username}` : '');
+                info.append(name, meta);
+                option.append(info);
+
+                option.addEventListener('click', () => {
+                    selectedTutors.push({
+                        user_id: uId,
+                        full_name: teacher.full_name,
+                        email: teacher.email,
+                        username: teacher.username,
+                    });
+                    if (selectedTutors.length === 1) {
+                        activeState.tutoring_primary_id = uId;
+                    }
+                    if (tutorPickerPanel) tutorPickerPanel.hidden = true;
+                    renderTutorsList();
+                    syncChangeState();
+                });
+
+                tutorPickerOptions.append(option);
+            });
+        };
+
+        // Render Author Picker Options
+        const renderAuthorPickerOptions = () => {
+            if (!authorPickerOptions) return;
+            authorPickerOptions.replaceChildren();
+
+            const query = (authorSearchInput?.value || '').trim().toLowerCase();
+            const selectedIds = new Set(selectedAuthors.map(a => parseInt(a.user_id, 10)));
+
+            const available = studentsCatalog.filter(s => {
+                const uId = parseInt(s.id || s.user_id, 10);
+                if (selectedIds.has(uId)) return false;
+                if (!query) return true;
+                const searchable = `${s.full_name} ${s.email} ${s.username} ${s.institutional_code}`.toLowerCase();
+                return searchable.includes(query);
+            });
+
+            if (available.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'sw-edit-project-picker-option';
+                empty.style.color = '#94a3b8';
+                empty.style.cursor = 'default';
+                empty.textContent = query ? 'No se encontraron estudiantes.' : 'Todos los estudiantes disponibles han sido añadidos.';
+                authorPickerOptions.append(empty);
+                return;
+            }
+
+            available.forEach((student) => {
+                const uId = parseInt(student.id || student.user_id, 10);
+                const option = document.createElement('button');
+                option.type = 'button';
+                option.className = 'sw-edit-project-picker-option';
+                option.setAttribute('role', 'option');
+
+                const info = document.createElement('div');
+                info.className = 'info';
+                const name = document.createElement('strong');
+                name.textContent = student.full_name || 'Estudiante';
+                const meta = document.createElement('small');
+                meta.textContent = [student.institutional_code, student.username && `@${student.username}`].filter(Boolean).join(' · ');
+                info.append(name, meta);
+                option.append(info);
+
+                option.addEventListener('click', () => {
+                    selectedAuthors.push({
+                        user_id: uId,
+                        full_name: student.full_name,
+                        email: student.email,
+                        username: student.username,
+                        institutional_code: student.institutional_code,
+                        is_leader: selectedAuthors.length === 0,
+                    });
+                    if (selectedAuthors.length === 1) {
+                        activeState.author_leader_id = uId;
+                    }
+                    if (authorPickerPanel) authorPickerPanel.hidden = true;
+                    renderAuthorsList();
+                    syncChangeState();
+                });
+
+                authorPickerOptions.append(option);
+            });
+        };
+
+        // Open Modal
+        const openModal = () => {
+            hideAlert();
+
+            // Populate form values from initialPayload
+            const data = initialPayload || {};
+            titleInput.value = data.title || '';
+            summaryInput.value = data.summary || '';
+
+            selectedTutors = (data.tutors || []).map(t => ({ ...t }));
+            selectedAuthors = (data.authors || []).map(a => ({ ...a }));
+
+            activeState.tutoring_primary_id = parseInt(data.tutoring_primary_id || '0', 10);
+            activeState.author_leader_id = parseInt(data.author_leader_id || '0', 10);
+
+            if (selectedTutors.length > 0 && !activeState.tutoring_primary_id) {
+                activeState.tutoring_primary_id = parseInt(selectedTutors[0].user_id, 10);
+            }
+            if (selectedAuthors.length > 0 && !activeState.author_leader_id) {
+                activeState.author_leader_id = parseInt(selectedAuthors[0].user_id, 10);
+            }
+
+            renderTutorsList();
+            renderAuthorsList();
+
+            if (tutorPickerPanel) tutorPickerPanel.hidden = true;
+            if (authorPickerPanel) authorPickerPanel.hidden = true;
+
+            initialStateString = getComparableState();
+            syncChangeState();
+
+            modal.hidden = false;
+            titleInput.focus();
+        };
+
+        // Close Modal Handling with Unsaved Changes Check
+        const closeModal = (force = false) => {
+            const isDirty = syncChangeState();
+            if (!force && isDirty) {
+                if (confirmModal) confirmModal.hidden = false;
+                return;
+            }
+            modal.hidden = true;
+            if (confirmModal) confirmModal.hidden = true;
+            hideAlert();
+            openBtn.focus();
+        };
+
+        // Elements for Tutoring Hide
+        const tutorHideBtn = form.querySelector('[data-sw-tutor-picker-hide]');
+        // Elements for Authors Hide
+        const authorHideBtn = form.querySelector('[data-sw-author-picker-hide]');
+
+        // Event Listeners
+        openBtn.addEventListener('click', openModal);
+
+        modal.querySelectorAll('[data-sw-edit-close]').forEach(btn => {
+            btn.addEventListener('click', () => closeModal(false));
+        });
+
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal) closeModal(false);
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !modal.hidden && confirmModal?.hidden) {
+                event.preventDefault();
+                closeModal(false);
+            }
+        });
+
+        confirmModal?.querySelector('[data-sw-confirm-keep]')?.addEventListener('click', () => {
+            confirmModal.hidden = true;
+        });
+
+        confirmModal?.querySelector('[data-sw-confirm-discard]')?.addEventListener('click', () => {
+            confirmModal.hidden = true;
+            closeModal(true);
+        });
+
+        titleInput.addEventListener('input', syncChangeState);
+        summaryInput.addEventListener('input', syncChangeState);
+
+        tutorAddBtn?.addEventListener('click', () => {
+            if (!tutorPickerPanel) return;
+            const open = tutorPickerPanel.hidden;
+            tutorPickerPanel.hidden = !open;
+            if (open) {
+                if (tutorSearchInput) tutorSearchInput.value = '';
+                renderTutorPickerOptions();
+                tutorSearchInput?.focus();
+            }
+        });
+
+        tutorHideBtn?.addEventListener('click', () => {
+            if (tutorPickerPanel) tutorPickerPanel.hidden = true;
+        });
+
+        tutorSearchInput?.addEventListener('input', renderTutorPickerOptions);
+
+        authorAddBtn?.addEventListener('click', () => {
+            if (!authorPickerPanel) return;
+            const open = authorPickerPanel.hidden;
+            authorPickerPanel.hidden = !open;
+            if (open) {
+                if (authorSearchInput) authorSearchInput.value = '';
+                renderAuthorPickerOptions();
+                authorSearchInput?.focus();
+            }
+        });
+
+        authorHideBtn?.addEventListener('click', () => {
+            if (authorPickerPanel) authorPickerPanel.hidden = true;
+        });
+
+        authorSearchInput?.addEventListener('input', renderAuthorPickerOptions);
+
+        // Click outside handler to hide pickers
+        document.addEventListener('click', (event) => {
+            if (modal.hidden) return;
+            if (tutorPickerPanel && !tutorPickerPanel.hidden) {
+                if (!tutorPickerPanel.contains(event.target) && !tutorAddBtn?.contains(event.target)) {
+                    tutorPickerPanel.hidden = true;
+                }
+            }
+            if (authorPickerPanel && !authorPickerPanel.hidden) {
+                if (!authorPickerPanel.contains(event.target) && !authorAddBtn?.contains(event.target)) {
+                    authorPickerPanel.hidden = true;
+                }
+            }
+        });
+
+        // Submit Form via Fetch
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            hideAlert();
+
+            const titleVal = (titleInput.value || '').trim();
+            if (titleVal.length < 5) {
+                showAlert('El título debe tener al menos 5 caracteres.');
+                titleInput.focus();
+                return;
+            }
+            if (titleVal.length > 240) {
+                showAlert('El título no puede superar 240 caracteres.');
+                titleInput.focus();
+                return;
+            }
+
+            const summaryVal = (summaryInput.value || '').trim();
+            if (summaryVal.length < 30) {
+                showAlert('La descripción debe tener al menos 30 caracteres.');
+                summaryInput.focus();
+                return;
+            }
+
+            if (selectedTutors.length === 0) {
+                showAlert('Debes conservar al menos un tutor de referencia.');
+                return;
+            }
+
+            if (selectedAuthors.length === 0) {
+                showAlert('El proyecto debe conservar al menos un integrante.');
+                return;
+            }
+
+            const primaryTutorId = parseInt(activeState.tutoring_primary_id || '0', 10);
+            if (!selectedTutors.some(t => parseInt(t.user_id, 10) === primaryTutorId)) {
+                showAlert('Selecciona un tutor principal válido.');
+                return;
+            }
+
+            const leaderAuthorId = parseInt(activeState.author_leader_id || '0', 10);
+            if (!selectedAuthors.some(a => parseInt(a.user_id, 10) === leaderAuthorId)) {
+                showAlert('Selecciona un integrante líder válido.');
+                return;
+            }
+
+            // REGLA 0 y 6: Verificar que el propio estudiante esté en la lista de autores
+            if (!selectedAuthors.some(a => parseInt(a.user_id, 10) === currentUserId)) {
+                showAlert('No puedes retirarte a ti mismo del proyecto desde esta opción.');
+                return;
+            }
+
+            isSaving = true;
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.querySelector('span').textContent = 'Guardando cambios...';
+            }
+
+            const data = new FormData();
+            data.set('_csrf', config.dataset.csrf || '');
+            data.set('project_id', String(projectId));
+            data.set('title', titleVal);
+            data.set('summary', summaryVal);
+            data.set('tutoring_primary_id', String(primaryTutorId));
+            data.set('author_leader_id', String(leaderAuthorId));
+
+            selectedTutors.forEach(t => data.append('tutoring_user_ids[]', String(t.user_id)));
+            selectedAuthors.forEach(a => data.append('author_user_ids[]', String(a.user_id)));
+
+            try {
+                const response = await fetch(saveEndpoint, {
+                    method: 'POST',
+                    body: data,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.message || 'No fue posible actualizar la información del proyecto.');
+                }
+
+                // Exito!
+                showVisualToast(result.message || 'Información del proyecto actualizada correctamente.', 'success');
+
+                // Dynamic Workspace UI Update (Requirement 11)
+                const updated = result.data?.updated_data;
+                if (updated) {
+                    // Update Title
+                    const swTitle = workspace.querySelector('.sw-title');
+                    if (swTitle) {
+                        swTitle.textContent = updated.title;
+                        swTitle.title = updated.title;
+                    }
+                    document.title = `${updated.title} | Gestión Académica`;
+
+                    // Update Tutors List in Header
+                    const tutorListEl = workspace.querySelector('.sw-tutor-group .sw-person-list');
+                    if (tutorListEl && Array.isArray(updated.tutors) && updated.tutors.length > 0) {
+                        tutorListEl.replaceChildren(...updated.tutors.map(t => {
+                            const span = document.createElement('span');
+                            span.className = 'sw-person-name';
+                            span.textContent = t.full_name;
+                            return span;
+                        }));
+                        const tutorLabel = workspace.querySelector('.sw-tutor-group .sw-person-label strong');
+                        if (tutorLabel) tutorLabel.textContent = updated.tutors.length > 1 ? 'TUTORES' : 'TUTOR';
+                    }
+
+                    // Update Authors List in Header
+                    const authorListEl = workspace.querySelector('.sw-students-group .sw-person-list');
+                    if (authorListEl && Array.isArray(updated.authors) && updated.authors.length > 0) {
+                        authorListEl.replaceChildren(...updated.authors.map(a => {
+                            const span = document.createElement('span');
+                            span.className = 'sw-person-name';
+                            span.textContent = a.full_name;
+                            return span;
+                        }));
+                    }
+
+                    // Update Initial Payload Cache
+                    initialPayload.title = updated.title;
+                    initialPayload.summary = updated.summary;
+                    initialPayload.tutoring_primary_id = primaryTutorId;
+                    initialPayload.author_leader_id = leaderAuthorId;
+                    initialPayload.tutors = selectedTutors.map(t => ({ ...t }));
+                    initialPayload.authors = selectedAuthors.map(a => ({ ...a, is_leader: parseInt(a.user_id, 10) === leaderAuthorId }));
+                }
+
+                closeModal(true);
+            } catch (error) {
+                showAlert(error.message || 'No fue posible actualizar la información del proyecto.', true);
+            } finally {
+                isSaving = false;
+                if (submitBtn) {
+                    submitBtn.querySelector('span').textContent = 'Guardando cambios';
+                    syncChangeState();
+                }
+            }
+        });
+    };
+
+    initStudentProjectEditor();
 });

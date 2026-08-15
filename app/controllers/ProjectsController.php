@@ -390,6 +390,10 @@ final class ProjectsController
             'documentReview' => $documentReview,
             // La auditoría administrativa permanece interna; no se expone como acción del historial académico.
             'projectHistoryEndpoint' => '',
+            'studentProjectSaveEndpoint' => !empty($projectCapabilities['edit_information']) ? route('student-project-save-information') : '',
+            'studentProjectEditCsrf' => !empty($projectCapabilities['edit_information']) ? $session->csrfToken('student_project_edit_info') : '',
+            'studentProjectEditorCatalogs' => !empty($projectCapabilities['edit_information']) ? (new AdminProjectModel())->catalogs() : [],
+            'currentUserId' => (int) $session->userId(),
             'projectStatusTransitions' => $projectStatusTransitions,
             'projectStatusEndpoint' => $isAdministrator ? route('admin-project-save') : '',
             'projectStatusCsrf' => $isAdministrator ? $session->csrfToken('admin_projects') : '',
@@ -446,6 +450,77 @@ final class ProjectsController
             ?(new ProjectRecordModel())->academicHistoryPage((int)$projectId,$offset,15)
             :(new ProjectAcademicTimelineService())->page((int)$projectId,$offset,15);
         $this->json(['success'=>true,'message'=>'Historial académico cargado.','data'=>$page]);
+    }
+
+    /** Guarda exclusivamente la información académica editable por un estudiante participante activo. */
+    public function saveStudentProjectInformation(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]);
+        }
+        $session = new AuthSessionService();
+        $actorId = (int) ($session->userId() ?? 0);
+        if ($actorId < 1) {
+            http_response_code(401);
+            $this->json(['success'=>false,'message'=>'Tu sesión expiró. Inicia sesión nuevamente para continuar.','data'=>[]]);
+        }
+        if (!$session->validateCsrf('student_project_edit_info', (string) ($_POST['_csrf'] ?? ''))) {
+            http_response_code(419);
+            $this->json(['success'=>false,'message'=>'Tu sesión expiró. Inicia sesión nuevamente para continuar.','data'=>[]]);
+        }
+        $projectId = filter_var($_POST['project_id'] ?? $_POST['id'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+        if ($projectId === false || $projectId === null) {
+            http_response_code(422);
+            $this->json(['success'=>false,'message'=>'El proyecto solicitado no es válido.','data'=>[]]);
+        }
+        $exists = Database::connection()->prepare('SELECT 1 FROM projects WHERE id=:id AND deleted_at IS NULL');
+        $exists->execute(['id'=>(int) $projectId]);
+        if (!$exists->fetchColumn()) {
+            http_response_code(404);
+            $this->json(['success'=>false,'message'=>'El proyecto solicitado no está disponible.','data'=>[]]);
+        }
+        if (empty((new ProjectCapabilityService())->forProjectId((int) $projectId, 'academic')['edit_information'])) {
+            http_response_code(403);
+            $this->json(['success'=>false,'message'=>'No tienes autorización para editar este proyecto.','data'=>[]]);
+        }
+        $input = [
+            'title' => $_POST['title'] ?? null,
+            'summary' => $_POST['summary'] ?? null,
+            'tutoring_user_ids' => $_POST['tutoring_user_ids'] ?? [],
+            'tutoring_primary_id' => $_POST['tutoring_primary_id'] ?? null,
+            'author_user_ids' => $_POST['author_user_ids'] ?? [],
+            'author_leader_id' => $_POST['author_leader_id'] ?? null,
+        ];
+        try {
+            $result = (new StudentProjectInformationService())->save((int) $projectId, $input, $actorId);
+            if (!empty($result['changed'])) {
+                $db = Database::connection();
+                $projectQuery = $db->prepare('SELECT p.id, p.title, p.summary, p.tutor_id, u.full_name AS tutor_name, u.email AS tutor_email FROM projects p LEFT JOIN users u ON u.id = p.tutor_id WHERE p.id = :id');
+                $projectQuery->execute(['id' => (int) $projectId]);
+                $pRow = $projectQuery->fetch();
+                $participantsQuery = $db->prepare("SELECT pp.user_id, pp.role_code, pp.is_leader, u.full_name, u.email, sp.institutional_code FROM project_participants pp INNER JOIN users u ON u.id = pp.user_id LEFT JOIN student_profiles sp ON sp.user_id = u.id WHERE pp.project_id = :id AND pp.status = 'active' AND pp.removed_at IS NULL ORDER BY pp.assigned_at, pp.user_id");
+                $participantsQuery->execute(['id' => (int) $projectId]);
+                $pList = $participantsQuery->fetchAll();
+                $result['updated_data'] = [
+                    'title' => (string) ($pRow['title'] ?? ''),
+                    'summary' => (string) ($pRow['summary'] ?? ''),
+                    'tutors' => array_values(array_map(static fn($item) => ['user_id' => (int) $item['user_id'], 'full_name' => (string) $item['full_name'], 'email' => (string) $item['email']], array_filter($pList, static fn($item) => in_array(strtolower((string) $item['role_code']), ['tutor', 'cotutor', 'co_tutor', 'co-tutor'], true)))),
+                    'authors' => array_values(array_map(static fn($item) => ['user_id' => (int) $item['user_id'], 'full_name' => (string) $item['full_name'], 'email' => (string) $item['email'], 'is_leader' => !empty($item['is_leader']), 'institutional_code' => (string) ($item['institutional_code'] ?? '')], array_filter($pList, static fn($item) => strtolower((string) $item['role_code']) === 'student'))),
+                ];
+            }
+            $this->json(['success'=>true,'message'=>!empty($result['changed'])?'Información del proyecto actualizada.':'No se detectaron cambios en el proyecto.','data'=>$result]);
+        } catch (StudentProjectInformationException $exception) {
+            http_response_code($exception->httpStatus());
+            $this->json(['success'=>false,'message'=>$exception->getMessage(),'data'=>[]]);
+        } catch (ProjectTutoringException|ProjectAuthorException $exception) {
+            http_response_code(422);
+            $this->json(['success'=>false,'message'=>$exception->getMessage(),'data'=>[]]);
+        } catch (Throwable $exception) {
+            error_log('Student project information: '.$exception->getMessage());
+            http_response_code(500);
+            $this->json(['success'=>false,'message'=>'No fue posible actualizar la información del proyecto.','data'=>[]]);
+        }
     }
 
     public function saveDescription(): void

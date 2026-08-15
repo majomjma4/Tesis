@@ -111,6 +111,7 @@ final class ProjectCapabilityService
             (int) ($participant['user_id'] ?? 0) === $userId && strtolower((string) ($participant['role_code'] ?? '')) === 'student'
         )) > 0;
         if ($isOwnerStudent) {
+            $capabilities['edit_information'] = (string) ($project['status'] ?? '') === 'development';
             $capabilities['view_adjustment_requests'] = true;
             $capabilities['respond_adjustment_request'] = true;
             $capabilities['address_adjustment_request'] = true;

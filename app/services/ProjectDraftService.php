@@ -82,8 +82,8 @@ final class ProjectDraftService
         $type = $catalogs['types'][$draft['type']] ?? null;
         if ($type === null) $errors['type'] = 'Selecciona un tipo de proyecto válido y activo.';
         elseif (!$type['enabled']) $errors['type'] = 'Este tipo de proyecto no está disponible para tu semestre actual.';
-        if (mb_strlen($draft['title']) < 8) $errors['title'] = 'Escribe un título de al menos 8 caracteres.';
-        elseif (mb_strlen($draft['title']) > 180) $errors['title'] = 'El título no puede superar 180 caracteres.';
+        if (mb_strlen($draft['title']) < 5) $errors['title'] = 'Escribe un título de al menos 5 caracteres.';
+        elseif (mb_strlen($draft['title']) > 240) $errors['title'] = 'El título no puede superar 240 caracteres.';
         if (mb_strlen($draft['description']) < 30) $errors['description'] = 'Describe el proyecto con al menos 30 caracteres.';
         if ($activePeriod !== null && $draft['submitted_period'] !== (string) $activePeriod['code']) $errors['period'] = 'El periodo académico enviado no es válido.';
         foreach (($this->fieldContract($catalogs)[$draft['type']]['required'] ?? []) as $field) {

@@ -105,6 +105,7 @@ match ($page) {
     'project-zip-entry-download' => (new ProjectsController())->zipEntryDownload(),
     'admin-project-file' => (new ProjectDocumentController())->change(),
     'student-project-document' => (new ProjectStudentDocumentController())->change(),
+    'student-project-save-information' => (new ProjectsController())->saveStudentProjectInformation(),
     'student-project-review-representation' => (new ProjectReviewRepresentationController())->change(),
     'project-document-review-save' => (new ProjectDocumentReviewController())->save(),
     'project-adjustment-create' => (new ProjectAdjustmentController())->create(),
