@@ -8,6 +8,7 @@ $documentCsrf = (string) ($studentDocumentCsrf ?? '');
 $historicalPreviewUrl = $historical ? route('project-file-version-preview').'&project_id='.$projectId.'&version_id='.(int)$historical['id'] : '';
 $docLimits = (new ProjectDocumentFileService())->limits();
 ?>
+<script type="application/json" data-sw-observations-json><?= e(json_encode($observations, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)) ?></script>
 <section class="sw-doc-workspace<?= $historical ? ' is-historical' : '' ?>" data-sw-document-manager data-endpoint="<?= e($documentEndpoint) ?>" data-csrf="<?= e($documentCsrf) ?>" data-max-file-bytes="<?= (int) $docLimits['max_file_bytes'] ?>" data-max-file-mb="<?= (int) $docLimits['max_file_mb'] ?>" data-review-representation-endpoint="<?= e(route('student-project-review-representation')) ?>" data-review-representation-csrf="<?= e((new AuthSessionService())->csrfToken('student_project_review_representation')) ?>" data-project-id="<?= (int) $projectId ?>" data-historical-preview="<?= e($historicalPreviewUrl) ?>" data-pdfjs-url="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.mjs')) ?>" data-pdfjs-worker="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.worker.mjs')) ?>" data-pdfjs-fonts="<?= e(asset('vendor/pdfjs/4.10.38/web/standard_fonts/')) ?>">
     <?php if ($historical): ?><div class="sw-historical-banner" role="status"><strong>Versión <?= (int)$historical['version_number'] ?> · Historial</strong><span>Estás consultando una versión anterior de este documento.</span><a href="<?= e($detailUrl.'&tab=documents') ?>">Volver a versión actual</a></div><?php endif; ?>
     <aside class="sw-explorer-panel" data-sw-explorer id="swExplorerPanel">
@@ -27,12 +28,42 @@ $docLimits = (new ProjectDocumentFileService())->limits();
         ?><li class="sw-archive-node"><div class="sw-file-row"><button type="button" class="sw-tree-item" aria-label="<?= e((string)$file['original_name']) ?>. Estado: <?= e($statusLabel) ?>" data-sw-file data-file-id="<?= $fileId ?>" data-file-name="<?= e((string)$file['original_name']) ?>" data-file-extension="<?= e(strtoupper($extension)) ?>" data-file-size="<?= e(ArchiveService::formatBytes((int)($file['size_bytes'] ?? 0))) ?>" data-file-preview="<?= e($previewUrl) ?>" data-file-download="<?= e($downloadUrl) ?>" data-file-zip-url="<?= e($zipUrl) ?>" data-file-zip-preview-url="<?= e($zipPreviewUrl) ?>" data-file-zip-download-url="<?= e($zipDownloadUrl) ?>" data-file-observations="<?= $observationCount ?>"><span class="sw-tree-item-info"><span class="sw-status-dot is-<?= e($documentStatus) ?>" aria-label="Estado: <?= e($statusLabel) ?>" role="img"></span><i class="fa-regular fa-file" aria-hidden="true"></i><span><?= e((string)$file['original_name']) ?></span></span><span class="sw-file-tooltip" role="tooltip" aria-hidden="true" hidden><span class="sw-file-tooltip-name"><?= e((string)$file['original_name']) ?></span><span class="sw-file-tooltip-status"><span class="sw-status-dot is-<?= e($documentStatus) ?>" aria-hidden="true"></span><span class="sw-file-tooltip-label"><?= e($statusLabel) ?></span></span></span></button><div class="sw-file-row-actions"><?php if ($canManageFiles && !$protected): ?><button type="button" class="sw-file-menu-trigger" data-sw-menu-trigger aria-label="Acciones de <?= e((string)$file['original_name']) ?>" aria-expanded="false"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i></button><div class="sw-file-menu" data-sw-file-menu hidden><button type="button" data-sw-replace data-file-id="<?= $fileId ?>" data-file-name="<?= e((string)$file['original_name']) ?>" data-file-checksum="<?= e((string)$file['checksum_sha256']) ?>">Reemplazar archivo</button><a href="<?= e($downloadUrl) ?>">Descargar</a><button type="button" data-sw-remove data-file-id="<?= $fileId ?>" data-file-name="<?= e((string)$file['original_name']) ?>">Quitar archivo</button></div><?php elseif ($protected): ?><span class="sw-protected-label" title="Protegido por una revisión previa">Protegido</span><?php endif; ?></div></div><?php if ($extension === 'zip'): ?><ul class="sw-zip-tree" data-sw-zip-tree hidden></ul><?php endif; ?></li><?php endforeach; ?></ul><?php endif; ?>
     </aside>
     <div class="sw-resizer sw-resizer-explorer" data-sw-resizer="explorer" role="separator" aria-orientation="vertical" aria-label="Redimensionar panel de archivos" tabindex="0" title="Arrastra para redimensionar (Doble clic para restablecer)"></div>
-    <section class="sw-viewer-panel"><header class="sw-viewer-toolbar"><div class="sw-viewer-doc-info"><i class="fa-solid fa-folder-open" data-sw-viewer-icon aria-hidden="true"></i><div><strong data-sw-viewer-name>Visor de documentos</strong><span data-sw-viewer-meta>Exploración y consulta documental</span></div></div><a class="sw-viewer-download" data-sw-viewer-download hidden><i class="fa-solid fa-download" aria-hidden="true"></i> Descargar</a></header><div class="sw-viewer-canvas"><div class="sw-preview-stage" data-sw-preview-stage></div></div></section>
+    <section class="sw-viewer-panel">
+        <?php $packageUrl = route('project-package-download') . '&id=' . (int)$projectId; ?>
+        <div class="sw-project-actions">
+            <div class="sw-project-actions-group">
+                <a class="sw-viewer-action" href="<?= e($packageUrl) ?>"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</a>
+            </div>
+            <div class="sw-project-actions-file">
+                <a class="sw-viewer-action is-file-download" data-sw-viewer-download hidden><i class="fa-solid fa-download" aria-hidden="true"></i> Descargar</a>
+                <button type="button" class="sw-viewer-action" data-sw-print disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Imprimir</button>
+            </div>
+        </div>
+        <header class="sw-viewer-toolbar">
+            <div class="sw-viewer-doc-info">
+                <i class="fa-solid fa-folder-open" data-sw-viewer-icon aria-hidden="true"></i>
+                <div>
+                    <strong data-sw-viewer-name>Visor de documentos</strong>
+                    <span data-sw-viewer-meta>Exploración y consulta documental</span>
+                </div>
+            </div>
+            <div class="sw-viewer-zoom" data-sw-viewer-zoom hidden>
+                <button type="button" data-sw-zoom-minus aria-label="Alejar" title="Alejar (−)">−</button>
+                <button type="button" data-sw-zoom-fit aria-label="Ajustar al ancho" title="Ajustar al ancho">Ajustar</button>
+                <button type="button" data-sw-zoom-plus aria-label="Acercar" title="Acercar (+)">+</button>
+                <span data-sw-zoom-percentage>100%</span>
+            </div>
+        </header>
+        <div class="sw-viewer-canvas"><div class="sw-preview-stage" data-sw-preview-stage></div></div>
+    </section>
     <div class="sw-resizer sw-resizer-observations" data-sw-resizer="observations" role="separator" aria-orientation="vertical" aria-label="Redimensionar panel de observaciones" tabindex="0" title="Arrastra para redimensionar (Doble clic para restablecer)"></div>
     <aside class="sw-observations-panel" data-sw-observations id="swObservationsPanel">
         <button type="button" class="sw-panel-reopen-btn" data-sw-open-observations hidden aria-label="Abrir panel de observaciones" title="Abrir panel de observaciones"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
         <header class="sw-obs-header"><span class="sw-obs-title"><i class="fa-solid fa-comments" aria-hidden="true"></i> Observaciones</span><button type="button" class="sw-panel-toggle" data-sw-toggle-observations aria-controls="swObservationsPanel" aria-label="Contraer panel de observaciones" aria-expanded="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></header>
         <div data-sw-file-observations><p class="sw-empty-state">Selecciona un archivo para consultar sus observaciones.</p></div>
+        <footer class="sw-obs-footer">
+            <button type="button" class="sw-obs-action-btn" disabled title="El envío documental aún no está habilitado en esta arquitectura"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Enviar pendientes a revisión</button>
+        </footer>
     </aside>
     <div class="sw-operation-modal" data-sw-operation-modal hidden><section role="dialog" aria-modal="true" aria-labelledby="swOperationTitle"><header><h2 data-sw-modal-title id="swOperationTitle">Confirmar acción</h2><button type="button" data-sw-modal-cancel aria-label="Cerrar"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header><div><p data-sw-modal-message></p><p class="sw-modal-file-summary" data-sw-modal-summary hidden></p></div><footer><button type="button" data-sw-modal-cancel>Cancelar</button><button type="button" class="is-danger" data-sw-modal-confirm>Confirmar</button></footer></section></div>
 </section>
