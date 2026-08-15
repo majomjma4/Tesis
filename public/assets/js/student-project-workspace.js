@@ -1,14 +1,359 @@
 document.addEventListener('DOMContentLoaded', () => {
     const workspace = document.querySelector('[data-student-workspace]');
-    if (!workspace) return;
-    const toast = (message, error = false) => typeof window.showToast === 'function' ? window.showToast(message, error) : console[error ? 'error' : 'info'](message);
+    let toastContainer = document.querySelector('.sw-toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'sw-toast-container';
+        document.body.appendChild(toastContainer);
+    }
+
+    const showVisualToast = (message, kind = false) => {
+        if (!message) return;
+
+        const isError = kind === true || kind === 'error';
+        const isInfo = kind === 'info' || kind === 'warning';
+        const toastClass = isError ? 'is-error' : (isInfo ? 'is-info' : 'is-success');
+        const iconClass = isError ? 'fa-circle-xmark' : (isInfo ? 'fa-circle-info' : 'fa-circle-check');
+
+        const toastEl = document.createElement('div');
+        toastEl.className = `sw-toast ${toastClass}`;
+        toastEl.setAttribute('role', isError ? 'alert' : 'status');
+
+        const icon = document.createElement('i');
+        icon.className = `fa-solid ${iconClass}`;
+        icon.setAttribute('aria-hidden', 'true');
+
+        const text = document.createElement('span');
+        text.className = 'sw-toast-text';
+        text.textContent = message;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'sw-toast-close';
+        closeBtn.setAttribute('aria-label', 'Cerrar mensaje');
+        closeBtn.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+
+        const dismiss = () => {
+            toastEl.classList.add('is-leaving');
+            setTimeout(() => toastEl.remove(), 200);
+        };
+
+        closeBtn.addEventListener('click', dismiss);
+        toastEl.append(icon, text, closeBtn);
+
+        toastContainer.appendChild(toastEl);
+
+        setTimeout(dismiss, 4200);
+    };
+
+    const setFlashToast = (message, kind = 'success') => {
+        try {
+            sessionStorage.setItem('studentWorkspace.flashToast', JSON.stringify({ message, kind }));
+        } catch (e) {
+            /* ignore storage errors */
+        }
+    };
+
+    const consumeFlashToast = () => {
+        try {
+            const raw = sessionStorage.getItem('studentWorkspace.flashToast');
+            if (!raw) return;
+            sessionStorage.removeItem('studentWorkspace.flashToast');
+            const data = JSON.parse(raw);
+            if (data && data.message) {
+                showVisualToast(data.message, data.kind || false);
+            }
+        } catch (e) {
+            sessionStorage.removeItem('studentWorkspace.flashToast');
+        }
+    };
+
+    window.showToast = showVisualToast;
+    const toast = showVisualToast;
+    consumeFlashToast();
     const tabs = [...workspace.querySelectorAll('[data-sw-tab]')];
     const panes = [...workspace.querySelectorAll('.sw-tab-pane')];
     tabs.forEach((tab) => tab.addEventListener('click', (event) => { event.preventDefault(); const pane = workspace.querySelector(`#swTab-${CSS.escape(tab.dataset.swTab)}`); if (!pane) return; tabs.forEach((item) => { const active=item===tab; item.classList.toggle('is-active',active); item.setAttribute('aria-selected',active?'true':'false'); }); panes.forEach((item) => item.classList.toggle('is-active',item===pane)); const url=new URL(workspace.dataset.projectUrl,window.location.origin); url.searchParams.set('tab',tab.dataset.swTab); window.history.pushState({},'',url); }));
     const fullTimeline=workspace.querySelector('[data-sw-full-timeline]'), timelineToggle=workspace.querySelector('[data-sw-toggle-timeline]');
     if (fullTimeline && timelineToggle) timelineToggle.addEventListener('click', () => { const open=fullTimeline.hidden; fullTimeline.hidden=!open; timelineToggle.setAttribute('aria-expanded',open?'true':'false'); timelineToggle.textContent=open?'Ocultar recorrido':'Ver recorrido completo'; });
-    const togglePanel=(panelSelector,triggerSelector,reopenSelector) => { const panel=workspace.querySelector(panelSelector), trigger=workspace.querySelector(triggerSelector), reopen=workspace.querySelector(reopenSelector), stateClass=panelSelector.includes('explorer')?'sw-explorer-collapsed':'sw-observations-collapsed'; const set=(collapsed)=>{panel.classList.toggle('is-collapsed',collapsed);workspace.classList.toggle(stateClass,collapsed);trigger.setAttribute('aria-expanded',collapsed?'false':'true');if(reopen)reopen.hidden=!collapsed;window.dispatchEvent(new Event('resize'));}; if(panel&&trigger){trigger.addEventListener('click',()=>set(!panel.classList.contains('is-collapsed')));reopen?.addEventListener('click',()=>set(false));} };
-    togglePanel('[data-sw-explorer]','[data-sw-toggle-explorer]','[data-sw-open-explorer]'); togglePanel('[data-sw-observations]','[data-sw-toggle-observations]','[data-sw-open-observations]');
+    // FASE — PANELES LATERALES REDIMENSIONABLES (Manual Resizing)
+    const STORAGE_EXPLORER_KEY = 'sw_explorer_width';
+    const STORAGE_OBS_KEY = 'sw_obs_width';
+    const DEFAULT_EXPLORER_WIDTH = 250;
+    const DEFAULT_OBS_WIDTH = 280;
+    const MIN_EXPLORER_WIDTH = 190;
+    const MIN_OBS_WIDTH = 210;
+    const MIN_VIEWER_WIDTH = 380;
+
+    let lastExplorerWidth = DEFAULT_EXPLORER_WIDTH;
+    let lastObsWidth = DEFAULT_OBS_WIDTH;
+
+    const clamp = (val, min, max) => Math.round(Math.max(min, Math.min(max, val)));
+
+    const togglePanel=(panelSelector,triggerSelector,reopenSelector) => {
+        const panel=workspace.querySelector(panelSelector),
+            trigger=workspace.querySelector(triggerSelector),
+            reopen=workspace.querySelector(reopenSelector),
+            stateClass=panelSelector.includes('explorer')?'sw-explorer-collapsed':'sw-observations-collapsed';
+        const set=(collapsed)=>{
+            panel.classList.toggle('is-collapsed',collapsed);
+            workspace.classList.toggle(stateClass,collapsed);
+            trigger.setAttribute('aria-expanded',collapsed?'false':'true');
+            if(reopen)reopen.hidden=!collapsed;
+            if (!collapsed) {
+                if (panelSelector.includes('explorer')) {
+                    workspace.style.setProperty('--sw-explorer-w', `${lastExplorerWidth}px`);
+                } else {
+                    workspace.style.setProperty('--sw-obs-w', `${lastObsWidth}px`);
+                }
+            }
+            window.dispatchEvent(new Event('resize'));
+        };
+        if(panel&&trigger){
+            trigger.addEventListener('click',()=>set(!panel.classList.contains('is-collapsed')));
+            reopen?.addEventListener('click',()=>set(false));
+        }
+    };
+    togglePanel('[data-sw-explorer]','[data-sw-toggle-explorer]','[data-sw-open-explorer]');
+    togglePanel('[data-sw-observations]','[data-sw-toggle-observations]','[data-sw-open-observations]');
+
+    const initResizablePanels = () => {
+        const docWorkspace = workspace.querySelector('.sw-doc-workspace');
+        if (!docWorkspace) return;
+
+        const explorerPanel = docWorkspace.querySelector('[data-sw-explorer]');
+        const obsPanel = docWorkspace.querySelector('[data-sw-observations]');
+        const resizerExplorer = docWorkspace.querySelector('[data-sw-resizer="explorer"]');
+        const resizerObs = docWorkspace.querySelector('[data-sw-resizer="observations"]');
+
+        const storedExplorer = parseInt(localStorage.getItem(STORAGE_EXPLORER_KEY) || '', 10);
+        const storedObs = parseInt(localStorage.getItem(STORAGE_OBS_KEY) || '', 10);
+
+        if (!isNaN(storedExplorer) && storedExplorer >= MIN_EXPLORER_WIDTH) {
+            lastExplorerWidth = storedExplorer;
+        }
+        if (!isNaN(storedObs) && storedObs >= MIN_OBS_WIDTH) {
+            lastObsWidth = storedObs;
+        }
+
+        const applyWidths = () => {
+            if (window.innerWidth > 760) {
+                const containerW = docWorkspace.getBoundingClientRect().width;
+                if (containerW > 0) {
+                    const maxExplorerW = Math.min(containerW * 0.35, Math.max(MIN_EXPLORER_WIDTH, containerW - MIN_VIEWER_WIDTH - MIN_OBS_WIDTH));
+                    const maxObsW = Math.min(containerW * 0.35, Math.max(MIN_OBS_WIDTH, containerW - MIN_VIEWER_WIDTH - MIN_EXPLORER_WIDTH));
+
+                    lastExplorerWidth = clamp(lastExplorerWidth, MIN_EXPLORER_WIDTH, maxExplorerW);
+                    lastObsWidth = clamp(lastObsWidth, MIN_OBS_WIDTH, maxObsW);
+
+                    workspace.style.setProperty('--sw-explorer-w', `${lastExplorerWidth}px`);
+                    workspace.style.setProperty('--sw-obs-w', `${lastObsWidth}px`);
+                }
+            } else {
+                workspace.style.removeProperty('--sw-explorer-w');
+                workspace.style.removeProperty('--sw-obs-w');
+            }
+        };
+
+        applyWidths();
+        window.addEventListener('resize', applyWidths);
+
+        const attachResizer = (resizerEl, type) => {
+            if (!resizerEl) return;
+
+            let startX = 0;
+            let startWidth = 0;
+            let isDragging = false;
+
+            const onPointerDown = (event) => {
+                if (window.innerWidth <= 760 || event.button !== 0) return;
+                event.preventDefault();
+
+                isDragging = true;
+                resizerEl.setPointerCapture(event.pointerId);
+                resizerEl.classList.add('is-dragging');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+
+                startX = event.clientX;
+                const panel = type === 'explorer' ? explorerPanel : obsPanel;
+                startWidth = panel ? panel.getBoundingClientRect().width : (type === 'explorer' ? lastExplorerWidth : lastObsWidth);
+            };
+
+            const onPointerMove = (event) => {
+                if (!isDragging) return;
+
+                const delta = event.clientX - startX;
+                const containerW = docWorkspace.getBoundingClientRect().width;
+
+                if (type === 'explorer') {
+                    const newW = startWidth + delta;
+                    const obsW = obsPanel && !obsPanel.classList.contains('is-collapsed') ? obsPanel.getBoundingClientRect().width : 40;
+                    const maxW = Math.min(containerW * 0.35, Math.max(MIN_EXPLORER_WIDTH, containerW - obsW - MIN_VIEWER_WIDTH));
+                    const clampedW = clamp(newW, MIN_EXPLORER_WIDTH, maxW);
+                    lastExplorerWidth = clampedW;
+                    workspace.style.setProperty('--sw-explorer-w', `${clampedW}px`);
+                } else {
+                    const newW = startWidth - delta;
+                    const explorerW = explorerPanel && !explorerPanel.classList.contains('is-collapsed') ? explorerPanel.getBoundingClientRect().width : 40;
+                    const maxW = Math.min(containerW * 0.35, Math.max(MIN_OBS_WIDTH, containerW - explorerW - MIN_VIEWER_WIDTH));
+                    const clampedW = clamp(newW, MIN_OBS_WIDTH, maxW);
+                    lastObsWidth = clampedW;
+                    workspace.style.setProperty('--sw-obs-w', `${clampedW}px`);
+                }
+            };
+
+            const onPointerUp = (event) => {
+                if (!isDragging) return;
+                isDragging = false;
+
+                try {
+                    resizerEl.releasePointerCapture(event.pointerId);
+                } catch (e) {}
+
+                resizerEl.classList.remove('is-dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+
+                if (type === 'explorer') {
+                    localStorage.setItem(STORAGE_EXPLORER_KEY, String(lastExplorerWidth));
+                } else {
+                    localStorage.setItem(STORAGE_OBS_KEY, String(lastObsWidth));
+                }
+
+                window.dispatchEvent(new Event('resize'));
+            };
+
+            resizerEl.addEventListener('pointerdown', onPointerDown);
+            resizerEl.addEventListener('pointermove', onPointerMove);
+            resizerEl.addEventListener('pointerup', onPointerUp);
+            resizerEl.addEventListener('pointercancel', onPointerUp);
+
+            resizerEl.addEventListener('dblclick', () => {
+                if (type === 'explorer') {
+                    lastExplorerWidth = DEFAULT_EXPLORER_WIDTH;
+                    localStorage.removeItem(STORAGE_EXPLORER_KEY);
+                    workspace.style.setProperty('--sw-explorer-w', `${DEFAULT_EXPLORER_WIDTH}px`);
+                } else {
+                    lastObsWidth = DEFAULT_OBS_WIDTH;
+                    localStorage.removeItem(STORAGE_OBS_KEY);
+                    workspace.style.setProperty('--sw-obs-w', `${DEFAULT_OBS_WIDTH}px`);
+                }
+                window.dispatchEvent(new Event('resize'));
+            });
+
+            resizerEl.addEventListener('keydown', (event) => {
+                if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                    event.preventDefault();
+                    const step = (event.key === 'ArrowRight' ? 15 : -15) * (type === 'explorer' ? 1 : -1);
+                    const containerW = docWorkspace.getBoundingClientRect().width;
+                    if (type === 'explorer') {
+                        lastExplorerWidth = clamp(lastExplorerWidth + step, MIN_EXPLORER_WIDTH, Math.min(containerW * 0.35, 400));
+                        workspace.style.setProperty('--sw-explorer-w', `${lastExplorerWidth}px`);
+                        localStorage.setItem(STORAGE_EXPLORER_KEY, String(lastExplorerWidth));
+                    } else {
+                        lastObsWidth = clamp(lastObsWidth + step, MIN_OBS_WIDTH, Math.min(containerW * 0.35, 400));
+                        workspace.style.setProperty('--sw-obs-w', `${lastObsWidth}px`);
+                        localStorage.setItem(STORAGE_OBS_KEY, String(lastObsWidth));
+                    }
+                    window.dispatchEvent(new Event('resize'));
+                }
+            });
+        };
+
+        attachResizer(resizerExplorer, 'explorer');
+        attachResizer(resizerObs, 'observations');
+    };
+
+    initResizablePanels();
+
+    const initFileTooltips = () => {
+        let hoverTimer = null;
+        let activeItem = null;
+
+        const cancelTimer = () => {
+            if (hoverTimer) {
+                clearTimeout(hoverTimer);
+                hoverTimer = null;
+            }
+        };
+
+        const attachTooltipToItem = (item) => {
+            if (item.dataset.swTooltipInit === 'true') return;
+            item.dataset.swTooltipInit = 'true';
+
+            const tooltip = item.querySelector('.sw-file-tooltip');
+            if (!tooltip) return;
+
+            const hideTooltip = () => {
+                cancelTimer();
+                if (activeItem === item) {
+                    activeItem = null;
+                }
+                tooltip.classList.remove('is-visible');
+                tooltip.hidden = true;
+            };
+
+            const showTooltipNow = () => {
+                if (window.innerWidth <= 760) return;
+                tooltip.hidden = false;
+                tooltip.classList.add('is-visible');
+
+                const rect = item.getBoundingClientRect();
+                const tooltipRect = tooltip.getBoundingClientRect();
+
+                let top = rect.top - tooltipRect.height - 8;
+                if (top < 10) {
+                    top = rect.bottom + 8;
+                }
+
+                let left = rect.left;
+                const maxLeft = window.innerWidth - tooltipRect.width - 12;
+                left = Math.max(12, Math.min(maxLeft, left));
+
+                tooltip.style.top = `${top}px`;
+                tooltip.style.left = `${left}px`;
+            };
+
+            const startHoverTimer = () => {
+                if (activeItem === item) return;
+
+                cancelTimer();
+                workspace.querySelectorAll('.sw-file-tooltip.is-visible').forEach((el) => {
+                    el.classList.remove('is-visible');
+                    el.hidden = true;
+                });
+
+                activeItem = item;
+
+                hoverTimer = setTimeout(() => {
+                    hoverTimer = null;
+                    if (activeItem === item) {
+                        showTooltipNow();
+                    }
+                }, 2000);
+            };
+
+            item.addEventListener('mouseenter', startHoverTimer);
+            item.addEventListener('mouseleave', hideTooltip);
+            item.addEventListener('click', hideTooltip);
+            item.addEventListener('pointerdown', hideTooltip);
+            item.addEventListener('blur', hideTooltip);
+
+            const trigger = item.closest('.sw-file-row')?.querySelector('[data-sw-menu-trigger]');
+            trigger?.addEventListener('mouseenter', hideTooltip);
+            trigger?.addEventListener('click', hideTooltip);
+        };
+
+        workspace.querySelectorAll('.sw-tree-item, .sw-zip-entry').forEach(attachTooltipToItem);
+
+        const observer = new MutationObserver(() => {
+            workspace.querySelectorAll('.sw-tree-item, .sw-zip-entry').forEach(attachTooltipToItem);
+        });
+        observer.observe(workspace, { childList: true, subtree: true });
+    };
+
+    initFileTooltips();
 
     const manager=workspace.querySelector('[data-sw-document-manager]'); if (!manager) return;
     const endpoint=manager.dataset.endpoint, csrf=manager.dataset.csrf, reviewRepresentationEndpoint=manager.dataset.reviewRepresentationEndpoint||'', reviewRepresentationCsrf=manager.dataset.reviewRepresentationCsrf||'', projectId=manager.dataset.projectId, historicalPreview=manager.dataset.historicalPreview||'';
@@ -29,8 +374,54 @@ document.addEventListener('DOMContentLoaded', () => {
     const request=async(action,file,extra={})=>{const body=new FormData();body.set('_csrf',csrf);body.set('project_id',projectId);body.set('action',action);Object.entries(extra).forEach(([key,value])=>body.set(key,value));if(file)body.set('file',file);const response=await fetch(endpoint,jsonRequestInit({method:'POST',body}));const payload=await readJsonResponse(response);if(!payload.success){const error=new Error(payload.message||'No fue posible completar la operación.');error.status=response.status;throw error;}return payload;};
     const reloadDocuments=()=>{const url=new URL(workspace.dataset.projectUrl,window.location.origin);url.searchParams.set('tab','documents');window.location.assign(url);};
     const existingByName=(name)=>[...manager.querySelectorAll('[data-sw-file]')].find((item)=>item.dataset.fileName===name);
-    const replaceFile=async(file,fileId,checksum)=>{try{toast('Subiendo archivo…');await request('replace',file,{file_id:fileId,expected_checksum:checksum});toast('Archivo reemplazado correctamente.');reloadDocuments();}catch(error){toast(error.message||'No fue posible completar la operación.',true);}};
-    const upload=async(file)=>{try{if(addButton)addButton.disabled=true;toast(`Subiendo ${file.name}…`);await request('add',file);toast('Archivo agregado correctamente.');return true;}catch(error){const existing=existingByName(file.name);if(error.status===409&&existing&&/existe/i.test(error.message)){const replace=existing.closest('.sw-file-row')?.querySelector('[data-sw-replace]');if(replace){confirm('Ya existe este archivo',`Ya existe un archivo llamado “${file.name}”. ¿Deseas reemplazarlo?`,`Archivo actual: ${file.name}\nNuevo archivo: ${file.name}`,false,async()=>{closeModal();await replaceFile(file,replace.dataset.fileId,replace.dataset.fileChecksum);});return false;}}toast(error.message||'No fue posible agregar el archivo.',true);return false;}finally{if(addButton)addButton.disabled=false;}};
+    const maxFileBytes=Number(manager.dataset.maxFileBytes||20971520), maxFileMb=Number(manager.dataset.maxFileMb||20);
+    const validateFileClient=(file)=>{
+        if(!file||file.size===0){ toast('El archivo seleccionado está vacío (0 bytes).',true); return false; }
+        if(file.size>maxFileBytes){ toast(`El archivo supera el límite máximo permitido de ${maxFileMb} MB.`,true); return false; }
+        return true;
+    };
+    const replaceFile=async(file,fileId,checksum)=>{
+        if(!validateFileClient(file))return;
+        try{
+            await request('replace',file,{file_id:fileId,expected_checksum:checksum});
+            setFlashToast('Archivo reemplazado correctamente.','success');
+            reloadDocuments();
+        }catch(error){
+            const isIdentical=error.status===409||/idéntico/i.test(error.message||'');
+            if(isIdentical){
+                toast(error.message||'El archivo no presenta cambios respecto a la versión actual.','info');
+                return;
+            }
+            toast(error.message||'No se pudo subir el archivo. Inténtalo nuevamente.',true);
+        }
+    };
+    const upload=async(file)=>{
+        if(!validateFileClient(file))return false;
+        try{
+            if(addButton)addButton.disabled=true;
+            await request('add',file);
+            setFlashToast('Archivo agregado correctamente.','success');
+            return true;
+        }catch(error){
+            const existing=existingByName(file.name);
+            if(error.status===409&&existing&&/existe/i.test(error.message)&&!/idéntico/i.test(error.message)){
+                const replace=existing.closest('.sw-file-row')?.querySelector('[data-sw-replace]');
+                if(replace){
+                    confirm('Ya existe este archivo',`Ya existe un archivo llamado “${file.name}”. ¿Deseas reemplazarlo?`,`Archivo actual: ${file.name}\nNuevo archivo: ${file.name}`,false,async()=>{closeModal();await replaceFile(file,replace.dataset.fileId,replace.dataset.fileChecksum);});
+                    return false;
+                }
+            }
+            const isIdentical=error.status===409&&/idéntico/i.test(error.message||'');
+            if(isIdentical){
+                toast(error.message||'El archivo no presenta cambios respecto a la versión actual.','info');
+                return false;
+            }
+            toast(error.message||'No se pudo subir el archivo. Inténtalo nuevamente.',true);
+            return false;
+        }finally{
+            if(addButton)addButton.disabled=false;
+        }
+    };
     addButton?.addEventListener('click',()=>fileInput?.click());
     fileInput?.addEventListener('change',async()=>{let changed=false;for(const file of [...fileInput.files])changed=(await upload(file))||changed;fileInput.value='';if(changed)reloadDocuments();});
     const externalFiles=(event)=>{const transfer=event.dataTransfer;if(!transfer||!transfer.files||transfer.files.length===0)return [];return [...transfer.files].filter((file)=>file instanceof File&&file.size>=0);};
@@ -39,7 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
     manager.querySelectorAll('[data-sw-menu-trigger]').forEach((trigger)=>trigger.addEventListener('click',(event)=>{event.stopPropagation();const menu=trigger.nextElementSibling,open=!menu.hidden;closeMenus();menu.hidden=open;trigger.setAttribute('aria-expanded',open?'false':'true');}));
     document.addEventListener('click',(event)=>{if(!manager.contains(event.target))closeMenus();});
     manager.querySelectorAll('[data-sw-replace]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();const chooser=document.createElement('input');chooser.type='file';chooser.hidden=true;document.body.appendChild(chooser);chooser.addEventListener('change',()=>{const file=chooser.files?.[0];chooser.remove();if(!file)return;confirm('Reemplazar archivo','Se conservará el historial técnico del archivo anterior.',`Archivo actual: ${button.dataset.fileName}\nNuevo archivo: ${file.name}`,false,async()=>{closeModal();await replaceFile(file,button.dataset.fileId,button.dataset.fileChecksum);});});chooser.click();}));
-    manager.querySelectorAll('[data-sw-remove]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();confirm('Quitar archivo','Este archivo dejará de formar parte del espacio de trabajo actual.',button.dataset.fileName,true,async()=>{try{await request('remove',null,{file_id:button.dataset.fileId});closeModal();toast('Archivo quitado.');reloadDocuments();}catch(error){toast(error.message||'No fue posible completar la operación.',true);}});}));
+    manager.querySelectorAll('[data-sw-remove]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();confirm('Quitar archivo','Este archivo dejará de formar parte del espacio de trabajo actual.',button.dataset.fileName,true,async()=>{try{await request('remove',null,{file_id:button.dataset.fileId});closeModal();setFlashToast('Archivo quitado.','success');reloadDocuments();}catch(error){toast(error.message||'No fue posible completar la operación.',true);}});}));
 
     const objectUrls=new Set();
     const releasePdfDocument=()=>{pdfDocumentGeneration++;const previous=pdfDocument;pdfDocument=null;pdfDocumentKey='';pdfDocumentLoading=null;if(previous&&typeof previous.destroy==='function'){try{const destruction=previous.destroy();if(destruction&&typeof destruction.catch==='function')destruction.catch(()=>{});}catch(error){/* La selección nueva no debe quedar bloqueada por una liberación tardía. */}}};
@@ -56,8 +447,146 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadPreview=async(url,retry=false)=>{if(!url)return previewMessage('Vista previa no disponible para este archivo.');const generation=++previewGeneration;previewController?.abort();const controller=new AbortController();previewController=controller;previewMessage('Preparando vista del documento…');let type='';let targetUrl=url;if(retry){try{const target=new URL(url,window.location.origin);target.searchParams.set('retry_preview','1');targetUrl=target.toString();}catch(e){targetUrl=url+(url.includes('?')?'&':'?')+'retry_preview=1';}}try{const payload=await readJsonResponse(await fetch(targetUrl,jsonRequestInit({signal:controller.signal})));if(generation!==previewGeneration)throw Object.assign(new Error('Preview superseded.'),{code:'preview_superseded'});const preview=payload?.data?.preview||{};type=preview.preview_type||'';if(!payload.success)throw new Error(payload.message||'No fue posible cargar la vista previa.');await renderPreview(preview,url);if(generation!==previewGeneration)throw Object.assign(new Error('Preview superseded.'),{code:'preview_superseded'});}catch(error){if(error.name==='AbortError'||error.code==='preview_superseded')return;console.error('No fue posible cargar la vista previa.',error);if(error.code==='session_expired'){previewMessage(error.message,'is-error');return;}const isDocx=(type==='docx')||(url&&/docx/i.test(url));const retryCb=isDocx?()=>loadPreview(url,true):null;previewMessage(previewErrorMessage(type),'is-error',retryCb);}finally{if(previewController===controller)previewController=null;}};
     const selectItem=(item)=>manager.querySelectorAll('[data-sw-file], [data-sw-zip-entry]').forEach((entry)=>entry.classList.toggle('is-selected',entry===item));
     const setViewer=(name,extension,size,downloadUrl)=>{viewerName.textContent=name||'Archivo';viewerMeta.textContent=`${extension||'Archivo'} · ${size||'Tamaño no disponible'}`;viewerEmpty.hidden=true;viewerDownload.hidden=!downloadUrl;viewerDownload.href=downloadUrl||'#';};
+    let zipCanvasContext = null;
+    const measureZipTextWidth = (text, font) => {
+        if (!zipCanvasContext) {
+            const canvas = document.createElement('canvas');
+            zipCanvasContext = canvas.getContext('2d');
+        }
+        if (zipCanvasContext) {
+            zipCanvasContext.font = font || '13.6px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            return zipCanvasContext.measureText(text).width;
+        }
+        return text.length * 7.5;
+    };
+
+    const fitZipEntryName = (nameElement) => {
+        const fullName = nameElement.dataset.fullName;
+        if (!fullName) return;
+
+        const button = nameElement.closest('.sw-zip-entry');
+        if (!button) return;
+
+        const buttonWidth = button.clientWidth;
+        if (buttonWidth <= 0) return;
+
+        const icon = button.querySelector('i');
+        const iconWidth = icon ? (icon.offsetWidth || 14) : 14;
+        const padding = 16;
+        const gap = 7;
+        const availableWidth = Math.max(20, buttonWidth - (iconWidth + gap + padding + 4));
+
+        const computed = window.getComputedStyle(nameElement);
+        const font = computed.font && computed.font !== '' ? computed.font : `${computed.fontSize || '13.6px'} ${computed.fontFamily || 'sans-serif'}`;
+        const fullTextWidth = measureZipTextWidth(fullName, font);
+
+        if (fullTextWidth <= availableWidth) {
+            nameElement.textContent = fullName;
+            return;
+        }
+
+        const ellipsis = '…';
+        const ellipsisWidth = measureZipTextWidth(ellipsis, font);
+        const targetWidth = availableWidth - ellipsisWidth;
+
+        if (targetWidth <= 5) {
+            nameElement.textContent = ellipsis;
+            return;
+        }
+
+        let low = 1;
+        let high = fullName.length - 1;
+        let bestLength = 1;
+
+        while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            const sub = fullName.substring(0, mid);
+            const subWidth = measureZipTextWidth(sub, font);
+
+            if (subWidth <= targetWidth) {
+                bestLength = mid;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+
+        nameElement.textContent = fullName.substring(0, bestLength) + ellipsis;
+    };
+
+    const updateAllZipNames = () => {
+        workspace.querySelectorAll('.sw-zip-entry-name').forEach(fitZipEntryName);
+    };
+
+    if (typeof ResizeObserver === 'function') {
+        const explorerPanel = workspace.querySelector('[data-sw-explorer]');
+        if (explorerPanel) {
+            const zipObserver = new ResizeObserver(() => {
+                requestAnimationFrame(updateAllZipNames);
+            });
+            zipObserver.observe(explorerPanel);
+        }
+    }
+
+    window.addEventListener('resize', updateAllZipNames);
+
     const zipEntryUrl=(baseUrl,path)=>{const target=new URL(baseUrl,window.location.origin);target.searchParams.set('path',path);return target.toString();};
-    const renderZipTree=(tree,archive,rootButton)=>{tree.replaceChildren();(archive.items||[]).forEach((item)=>{const entry=document.createElement('li'),button=document.createElement('button'),icon=document.createElement('i'),name=document.createElement('span'),isDirectory=item.kind==='folder';button.type='button';button.className='sw-zip-entry';button.dataset.swZipEntry='';button.title=item.path||item.name||'';icon.className=isDirectory?'fa-solid fa-folder':'fa-regular fa-file';icon.setAttribute('aria-hidden','true');name.textContent=item.name||item.path;button.append(icon,name);entry.append(button);if(isDirectory){const child=document.createElement('ul');child.className='sw-zip-tree';child.hidden=true;button.addEventListener('click',()=>loadZipDirectory(rootButton,item.path,child));entry.append(child);}else button.addEventListener('click',()=>{selectItem(button);setViewer(item.name||item.path,(item.extension||item.type||'Archivo').toUpperCase(),item.size||'Tamaño no disponible',zipEntryUrl(rootButton.dataset.fileZipDownloadUrl,item.path));observationPanel.innerHTML='<p class="sw-empty-state">Las observaciones de archivos internos se consultarán cuando estén vinculadas al archivo principal.</p>';loadPreview(zipEntryUrl(rootButton.dataset.fileZipPreviewUrl,item.path));});tree.append(entry);});};
+    const renderZipTree=(tree,archive,rootButton)=>{
+        tree.replaceChildren();
+        (archive.items||[]).forEach((item)=>{
+            const entry=document.createElement('li'),
+                  button=document.createElement('button'),
+                  icon=document.createElement('i'),
+                  name=document.createElement('span'),
+                  isDirectory=item.kind==='folder',
+                  fullName=item.name||item.path||'Archivo interno';
+            entry.className='sw-zip-node';
+            button.type='button';
+            button.className='sw-zip-entry';
+            button.dataset.swZipEntry='';
+            button.setAttribute('aria-label', `${fullName} (${isDirectory ? 'Carpeta' : 'Archivo'})`);
+
+            const tooltip = document.createElement('span');
+            tooltip.className = 'sw-file-tooltip';
+            tooltip.setAttribute('role', 'tooltip');
+            tooltip.setAttribute('aria-hidden', 'true');
+            tooltip.hidden = true;
+
+            const tooltipName = document.createElement('span');
+            tooltipName.className = 'sw-file-tooltip-name';
+            tooltipName.textContent = fullName;
+
+            const tooltipStatus = document.createElement('span');
+            tooltipStatus.className = 'sw-file-tooltip-status';
+            tooltipStatus.innerHTML = `<i class="${isDirectory ? 'fa-solid fa-folder' : 'fa-regular fa-file'}" aria-hidden="true"></i> <span class="sw-file-tooltip-label">${isDirectory ? 'Carpeta interna' : (item.extension || item.type || 'Archivo').toUpperCase()}</span>`;
+
+            tooltip.append(tooltipName, tooltipStatus);
+
+            icon.className=isDirectory?'fa-solid fa-folder':'fa-regular fa-file';
+            icon.setAttribute('aria-hidden','true');
+            name.className='sw-zip-entry-name';
+            name.dataset.fullName=fullName;
+            name.textContent=fullName;
+            button.append(icon,name,tooltip);
+            entry.append(button);
+            if(isDirectory){
+                const child=document.createElement('ul');
+                child.className='sw-zip-tree';
+                child.hidden=true;
+                button.addEventListener('click',()=>loadZipDirectory(rootButton,item.path,child));
+                entry.append(child);
+            } else {
+                button.addEventListener('click',()=>{
+                    selectItem(button);
+                    setViewer(fullName,(item.extension||item.type||'Archivo').toUpperCase(),item.size||'Tamaño no disponible',zipEntryUrl(rootButton.dataset.fileZipDownloadUrl,item.path));
+                    observationPanel.innerHTML='<p class="sw-empty-state">Las observaciones de archivos internos se consultarán cuando estén vinculadas al archivo principal.</p>';
+                    loadPreview(zipEntryUrl(rootButton.dataset.fileZipPreviewUrl,item.path));
+                });
+            }
+            tree.append(entry);
+        });
+        setTimeout(updateAllZipNames, 0);
+    };
     const loadZipDirectory=async(rootButton,path,tree)=>{if(!tree)return;if(tree.dataset.loaded==='true'){tree.hidden=!tree.hidden;return;}tree.hidden=false;tree.textContent='Cargando…';try{const target=new URL(rootButton.dataset.fileZipUrl,window.location.origin);if(path)target.searchParams.set('path',path);const payload=await readJsonResponse(await fetch(target,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible abrir el ZIP.');renderZipTree(tree,payload.data.archive,rootButton);tree.dataset.loaded='true';}catch(error){console.error('No fue posible cargar la estructura del ZIP.',error);tree.textContent=error.code==='session_expired'?error.message:'No fue posible abrir esta carpeta.';}};
     const selectFile=(button)=>{cancelPreviewRequest();selectItem(button);setViewer(button.dataset.fileName,button.dataset.fileExtension,button.dataset.fileSize,button.dataset.fileDownload);const count=Number(button.dataset.fileObservations||0);observationPanel.innerHTML=`<p class="sw-empty-state">${count?`${count} observación${count===1?'':'es'} registrada${count===1?'':'s'} para este archivo.`:'No hay observaciones registradas para este archivo.'}</p>`;if(button.dataset.fileZipUrl){currentPreviewUrl='';previewMessage('Archivo ZIP seleccionado. Usa el explorador para navegar por su contenido.');void loadZipDirectory(button,'',button.closest('.sw-archive-node')?.querySelector('[data-sw-zip-tree]'));return;}currentPreviewUrl=button.dataset.filePreview;void loadPreview(button.dataset.filePreview);};
     manager.querySelectorAll('[data-sw-file]').forEach((button)=>button.addEventListener('click',(event)=>{event.preventDefault();selectFile(event.currentTarget);}));
