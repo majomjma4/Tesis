@@ -7,72 +7,120 @@ $statusLabel = $statusLabels[$status] ?? 'No disponible';
 $typeCode = (string) ($project['type_code'] ?? '');
 $isDegreeProject = $typeCode === 'thesis';
 $participants = (array) ($project['participants'] ?? []);
+
+// Extract tutors
+$tutorParticipants = array_values(array_filter($participants, static fn(array $p): bool => in_array((string) ($p['role_code'] ?? ''), ['tutor', 'cotutor', 'director', 'codirector'], true) && (string) ($p['status'] ?? 'active') === 'active' && empty($p['removed_at'])));
+$tutorNames = array_map(static fn(array $p): string => (string) ($p['full_name'] ?? $p['name'] ?? 'Tutor'), $tutorParticipants);
+if ($tutorNames === [] && !empty($project['tutor_name'])) {
+    $tutorNames = [(string) $project['tutor_name']];
+}
+if ($tutorNames === []) {
+    $tutorNames = ['No asignado'];
+}
+
+// Extract students (integrantes)
+$studentParticipants = array_values(array_filter($participants, static fn(array $p): bool => (string) ($p['role_code'] ?? '') === 'student' && (string) ($p['status'] ?? 'active') === 'active' && empty($p['removed_at'])));
+$studentNames = array_map(static fn(array $p): string => (string) ($p['full_name'] ?? $p['name'] ?? 'Estudiante'), $studentParticipants);
+if ($studentNames === []) {
+    $studentNames = ['No asignado'];
+}
+
 $tribunalMembers = array_values(array_filter($participants, static fn(array $member): bool => in_array((string) ($member['role_code'] ?? ''), ['tribunal','jury'], true)));
 $showTribunalTab = $isDegreeProject && ($tribunalMembers !== [] || $studentDefense !== null || in_array($status, ['defense','tribunal_approved','published'], true));
-$activeTab = (string) ($studentActiveTab ?? 'summary');
-if ($activeTab === 'tribunal' && !$showTribunalTab) $activeTab = 'summary';
-$reviewSituation = (array) ($project['review_situation'] ?? []);
-$situation = null;
-if ($status === 'development' && !empty($reviewSituation['has_pending_observations'])) $situation = 'Requiere correcciones';
-elseif ($status === 'development' && empty($project['files'])) $situation = 'Preparando primera entrega';
-elseif ($status === 'under_review') $situation = 'Esperando revisión del tutor';
-elseif ($status === 'approved') $situation = 'Publicación pendiente';
-elseif ($status === 'defense') $situation = $tribunalMembers ? 'Tribunal asignado' : 'Tribunal pendiente';
-elseif ($status === 'tribunal_approved' && $studentDefense !== null) $situation = !empty($studentDefense['defense_date']) ? 'Defensa programada' : 'Defensa pendiente';
-$statusTrail = [];
-foreach ((array) ($project['academic_history'] ?? []) as $event) {
-    foreach (['previous_state','new_state'] as $stateKey) {
-        $code = (string) (($event[$stateKey]['status'] ?? $event[$stateKey]['project_status'] ?? ''));
-        if (isset($statusLabels[$code]) && ($statusTrail === [] || end($statusTrail) !== $code)) $statusTrail[] = $code;
-    }
+$activeTab = (string) ($studentActiveTab ?? 'documents');
+if ($activeTab === 'tribunal' && !$showTribunalTab) $activeTab = 'documents';
+
+$workflowSequence = ['development', 'under_review', 'approved'];
+if ($isDegreeProject || in_array($status, ['defense', 'tribunal_approved'], true)) {
+    $workflowSequence[] = 'defense';
+    $workflowSequence[] = 'tribunal_approved';
 }
-foreach ((array) ($project['activity'] ?? []) as $event) {
-    foreach (['previous_state','new_state'] as $stateKey) {
-        $raw = $event[$stateKey] ?? [];
-        if (is_string($raw)) $raw = json_decode($raw, true) ?: [];
-        $code = (string) ($raw['status'] ?? $raw['project_status'] ?? '');
-        if (isset($statusLabels[$code]) && ($statusTrail === [] || end($statusTrail) !== $code)) $statusTrail[] = $code;
-    }
+$workflowSequence[] = 'published';
+$currentIndex = array_search($status, $workflowSequence, true);
+if ($currentIndex === false) $currentIndex = 0;
+
+$compactTimeline = [];
+$seqCount = count($workflowSequence);
+foreach ($workflowSequence as $idx => $code) {
+    $compactTimeline[] = [
+        'code' => $code,
+        'label' => $statusLabels[$code] ?? $code,
+        'is_completed' => $idx < $currentIndex,
+        'is_current' => $idx === $currentIndex,
+        'is_pending' => $idx > $currentIndex,
+        'is_last' => $idx === $seqCount - 1,
+    ];
 }
-if ($statusTrail === []) $statusTrail[] = $status;
-elseif (end($statusTrail) !== $status) $statusTrail[] = $status;
-$horizontalTrail = array_slice($statusTrail, -4);
+
 $detailUrl = route('project-detail') . '&id=' . $projectId;
 $tabs = [
-    'summary'=>['Resumen','fa-circle-info'], 'documents'=>['Documentos','fa-folder-open'],
-    'observations'=>['Observaciones','fa-comments'], 'versions'=>['Versiones','fa-clock-rotate-left'],
-    'history'=>['Historial','fa-list-check'],
+    'documents' => ['Documentos', 'fa-folder-open'],
+    'history' => ['Historial', 'fa-list-check'],
 ];
-if ($showTribunalTab) $tabs['tribunal'] = ['Tribunal y defensa','fa-gavel'];
+if ($showTribunalTab) $tabs['tribunal'] = ['Tribunal y defensa', 'fa-gavel'];
 $formatDate = static function (?string $date, bool $time = false): string { if (!$date) return 'No disponible'; $stamp = strtotime($date); return $stamp === false ? 'No disponible' : date($time ? 'd/m/Y H:i' : 'd/m/Y', $stamp); };
 ?>
 <div class="student-workspace" data-student-workspace data-project-url="<?= e($detailUrl) ?>">
+    <div class="sw-top-bar">
+        <a class="sw-back-link" href="<?= e(route('projects')) ?>">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Volver a Mis proyectos
+        </a>
+    </div>
+
     <header class="sw-header-card">
-        <div class="sw-header-top">
-            <div style="min-width:0;">
-                <div class="sw-header-meta"><span class="sw-badge-type"><?= e((string) ($project['type_name'] ?? 'No disponible')) ?></span><span class="sw-code"><?= e((string) ($project['code'] ?? 'No disponible')) ?></span></div>
+        <div class="sw-header-main">
+            <div class="sw-header-left">
+                <div class="sw-header-meta">
+                    <span class="sw-badge-type"><?= e(mb_strtoupper((string) ($project['type_name'] ?? 'Titulación'), 'UTF-8')) ?></span>
+                    <span class="sw-meta-sep">·</span>
+                    <span class="sw-code"><?= e((string) ($project['code'] ?? 'No disponible')) ?></span>
+                </div>
                 <h1 class="sw-title" title="<?= e((string) ($project['title'] ?? 'Sin título')) ?>"><?= e((string) ($project['title'] ?? 'Sin título')) ?></h1>
             </div>
-            <span class="sw-badge-status is-<?= e($status) ?>"><i class="fa-solid fa-circle-dot" aria-hidden="true"></i><?= e($statusLabel) ?></span>
+            <div class="sw-header-right">
+                <span class="sw-badge-status is-<?= e($status) ?>"><i class="fa-solid fa-circle-dot" aria-hidden="true"></i><?= e($statusLabel) ?></span>
+            </div>
         </div>
-        <div class="sw-header-info-grid">
-            <?php if ($situation !== null): ?><div class="sw-info-item"><span class="sw-info-label">Situación</span><span class="sw-info-value"><?= e($situation) ?></span></div><?php endif; ?>
-            <div class="sw-info-item"><span class="sw-info-label">Tutor</span><span class="sw-info-value"><?= e((string) ($project['tutor_name'] ?? 'No asignado')) ?></span></div>
-            <div class="sw-info-item"><span class="sw-info-label">Periodo académico</span><span class="sw-info-value"><?= e((string) ($project['period_name'] ?? 'No disponible')) ?></span></div>
-            <div class="sw-info-item"><span class="sw-info-label">Última actualización</span><span class="sw-info-value"><?= e($formatDate((string) ($project['updated_at'] ?? ''), true)) ?></span></div>
+
+        <div class="sw-header-people-grid">
+            <div class="sw-person-group sw-tutor-group">
+                <span class="sw-person-label"><i class="fa-solid fa-user-tie" aria-hidden="true"></i> <strong><?= count($tutorNames) > 1 ? 'TUTORES' : 'TUTOR' ?></strong></span>
+                <div class="sw-person-list">
+                    <?php foreach ($tutorNames as $name): ?>
+                        <span class="sw-person-name"><?= e($name) ?></span>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div class="sw-person-group sw-students-group">
+                <span class="sw-person-label"><i class="fa-solid fa-users" aria-hidden="true"></i> <strong>INTEGRANTES</strong></span>
+                <div class="sw-person-list">
+                    <?php foreach ($studentNames as $name): ?>
+                        <span class="sw-person-name"><?= e($name) ?></span>
+                    <?php endforeach; ?>
+                </div>
+            </div>
         </div>
-        <div class="sw-header-actions"><a class="sw-secondary-link" href="<?= e(route('projects')) ?>"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Volver a Mis proyectos</a><a class="sw-primary-link" href="<?= e($detailUrl . '&tab=documents') ?>"><i class="fa-solid fa-folder-open" aria-hidden="true"></i> Preparar documentos</a></div>
+
+        <div class="sw-compact-timeline" aria-label="Recorrido de estados del proyecto">
+            <div class="sw-ct-track">
+                <?php foreach ($compactTimeline as $step): ?>
+                    <div class="sw-ct-step<?= $step['is_current'] ? ' is-current' : ($step['is_completed'] ? ' is-completed' : ' is-pending') ?>">
+                        <span class="sw-ct-node">
+                            <i class="fa-solid <?= $step['is_current'] ? 'fa-circle-dot' : ($step['is_completed'] ? 'fa-circle-check' : 'fa-circle') ?>" aria-hidden="true"></i>
+                            <?= e($step['label']) ?>
+                        </span>
+                        <?php if (!$step['is_last']): ?>
+                            <span class="sw-ct-line" aria-hidden="true"></span>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
     </header>
 
-    <section class="sw-timeline-card" aria-label="Recorrido de estados del proyecto">
-        <div class="sw-timeline-header"><span class="sw-timeline-title"><i class="fa-solid fa-route" aria-hidden="true"></i> Recorrido de estados</span><?php if (count($statusTrail) > count($horizontalTrail)): ?><button type="button" class="sw-toggle-btn" data-sw-toggle-timeline aria-expanded="false">Ver recorrido completo</button><?php endif; ?></div>
-        <div class="sw-timeline-horizontal"><?php foreach ($horizontalTrail as $index => $code): ?><div class="sw-timeline-step"><span class="sw-timeline-node<?= $index === count($horizontalTrail)-1 ? ' is-active' : '' ?>"><?= e($statusLabels[$code]) ?><?= $index === count($horizontalTrail)-1 ? ' · Estado actual' : '' ?></span><?php if ($index < count($horizontalTrail)-1): ?><span class="sw-timeline-line" aria-hidden="true"></span><?php endif; ?></div><?php endforeach; ?></div>
-        <?php if (count($statusTrail) > count($horizontalTrail)): ?><div class="sw-timeline-vertical" data-sw-full-timeline hidden><?php foreach ($statusTrail as $index => $code): ?><div class="sw-timeline-vnode"><i class="fa-solid <?= $index === count($statusTrail)-1 ? 'fa-circle-dot' : 'fa-circle' ?>" aria-hidden="true"></i><?= e($statusLabels[$code]) ?><?= $index === count($statusTrail)-1 ? ' · Estado actual' : '' ?></div><?php endforeach; ?></div><?php endif; ?>
-    </section>
-
     <nav class="sw-tabs-nav" aria-label="Secciones de Mi proyecto" role="tablist">
-        <?php $primaryTabKeys = ['summary','documents','observations']; foreach ($tabs as $key => [$label,$icon]): ?><a class="sw-tab-btn<?= $activeTab === $key ? ' is-active' : '' ?><?= in_array($key, $primaryTabKeys, true) ? '' : ' sw-tab-secondary' ?>" href="<?= e($detailUrl . '&tab=' . $key) ?>" role="tab" aria-selected="<?= $activeTab === $key ? 'true' : 'false' ?>" data-sw-tab="<?= e($key) ?>"><i class="fa-solid <?= e($icon) ?>" aria-hidden="true"></i><?= e($label) ?></a><?php endforeach; ?>
-        <details class="sw-tabs-more"><summary><i class="fa-solid fa-ellipsis" aria-hidden="true"></i> Más</summary><div><?php foreach ($tabs as $key => [$label,$icon]): if (in_array($key, $primaryTabKeys, true)) continue; ?><a href="<?= e($detailUrl . '&tab=' . $key) ?>" data-sw-tab="<?= e($key) ?>"><i class="fa-solid <?= e($icon) ?>" aria-hidden="true"></i><?= e($label) ?></a><?php endforeach; ?></div></details>
+        <?php foreach ($tabs as $key => [$label,$icon]): ?><a class="sw-tab-btn<?= $activeTab === $key ? ' is-active' : '' ?>" href="<?= e($detailUrl . '&tab=' . $key) ?>" role="tab" aria-selected="<?= $activeTab === $key ? 'true' : 'false' ?>" data-sw-tab="<?= e($key) ?>"><i class="fa-solid <?= e($icon) ?>" aria-hidden="true"></i><?= e($label) ?></a><?php endforeach; ?>
     </nav>
     <main>
         <?php foreach (array_keys($tabs) as $key): ?><section class="sw-tab-pane<?= $activeTab === $key ? ' is-active' : '' ?>" id="swTab-<?= e($key) ?>" role="tabpanel"><?php require __DIR__ . '/student-workspace/_' . $key . '.php'; ?></section><?php endforeach; ?>

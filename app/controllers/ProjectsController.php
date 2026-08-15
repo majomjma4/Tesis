@@ -244,10 +244,10 @@ final class ProjectsController
         }
 
         $projectContext = $isAdministrator ? 'academic_management' : 'academic';
-        $studentTabs = ['summary','documents','observations','versions','history','tribunal'];
-        $studentTabAliases = ['files'=>'documents','deliveries'=>'documents','final-documents'=>'documents','review'=>'observations','comments'=>'observations','information'=>'summary','activity'=>'history','calendar'=>'history','participants'=>'summary','more'=>'summary'];
+        $studentTabs = ['documents','history','tribunal'];
+        $studentTabAliases = ['summary'=>'documents','information'=>'documents','participants'=>'documents','more'=>'documents','files'=>'documents','deliveries'=>'documents','final-documents'=>'documents','observations'=>'documents','review'=>'documents','comments'=>'documents','versions'=>'history','activity'=>'history','calendar'=>'history'];
         $studentTab = $studentTabAliases[$requestedTab] ?? $requestedTab;
-        $studentTab = in_array($studentTab, $studentTabs, true) ? $studentTab : 'summary';
+        $studentTab = in_array($studentTab, $studentTabs, true) ? $studentTab : 'documents';
         $legacyTabs = ['summary'=>'information','deliveries'=>'files','documents'=>'files','final-documents'=>'files','observations'=>'information','comments'=>'information','review'=>'information','history'=>'information','calendar'=>'information','activity'=>'information','participants'=>'information','more'=>'information'];
         $tab = $legacyTabs[$requestedTab] ?? $requestedTab;
         $tab = in_array($tab, ['information','files','evolution'], true) ? $tab : 'information';
