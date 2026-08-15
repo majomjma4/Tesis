@@ -358,7 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let pdfjsPromise=null, pdfDocument=null, pdfDocumentKey='', pdfDocumentLoading=null, pdfDocumentGeneration=0, previewGeneration=0, previewController=null, currentPreviewUrl='', pdfScale=1, pdfFitScale=1, activePdfPreview=null, pocAnnotations=[], annotationsVisible=true;
     const pdfjs=async()=>{if(!pdfjsPromise)pdfjsPromise=import(manager.dataset.pdfjsUrl).then((module)=>{module.GlobalWorkerOptions.workerSrc=manager.dataset.pdfjsWorker;return module;});return pdfjsPromise;};
     const jsonRequestInit=(options={})=>({...options,credentials:'same-origin',headers:{Accept:'application/json',...(options.headers||{})}});
-    const readJsonResponse=async(response)=>{const redirectedToLogin=response.redirected&&/([?&]page=login)(?:&|$)/i.test(response.url||'');if(response.status===401||redirectedToLogin){const error=new Error('Tu sesión ha expirado. Vuelve a iniciar sesión.');error.status=401;error.code='session_expired';throw error;}const contentType=(response.headers.get('content-type')||'').toLowerCase();if(!contentType.includes('application/json')){const error=new Error('Respuesta inesperada del servidor.');error.status=response.status;error.code='unexpected_response';throw error;}const payload=await response.json();if(!response.ok){const error=new Error(payload.message||'No fue posible completar la operación.');error.status=response.status;throw error;}return payload;};
+    const readJsonResponse=async(response)=>{const redirectedToLogin=response.redirected&&/([?&]page=login)(?:&|$)/i.test(response.url||'');if(response.status===401||redirectedToLogin){const error=new Error('Tu sesión ha expirado. Vuelve a iniciar sesión.');error.status=401;error.code='session_expired';throw error;}const contentType=(response.headers.get('content-type')||'').toLowerCase();if(!contentType.includes('application/json')){const error=new Error('Respuesta inesperada del servidor.');error.status=response.status;error.code='unexpected_response';throw error;}const payload=await response.json();if(!response.ok){const error=new Error(payload.message||'No fue posible completar la operación.');error.status=response.status;error.data=payload.data||{};throw error;}return payload;};
     const fileInput=manager.querySelector('[data-sw-file-input]'), addButton=manager.querySelector('[data-sw-add-files]');
     const viewerName=manager.querySelector('[data-sw-viewer-name]'), viewerMeta=manager.querySelector('[data-sw-viewer-meta]'), viewerDownload=manager.querySelector('[data-sw-viewer-download]'), viewerEmpty=manager.querySelector('[data-sw-viewer-empty]'), previewStage=manager.querySelector('[data-sw-preview-stage]'), observationPanel=manager.querySelector('[data-sw-file-observations]');
     const mobileObsBadge=manager.querySelector('[data-sw-mobile-obs-badge]');
@@ -1263,6 +1263,141 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     setTimeout(updateAdaptiveTimeline, 100);
+
+    // Envío formal a revisión: usa únicamente el endpoint y las capacidades emitidas por el servidor.
+    const initStudentProjectSubmission = () => {
+        const trigger = manager.querySelector('[data-sw-submit-review]');
+        const submitModal = manager.querySelector('[data-sw-submit-modal]');
+        const confirmButton = submitModal?.querySelector('[data-sw-submit-confirm]');
+        const cancelButtons = submitModal?.querySelectorAll('[data-sw-submit-cancel]');
+        const errorBox = submitModal?.querySelector('[data-sw-submit-error]');
+        const errorTitle = submitModal?.querySelector('[data-sw-submit-error-title]');
+        const errorList = submitModal?.querySelector('[data-sw-submit-error-list]');
+        const submitEndpoint = manager.dataset.submitEndpoint || '';
+        const submitCsrf = manager.dataset.submitCsrf || '';
+        if (!trigger || !submitModal || !confirmButton || !submitEndpoint || !submitCsrf) return;
+
+        let submitting = false;
+        let lastFocus = null;
+        const setError = (message, pending = []) => {
+            if (!errorBox || !errorTitle || !errorList) return;
+            errorBox.hidden = false;
+            errorTitle.textContent = message;
+            errorList.replaceChildren();
+            pending.forEach((item) => {
+                const row = document.createElement('li');
+                const name = String(item?.name || 'Documento');
+                const reason = String(item?.reason || '').replace(/_/g, ' ');
+                row.textContent = reason ? `${name} — ${reason}` : name;
+                errorList.append(row);
+            });
+            errorList.hidden = pending.length === 0;
+        };
+        const clearError = () => {
+            if (errorBox) errorBox.hidden = true;
+            if (errorList) { errorList.replaceChildren(); errorList.hidden = true; }
+        };
+        const setSubmitting = (active) => {
+            submitting = active;
+            confirmButton.disabled = active;
+            cancelButtons?.forEach((button) => { button.disabled = active; });
+            const label = confirmButton.querySelector('span');
+            if (label) label.textContent = active ? 'Enviando a revisión…' : 'Enviar a revisión';
+            confirmButton.querySelector('i')?.classList.toggle('fa-spin', active);
+        };
+        const close = () => {
+            if (submitting) return;
+            submitModal.hidden = true;
+            clearError();
+            lastFocus?.focus();
+        };
+        const updateStatusUi = (result) => {
+            const status = String(result.project_status || 'under_review');
+            const capabilities = result.capabilities || {};
+            workspace.dataset.swProjectStatus = status;
+            const labels = { development: 'En desarrollo', under_review: 'En revisión', approved: 'Aprobado', defense: 'En tribunal', tribunal_approved: 'Aprobado por el tribunal', published: 'Publicado' };
+            const badge = workspace.querySelector('[data-sw-project-status-badge]');
+            if (badge) {
+                badge.className = `sw-badge-status is-${status}`;
+                badge.replaceChildren();
+                const icon = document.createElement('i');
+                icon.className = 'fa-solid fa-circle-dot'; icon.setAttribute('aria-hidden', 'true');
+                badge.append(icon, document.createTextNode(labels[status] || 'En revisión'));
+            }
+            const sequence = ['development', 'under_review', 'approved', 'defense', 'tribunal_approved', 'published'];
+            const currentIndex = sequence.indexOf(status);
+            timelineSteps.forEach((step) => {
+                const index = sequence.indexOf(step.dataset.swStatusStep || '');
+                const current = index === currentIndex;
+                const completed = index >= 0 && currentIndex >= 0 && index < currentIndex;
+                step.classList.toggle('is-current', current);
+                step.classList.toggle('is-completed', completed);
+                step.classList.toggle('is-pending', !current && !completed);
+                const icon = step.querySelector('.sw-ct-node i');
+                if (icon) icon.className = `fa-solid ${current ? 'fa-circle-dot' : (completed ? 'fa-circle-check' : 'fa-circle')}`;
+            });
+            updateAdaptiveTimeline();
+            if (capabilities.edit_information === false || status === 'under_review') workspace.querySelector('[data-sw-edit-info-open]')?.remove();
+            if (capabilities.manage_workspace_files === false || status === 'under_review') {
+                manager.querySelector('[data-sw-add-files]')?.remove();
+                manager.querySelector('[data-sw-file-input]')?.remove();
+                manager.querySelectorAll('[data-sw-menu-trigger]').forEach((button) => button.remove());
+                manager.querySelectorAll('[data-sw-file-menu]').forEach((menu) => { menu.hidden = true; });
+            }
+            if (capabilities.send_for_review === false || status === 'under_review') trigger.remove();
+            const historyPane = workspace.querySelector('#swTab-history');
+            if (!historyPane) return;
+            let list = historyPane.querySelector('.sw-history-list');
+            if (!list) {
+                const empty = historyPane.querySelector('.sw-empty-state');
+                list = document.createElement('div'); list.className = 'sw-history-list';
+                empty?.replaceWith(list);
+            }
+            const event = document.createElement('article'); event.className = 'sw-history-event is-delivery';
+            const main = document.createElement('div'); main.className = 'sw-history-main';
+            const title = document.createElement('strong'); title.className = 'sw-history-title';
+            title.innerHTML = '<i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Entrega documental registrada';
+            const description = document.createElement('p'); description.className = 'sw-history-desc';
+            description.textContent = `Entrega ${result.delivery_number}: ${result.submitted_file_count} documento(s) enviado(s) a revisión.`;
+            main.append(title, description);
+            event.append(main); list.prepend(event);
+        };
+        trigger.addEventListener('click', () => {
+            lastFocus = trigger;
+            clearError(); setSubmitting(false);
+            submitModal.hidden = false;
+            submitModal.querySelector('[data-sw-submit-cancel]')?.focus();
+        });
+        cancelButtons?.forEach((button) => button.addEventListener('click', close));
+        submitModal.addEventListener('click', (event) => { if (event.target === submitModal) close(); });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !submitModal.hidden && !submitting) { event.preventDefault(); close(); } });
+        confirmButton.addEventListener('click', async () => {
+            if (submitting) return;
+            clearError(); setSubmitting(true);
+            const body = new FormData(); body.set('project_id', String(projectId)); body.set('_csrf', submitCsrf);
+            try {
+                const payload = await readJsonResponse(await fetch(submitEndpoint, jsonRequestInit({ method: 'POST', body })));
+                if (!payload.success) throw new Error(payload.message || 'No fue posible enviar los documentos a revisión.');
+                const result = payload.data || {};
+                setSubmitting(false); submitModal.hidden = true;
+                updateStatusUi(result);
+                showVisualToast(`Entrega ${result.delivery_number || ''}: ${result.submitted_file_count || 0} documento(s) enviado(s) a revisión.`, 'success');
+            } catch (error) {
+                setSubmitting(false);
+                const status = Number(error.status || 0);
+                const data = error.data || {};
+                const message = status === 419
+                    ? 'La sesión del formulario venció. Actualiza la página e inténtalo nuevamente.'
+                    : status === 409 ? 'El proyecto ya fue enviado a revisión. Actualiza la página para consultar su estado actual.'
+                    : status === 401 ? 'Tu sesión expiró. Inicia sesión nuevamente para continuar.'
+                    : status === 403 ? 'No tienes autorización para enviar este proyecto a revisión.'
+                    : (error.message || 'No fue posible enviar los documentos a revisión.');
+                setError(message, Array.isArray(data.pending_review_representations) ? data.pending_review_representations : []);
+                showVisualToast(message, 'error');
+            }
+        });
+    };
+    initStudentProjectSubmission();
 
     if (historicalPreview) {
         (async()=>{try{const payload=await readJsonResponse(await fetch(historicalPreview,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible cargar la versión.');const preview=payload.data.preview;updateSelectedFileHeader(preview.original_name,`Versión ${preview.version_number}`,'Historial','');await renderPreview({status:'ready',preview_type:'pdf',content_url:preview.content_url,name:preview.original_name});const items=preview.observations||[];observationPanel.innerHTML=items.length?items.map((item)=>`<article class="sw-record"><strong>${String(item.category||'Observación')}</strong><p>${String(item.body||'')}</p></article>`).join(''):'<p class="sw-empty-state">No hay observaciones registradas para esta versión.</p>';}catch(error){console.error(error);previewMessage(error.code==='session_expired'?error.message:'No fue posible cargar la versión histórica.','is-error');}})();

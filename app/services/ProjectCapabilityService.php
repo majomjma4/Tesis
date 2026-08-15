@@ -11,7 +11,7 @@ final class ProjectCapabilityService
         'manage_tribunal', 'manage_publication', 'register_delivery', 'review_delivery',
         'create_observation', 'respond_observation', 'request_corrections', 'download_files',
         'review_documents', 'publish_project',
-        'manage_workspace_files',
+        'manage_workspace_files', 'send_for_review',
         'create_adjustment_request', 'view_adjustment_requests', 'respond_adjustment_request',
         'address_adjustment_request', 'close_adjustment_request',
     ];
@@ -120,10 +120,11 @@ final class ProjectCapabilityService
             $capabilities['publish_project'] = ($type === 'thesis' && $status === 'tribunal_approved')
                 || ($type !== 'thesis' && $status === 'approved');
             $capabilities['manage_workspace_files'] = $status === 'development';
+            $capabilities['send_for_review'] = $status === 'development';
         }
 
-        // Los permisos académicos globales existen, pero esta pantalla aún no tiene endpoints operativos.
-        $capabilities['register_delivery'] = false;
+        // La entrega estudiantil se habilita únicamente mientras el expediente sigue en desarrollo.
+        $capabilities['register_delivery'] = !empty($capabilities['send_for_review']);
         $capabilities['review_delivery'] = false;
         $capabilities['create_observation'] = false;
         $capabilities['respond_observation'] = false;

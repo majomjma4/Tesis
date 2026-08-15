@@ -25,13 +25,9 @@ final class ProjectDraftRegistrationService
             $this->insertParticipants($db,$projectId,$draft,$userId);
             $this->syncKeywords($db,$projectId,$draft,$catalogs);
             $this->promoteFiles($db,$projectId,$files,$draftStorage,$fileStorage,$userId,$draftId,$moved);
-            $readiness=(new ProjectReviewReadinessService())->check($projectId,true);
-            if (!empty($readiness['ready'])) {
-                $db->prepare("UPDATE projects SET status='under_review' WHERE id=:id AND status='development'")->execute(['id'=>$projectId]);
-            }
             (new ProjectAuditService($db))->record($projectId,$userId,'project_created','project',$projectId,null,[
                 'code'=>$code,'type'=>(string)$type['label'],'tutor_id'=>(int)$draft['tutor_id'],'participants'=>count($draft['members']),'files'=>count($files),
-                'academic_period_id'=>(int)$catalogs['active_period']['id'],'status'=>!empty($readiness['ready'])?'under_review':'development','current_stage'=>'registration',
+                'academic_period_id'=>(int)$catalogs['active_period']['id'],'status'=>'development','current_stage'=>'registration',
             ]);
             $db->prepare('DELETE FROM project_draft_files WHERE draft_id=:draft AND user_id=:user')->execute(['draft'=>$draftId,'user'=>$userId]);
             $delete=$db->prepare('DELETE FROM project_drafts WHERE id=:draft AND user_id=:user');$delete->execute(['draft'=>$draftId,'user'=>$userId]);
@@ -40,10 +36,8 @@ final class ProjectDraftRegistrationService
         } catch(Throwable $exception) {
             if($db->inTransaction())$db->rollBack();$this->restoreMovedFiles($moved);throw $exception;
         }
-        if (!empty($readiness['ready'])) try {(new ProjectAcademicNotificationService())->notifyProjectRegisteredForReview($db,$projectId,(int)$draft['tutor_id'],$code,(string)$draft['title']);}
-        catch(Throwable $exception){error_log('Project registration notification: '.$exception->getMessage());}
         try {$draftStorage->cleanupConsumedDirectory($userId,$draftId);}catch(Throwable $exception){error_log('Project registration temporary cleanup: '.$exception->getMessage());}
-        return ['project_id'=>$projectId,'project_code'=>$code,'redirect_url'=>route('project-detail').'&id='.$projectId,'review_readiness'=>$readiness];
+        return ['project_id'=>$projectId,'project_code'=>$code,'redirect_url'=>route('project-detail').'&id='.$projectId];
     }
 
     private function lockedDraft(PDO $db,int $userId,string $draftId):array

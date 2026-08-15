@@ -3,13 +3,14 @@ $files = (array) ($project['files'] ?? []);
 $observations = (array) ($project['observations'] ?? []);
 $historical = is_array($historicalVersion ?? null) ? $historicalVersion : null;
 $canManageFiles = !$historical && !empty($projectCapabilities['manage_workspace_files']);
+$canSendForReview = !$historical && !empty($projectCapabilities['send_for_review']);
 $documentEndpoint = (string) ($studentDocumentEndpoint ?? '');
 $documentCsrf = (string) ($studentDocumentCsrf ?? '');
 $historicalPreviewUrl = $historical ? route('project-file-version-preview').'&project_id='.$projectId.'&version_id='.(int)$historical['id'] : '';
 $docLimits = (new ProjectDocumentFileService())->limits();
 ?>
 <script type="application/json" data-sw-observations-json><?= e(json_encode($observations, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)) ?></script>
-<section class="sw-doc-workspace<?= $historical ? ' is-historical' : '' ?>" data-sw-document-manager data-sw-active-tab="explorer" data-endpoint="<?= e($documentEndpoint) ?>" data-csrf="<?= e($documentCsrf) ?>" data-max-file-bytes="<?= (int) $docLimits['max_file_bytes'] ?>" data-max-file-mb="<?= (int) $docLimits['max_file_mb'] ?>" data-review-representation-endpoint="<?= e(route('student-project-review-representation')) ?>" data-review-representation-csrf="<?= e((new AuthSessionService())->csrfToken('student_project_review_representation')) ?>" data-project-id="<?= (int) $projectId ?>" data-historical-preview="<?= e($historicalPreviewUrl) ?>" data-pdfjs-url="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.mjs')) ?>" data-pdfjs-worker="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.worker.mjs')) ?>" data-pdfjs-fonts="<?= e(asset('vendor/pdfjs/4.10.38/web/standard_fonts/')) ?>">
+<section class="sw-doc-workspace<?= $historical ? ' is-historical' : '' ?>" data-sw-document-manager data-sw-active-tab="explorer" data-endpoint="<?= e($documentEndpoint) ?>" data-csrf="<?= e($documentCsrf) ?>" data-submit-endpoint="<?= e((string) ($studentProjectSubmitEndpoint ?? '')) ?>" data-submit-csrf="<?= e((string) ($studentProjectSubmitCsrf ?? '')) ?>" data-max-file-bytes="<?= (int) $docLimits['max_file_bytes'] ?>" data-max-file-mb="<?= (int) $docLimits['max_file_mb'] ?>" data-review-representation-endpoint="<?= e(route('student-project-review-representation')) ?>" data-review-representation-csrf="<?= e((new AuthSessionService())->csrfToken('student_project_review_representation')) ?>" data-project-id="<?= (int) $projectId ?>" data-historical-preview="<?= e($historicalPreviewUrl) ?>" data-pdfjs-url="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.mjs')) ?>" data-pdfjs-worker="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.worker.mjs')) ?>" data-pdfjs-fonts="<?= e(asset('vendor/pdfjs/4.10.38/web/standard_fonts/')) ?>">
     <?php if ($historical): ?><div class="sw-historical-banner" role="status"><strong>Versión <?= (int)$historical['version_number'] ?> · Historial</strong><span>Estás consultando una versión anterior de este documento.</span><a href="<?= e($detailUrl.'&tab=documents') ?>">Volver a versión actual</a></div><?php endif; ?>
     <nav class="sw-mobile-switcher" data-sw-mobile-switcher aria-label="Navegación móvil del espacio de trabajo">
         <button type="button" class="sw-mobile-tab is-active" data-sw-mobile-tab="explorer">
@@ -74,8 +75,56 @@ $docLimits = (new ProjectDocumentFileService())->limits();
         <header class="sw-obs-header"><span class="sw-obs-title"><i class="fa-solid fa-comments" aria-hidden="true"></i> Observaciones</span><button type="button" class="sw-panel-toggle" data-sw-toggle-observations aria-controls="swObservationsPanel" aria-label="Contraer panel de observaciones" aria-expanded="true"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></header>
         <div data-sw-file-observations><p class="sw-empty-state">Selecciona un archivo para consultar sus observaciones.</p></div>
         <footer class="sw-obs-footer">
-            <button type="button" class="sw-obs-action-btn" disabled title="El envío documental aún no está habilitado en esta arquitectura"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Enviar a revisión</button>
+            <?php if ($canSendForReview): ?><button type="button" class="sw-obs-action-btn" data-sw-submit-review><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Enviar a revisión</button><?php endif; ?>
         </footer>
     </aside>
     <div class="sw-operation-modal" data-sw-operation-modal hidden><section role="dialog" aria-modal="true" aria-labelledby="swOperationTitle"><header><h2 data-sw-modal-title id="swOperationTitle">Confirmar acción</h2><button type="button" data-sw-modal-cancel aria-label="Cerrar"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header><div><p data-sw-modal-message></p><p class="sw-modal-file-summary" data-sw-modal-summary hidden></p></div><footer><button type="button" data-sw-modal-cancel>Cancelar</button><button type="button" class="is-danger" data-sw-modal-confirm>Confirmar</button></footer></section></div>
+    <?php
+    $hasPreviousReview = !empty(array_filter($files, static fn(array $f): bool =>
+        in_array(strtolower((string)($f['document_status'] ?? 'development')), ['approved', 'corrections_requested'], true)
+    )) || !empty($observations);
+    ?>
+    <div class="sw-operation-modal sw-submit-modal-overlay" data-sw-submit-modal hidden>
+        <section role="dialog" aria-modal="true" aria-labelledby="swSubmitReviewTitle" class="sw-submit-modal-card">
+            <header class="sw-submit-modal-header">
+                <h2 id="swSubmitReviewTitle">Enviar proyecto a revisión</h2>
+                <button type="button" class="sw-submit-modal-close-btn" data-sw-submit-cancel aria-label="Cerrar ventana">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </header>
+
+            <div class="sw-submit-modal-body">
+                <div class="sw-submit-hero">
+                    <div class="sw-submit-icon-badge">
+                        <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+                    </div>
+                    <h3 class="sw-submit-question">
+                        <?= $hasPreviousReview ? '¿Listo para reenviar tus correcciones?' : '¿Listo para enviar tu proyecto?' ?>
+                    </h3>
+                    <p class="sw-submit-subtitle">
+                        <?= $hasPreviousReview
+                            ? 'Se enviarán únicamente los documentos corregidos o pendientes. Los documentos ya aprobados se conservarán.'
+                            : 'Tus documentos serán enviados al tutor para su primera revisión.' ?>
+                    </p>
+                </div>
+
+                <div class="sw-submit-restriction-box">
+                    <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                    <span>Mientras esté en revisión, no podrás editar la información ni modificar los archivos.</span>
+                </div>
+
+                <div data-sw-submit-error hidden role="alert" class="sw-submit-error-alert">
+                    <strong data-sw-submit-error-title></strong>
+                    <ul data-sw-submit-error-list hidden></ul>
+                </div>
+            </div>
+
+            <footer class="sw-submit-modal-footer">
+                <button type="button" class="sw-submit-cancel-btn" data-sw-submit-cancel>Cancelar</button>
+                <button type="button" class="sw-submit-confirm-btn" data-sw-submit-confirm>
+                    <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> <span>Enviar a revisión</span>
+                </button>
+            </footer>
+        </section>
+    </div>
 </section>

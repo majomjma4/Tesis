@@ -392,6 +392,8 @@ final class ProjectsController
             'projectHistoryEndpoint' => '',
             'studentProjectSaveEndpoint' => !empty($projectCapabilities['edit_information']) ? route('student-project-save-information') : '',
             'studentProjectEditCsrf' => !empty($projectCapabilities['edit_information']) ? $session->csrfToken('student_project_edit_info') : '',
+            'studentProjectSubmitEndpoint' => !empty($projectCapabilities['send_for_review']) ? route('student-project-submit-review') : '',
+            'studentProjectSubmitCsrf' => !empty($projectCapabilities['send_for_review']) ? $session->csrfToken('student_project_submit_review') : '',
             'studentProjectEditorCatalogs' => !empty($projectCapabilities['edit_information']) ? (new AdminProjectModel())->catalogs() : [],
             'currentUserId' => (int) $session->userId(),
             'projectStatusTransitions' => $projectStatusTransitions,
@@ -544,6 +546,42 @@ final class ProjectsController
             error_log('Project description: ' . $exception->getMessage());
             http_response_code(500);
             $this->json(['success' => false, 'message' => 'No fue posible guardar la descripción.', 'data' => []]);
+        }
+    }
+
+    /** Envía documentos pendientes a revisión usando la identidad de la sesión. */
+    public function submitStudentProjectForReview(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]);
+        }
+        $session = new AuthSessionService();
+        $actorId = (int) ($session->userId() ?? 0);
+        if ($actorId < 1) {
+            http_response_code(401);
+            $this->json(['success'=>false,'message'=>'Tu sesión expiró. Inicia sesión nuevamente para continuar.','data'=>[]]);
+        }
+        if (!$session->validateCsrf('student_project_submit_review', (string) ($_POST['_csrf'] ?? ''))) {
+            http_response_code(419);
+            $this->json(['success'=>false,'message'=>'Tu sesión expiró. Inicia sesión nuevamente para continuar.','data'=>[]]);
+        }
+        $projectId = filter_var($_POST['project_id'] ?? $_POST['id'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+        if ($projectId === false || $projectId === null) {
+            http_response_code(422);
+            $this->json(['success'=>false,'message'=>'El proyecto solicitado no es válido.','data'=>[]]);
+        }
+        try {
+            $result = (new StudentProjectSubmissionService())->submitForReview((int) $projectId, $actorId);
+            $result['capabilities'] = (new ProjectCapabilityService())->forProjectId((int) $projectId, 'academic');
+            $this->json(['success'=>true,'message'=>'Documentos enviados a revisión correctamente.','data'=>$result]);
+        } catch (StudentProjectSubmissionException $exception) {
+            http_response_code($exception->httpStatus());
+            $this->json(['success'=>false,'message'=>$exception->getMessage(),'data'=>$exception->data()]);
+        } catch (Throwable $exception) {
+            error_log('Student project submission: '.$exception->getMessage());
+            http_response_code(500);
+            $this->json(['success'=>false,'message'=>'No fue posible enviar los documentos a revisión.','data'=>[]]);
         }
     }
 

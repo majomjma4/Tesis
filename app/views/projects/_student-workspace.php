@@ -60,7 +60,7 @@ $tabs = [
 if ($showTribunalTab) $tabs['tribunal'] = ['Tribunal y defensa', 'fa-gavel'];
 $formatDate = static function (?string $date, bool $time = false): string { if (!$date) return 'No disponible'; $stamp = strtotime($date); return $stamp === false ? 'No disponible' : date($time ? 'd/m/Y H:i' : 'd/m/Y', $stamp); };
 ?>
-<div class="student-workspace" data-student-workspace data-project-url="<?= e($detailUrl) ?>">
+<div class="student-workspace" data-student-workspace data-project-url="<?= e($detailUrl) ?>" data-sw-project-status="<?= e($status) ?>">
     <div class="sw-top-bar">
         <a class="sw-back-link" href="<?= e(route('projects')) ?>">
             <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Volver a Mis proyectos
@@ -83,7 +83,7 @@ $formatDate = static function (?string $date, bool $time = false): string { if (
                         <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> <span>Editar información</span>
                     </button>
                 <?php endif; ?>
-                <span class="sw-badge-status is-<?= e($status) ?>"><i class="fa-solid fa-circle-dot" aria-hidden="true"></i><?= e($statusLabel) ?></span>
+                <span class="sw-badge-status is-<?= e($status) ?>" data-sw-project-status-badge><i class="fa-solid fa-circle-dot" aria-hidden="true"></i><?= e($statusLabel) ?></span>
             </div>
         </div>
 
@@ -110,7 +110,7 @@ $formatDate = static function (?string $date, bool $time = false): string { if (
         <div class="sw-compact-timeline" data-sw-timeline aria-label="Recorrido de estados del proyecto">
             <div class="sw-ct-track" data-sw-timeline-track>
                 <?php foreach ($compactTimeline as $step): ?>
-                    <div class="sw-ct-step<?= $step['is_current'] ? ' is-current' : ($step['is_completed'] ? ' is-completed' : ' is-pending') ?>" data-sw-timeline-step>
+                    <div class="sw-ct-step<?= $step['is_current'] ? ' is-current' : ($step['is_completed'] ? ' is-completed' : ' is-pending') ?>" data-sw-timeline-step data-sw-status-step="<?= e($step['code']) ?>">
                         <span class="sw-ct-node">
                             <i class="fa-solid <?= $step['is_current'] ? 'fa-circle-dot' : ($step['is_completed'] ? 'fa-circle-check' : 'fa-circle') ?>" aria-hidden="true"></i>
                             <?= e($step['label']) ?>

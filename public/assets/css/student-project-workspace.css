@@ -704,7 +704,7 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
 .student-workspace .sw-preview-docx-content td { border:1px solid var(--sw-border);padding:.45rem;vertical-align:top; }
 .student-workspace .sw-operation-modal { position:fixed;z-index:10050;inset:0;background:rgba(15,23,42,.55);display:grid;place-items:center;padding:1rem; }
 .student-workspace .sw-operation-modal[hidden] { display:none; }
-.student-workspace .sw-operation-modal section { width:min(440px,100%);background:#fff;border-radius:12px;box-shadow:0 24px 55px rgba(15,23,42,.3);overflow:hidden; }
+.student-workspace .sw-operation-modal section { width:min(440px,100%);max-height:calc(100dvh - 2rem);box-sizing:border-box;background:#fff;border-radius:12px;box-shadow:0 24px 55px rgba(15,23,42,.3);overflow:auto; }
 .student-workspace .sw-operation-modal header,.student-workspace .sw-operation-modal footer { padding:1rem 1.15rem;display:flex;justify-content:space-between;align-items:center;gap:.75rem;border-bottom:1px solid var(--sw-border); }
 .student-workspace .sw-operation-modal header h2 { margin:0;font-size:1rem;color:var(--sw-text); }
 .student-workspace .sw-operation-modal header button { border:0;background:transparent;font:inherit;cursor:pointer; }
@@ -712,7 +712,11 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
 .student-workspace .sw-operation-modal footer { justify-content:flex-end;border-top:1px solid var(--sw-border);border-bottom:0; }
 .student-workspace .sw-operation-modal footer button { border:1px solid var(--sw-border);background:#fff;color:var(--sw-text);border-radius:7px;padding:.45rem .7rem;font:inherit;font-size:.82rem;font-weight:700;cursor:pointer; }
 .student-workspace .sw-operation-modal footer .is-danger { border-color:#b91c1c;background:#b91c1c;color:#fff; }
+.student-workspace .sw-operation-modal footer .is-primary { border-color:var(--sw-primary,#2563eb);background:var(--sw-primary,#2563eb);color:#fff; }
 .student-workspace .sw-modal-file-summary { white-space:pre-line;color:var(--sw-text-muted);font-size:.8rem; }
+.student-workspace [data-sw-submit-error] { margin-top:.85rem;padding:.7rem .8rem;border:1px solid #fca5a5;border-radius:8px;background:#fef2f2;color:#991b1b; }
+.student-workspace [data-sw-submit-error-list] { margin:.45rem 0 0;padding-left:1.1rem; }
+.student-workspace .sw-modal-warning { color:#92400e;font-size:.84rem; }
 
 /* Workspace Documental (5 Columnas: Explorer | ResizerA | Viewer | ResizerB | Observations) */
 .student-workspace .sw-doc-workspace {
@@ -2946,5 +2950,255 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
         justify-content: flex-end;
         border-top: 1px solid #f1f5f9;
         padding-top: 0.35rem;
+    }
+}
+
+/* ==========================================================================
+   ESTILOS SCOPED DEL MODAL "ENVIAR A REVISIÓN" (FASE 8.1)
+   ========================================================================== */
+
+.sw-submit-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    box-sizing: border-box;
+    animation: swFadeIn 0.2s ease-out;
+}
+
+.sw-submit-modal-card {
+    width: 100%;
+    max-width: 450px;
+    max-height: calc(100vh - 2rem);
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+    animation: swSlideUp 0.22s ease-out;
+}
+
+.sw-submit-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+    flex-shrink: 0;
+}
+
+.sw-submit-modal-header h2 {
+    margin: 0;
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.sw-submit-modal-close-btn {
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    font-size: 1rem;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.sw-submit-modal-close-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.sw-submit-modal-body {
+    padding: 1.5rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+.sw-submit-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    width: 100%;
+}
+
+.sw-submit-icon-badge {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #eff6ff;
+    color: var(--sw-primary, #2563eb);
+    font-size: 1.6rem;
+    display: grid;
+    place-items: center;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+}
+
+.sw-submit-question {
+    margin: 0 0 0.45rem 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.35;
+}
+
+.sw-submit-subtitle {
+    margin: 0 0 1.25rem 0;
+    font-size: 0.88rem;
+    color: #64748b;
+    line-height: 1.45;
+    max-width: 380px;
+}
+
+.sw-submit-restriction-box {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.75rem 0.95rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    text-align: left;
+    box-sizing: border-box;
+}
+
+.sw-submit-restriction-box i {
+    font-size: 0.95rem;
+    color: #d97706;
+    margin-top: 0.15rem;
+    flex-shrink: 0;
+}
+
+.sw-submit-restriction-box span {
+    font-size: 0.82rem;
+    color: #334155;
+    line-height: 1.4;
+}
+
+.sw-submit-error-alert {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.75rem 0.95rem;
+    border: 1px solid #fecaca;
+    border-radius: 9px;
+    background: #fef2f2;
+    color: #991b1b;
+    font-size: 0.84rem;
+    text-align: left;
+    box-sizing: border-box;
+}
+
+.sw-submit-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.65rem;
+    padding: 0.9rem 1.25rem;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    flex-shrink: 0;
+}
+
+.sw-submit-cancel-btn {
+    padding: 0.55rem 1.1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #334155;
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.sw-submit-cancel-btn:hover:not(:disabled) {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.sw-submit-confirm-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.55rem 1.25rem;
+    border: 1px solid var(--sw-primary, #2563eb);
+    border-radius: 9px;
+    background: #eff6ff;
+    color: #0f172a !important;
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.sw-submit-confirm-btn i {
+    color: var(--sw-primary, #2563eb) !important;
+    transition: color 0.15s ease;
+}
+
+.sw-submit-confirm-btn span {
+    color: #0f172a !important;
+    transition: color 0.15s ease;
+}
+
+.sw-submit-confirm-btn:hover:not(:disabled),
+.sw-submit-confirm-btn:focus:not(:disabled),
+.sw-submit-confirm-btn:active:not(:disabled) {
+    background: var(--sw-primary, #2563eb) !important;
+    border-color: var(--sw-primary, #2563eb) !important;
+    color: #ffffff !important;
+}
+
+.sw-submit-confirm-btn:hover:not(:disabled) i,
+.sw-submit-confirm-btn:hover:not(:disabled) span,
+.sw-submit-confirm-btn:focus:not(:disabled) i,
+.sw-submit-confirm-btn:focus:not(:disabled) span,
+.sw-submit-confirm-btn:active:not(:disabled) i,
+.sw-submit-confirm-btn:active:not(:disabled) span {
+    color: #ffffff !important;
+}
+
+.sw-submit-confirm-btn:disabled,
+.sw-submit-cancel-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+    .sw-submit-modal-card {
+        max-width: 100%;
+        border-radius: 12px;
+    }
+
+    .sw-submit-modal-footer {
+        padding: 0.85rem 1rem;
+    }
+
+    .sw-submit-cancel-btn,
+    .sw-submit-confirm-btn {
+        flex: 1 1 0%;
+        justify-content: center;
     }
 }

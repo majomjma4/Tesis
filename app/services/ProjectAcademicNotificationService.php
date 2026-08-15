@@ -10,6 +10,14 @@ final class ProjectAcademicNotificationService
         $metadata=$this->metadata($code,$title,['event'=>'project_registered_for_review','tutor_id'=>$tutorId]);
         $this->forUser($db,$tutorId,$projectId,'review','Proyecto enviado a revisión','El proyecto '.$this->label($code,$title).' fue enviado para tu revisión.','project-registered-for-review:'.$projectId.':'.$tutorId,$metadata,'Revisar proyecto');
     }
+    /** Notifica a todos los tutores activos tras una entrega formal confirmada. */
+    public function projectSubmittedForReview(PDO $db,int $projectId,string $code,string $title,int $deliveryNumber,int $fileCount):void
+    {
+        if($projectId<1||$deliveryNumber<1||$fileCount<1)return;
+        $q=$db->prepare("SELECT DISTINCT pp.user_id FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id WHERE pp.project_id=:project AND LOWER(pp.role_code) IN ('tutor','cotutor','co_tutor','co-tutor') AND pp.status='active' AND pp.removed_at IS NULL AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL");
+        $q->execute(['project'=>$projectId]);
+        foreach($q->fetchAll(PDO::FETCH_COLUMN) as $tutorId){$id=(int)$tutorId;$metadata=$this->metadata($code,$title,['event'=>'project_submitted_for_review','delivery_number'=>$deliveryNumber,'file_count'=>$fileCount]);$this->forUser($db,$id,$projectId,'review','Proyecto enviado a revisión','El proyecto '.$this->label($code,$title).' envió la entrega '.$deliveryNumber.' con '.$fileCount.' documento(s) para tu revisión.','project-submitted-for-review:'.$projectId.':'.$deliveryNumber.':'.$id,$metadata,'Revisar proyecto');}
+    }
     public function tutorAssigned(PDO $db,int $projectId,string $code,string $title,array $addedTutors,int $actorId):void { foreach($addedTutors as $tutor){$userId=(int)($tutor['user_id']??0);if($userId<1)continue;$metadata=$this->metadata($code,$title,['assignment'=>'tutor','tutor_id'=>$userId]);if($userId!==$actorId)$this->forUser($db,$userId,$projectId,'review','Has sido asignado como tutor','Has sido asignado como tutor del proyecto '.$this->label($code,$title),'project-tutor-assigned:'.$projectId.':'.$userId,$metadata,'Ver proyecto');$this->forStudents($db,$projectId,'system','Tutor asignado',trim((string)($tutor['name']??'El docente asignado')).' ha sido asignado como tutor del proyecto '.$this->label($code,$title),'project-tutor-assigned-students:'.$projectId.':'.$userId,$metadata,'Ver proyecto');} }
     public function tribunalAssigned(PDO $db,int $projectId,string $code,string $title,array $addedTeachers,int $actorId):void {
         if($addedTeachers===[])return;$metadata=$this->metadata($code,$title,['assignment'=>'tribunal']);

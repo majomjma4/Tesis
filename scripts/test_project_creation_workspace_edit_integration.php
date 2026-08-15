@@ -102,15 +102,13 @@ try {
     $recordModel = new ProjectRecordModel();
     $createdProject = $recordModel->find($projectId, $actorId, false);
     expectIntegration($createdProject !== null, 'El workspace no puede recuperar el proyecto recién registrado.');
+    expectIntegration((string) $createdProject['status'] === 'development', 'El registro debe mantener el proyecto en development hasta un envío explícito.');
     $workspace = workspaceEditorPayload($createdProject);
     expectIntegration($workspace['title'] === $createdTitle, 'El título no coincide entre creación y workspace.');
     expectIntegration($workspace['summary'] === $createdSummary, 'El resumen no coincide entre creación y workspace.');
     expectIntegration($workspace['tutor_id'] === (int) $tutor['id'] && $workspace['tutoring_user_ids'] === [(int) $tutor['id']], 'El tutor no coincide entre creación y workspace.');
     expectIntegration($workspace['author_user_ids'] === [$actorId] && $workspace['author_leader_id'] === $actorId, 'Los integrantes o líder no coinciden entre creación y workspace.');
 
-    // Sin archivos, la política actual considera listo el expediente y lo pasa a under_review.
-    // Solo esta fixture se devuelve a development para ejercitar la edición permitida por la fase.
-    $db->prepare("UPDATE projects SET status='development' WHERE id=:id")->execute(['id' => $projectId]);
     $editor = new StudentProjectInformationService();
     $editInput = [
         'title' => 'Proyecto de integración actualizado',
