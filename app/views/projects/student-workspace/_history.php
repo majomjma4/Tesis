@@ -1,6 +1,7 @@
 <?php
 /** @var array<string,mixed> $project */
 /** @var array<int,array<string,mixed>> $studentVersions */
+/** @var \Closure(?string, bool=): string $formatDate */
 $events = (array) ($project['academic_history'] ?? []);
 $versions = (array) ($studentVersions ?? []);
 ?>
