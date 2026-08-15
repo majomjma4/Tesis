@@ -345,10 +345,10 @@ document.addEventListener('DOMContentLoaded', () => {
             trigger?.addEventListener('click', hideTooltip);
         };
 
-        workspace.querySelectorAll('.sw-tree-item, .sw-zip-entry').forEach(attachTooltipToItem);
+        workspace.querySelectorAll('.sw-tree-item, .sw-zip-entry, .sw-zip-folder-btn').forEach(attachTooltipToItem);
 
         const observer = new MutationObserver(() => {
-            workspace.querySelectorAll('.sw-tree-item, .sw-zip-entry').forEach(attachTooltipToItem);
+            workspace.querySelectorAll('.sw-tree-item, .sw-zip-entry, .sw-zip-folder-btn').forEach(attachTooltipToItem);
         });
         observer.observe(workspace, { childList: true, subtree: true });
     };
@@ -442,8 +442,146 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderBlocks=(blocks)=>{const content=document.createElement('div');content.className='sw-preview-docx-content';(blocks||[]).forEach((block)=>{if(block.type==='table'){const table=document.createElement('table');(block.rows||[]).forEach((row)=>{const tr=document.createElement('tr');row.forEach((cell)=>{const td=document.createElement('td');td.textContent=cell;tr.append(td);});table.append(tr);});content.append(table);}else{const node=document.createElement(block.type==='heading'?`h${Math.min(6,Math.max(1,block.level||2))}`:'p');node.textContent=block.text||'';content.append(node);}});previewStage.append(content);};
     const previewErrorMessage=(type)=>type==='image'?'No fue posible mostrar esta imagen.':(type==='pdf'?'No fue posible abrir este PDF.':'No fue posible generar la vista previa de este documento.');
     const renderImage=async(preview)=>{const response=await fetch(preview.content_url,{credentials:'same-origin'}),contentType=response.headers.get('content-type')||'';if(!response.ok||!contentType.startsWith('image/'))throw new Error('Respuesta de imagen no válida.');const url=URL.createObjectURL(await response.blob()),image=document.createElement('img');objectUrls.add(url);image.src=url;image.alt=preview.name;image.draggable=false;image.className='sw-preview-image';await new Promise((resolve,reject)=>{image.addEventListener('load',resolve,{once:true});image.addEventListener('error',reject,{once:true});previewStage.append(image);});};
-    const renderPdfPoc=async(preview,restore=null)=>{activePdfPreview=preview;const pdfDoc=await loadPdfDocument(preview),api=await pdfjs(),first=await pdfDoc.getPage(1),natural=first.getViewport({scale:1});const availableWidth=Math.max(280,(previewStage.clientWidth||600)-24);pdfFitScale=Math.min(2.5,Math.max(.35,availableWidth/natural.width));const effectiveScale=pdfFitScale*pdfScale,controls=document.createElement('div');controls.className='sw-poc-pdf-controls';for(const [label,factor] of [['−',.8],['Ajustar',0],['+',1.25]]){const button=document.createElement('button');button.type='button';button.textContent=label;button.addEventListener('click',async()=>{const position={top:previewStage.scrollTop/Math.max(1,previewStage.scrollHeight-previewStage.clientHeight),left:previewStage.scrollLeft/Math.max(1,previewStage.scrollWidth-previewStage.clientWidth)};pdfScale=factor===0?1:Math.min(2.5,Math.max(.5,pdfScale*factor));clearPreview();await renderPdfPoc(preview,position);});controls.append(button);}const label=document.createElement('span');label.textContent=pdfScale===1?'Ajustar':`${Math.round(pdfScale*100)}%`;controls.append(label);previewStage.append(controls);const pages=document.createElement('div');pages.className='sw-poc-pages';previewStage.append(pages);for(let number=1;number<=pdfDoc.numPages;number++){const page=await pdfDoc.getPage(number),viewport=page.getViewport({scale:effectiveScale}),host=document.createElement('div');host.className='sw-poc-page';host.dataset.pocPage=String(number);host.style.width=`${viewport.width}px`;host.style.height=`${viewport.height}px`;host.style.setProperty('--scale-factor',String(effectiveScale));const outputScale=window.devicePixelRatio||1,canvas=document.createElement('canvas');canvas.width=Math.floor(viewport.width*outputScale);canvas.height=Math.floor(viewport.height*outputScale);canvas.style.width=`${viewport.width}px`;canvas.style.height=`${viewport.height}px`;host.append(canvas);await page.render({canvasContext:canvas.getContext('2d'),viewport,transform:outputScale===1?null:[outputScale,0,0,outputScale,0,0]}).promise;const text=document.createElement('div');text.className='sw-poc-text-layer';text.style.width=`${viewport.width}px`;text.style.height=`${viewport.height}px`;host.append(text);await new api.TextLayer({textContentSource:await page.getTextContent(),container:text,viewport}).render();pages.append(host);}if(restore){previewStage.scrollTop=(previewStage.scrollHeight-previewStage.clientHeight)*restore.top;previewStage.scrollLeft=(previewStage.scrollWidth-previewStage.clientWidth)*restore.left;}drawPocAnnotations();renderPocPanel();};
-    const renderPreview=async(preview,originalUrl='')=>{clearPreview();if(!previewStage)return;if(preview.status!=='ready'){activePdfPreview=null;releasePdfDocument();const ext=String(preview.extension||'').toLowerCase(),type=String(preview.preview_type||'').toLowerCase();const isDocx=ext==='docx'||type==='docx'||(originalUrl&&/docx/i.test(originalUrl));if(preview.manual_pdf_required&&!historicalPreview&&reviewRepresentationEndpoint){reviewPendingMessage(preview);return;}const retryCb=isDocx&&originalUrl?()=>loadPreview(originalUrl,true):null;previewMessage(preview.message||'Vista previa no disponible para este archivo.','is-error',retryCb);return;}const type=preview.preview_type;if(type==='pdf'){await renderPdfPoc(preview);}else{activePdfPreview=null;releasePdfDocument();if(type==='image'){await renderImage(preview);}else if(type==='text'||type==='code'){const pre=document.createElement('pre');pre.className=`sw-preview-text ${type==='code'?'is-code':''}`;pre.textContent=preview.content||'';pre.draggable=false;previewStage.append(pre);}else if(type==='docx'){const note=document.createElement('p');note.className='sw-docx-notice';note.textContent='Vista previa del contenido. Descarga el archivo para consultar el formato completo.';previewStage.append(note);if(!window.JSZip||typeof window.docx?.renderAsync!=='function'||!preview.content_url){renderBlocks(preview.blocks);previewStage.hidden=false;return;}const response=await fetch(preview.content_url,{credentials:'same-origin'}),contentType=response.headers.get('content-type')||'';if(!response.ok||!/application\/(vnd\.openxmlformats-officedocument\.wordprocessingml\.document|zip|octet-stream)/i.test(contentType))throw new Error('Respuesta DOCX no válida.');const data=await response.arrayBuffer(),host=document.createElement('div');host.className='sw-preview-docx';host.draggable=false;previewStage.append(host);await window.docx.renderAsync(data,host,null,{inWrapper:true,ignoreLastRenderedPageBreak:false,renderHeaders:true,renderFooters:true});}else previewMessage(preview.message||'Vista previa no disponible para este archivo.');}previewStage.hidden=false;};
+    let pdfZoomMultiplier=1.0;
+    let pdfRenderGeneration=0;
+    const renderPdfPoc=async(preview,restore=null)=>{
+        activePdfPreview=preview;
+        const generation=++pdfRenderGeneration;
+
+        const pdfDoc=await loadPdfDocument(preview);
+        if(generation!==pdfRenderGeneration)return;
+
+        const api=await pdfjs();
+        if(generation!==pdfRenderGeneration)return;
+
+        const first=await pdfDoc.getPage(1);
+        if(generation!==pdfRenderGeneration)return;
+
+        const natural=first.getViewport({scale:1.0});
+        const availableWidth=Math.max(280,(previewStage.clientWidth||600)-24);
+        const usableWidth=availableWidth*0.92;
+        pdfFitScale=Math.min(3.0,Math.max(0.2,usableWidth/natural.width));
+        const effectiveScale=pdfFitScale*pdfZoomMultiplier;
+        const relativePercentage=Math.round(pdfZoomMultiplier*100);
+
+        if (pdfZoomMultiplier === 1.0 && workspace) {
+            const pageRenderedHeight = Math.ceil(natural.height * pdfFitScale);
+            const targetWorkspaceHeight = pageRenderedHeight + 130;
+            const viewportCap = Math.max(680, window.innerHeight - 110);
+            const optimalHeight = Math.min(viewportCap, Math.max(680, targetWorkspaceHeight));
+            workspace.style.setProperty('--sw-dynamic-workspace-h', `${optimalHeight}px`);
+        }
+
+        let controls=previewStage.querySelector('.sw-poc-pdf-controls');
+        let zoomLabel=controls?.querySelector('.sw-poc-zoom-label');
+
+        if(!controls){
+            controls=document.createElement('div');
+            controls.className='sw-poc-pdf-controls';
+
+            const btnMinus=document.createElement('button');
+            btnMinus.type='button';
+            btnMinus.textContent='−';
+            btnMinus.setAttribute('aria-label','Alejar');
+
+            const btnFit=document.createElement('button');
+            btnFit.type='button';
+            btnFit.textContent='Ajustar';
+            btnFit.setAttribute('aria-label','Ajustar al ancho');
+
+            const btnPlus=document.createElement('button');
+            btnPlus.type='button';
+            btnPlus.textContent='+';
+            btnPlus.setAttribute('aria-label','Acercar');
+
+            zoomLabel=document.createElement('span');
+            zoomLabel.className='sw-poc-zoom-label';
+
+            const handleZoomChange=(newMultiplier)=>{
+                const position={
+                    top:previewStage.scrollTop/Math.max(1,previewStage.scrollHeight-previewStage.clientHeight),
+                    left:previewStage.scrollLeft/Math.max(1,previewStage.scrollWidth-previewStage.clientWidth)
+                };
+                pdfZoomMultiplier=newMultiplier;
+                renderPdfPoc(preview,position);
+            };
+
+            btnMinus.addEventListener('click',()=>handleZoomChange(Math.max(0.5,Math.round((pdfZoomMultiplier-0.10)*100)/100)));
+            btnFit.addEventListener('click',()=>handleZoomChange(1.0));
+            btnPlus.addEventListener('click',()=>handleZoomChange(Math.min(3.0,Math.round((pdfZoomMultiplier+0.10)*100)/100)));
+
+            controls.append(btnMinus,btnFit,btnPlus,zoomLabel);
+            previewStage.prepend(controls);
+        }
+
+        if(zoomLabel){
+            zoomLabel.textContent=`${relativePercentage}%`;
+        }
+
+        const nextPages=document.createElement('div');
+        nextPages.className='sw-poc-pages';
+
+        for(let number=1;number<=pdfDoc.numPages;number++){
+            if(generation!==pdfRenderGeneration)return;
+
+            const page=await pdfDoc.getPage(number);
+            if(generation!==pdfRenderGeneration)return;
+
+            const viewport=page.getViewport({scale:effectiveScale}),host=document.createElement('div');
+            host.className='sw-poc-page';
+            host.dataset.pocPage=String(number);
+            host.style.width=`${viewport.width}px`;
+            host.style.height=`${viewport.height}px`;
+            host.style.setProperty('--scale-factor',String(effectiveScale));
+            const outputScale=window.devicePixelRatio||1,canvas=document.createElement('canvas');
+            canvas.width=Math.floor(viewport.width*outputScale);
+            canvas.height=Math.floor(viewport.height*outputScale);
+            canvas.style.width=`${viewport.width}px`;
+            canvas.style.height=`${viewport.height}px`;
+            host.append(canvas);
+
+            await page.render({canvasContext:canvas.getContext('2d'),viewport,transform:outputScale===1?null:[outputScale,0,0,outputScale,0,0]}).promise;
+            if(generation!==pdfRenderGeneration)return;
+
+            const text=document.createElement('div');
+            text.className='sw-poc-text-layer';
+            text.style.width=`${viewport.width}px`;
+            text.style.height=`${viewport.height}px`;
+            host.append(text);
+
+            await new api.TextLayer({textContentSource:await page.getTextContent(),container:text,viewport}).render();
+            if(generation!==pdfRenderGeneration)return;
+
+            nextPages.append(host);
+        }
+
+        if(generation!==pdfRenderGeneration)return;
+
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed) {
+            sel.removeAllRanges();
+        }
+
+        const existingPages=previewStage.querySelector('.sw-poc-pages');
+        if(existingPages){
+            existingPages.replaceWith(nextPages);
+        }else{
+            previewStage.append(nextPages);
+        }
+
+        if(restore){
+            previewStage.scrollTop=(previewStage.scrollHeight-previewStage.clientHeight)*restore.top;
+            previewStage.scrollLeft=(previewStage.scrollWidth-previewStage.clientWidth)*restore.left;
+        }
+
+        drawPocAnnotations();
+        renderPocPanel();
+
+        if(previewStage){
+            previewStage.hidden=false;
+        }
+    };
+    const renderPreview=async(preview,originalUrl='')=>{clearPreview();if(!previewStage)return;pdfZoomMultiplier=1.0;if(preview.status!=='ready'){activePdfPreview=null;releasePdfDocument();const ext=String(preview.extension||'').toLowerCase(),type=String(preview.preview_type||'').toLowerCase();const isDocx=ext==='docx'||type==='docx'||(originalUrl&&/docx/i.test(originalUrl));if(preview.manual_pdf_required&&!historicalPreview&&reviewRepresentationEndpoint){reviewPendingMessage(preview);return;}const retryCb=isDocx&&originalUrl?()=>loadPreview(originalUrl,true):null;previewMessage(preview.message||'Vista previa no disponible para este archivo.','is-error',retryCb);return;}const type=preview.preview_type;if(type==='pdf'){await renderPdfPoc(preview);}else{activePdfPreview=null;releasePdfDocument();if(type==='image'){await renderImage(preview);}else if(type==='text'||type==='code'){const pre=document.createElement('pre');pre.className=`sw-preview-text ${type==='code'?'is-code':''}`;pre.textContent=preview.content||'';pre.draggable=false;previewStage.append(pre);}else if(type==='docx'){const note=document.createElement('p');note.className='sw-docx-notice';note.textContent='Vista previa del contenido. Descarga el archivo para consultar el formato completo.';previewStage.append(note);if(!window.JSZip||typeof window.docx?.renderAsync!=='function'||!preview.content_url){renderBlocks(preview.blocks);previewStage.hidden=false;return;}const response=await fetch(preview.content_url,{credentials:'same-origin'}),contentType=response.headers.get('content-type')||'';if(!response.ok||!/application\/(vnd\.openxmlformats-officedocument\.wordprocessingml\.document|zip|octet-stream)/i.test(contentType))throw new Error('Respuesta DOCX no válida.');const data=await response.arrayBuffer(),host=document.createElement('div');host.className='sw-preview-docx';host.draggable=false;previewStage.append(host);await window.docx.renderAsync(data,host,null,{inWrapper:true,ignoreLastRenderedPageBreak:false,renderHeaders:true,renderFooters:true});}else previewMessage(preview.message||'Vista previa no disponible para este archivo.');}previewStage.hidden=false;};
     const loadPreview=async(url,retry=false)=>{if(!url)return previewMessage('Vista previa no disponible para este archivo.');const generation=++previewGeneration;previewController?.abort();const controller=new AbortController();previewController=controller;previewMessage('Preparando vista del documento…');let type='';let targetUrl=url;if(retry){try{const target=new URL(url,window.location.origin);target.searchParams.set('retry_preview','1');targetUrl=target.toString();}catch(e){targetUrl=url+(url.includes('?')?'&':'?')+'retry_preview=1';}}try{const payload=await readJsonResponse(await fetch(targetUrl,jsonRequestInit({signal:controller.signal})));if(generation!==previewGeneration)throw Object.assign(new Error('Preview superseded.'),{code:'preview_superseded'});const preview=payload?.data?.preview||{};type=preview.preview_type||'';if(!payload.success)throw new Error(payload.message||'No fue posible cargar la vista previa.');await renderPreview(preview,url);if(generation!==previewGeneration)throw Object.assign(new Error('Preview superseded.'),{code:'preview_superseded'});}catch(error){if(error.name==='AbortError'||error.code==='preview_superseded')return;console.error('No fue posible cargar la vista previa.',error);if(error.code==='session_expired'){previewMessage(error.message,'is-error');return;}const isDocx=(type==='docx')||(url&&/docx/i.test(url));const retryCb=isDocx?()=>loadPreview(url,true):null;previewMessage(previewErrorMessage(type),'is-error',retryCb);}finally{if(previewController===controller)previewController=null;}};
     const selectItem=(item)=>manager.querySelectorAll('[data-sw-file], [data-sw-zip-entry]').forEach((entry)=>entry.classList.toggle('is-selected',entry===item));
     const setViewer=(name,extension,size,downloadUrl)=>{viewerName.textContent=name||'Archivo';viewerMeta.textContent=`${extension||'Archivo'} · ${size||'Tamaño no disponible'}`;viewerEmpty.hidden=true;viewerDownload.hidden=!downloadUrl;viewerDownload.href=downloadUrl||'#';};
@@ -464,135 +602,154 @@ document.addEventListener('DOMContentLoaded', () => {
         const fullName = nameElement.dataset.fullName;
         if (!fullName) return;
 
-        const button = nameElement.closest('.sw-zip-entry');
+        const button = nameElement.closest('.sw-zip-entry, .sw-zip-folder-btn');
         if (!button) return;
 
         const buttonWidth = button.clientWidth;
         if (buttonWidth <= 0) return;
 
-        const icon = button.querySelector('i');
-        const iconWidth = icon ? (icon.offsetWidth || 14) : 14;
-        const padding = 16;
-        const gap = 7;
-        const availableWidth = Math.max(20, buttonWidth - (iconWidth + gap + padding + 4));
+        const availableWidth = Math.max(30, buttonWidth - 36);
+        const font = window.getComputedStyle(nameElement).font;
 
-        const computed = window.getComputedStyle(nameElement);
-        const font = computed.font && computed.font !== '' ? computed.font : `${computed.fontSize || '13.6px'} ${computed.fontFamily || 'sans-serif'}`;
-        const fullTextWidth = measureZipTextWidth(fullName, font);
-
-        if (fullTextWidth <= availableWidth) {
+        if (measureZipTextWidth(fullName, font) <= availableWidth) {
             nameElement.textContent = fullName;
             return;
         }
 
-        const ellipsis = '…';
-        const ellipsisWidth = measureZipTextWidth(ellipsis, font);
-        const targetWidth = availableWidth - ellipsisWidth;
-
-        if (targetWidth <= 5) {
-            nameElement.textContent = ellipsis;
-            return;
-        }
-
         let low = 1;
-        let high = fullName.length - 1;
-        let bestLength = 1;
+        let high = fullName.length;
+        let best = 1;
 
         while (low <= high) {
             const mid = Math.floor((low + high) / 2);
-            const sub = fullName.substring(0, mid);
-            const subWidth = measureZipTextWidth(sub, font);
-
-            if (subWidth <= targetWidth) {
-                bestLength = mid;
+            const candidate = fullName.slice(0, mid) + '…';
+            if (measureZipTextWidth(candidate, font) <= availableWidth) {
+                best = mid;
                 low = mid + 1;
             } else {
                 high = mid - 1;
             }
         }
 
-        nameElement.textContent = fullName.substring(0, bestLength) + ellipsis;
+        nameElement.textContent = fullName.slice(0, best) + '…';
     };
 
     const updateAllZipNames = () => {
-        workspace.querySelectorAll('.sw-zip-entry-name').forEach(fitZipEntryName);
+        workspace.querySelectorAll('.sw-zip-entry-name').forEach((el) => {
+            if (!el.dataset.fullName) {
+                el.dataset.fullName = el.textContent.trim();
+            }
+            fitZipEntryName(el);
+        });
     };
 
-    if (typeof ResizeObserver === 'function') {
-        const explorerPanel = workspace.querySelector('[data-sw-explorer]');
-        if (explorerPanel) {
-            const zipObserver = new ResizeObserver(() => {
-                requestAnimationFrame(updateAllZipNames);
-            });
-            zipObserver.observe(explorerPanel);
-        }
+    const explorerPanel = workspace.querySelector('[data-sw-explorer]');
+    if (explorerPanel && typeof window.ResizeObserver === 'function') {
+        const explorerObserver = new ResizeObserver(() => {
+            updateAllZipNames();
+        });
+        explorerObserver.observe(explorerPanel);
     }
 
-    window.addEventListener('resize', updateAllZipNames);
-
-    const zipEntryUrl=(baseUrl,path)=>{const target=new URL(baseUrl,window.location.origin);target.searchParams.set('path',path);return target.toString();};
-    const renderZipTree=(tree,archive,rootButton)=>{
+    const zipEntryUrl=(baseUrl,path)=>{if(!baseUrl)return '';try{const target=new URL(baseUrl,window.location.origin);if(path)target.searchParams.set('path',path);return target.toString();}catch(e){return baseUrl;}};
+    const renderZipTree=(tree,nodes,rootButton)=>{
         tree.replaceChildren();
-        (archive.items||[]).forEach((item)=>{
-            const entry=document.createElement('li'),
-                  button=document.createElement('button'),
-                  icon=document.createElement('i'),
-                  name=document.createElement('span'),
-                  isDirectory=item.kind==='folder',
-                  fullName=item.name||item.path||'Archivo interno';
-            entry.className='sw-zip-node';
-            button.type='button';
-            button.className='sw-zip-entry';
-            button.dataset.swZipEntry='';
-            button.setAttribute('aria-label', `${fullName} (${isDirectory ? 'Carpeta' : 'Archivo'})`);
-
-            const tooltip = document.createElement('span');
-            tooltip.className = 'sw-file-tooltip';
-            tooltip.setAttribute('role', 'tooltip');
-            tooltip.setAttribute('aria-hidden', 'true');
-            tooltip.hidden = true;
-
-            const tooltipName = document.createElement('span');
-            tooltipName.className = 'sw-file-tooltip-name';
-            tooltipName.textContent = fullName;
-
-            const tooltipStatus = document.createElement('span');
-            tooltipStatus.className = 'sw-file-tooltip-status';
-            tooltipStatus.innerHTML = `<i class="${isDirectory ? 'fa-solid fa-folder' : 'fa-regular fa-file'}" aria-hidden="true"></i> <span class="sw-file-tooltip-label">${isDirectory ? 'Carpeta interna' : (item.extension || item.type || 'Archivo').toUpperCase()}</span>`;
-
-            tooltip.append(tooltipName, tooltipStatus);
-
-            icon.className=isDirectory?'fa-solid fa-folder':'fa-regular fa-file';
-            icon.setAttribute('aria-hidden','true');
-            name.className='sw-zip-entry-name';
-            name.dataset.fullName=fullName;
-            name.textContent=fullName;
-            button.append(icon,name,tooltip);
-            entry.append(button);
+        const items = Array.isArray(nodes) ? nodes : (Array.isArray(nodes?.items) ? nodes.items : []);
+        items.forEach((node)=>{
+            const isDirectory = node.kind === 'folder' || node.kind === 'directory' || node.type === 'directory' || node.type === 'folder' || Boolean(node.is_dir);
+            const entry=document.createElement('div');
+            entry.className=`sw-zip-node ${isDirectory?'is-dir':''}`;
             if(isDirectory){
-                const child=document.createElement('ul');
-                child.className='sw-zip-tree';
-                child.hidden=true;
-                button.addEventListener('click',()=>loadZipDirectory(rootButton,item.path,child));
-                entry.append(child);
-            } else {
-                button.addEventListener('click',()=>{
-                    selectItem(button);
-                    setViewer(fullName,(item.extension||item.type||'Archivo').toUpperCase(),item.size||'Tamaño no disponible',zipEntryUrl(rootButton.dataset.fileZipDownloadUrl,item.path));
-                    observationPanel.innerHTML='<p class="sw-empty-state">Las observaciones de archivos internos se consultarán cuando estén vinculadas al archivo principal.</p>';
-                    loadPreview(zipEntryUrl(rootButton.dataset.fileZipPreviewUrl,item.path));
+                const button=document.createElement('button');
+                button.type='button';
+                button.className='sw-zip-folder-btn';
+                button.innerHTML=`<i class="fa-solid fa-folder-closed" aria-hidden="true"></i><span class="sw-zip-entry-name">${node.name}</span>`;
+                const nameSpan = button.querySelector('.sw-zip-entry-name');
+                if (nameSpan) {
+                    nameSpan.dataset.fullName = node.name;
+                }
+
+                const tooltip = document.createElement('span');
+                tooltip.className = 'sw-file-tooltip';
+                tooltip.setAttribute('role', 'tooltip');
+                tooltip.setAttribute('aria-hidden', 'true');
+                tooltip.hidden = true;
+
+                const tooltipName = document.createElement('span');
+                tooltipName.className = 'sw-file-tooltip-name';
+                tooltipName.textContent = node.name;
+
+                const tooltipStatus = document.createElement('span');
+                tooltipStatus.className = 'sw-file-tooltip-status';
+                tooltipStatus.innerHTML = `<i class="fa-solid fa-folder" aria-hidden="true"></i> <span class="sw-file-tooltip-label">Carpeta</span>`;
+
+                tooltip.append(tooltipName, tooltipStatus);
+                button.append(tooltip);
+
+                const subtree=document.createElement('div');
+                subtree.className='sw-zip-subtree';
+                subtree.hidden=true;
+                button.addEventListener('click',async()=>{
+                    const open=!subtree.hidden;
+                    subtree.hidden=open;
+                    button.querySelector('i').className=`fa-solid ${open?'fa-folder-closed':'fa-folder-open'}`;
+                    if(!open&&subtree.dataset.loaded!=='true'){
+                        await loadZipDirectory(rootButton,node.path,subtree);
+                    }
                 });
+                entry.append(button,subtree);
+            }else{
+                const button=document.createElement('button');
+                button.type='button';
+                button.className='sw-zip-entry';
+                button.dataset.swZipEntry='';
+                const sizeLabel = node.size_label || node.size || '';
+                button.dataset.fileSize = sizeLabel;
+                button.innerHTML=`<i class="fa-regular fa-file" aria-hidden="true"></i><span class="sw-zip-entry-name">${node.name}</span>`;
+                const nameSpan = button.querySelector('.sw-zip-entry-name');
+                if (nameSpan) {
+                    nameSpan.dataset.fullName = node.name;
+                }
+
+                const tooltip = document.createElement('span');
+                tooltip.className = 'sw-file-tooltip';
+                tooltip.setAttribute('role', 'tooltip');
+                tooltip.setAttribute('aria-hidden', 'true');
+                tooltip.hidden = true;
+
+                const tooltipName = document.createElement('span');
+                tooltipName.className = 'sw-file-tooltip-name';
+                tooltipName.textContent = node.name;
+
+                const tooltipStatus = document.createElement('span');
+                tooltipStatus.className = 'sw-file-tooltip-status';
+                const extLabel = (node.extension || 'Archivo').toUpperCase();
+                const sizeText = sizeLabel && sizeLabel !== '—' ? ` · ${sizeLabel}` : '';
+                tooltipStatus.innerHTML = `<i class="fa-regular fa-file" aria-hidden="true"></i> <span class="sw-file-tooltip-label">${extLabel}${sizeText}</span>`;
+
+                tooltip.append(tooltipName, tooltipStatus);
+                button.append(tooltip);
+
+                const previewUrl = node.preview_url || zipEntryUrl(rootButton.dataset.fileZipPreviewUrl, node.path);
+                button.addEventListener('click',()=>{
+                    cancelPreviewRequest();
+                    selectItem(button);
+                    setViewer(`${rootButton.dataset.fileName} → ${node.name}`,node.extension||'',sizeLabel,node.download_url||zipEntryUrl(rootButton.dataset.fileZipDownloadUrl, node.path));
+                    currentPreviewUrl=previewUrl;
+                    void loadPreview(previewUrl);
+                });
+                entry.append(button);
             }
             tree.append(entry);
         });
         setTimeout(updateAllZipNames, 0);
     };
-    const loadZipDirectory=async(rootButton,path,tree)=>{if(!tree)return;if(tree.dataset.loaded==='true'){tree.hidden=!tree.hidden;return;}tree.hidden=false;tree.textContent='Cargando…';try{const target=new URL(rootButton.dataset.fileZipUrl,window.location.origin);if(path)target.searchParams.set('path',path);const payload=await readJsonResponse(await fetch(target,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible abrir el ZIP.');renderZipTree(tree,payload.data.archive,rootButton);tree.dataset.loaded='true';}catch(error){console.error('No fue posible cargar la estructura del ZIP.',error);tree.textContent=error.code==='session_expired'?error.message:'No fue posible abrir esta carpeta.';}};
+    const loadZipDirectory=async(rootButton,path,tree)=>{if(!tree)return;if(tree.dataset.loaded==='true'){tree.hidden=!tree.hidden;return;}tree.hidden=false;tree.textContent='Cargando…';try{const target=new URL(rootButton.dataset.fileZipUrl,window.location.origin);if(path)target.searchParams.set('path',path);const payload=await readJsonResponse(await fetch(target,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible abrir el ZIP.');renderZipTree(tree,payload.data?.archive?.items||payload.data?.archive||[],rootButton);tree.dataset.loaded='true';}catch(error){console.error('No fue posible cargar la estructura del ZIP.',error);tree.textContent=error.code==='session_expired'?error.message:'No fue posible abrir esta carpeta.';}};
     const selectFile=(button)=>{cancelPreviewRequest();selectItem(button);setViewer(button.dataset.fileName,button.dataset.fileExtension,button.dataset.fileSize,button.dataset.fileDownload);const count=Number(button.dataset.fileObservations||0);observationPanel.innerHTML=`<p class="sw-empty-state">${count?`${count} observación${count===1?'':'es'} registrada${count===1?'':'s'} para este archivo.`:'No hay observaciones registradas para este archivo.'}</p>`;if(button.dataset.fileZipUrl){currentPreviewUrl='';previewMessage('Archivo ZIP seleccionado. Usa el explorador para navegar por su contenido.');void loadZipDirectory(button,'',button.closest('.sw-archive-node')?.querySelector('[data-sw-zip-tree]'));return;}currentPreviewUrl=button.dataset.filePreview;void loadPreview(button.dataset.filePreview);};
     manager.querySelectorAll('[data-sw-file]').forEach((button)=>button.addEventListener('click',(event)=>{event.preventDefault();selectFile(event.currentTarget);}));
     const drawPocAnnotations=()=>{previewStage?.querySelectorAll('[data-poc-overlay]').forEach((node)=>node.remove());if(!annotationsVisible)return;pocAnnotations.forEach((annotation,index)=>{const page=previewStage?.querySelector(`[data-poc-page="${annotation.page}"]`);if(!page)return;annotation.rects.forEach((rect)=>{const overlay=document.createElement('span');overlay.dataset.pocOverlay='';overlay.className=`sw-poc-annotation is-${annotation.style}`;Object.assign(overlay.style,{left:`${rect.x*100}%`,top:`${rect.y*100}%`,width:`${rect.width*100}%`,height:`${rect.height*100}%`});page.append(overlay);});const marker=document.createElement('button');marker.type='button';marker.dataset.pocOverlay='';marker.className='sw-poc-marker';marker.textContent=String(index+1);marker.setAttribute('aria-label',`Abrir observación ${index+1}`);Object.assign(marker.style,{left:`${annotation.rects[0].x*100}%`,top:`${annotation.rects[0].y*100}%`});marker.addEventListener('click',()=>page.scrollIntoView({behavior:'smooth',block:'center'}));page.append(marker);});};
     const renderPocPanel=()=>{if(!observationPanel)return;if(!pocAnnotations.length){observationPanel.innerHTML='<p class="sw-empty-state">No hay observaciones registradas para este archivo.</p>';return;}observationPanel.replaceChildren();const toggle=document.createElement('button');toggle.type='button';toggle.className='sw-poc-control';toggle.textContent=annotationsVisible?'Ocultar observaciones':'Mostrar observaciones';toggle.addEventListener('click',()=>{annotationsVisible=!annotationsVisible;drawPocAnnotations();renderPocPanel();});observationPanel.append(toggle);pocAnnotations.forEach((annotation,index)=>{const item=document.createElement('button');item.type='button';item.className='sw-poc-observation';item.textContent=`${index+1}. ${annotation.comment}: “${annotation.selected_text}”`;item.addEventListener('click',()=>previewStage?.querySelector(`[data-poc-page="${annotation.page}"]`)?.scrollIntoView({behavior:'smooth',block:'center'}));observationPanel.append(item);});};
-    let pdfResizeTimer=null;window.addEventListener('resize',()=>{if(!activePdfPreview)return;clearTimeout(pdfResizeTimer);pdfResizeTimer=setTimeout(async()=>{const restore={top:previewStage.scrollTop/Math.max(1,previewStage.scrollHeight-previewStage.clientHeight),left:previewStage.scrollLeft/Math.max(1,previewStage.scrollWidth-previewStage.clientWidth)};clearPreview();try{await renderPdfPoc(activePdfPreview,restore);previewStage.hidden=false;}catch(error){previewMessage('No fue posible cargar la vista previa del documento.','is-error');}},120);});
+    let pdfResizeTimer=null;window.addEventListener('resize',()=>{if(!activePdfPreview)return;clearTimeout(pdfResizeTimer);pdfResizeTimer=setTimeout(async()=>{const restore={top:previewStage.scrollTop/Math.max(1,previewStage.scrollHeight-previewStage.clientHeight),left:previewStage.scrollLeft/Math.max(1,previewStage.scrollWidth-previewStage.clientWidth)};try{await renderPdfPoc(activePdfPreview,restore);}catch(error){console.error('No fue posible re-renderizar la vista previa en resize.',error);}},100);});
     if (historicalPreview) {
         (async()=>{try{const payload=await readJsonResponse(await fetch(historicalPreview,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible cargar la versión.');const preview=payload.data.preview;setViewer(preview.original_name,`Versión ${preview.version_number}`,'Historial','');await renderPreview({status:'ready',preview_type:'pdf',content_url:preview.content_url,name:preview.original_name});const items=preview.observations||[];observationPanel.innerHTML=items.length?items.map((item)=>`<article class="sw-record"><strong>${String(item.category||'Observación')}</strong><p>${String(item.body||'')}</p></article>`).join(''):'<p class="sw-empty-state">No hay observaciones registradas para esta versión.</p>';}catch(error){console.error(error);previewMessage(error.code==='session_expired'?error.message:'No fue posible cargar la versión histórica.','is-error');}})();
     }
