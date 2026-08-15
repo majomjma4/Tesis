@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.appendChild(toastContainer);
     }
 
-    const showVisualToast = (message, kind = false) => {
+    const showVisualToast = (message, kind = false, title = '') => {
         if (!message) return;
 
         const isError = kind === true || kind === 'error';
@@ -25,7 +25,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const text = document.createElement('span');
         text.className = 'sw-toast-text';
-        text.textContent = message;
+        if (title) {
+            const heading = document.createElement('strong');
+            heading.textContent = title;
+            text.append(heading, document.createElement('br'));
+        }
+        text.append(document.createTextNode(message));
 
         const closeBtn = document.createElement('button');
         closeBtn.type = 'button';
@@ -351,7 +356,87 @@ document.addEventListener('DOMContentLoaded', () => {
         observer.observe(workspace, { childList: true, subtree: true });
     };
 
+    const initFileLockTooltips = () => {
+        let activeBadge = null;
+
+        const hideLockTooltip = (badge) => {
+            if (!badge) return;
+            badge.classList.remove('is-active');
+            const tooltip = badge.querySelector('.sw-file-lock-tooltip');
+            if (tooltip) {
+                tooltip.classList.remove('is-visible');
+                tooltip.hidden = true;
+            }
+            if (activeBadge === badge) activeBadge = null;
+        };
+
+        const showLockTooltip = (badge) => {
+            if (!badge) return;
+            if (activeBadge && activeBadge !== badge) hideLockTooltip(activeBadge);
+
+            const tooltip = badge.querySelector('.sw-file-lock-tooltip');
+            if (!tooltip) return;
+
+            activeBadge = badge;
+            badge.classList.add('is-active');
+            tooltip.hidden = false;
+            tooltip.classList.add('is-visible');
+
+            const rect = badge.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+
+            let top = rect.top + (rect.height / 2) - (tooltipRect.height / 2);
+            top = Math.max(10, Math.min(window.innerHeight - tooltipRect.height - 10, top));
+
+            let left = rect.right + 8;
+            if (left + tooltipRect.width > window.innerWidth - 12) {
+                left = rect.left - tooltipRect.width - 8;
+            }
+            left = Math.max(12, left);
+
+            tooltip.style.top = `${top}px`;
+            tooltip.style.left = `${left}px`;
+        };
+
+        workspace.addEventListener('mouseenter', (e) => {
+            const badge = e.target.closest('.sw-file-lock-badge');
+            if (badge) showLockTooltip(badge);
+        }, true);
+
+        workspace.addEventListener('mouseleave', (e) => {
+            const badge = e.target.closest('.sw-file-lock-badge');
+            if (badge) hideLockTooltip(badge);
+        }, true);
+
+        workspace.addEventListener('focusin', (e) => {
+            const badge = e.target.closest('.sw-file-lock-badge');
+            if (badge) showLockTooltip(badge);
+        });
+
+        workspace.addEventListener('focusout', (e) => {
+            const badge = e.target.closest('.sw-file-lock-badge');
+            if (badge) hideLockTooltip(badge);
+        });
+
+        workspace.addEventListener('click', (e) => {
+            const badge = e.target.closest('.sw-file-lock-badge');
+            if (badge) {
+                e.stopPropagation();
+                if (badge.classList.contains('is-active')) {
+                    hideLockTooltip(badge);
+                } else {
+                    showLockTooltip(badge);
+                }
+            } else if (activeBadge) {
+                hideLockTooltip(activeBadge);
+            }
+        });
+
+        window.addEventListener('scroll', () => { if (activeBadge) hideLockTooltip(activeBadge); }, { passive: true });
+    };
+
     initFileTooltips();
+    initFileLockTooltips();
 
     const manager=workspace.querySelector('[data-sw-document-manager]'); if (!manager) return;
     const endpoint=manager.dataset.endpoint, csrf=manager.dataset.csrf, reviewRepresentationEndpoint=manager.dataset.reviewRepresentationEndpoint||'', reviewRepresentationCsrf=manager.dataset.reviewRepresentationCsrf||'', projectId=manager.dataset.projectId, historicalPreview=manager.dataset.historicalPreview||'';
@@ -1381,7 +1466,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const result = payload.data || {};
                 setSubmitting(false); submitModal.hidden = true;
                 updateStatusUi(result);
-                showVisualToast(`Entrega ${result.delivery_number || ''}: ${result.submitted_file_count || 0} documento(s) enviado(s) a revisión.`, 'success');
+                const submittedFileCount = Number(result.submitted_file_count || 0);
+                const submissionMessage = submittedFileCount === 1
+                    ? '1 documento fue enviado al tutor para su revisión.'
+                    : `${submittedFileCount} documentos fueron enviados al tutor para su revisión.`;
+                showVisualToast(submissionMessage, 'success', 'Proyecto enviado a revisión');
             } catch (error) {
                 setSubmitting(false);
                 const status = Number(error.status || 0);
