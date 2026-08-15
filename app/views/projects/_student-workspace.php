@@ -49,9 +49,9 @@ $formatDate = static function (?string $date, bool $time = false): string { if (
 <div class="student-workspace" data-student-workspace data-project-url="<?= e($detailUrl) ?>">
     <header class="sw-header-card">
         <div class="sw-header-top">
-            <div>
+            <div style="min-width:0;">
                 <div class="sw-header-meta"><span class="sw-badge-type"><?= e((string) ($project['type_name'] ?? 'No disponible')) ?></span><span class="sw-code"><?= e((string) ($project['code'] ?? 'No disponible')) ?></span></div>
-                <h1 class="sw-title"><?= e((string) ($project['title'] ?? 'Sin título')) ?></h1>
+                <h1 class="sw-title" title="<?= e((string) ($project['title'] ?? 'Sin título')) ?>"><?= e((string) ($project['title'] ?? 'Sin título')) ?></h1>
             </div>
             <span class="sw-badge-status is-<?= e($status) ?>"><i class="fa-solid fa-circle-dot" aria-hidden="true"></i><?= e($statusLabel) ?></span>
         </div>
