@@ -2,7 +2,7 @@
 declare(strict_types=1);
 final class PrivateProjectFileService
 {
-    private const MIME_BY_EXTENSION=['pdf'=>['application/pdf'],'docx'=>['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],'zip'=>['application/zip','application/x-zip-compressed']];
+    private const MIME_BY_EXTENSION=['pdf'=>['application/pdf'],'docx'=>['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],'xlsx'=>['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],'pptx'=>['application/vnd.openxmlformats-officedocument.presentationml.presentation'],'png'=>['image/png'],'jpg'=>['image/jpeg'],'jpeg'=>['image/jpeg'],'webp'=>['image/webp'],'gif'=>['image/gif'],'txt'=>['text/plain'],'zip'=>['application/zip','application/x-zip-compressed','application/octet-stream']];
     private string $root;
     public function __construct(){ $this->root=ROOT_PATH.'/storage/private/projects'; }
     public function validateUpload(array $file):array

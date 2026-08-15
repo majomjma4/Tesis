@@ -562,6 +562,135 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
 .student-workspace .sw-preview-image { display:block;max-width:100%;max-height:min(68vh,720px);margin:auto;object-fit:contain; }
 .student-workspace .sw-preview-text { margin:0;padding:1rem;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--sw-text);font:13px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; }
 .student-workspace .sw-preview-text.is-code { background:#0f172a;color:#e2e8f0;min-height:320px; }
+
+/* Componente de Estado Visual del Visor (Empty, Loading, Unsupported, Forbidden, Error) */
+.student-workspace .sw-preview-state-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    margin: auto;
+    padding: 2.5rem 1.5rem;
+    max-width: 440px;
+    width: 100%;
+    box-sizing: border-box;
+    animation: swStateFadeIn 0.2s ease-out;
+}
+
+@keyframes swStateFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.student-workspace .sw-state-icon-badge {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2rem;
+    margin-bottom: 1.25rem;
+    transition: transform 0.2s ease;
+}
+
+.student-workspace .sw-state-icon-badge .sub-icon {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.82rem;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+}
+
+.student-workspace .sw-preview-state-card.is-empty .sw-state-icon-badge {
+    background: #eff6ff;
+    border: 1px solid #dbeafe;
+    color: #2563eb;
+}
+.student-workspace .sw-preview-state-card.is-empty .sw-state-icon-badge .sub-icon {
+    color: #2563eb;
+}
+
+.student-workspace .sw-preview-state-card.is-loading .sw-state-icon-badge,
+.student-workspace .sw-preview-state-card.is-processing .sw-state-icon-badge {
+    background: #f5f3ff;
+    border: 1px solid #ede9fe;
+    color: #4f46e5;
+}
+.student-workspace .sw-preview-state-card.is-loading .sw-state-icon-badge .sub-icon,
+.student-workspace .sw-preview-state-card.is-processing .sw-state-icon-badge .sub-icon {
+    color: #4f46e5;
+}
+
+.student-workspace .sw-preview-state-card.is-unsupported .sw-state-icon-badge {
+    background: #fffbeb;
+    border: 1px solid #fef3c7;
+    color: #d97706;
+}
+.student-workspace .sw-preview-state-card.is-unsupported .sw-state-icon-badge .sub-icon {
+    color: #d97706;
+}
+
+.student-workspace .sw-preview-state-card.is-forbidden .sw-state-icon-badge,
+.student-workspace .sw-preview-state-card.is-error .sw-state-icon-badge {
+    background: #fff1f2;
+    border: 1px solid #ffe4e6;
+    color: #e11d48;
+}
+
+.student-workspace .sw-state-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--sw-title, #0f172a);
+    line-height: 1.35;
+}
+
+.student-workspace .sw-state-message {
+    margin: 0 0 1.25rem 0;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: var(--sw-text-muted, #64748b);
+    max-width: 380px;
+}
+
+.student-workspace .sw-state-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.55rem 1.2rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    border: 1px solid var(--sw-primary, #2563eb);
+    background: var(--sw-primary, #2563eb);
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+}
+
+.student-workspace .sw-state-action-btn:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+}
+
+.student-workspace .sw-state-action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
 .student-workspace .sw-docx-notice { margin:0;padding:.7rem 1rem;background:#eff6ff;border-bottom:1px solid #bfdbfe;color:#1e40af;font-size:.8rem; }
 .student-workspace .sw-preview-docx,.student-workspace .sw-preview-docx-content { box-sizing:border-box;width:100%;padding:1rem;overflow:auto;background:#e2e8f0; }
 .student-workspace .sw-preview-docx .docx-wrapper { box-sizing:border-box;display:block;width:100%;max-width:100%;padding:0;background:transparent;overflow:hidden; }

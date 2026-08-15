@@ -436,12 +436,180 @@ document.addEventListener('DOMContentLoaded', () => {
     const releasePdfDocument=()=>{pdfDocumentGeneration++;const previous=pdfDocument;pdfDocument=null;pdfDocumentKey='';pdfDocumentLoading=null;if(previous&&typeof previous.destroy==='function'){try{const destruction=previous.destroy();if(destruction&&typeof destruction.catch==='function')destruction.catch(()=>{});}catch(error){/* La selección nueva no debe quedar bloqueada por una liberación tardía. */}}};
     const cancelPreviewRequest=()=>{previewGeneration++;if(previewController){previewController.abort();previewController=null;}activePdfPreview=null;try{releasePdfDocument();}catch(error){/* La selección nueva continúa aunque el documento anterior no se libere de inmediato. */}};
     const loadPdfDocument=async(preview)=>{const key=String(preview.content_url||'');if(!key)throw new Error('PDF privado no disponible.');if(pdfDocument&&pdfDocumentKey===key)return pdfDocument;if(pdfDocumentLoading&&pdfDocumentLoading.key===key)return pdfDocumentLoading.promise;releasePdfDocument();const generation=pdfDocumentGeneration;const promise=(async()=>{const response=await fetch(preview.content_url,{credentials:'same-origin'});if(!response.ok)throw new Error('PDF privado no disponible.');const api=await pdfjs(),bytes=new Uint8Array(await response.arrayBuffer()),document=await api.getDocument({data:bytes,standardFontDataUrl:manager.dataset.pdfjsFonts}).promise;if(generation!==pdfDocumentGeneration){document.destroy().catch(()=>{});throw new Error('Carga de PDF cancelada.');}pdfDocument=document;pdfDocumentKey=key;return document;})();pdfDocumentLoading={key,promise};try{return await promise;}finally{if(pdfDocumentLoading?.promise===promise)pdfDocumentLoading=null;}};
-    const clearPreview=()=>{objectUrls.forEach((url)=>URL.revokeObjectURL(url));objectUrls.clear();previewStage?.replaceChildren();if(previewStage)previewStage.hidden=true;};
-    const previewMessage=(message,kind='',retryCallback=null)=>{clearPreview();if(!previewStage)return;const wrapper=document.createElement('div');wrapper.className='sw-preview-error-wrapper';const state=document.createElement('p');state.className=`sw-preview-message ${kind}`;state.textContent=message;wrapper.append(state);if(typeof retryCallback==='function'){const retryBtn=document.createElement('button');retryBtn.type='button';retryBtn.className='sw-retry-preview-btn';retryBtn.textContent='Reintentar vista previa';retryBtn.addEventListener('click',(e)=>{e.preventDefault();retryBtn.disabled=true;retryCallback();});wrapper.append(retryBtn);}previewStage.append(wrapper);previewStage.hidden=false;};
-    const reviewPendingMessage=(preview)=>{clearPreview();if(!previewStage)return;const wrapper=document.createElement('div');wrapper.className='sw-review-representation-pending';const title=document.createElement('strong');title.textContent='Vista de revisión pendiente';const text=document.createElement('p');text.textContent='Este documento está guardado correctamente, pero necesitamos una copia PDF para mostrarlo durante la revisión académica.';const upload=document.createElement('button');upload.type='button';upload.className='sw-review-representation-upload';upload.textContent='Subir PDF para revisión';const input=document.createElement('input');input.type='file';input.accept='.pdf,application/pdf';input.hidden=true;upload.addEventListener('click',()=>input.click());input.addEventListener('change',async()=>{const file=input.files?.[0];input.value='';if(!file)return;const body=new FormData();body.set('_csrf',reviewRepresentationCsrf);body.set('project_id',projectId);body.set('action','upload');body.set('file_id',String(preview.file_id||''));body.set('file',file);upload.disabled=true;upload.textContent='Validando PDF…';try{const response=await fetch(reviewRepresentationEndpoint,{method:'POST',credentials:'same-origin',headers:{Accept:'application/json'},body});const payload=await readJsonResponse(response);if(!payload.success)throw new Error(payload.message||'No fue posible asociar el PDF.');await loadPreview(currentPreviewUrl);}catch(error){upload.disabled=false;upload.textContent='Subir PDF para revisión';text.textContent=error.message||'No fue posible asociar el PDF.';text.className='sw-preview-message is-error';}});wrapper.append(title,text,upload,input);previewStage.append(wrapper);previewStage.hidden=false;};
-    const renderBlocks=(blocks)=>{const content=document.createElement('div');content.className='sw-preview-docx-content';(blocks||[]).forEach((block)=>{if(block.type==='table'){const table=document.createElement('table');(block.rows||[]).forEach((row)=>{const tr=document.createElement('tr');row.forEach((cell)=>{const td=document.createElement('td');td.textContent=cell;tr.append(td);});table.append(tr);});content.append(table);}else{const node=document.createElement(block.type==='heading'?`h${Math.min(6,Math.max(1,block.level||2))}`:'p');node.textContent=block.text||'';content.append(node);}});previewStage.append(content);};
-    const previewErrorMessage=(type)=>type==='image'?'No fue posible mostrar esta imagen.':(type==='pdf'?'No fue posible abrir este PDF.':'No fue posible generar la vista previa de este documento.');
-    const renderImage=async(preview)=>{const response=await fetch(preview.content_url,{credentials:'same-origin'}),contentType=response.headers.get('content-type')||'';if(!response.ok||!contentType.startsWith('image/'))throw new Error('Respuesta de imagen no válida.');const url=URL.createObjectURL(await response.blob()),image=document.createElement('img');objectUrls.add(url);image.src=url;image.alt=preview.name;image.draggable=false;image.className='sw-preview-image';await new Promise((resolve,reject)=>{image.addEventListener('load',resolve,{once:true});image.addEventListener('error',reject,{once:true});previewStage.append(image);});};
+    const clearPreview = () => {
+        objectUrls.forEach((url) => URL.revokeObjectURL(url));
+        objectUrls.clear();
+        previewStage?.replaceChildren();
+        if (previewStage) previewStage.hidden = true;
+    };
+    const renderPreviewState = ({
+        type = 'empty',
+        title = '',
+        message = '',
+        actionText = '',
+        actionCallback = null,
+        actionHref = ''
+    }) => {
+        clearPreview();
+        if (!previewStage) return;
+
+        const card = document.createElement('div');
+        card.className = `sw-preview-state-card is-${type}`;
+
+        const badge = document.createElement('div');
+        badge.className = 'sw-state-icon-badge';
+
+        if (type === 'empty') {
+            badge.innerHTML = '<i class="fa-regular fa-file-lines main-icon" aria-hidden="true"></i><i class="fa-solid fa-eye sub-icon" aria-hidden="true"></i>';
+        } else if (type === 'loading' || type === 'processing') {
+            badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin main-icon" aria-hidden="true"></i>';
+        } else if (type === 'unsupported') {
+            badge.innerHTML = '<i class="fa-solid fa-file-arrow-down main-icon" aria-hidden="true"></i><i class="fa-solid fa-eye-slash sub-icon" aria-hidden="true"></i>';
+        } else if (type === 'forbidden') {
+            badge.innerHTML = '<i class="fa-solid fa-file-circle-xmark main-icon" aria-hidden="true"></i>';
+        } else if (type === 'error') {
+            badge.innerHTML = '<i class="fa-solid fa-circle-exclamation main-icon" aria-hidden="true"></i>';
+        }
+
+        const titleEl = document.createElement('h3');
+        titleEl.className = 'sw-state-title';
+        titleEl.textContent = title || (type === 'empty' ? 'Visualiza tus archivos' : (type === 'loading' ? 'Preparando documento' : 'Vista del documento'));
+
+        const msgEl = document.createElement('p');
+        msgEl.className = 'sw-state-message';
+        msgEl.textContent = message || '';
+
+        card.append(badge, titleEl, msgEl);
+
+        if (actionHref) {
+            const actionLink = document.createElement('a');
+            actionLink.className = 'sw-state-action-btn';
+            actionLink.href = actionHref;
+            actionLink.innerHTML = `<i class="fa-solid fa-download" aria-hidden="true"></i> ${actionText || 'Descargar'}`;
+            card.append(actionLink);
+        } else if (typeof actionCallback === 'function') {
+            const actionBtn = document.createElement('button');
+            actionBtn.type = 'button';
+            actionBtn.className = 'sw-state-action-btn';
+            actionBtn.innerHTML = `<i class="fa-solid fa-rotate-right" aria-hidden="true"></i> ${actionText || 'Reintentar'}`;
+            actionBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                actionBtn.disabled = true;
+                actionCallback();
+            });
+            card.append(actionBtn);
+        }
+
+        previewStage.append(card);
+        previewStage.hidden = false;
+    };
+
+    let currentDownloadUrl = '';
+    const previewMessage = (message, kind = '', retryCallback = null) => {
+        const isError = kind === 'is-error';
+        renderPreviewState({
+            type: isError ? 'error' : 'unsupported',
+            title: isError ? 'No pudimos abrir el archivo' : 'Vista previa no disponible',
+            message: message || (isError ? 'Ocurrió un problema al preparar la vista del documento.' : 'Este formato no puede visualizarse en el visor. Puedes descargar el archivo para consultarlo.'),
+            actionText: isError ? 'Reintentar vista previa' : (currentDownloadUrl ? 'Descargar archivo' : ''),
+            actionCallback: retryCallback,
+            actionHref: !isError ? currentDownloadUrl : ''
+        });
+    };
+    const reviewPendingMessage = (preview) => {
+        renderPreviewState({
+            type: 'unsupported',
+            title: 'Vista de revisión pendiente',
+            message: 'Este documento está guardado correctamente, pero necesitamos una copia PDF para mostrarlo durante la revisión académica.'
+        });
+        if (!previewStage) return;
+        const card = previewStage.querySelector('.sw-preview-state-card');
+        if (!card) return;
+        const uploadBtn = document.createElement('button');
+        uploadBtn.type = 'button';
+        uploadBtn.className = 'sw-state-action-btn';
+        uploadBtn.innerHTML = '<i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i> Subir PDF para revisión';
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.pdf,application/pdf';
+        input.hidden = true;
+        uploadBtn.addEventListener('click', () => input.click());
+        input.addEventListener('change', async () => {
+            const file = input.files?.[0];
+            input.value = '';
+            if (!file) return;
+            const body = new FormData();
+            body.set('_csrf', reviewRepresentationCsrf);
+            body.set('project_id', projectId);
+            body.set('action', 'upload');
+            body.set('file_id', String(preview.file_id || ''));
+            body.set('file', file);
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Validando PDF…';
+            try {
+                const response = await fetch(reviewRepresentationEndpoint, { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }, body });
+                const payload = await readJsonResponse(response);
+                if (!payload.success) throw new Error(payload.message || 'No fue posible asociar el PDF.');
+                await loadPreview(currentPreviewUrl);
+            } catch (error) {
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fa-solid fa-file-arrow-up" aria-hidden="true"></i> Subir PDF para revisión';
+                renderPreviewState({
+                    type: 'error',
+                    title: 'No fue posible asociar el PDF',
+                    message: error.message || 'Ocurrió un problema al subir la copia en formato PDF.'
+                });
+            }
+        });
+        card.append(uploadBtn, input);
+    };
+    const renderBlocks = (blocks) => {
+        const content = document.createElement('div');
+        content.className = 'sw-preview-docx-content';
+        (blocks || []).forEach((block) => {
+            if (block.type === 'table') {
+                const table = document.createElement('table');
+                (block.rows || []).forEach((row) => {
+                    const tr = document.createElement('tr');
+                    row.forEach((cell) => {
+                        const td = document.createElement('td');
+                        td.textContent = cell;
+                        tr.append(td);
+                    });
+                    table.append(tr);
+                });
+                content.append(table);
+            } else {
+                const node = document.createElement(block.type === 'heading' ? `h${Math.min(6, Math.max(1, block.level || 2))}` : 'p');
+                node.textContent = block.text || '';
+                content.append(node);
+            }
+        });
+        previewStage.append(content);
+    };
+    const previewErrorMessage = (type) =>
+        type === 'image'
+            ? 'No fue posible mostrar esta imagen.'
+            : (type === 'pdf'
+                ? 'No fue posible abrir este PDF.'
+                : 'No fue posible generar la vista previa de este documento.');
+    const renderImage = async (preview) => {
+        const response = await fetch(preview.content_url, { credentials: 'same-origin' });
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok || !contentType.startsWith('image/')) throw new Error('Respuesta de imagen no válida.');
+        const url = URL.createObjectURL(await response.blob());
+        const image = document.createElement('img');
+        objectUrls.add(url);
+        image.src = url;
+        image.alt = preview.name;
+        image.draggable = false;
+        image.className = 'sw-preview-image';
+        await new Promise((resolve, reject) => {
+            image.addEventListener('load', resolve, { once: true });
+            image.addEventListener('error', reject, { once: true });
+            previewStage.append(image);
+        });
+    };
     let pdfZoomMultiplier=1.0;
     let pdfRenderGeneration=0;
     const renderPdfPoc=async(preview,restore=null)=>{
@@ -581,10 +749,183 @@ document.addEventListener('DOMContentLoaded', () => {
             previewStage.hidden=false;
         }
     };
-    const renderPreview=async(preview,originalUrl='')=>{clearPreview();if(!previewStage)return;pdfZoomMultiplier=1.0;if(preview.status!=='ready'){activePdfPreview=null;releasePdfDocument();const ext=String(preview.extension||'').toLowerCase(),type=String(preview.preview_type||'').toLowerCase();const isDocx=ext==='docx'||type==='docx'||(originalUrl&&/docx/i.test(originalUrl));if(preview.manual_pdf_required&&!historicalPreview&&reviewRepresentationEndpoint){reviewPendingMessage(preview);return;}const retryCb=isDocx&&originalUrl?()=>loadPreview(originalUrl,true):null;previewMessage(preview.message||'Vista previa no disponible para este archivo.','is-error',retryCb);return;}const type=preview.preview_type;if(type==='pdf'){await renderPdfPoc(preview);}else{activePdfPreview=null;releasePdfDocument();if(type==='image'){await renderImage(preview);}else if(type==='text'||type==='code'){const pre=document.createElement('pre');pre.className=`sw-preview-text ${type==='code'?'is-code':''}`;pre.textContent=preview.content||'';pre.draggable=false;previewStage.append(pre);}else if(type==='docx'){const note=document.createElement('p');note.className='sw-docx-notice';note.textContent='Vista previa del contenido. Descarga el archivo para consultar el formato completo.';previewStage.append(note);if(!window.JSZip||typeof window.docx?.renderAsync!=='function'||!preview.content_url){renderBlocks(preview.blocks);previewStage.hidden=false;return;}const response=await fetch(preview.content_url,{credentials:'same-origin'}),contentType=response.headers.get('content-type')||'';if(!response.ok||!/application\/(vnd\.openxmlformats-officedocument\.wordprocessingml\.document|zip|octet-stream)/i.test(contentType))throw new Error('Respuesta DOCX no válida.');const data=await response.arrayBuffer(),host=document.createElement('div');host.className='sw-preview-docx';host.draggable=false;previewStage.append(host);await window.docx.renderAsync(data,host,null,{inWrapper:true,ignoreLastRenderedPageBreak:false,renderHeaders:true,renderFooters:true});}else previewMessage(preview.message||'Vista previa no disponible para este archivo.');}previewStage.hidden=false;};
-    const loadPreview=async(url,retry=false)=>{if(!url)return previewMessage('Vista previa no disponible para este archivo.');const generation=++previewGeneration;previewController?.abort();const controller=new AbortController();previewController=controller;previewMessage('Preparando vista del documento…');let type='';let targetUrl=url;if(retry){try{const target=new URL(url,window.location.origin);target.searchParams.set('retry_preview','1');targetUrl=target.toString();}catch(e){targetUrl=url+(url.includes('?')?'&':'?')+'retry_preview=1';}}try{const payload=await readJsonResponse(await fetch(targetUrl,jsonRequestInit({signal:controller.signal})));if(generation!==previewGeneration)throw Object.assign(new Error('Preview superseded.'),{code:'preview_superseded'});const preview=payload?.data?.preview||{};type=preview.preview_type||'';if(!payload.success)throw new Error(payload.message||'No fue posible cargar la vista previa.');await renderPreview(preview,url);if(generation!==previewGeneration)throw Object.assign(new Error('Preview superseded.'),{code:'preview_superseded'});}catch(error){if(error.name==='AbortError'||error.code==='preview_superseded')return;console.error('No fue posible cargar la vista previa.',error);if(error.code==='session_expired'){previewMessage(error.message,'is-error');return;}const isDocx=(type==='docx')||(url&&/docx/i.test(url));const retryCb=isDocx?()=>loadPreview(url,true):null;previewMessage(previewErrorMessage(type),'is-error',retryCb);}finally{if(previewController===controller)previewController=null;}};
+    const renderPreview = async (preview, originalUrl = '') => {
+        clearPreview();
+        if (!previewStage) return;
+        pdfZoomMultiplier = 1.0;
+        if (preview.status !== 'ready') {
+            activePdfPreview = null;
+            releasePdfDocument();
+            const ext = String(preview.extension || '').toLowerCase();
+            const type = String(preview.preview_type || '').toLowerCase();
+            const isDocx = ext === 'docx' || type === 'docx' || (originalUrl && /docx/i.test(originalUrl));
+
+            if (preview.manual_pdf_required && !historicalPreview && reviewRepresentationEndpoint) {
+                reviewPendingMessage(preview);
+                return;
+            }
+
+            const extUpper = (preview.extension || ext || 'FILE').toUpperCase();
+            if (preview.status === 'unsupported' || type === 'unsupported' || preview.status === 'too_large' || preview.status === 'empty') {
+                renderPreviewState({
+                    type: 'unsupported',
+                    title: 'Formato no disponible para visualización',
+                    message: preview.message || `Los archivos ${extUpper} no pueden visualizarse directamente en este visor. Puedes descargar el archivo para consultarlo.`,
+                    actionText: currentDownloadUrl ? 'Descargar archivo' : '',
+                    actionHref: currentDownloadUrl
+                });
+                return;
+            }
+
+            const retryCb = isDocx && originalUrl ? () => loadPreview(originalUrl, true) : null;
+            previewMessage(preview.message || 'No fue posible abrir este documento.', 'is-error', retryCb);
+            return;
+        }
+
+        const type = preview.preview_type;
+        if (type === 'pdf') {
+            await renderPdfPoc(preview);
+        } else {
+            activePdfPreview = null;
+            releasePdfDocument();
+            if (type === 'image') {
+                await renderImage(preview);
+            } else if (type === 'text' || type === 'code') {
+                const pre = document.createElement('pre');
+                pre.className = `sw-preview-text ${type === 'code' ? 'is-code' : ''}`;
+                pre.textContent = preview.content || '';
+                pre.draggable = false;
+                previewStage.append(pre);
+            } else if (type === 'docx') {
+                const note = document.createElement('p');
+                note.className = 'sw-docx-notice';
+                note.textContent = 'Vista previa del contenido. Descarga el archivo para consultar el formato completo.';
+                previewStage.append(note);
+                if (!window.JSZip || typeof window.docx?.renderAsync !== 'function' || !preview.content_url) {
+                    renderBlocks(preview.blocks);
+                    previewStage.hidden = false;
+                    return;
+                }
+                const response = await fetch(preview.content_url, { credentials: 'same-origin' });
+                const contentType = response.headers.get('content-type') || '';
+                if (!response.ok || !/application\/(vnd\.openxmlformats-officedocument\.wordprocessingml\.document|zip|octet-stream)/i.test(contentType)) throw new Error('Respuesta DOCX no válida.');
+                const data = await response.arrayBuffer();
+                const host = document.createElement('div');
+                host.className = 'sw-preview-docx';
+                host.draggable = false;
+                previewStage.append(host);
+                await window.docx.renderAsync(data, host, null, { inWrapper: true, ignoreLastRenderedPageBreak: false, renderHeaders: true, renderFooters: true });
+            } else {
+                const extUpper = (preview.extension || 'FILE').toUpperCase();
+                renderPreviewState({
+                    type: 'unsupported',
+                    title: 'Formato no disponible para visualización',
+                    message: preview.message || `Los archivos ${extUpper} no pueden visualizarse directamente en este visor. Puedes descargar el archivo para consultarlo.`,
+                    actionText: currentDownloadUrl ? 'Descargar archivo' : '',
+                    actionHref: currentDownloadUrl
+                });
+            }
+        }
+        previewStage.hidden = false;
+    };
+    const loadPreview=async(url,retry=false)=>{
+        const extClean = (currentFileExtension || '').toLowerCase().trim();
+        const isImageFormat = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(extClean);
+        if (isImageFormat) {
+            const extUpper = (extClean || 'JPG').toUpperCase();
+            return renderPreviewState({
+                type: 'unsupported',
+                title: 'Formato no disponible para visualización',
+                message: `Los archivos ${extUpper} no pueden visualizarse directamente en este visor. Puedes descargar el archivo para consultarlo.`,
+                actionText: currentDownloadUrl ? 'Descargar archivo' : '',
+                actionHref: currentDownloadUrl
+            });
+        }
+        if(!url){
+            return renderPreviewState({
+                type:'unsupported',
+                title:'Formato no disponible para visualización',
+                message:'Este formato no puede visualizarse en el visor. Puedes descargar el archivo para consultarlo.',
+                actionText:currentDownloadUrl?'Descargar archivo':'',
+                actionHref:currentDownloadUrl
+            });
+        }
+        const generation=++previewGeneration;
+        previewController?.abort();
+        const controller=new AbortController();
+        previewController=controller;
+
+        const isDocxUrl = Boolean(url && /docx/i.test(url));
+        renderPreviewState({
+            type: 'loading',
+            title: isDocxUrl ? 'Preparando vista previa' : 'Preparando documento',
+            message: isDocxUrl ? 'Estamos convirtiendo el documento para poder visualizarlo.' : 'Estamos preparando la vista del documento. Esto puede tomar un momento.'
+        });
+
+        let type='';
+        let targetUrl=url;
+        if(retry){
+            try{
+                const target=new URL(url,window.location.origin);
+                target.searchParams.set('retry_preview','1');
+                targetUrl=target.toString();
+            }catch(e){
+                targetUrl=url+(url.includes('?')?'&':'?')+'retry_preview=1';
+            }
+        }
+        try{
+            const payload=await readJsonResponse(await fetch(targetUrl,jsonRequestInit({signal:controller.signal})));
+            if(generation!==previewGeneration)throw Object.assign(new Error('Preview superseded.'),{code:'preview_superseded'});
+            const preview=payload?.data?.preview||{};
+            type=preview.preview_type||'';
+            if(!payload.success)throw new Error(payload.message||'No fue posible cargar la vista previa.');
+            await renderPreview(preview,url);
+            if(generation!==previewGeneration)throw Object.assign(new Error('Preview superseded.'),{code:'preview_superseded'});
+        }catch(error){
+            if(error.name==='AbortError'||error.code==='preview_superseded')return;
+            console.error('No fue posible cargar la vista previa.',error);
+            if(error.code==='session_expired'){
+                previewMessage(error.message,'is-error');
+                return;
+            }
+            const extUpper = (extClean || 'FILE').toUpperCase();
+            const isNonDocument = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'zip', 'rar'].includes(extClean) || type === 'image' || type === 'unsupported';
+            if (isNonDocument) {
+                renderPreviewState({
+                    type: 'unsupported',
+                    title: 'Formato no disponible para visualización',
+                    message: `Los archivos ${extUpper} no pueden visualizarse directamente en este visor. Puedes descargar el archivo para consultarlo.`,
+                    actionText: currentDownloadUrl ? 'Descargar archivo' : '',
+                    actionHref: currentDownloadUrl
+                });
+                return;
+            }
+            const isDocx=(type==='docx')||(url&&/docx/i.test(url));
+            const retryCb=isDocx?()=>loadPreview(url,true):null;
+            previewMessage(previewErrorMessage(type),'is-error',retryCb);
+        }finally{
+            if(previewController===controller)previewController=null;
+        }
+    };
     const selectItem=(item)=>manager.querySelectorAll('[data-sw-file], [data-sw-zip-entry]').forEach((entry)=>entry.classList.toggle('is-selected',entry===item));
-    const setViewer=(name,extension,size,downloadUrl)=>{viewerName.textContent=name||'Archivo';viewerMeta.textContent=`${extension||'Archivo'} · ${size||'Tamaño no disponible'}`;viewerEmpty.hidden=true;viewerDownload.hidden=!downloadUrl;viewerDownload.href=downloadUrl||'#';};
+    const viewerIcon = workspace.querySelector('[data-sw-viewer-icon]');
+    let currentFileName = '';
+    let currentFileExtension = '';
+    const setViewer=(name,extension,size,downloadUrl)=>{
+        currentFileName = name || '';
+        currentFileExtension = String(extension || '').toLowerCase().trim();
+        currentDownloadUrl = downloadUrl || '';
+        if (viewerIcon) {
+            viewerIcon.className = downloadUrl ? 'fa-regular fa-file' : 'fa-solid fa-folder-open';
+        }
+        viewerName.textContent=name||'Visor de documentos';
+        viewerMeta.textContent=downloadUrl ? `${extension||'Archivo'} · ${size||'Tamaño no disponible'}` : 'Exploración y consulta documental';
+        if (viewerEmpty) viewerEmpty.hidden=true;
+        if (viewerDownload) {
+            viewerDownload.hidden=!downloadUrl;
+            viewerDownload.href=downloadUrl||'#';
+        }
+    };
     let zipCanvasContext = null;
     const measureZipTextWidth = (text, font) => {
         if (!zipCanvasContext) {
@@ -745,12 +1086,18 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(updateAllZipNames, 0);
     };
     const loadZipDirectory=async(rootButton,path,tree)=>{if(!tree)return;if(tree.dataset.loaded==='true'){tree.hidden=!tree.hidden;return;}tree.hidden=false;tree.textContent='Cargando…';try{const target=new URL(rootButton.dataset.fileZipUrl,window.location.origin);if(path)target.searchParams.set('path',path);const payload=await readJsonResponse(await fetch(target,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible abrir el ZIP.');renderZipTree(tree,payload.data?.archive?.items||payload.data?.archive||[],rootButton);tree.dataset.loaded='true';}catch(error){console.error('No fue posible cargar la estructura del ZIP.',error);tree.textContent=error.code==='session_expired'?error.message:'No fue posible abrir esta carpeta.';}};
-    const selectFile=(button)=>{cancelPreviewRequest();selectItem(button);setViewer(button.dataset.fileName,button.dataset.fileExtension,button.dataset.fileSize,button.dataset.fileDownload);const count=Number(button.dataset.fileObservations||0);observationPanel.innerHTML=`<p class="sw-empty-state">${count?`${count} observación${count===1?'':'es'} registrada${count===1?'':'s'} para este archivo.`:'No hay observaciones registradas para este archivo.'}</p>`;if(button.dataset.fileZipUrl){currentPreviewUrl='';previewMessage('Archivo ZIP seleccionado. Usa el explorador para navegar por su contenido.');void loadZipDirectory(button,'',button.closest('.sw-archive-node')?.querySelector('[data-sw-zip-tree]'));return;}currentPreviewUrl=button.dataset.filePreview;void loadPreview(button.dataset.filePreview);};
+    const selectFile=(button)=>{cancelPreviewRequest();selectItem(button);setViewer(button.dataset.fileName,button.dataset.fileExtension,button.dataset.fileSize,button.dataset.fileDownload);const count=Number(button.dataset.fileObservations||0);observationPanel.innerHTML=`<p class="sw-empty-state">${count?`${count} observación${count===1?'':'es'} registrada${count===1?'':'s'} para este archivo.`:'No hay observaciones registradas para este archivo.'}</p>`;if(button.dataset.fileZipUrl){currentPreviewUrl='';renderPreviewState({type:'empty',title:'Archivo ZIP seleccionado',message:'Usa el explorador de archivos para desplegar y consultar el contenido del ZIP.'});void loadZipDirectory(button,'',button.closest('.sw-archive-node')?.querySelector('[data-sw-zip-tree]'));return;}currentPreviewUrl=button.dataset.filePreview;void loadPreview(button.dataset.filePreview);};
     manager.querySelectorAll('[data-sw-file]').forEach((button)=>button.addEventListener('click',(event)=>{event.preventDefault();selectFile(event.currentTarget);}));
     const drawPocAnnotations=()=>{previewStage?.querySelectorAll('[data-poc-overlay]').forEach((node)=>node.remove());if(!annotationsVisible)return;pocAnnotations.forEach((annotation,index)=>{const page=previewStage?.querySelector(`[data-poc-page="${annotation.page}"]`);if(!page)return;annotation.rects.forEach((rect)=>{const overlay=document.createElement('span');overlay.dataset.pocOverlay='';overlay.className=`sw-poc-annotation is-${annotation.style}`;Object.assign(overlay.style,{left:`${rect.x*100}%`,top:`${rect.y*100}%`,width:`${rect.width*100}%`,height:`${rect.height*100}%`});page.append(overlay);});const marker=document.createElement('button');marker.type='button';marker.dataset.pocOverlay='';marker.className='sw-poc-marker';marker.textContent=String(index+1);marker.setAttribute('aria-label',`Abrir observación ${index+1}`);Object.assign(marker.style,{left:`${annotation.rects[0].x*100}%`,top:`${annotation.rects[0].y*100}%`});marker.addEventListener('click',()=>page.scrollIntoView({behavior:'smooth',block:'center'}));page.append(marker);});};
     const renderPocPanel=()=>{if(!observationPanel)return;if(!pocAnnotations.length){observationPanel.innerHTML='<p class="sw-empty-state">No hay observaciones registradas para este archivo.</p>';return;}observationPanel.replaceChildren();const toggle=document.createElement('button');toggle.type='button';toggle.className='sw-poc-control';toggle.textContent=annotationsVisible?'Ocultar observaciones':'Mostrar observaciones';toggle.addEventListener('click',()=>{annotationsVisible=!annotationsVisible;drawPocAnnotations();renderPocPanel();});observationPanel.append(toggle);pocAnnotations.forEach((annotation,index)=>{const item=document.createElement('button');item.type='button';item.className='sw-poc-observation';item.textContent=`${index+1}. ${annotation.comment}: “${annotation.selected_text}”`;item.addEventListener('click',()=>previewStage?.querySelector(`[data-poc-page="${annotation.page}"]`)?.scrollIntoView({behavior:'smooth',block:'center'}));observationPanel.append(item);});};
     let pdfResizeTimer=null;window.addEventListener('resize',()=>{if(!activePdfPreview)return;clearTimeout(pdfResizeTimer);pdfResizeTimer=setTimeout(async()=>{const restore={top:previewStage.scrollTop/Math.max(1,previewStage.scrollHeight-previewStage.clientHeight),left:previewStage.scrollLeft/Math.max(1,previewStage.scrollWidth-previewStage.clientWidth)};try{await renderPdfPoc(activePdfPreview,restore);}catch(error){console.error('No fue posible re-renderizar la vista previa en resize.',error);}},100);});
     if (historicalPreview) {
         (async()=>{try{const payload=await readJsonResponse(await fetch(historicalPreview,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible cargar la versión.');const preview=payload.data.preview;setViewer(preview.original_name,`Versión ${preview.version_number}`,'Historial','');await renderPreview({status:'ready',preview_type:'pdf',content_url:preview.content_url,name:preview.original_name});const items=preview.observations||[];observationPanel.innerHTML=items.length?items.map((item)=>`<article class="sw-record"><strong>${String(item.category||'Observación')}</strong><p>${String(item.body||'')}</p></article>`).join(''):'<p class="sw-empty-state">No hay observaciones registradas para esta versión.</p>';}catch(error){console.error(error);previewMessage(error.code==='session_expired'?error.message:'No fue posible cargar la versión histórica.','is-error');}})();
+    } else {
+        renderPreviewState({
+            type: 'empty',
+            title: 'Visualiza tus archivos',
+            message: 'Selecciona un documento del panel Archivos para consultarlo aquí.'
+        });
     }
 });
