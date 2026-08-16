@@ -48,6 +48,15 @@ try{
     $required=['event_key','event_type','occurred_at_utc','occurred_at_local','source_type','source_id','actor','title','description','project_id','delivery','file','version','observation','adjustment','previous_state','new_state','badges','metadata','is_download_available'];
     $assert(array_diff($required,array_keys($all[0]??[]))===[],'contrato estable');
     $registration=array_values(array_filter($all,static fn(array $event):bool=>$event['event_type']==='project_registered'))[0]??[];$assert(!str_contains((string)($registration['description']??''),'junto con su primera entrega'),'registro no inventa entrega conjunta');$assert(($registration['actor']??'')===$creatorName,'registro usa projects.created_by');
+    $d1=$db->prepare("INSERT INTO project_deliveries(project_id,version_number,title,comment,status,submitted_by,submitted_at) VALUES(:project,10,'Entrega 1','Contenido 1','under_review',:actor,'2026-08-01 10:10:00')");$d1->execute(['project'=>$emptyProject,'actor'=>$student]);$del1Id=(int)$db->lastInsertId();
+    $d2=$db->prepare("INSERT INTO project_deliveries(project_id,version_number,title,comment,status,submitted_by,submitted_at) VALUES(:project,11,'Entrega 2','Contenido 2','under_review',:actor,'2026-08-01 10:20:00')");$d2->execute(['project'=>$emptyProject,'actor'=>$student]);$del2Id=(int)$db->lastInsertId();
+    $audit->record($emptyProject,$student,'project_submitted_for_review','project_delivery',$del1Id,['status'=>'development'],['status'=>'under_review','delivery_id'=>$del1Id,'submitted_file_count'=>10]);
+    $audit->record($emptyProject,$student,'project_submitted_for_review','project_delivery',$del2Id,['status'=>'development'],['status'=>'under_review','delivery_id'=>$del2Id,'submitted_file_count'=>14]);
+    $historyHist=(new ProjectAcademicTimelineService($db))->page($emptyProject,0,50);
+    $eventsHist=array_column($historyHist['events'],null,'event_key');
+    $assert(isset($eventsHist['delivery:'.$del1Id])&&str_contains($eventsHist['delivery:'.$del1Id]['description'],'10 archivos enviados a revisión por el estudiante.'),'conteo histórico entrega 1 snapshot = 10');
+    $assert(isset($eventsHist['delivery:'.$del2Id])&&str_contains($eventsHist['delivery:'.$del2Id]['description'],'14 archivos enviados a revisión por el estudiante.'),'conteo histórico entrega 2 snapshot = 14');
+
     $suffix=bin2hex(random_bytes(5));$q=$db->prepare("INSERT INTO users(email,password_hash,full_name,status) VALUES(:email,'test-only','Persona ajena','active')");$q->execute(['email'=>'timeline-'.$suffix.'@example.invalid']);$outsider=(int)$db->lastInsertId();
     $role=$db->prepare("INSERT INTO user_roles(user_id,role_id) SELECT :user,id FROM roles WHERE code='student'");$role->execute(['user'=>$outsider]);$assert(empty((new ProjectCapabilityService())->resolve(['id'=>$project,'created_by'=>$admin,'participants'=>[]],'academic',$outsider,['student'],false)['view_academic_history']),'usuario no relacionado sin acceso al historial');
 }finally{if($db->inTransaction())$db->rollBack();}

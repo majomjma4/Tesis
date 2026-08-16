@@ -196,7 +196,8 @@ final class ProjectCapabilityService
         );
         $assignment->execute(['project'=>(int)$project['id'], 'user'=>$userId]);
         $projectRoles = array_map('strval', $assignment->fetchAll(PDO::FETCH_COLUMN));
-        $teacher = in_array('teacher', $roles, true);
+        $isTutor = ((int)($project['tutor_id'] ?? 0) === $userId) || count(array_intersect(['tutor', 'co_tutor', 'cotutor', 'co-tutor'], $projectRoles)) > 0;
+        $teacher = in_array('teacher', $roles, true) && $isTutor;
         $student = in_array('student', $roles, true) && in_array('student', $projectRoles, true);
         if ($teacher || $student) $result['view_adjustment_requests'] = true;
         if ($teacher) $result['create_adjustment_request'] = true;

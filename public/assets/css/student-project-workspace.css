@@ -30,8 +30,8 @@ body.app-student-workspace-fullscreen .sidebar-overlay { display:none !important
 body.app-student-workspace-fullscreen { width:100%; min-width:0; min-height:100vh; background:var(--bg); }
 body.app-student-workspace-fullscreen .main { box-sizing:border-box; margin-left:0; width:100%; max-width:none; min-width:0; min-height:100vh; background:var(--bg); }
 body.app-student-workspace-fullscreen .topbar { display:none; }
-body.app-student-workspace-fullscreen .app-page-content { box-sizing:border-box; width:100%; max-width:none; min-width:0; min-height:100vh; background:var(--bg); padding:clamp(.75rem,2vw,2rem) clamp(1rem,3vw,3.5rem) 3rem; }
-body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box; width:100%; max-width:none; min-width:0; min-height:100%; }
+body.app-student-workspace-fullscreen .app-page-content { box-sizing:border-box; width:100%; max-width:none; min-width:0; flex:1 1 auto; display:flex; flex-direction:column; min-height:0; background:var(--bg); padding:0.75rem 1.25rem 0.75rem !important; }
+body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box; width:100%; max-width:none; min-width:0; flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
 .sw-tabs-more { display:none; position:relative; }
 .sw-tabs-more summary { list-style:none; cursor:pointer; }
 .sw-tabs-more summary::-webkit-details-marker { display:none; }
@@ -3983,6 +3983,7 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     word-break: break-word;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -4593,32 +4594,59 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
 }
 
 @media (min-width: 769px) {
+    .student-workspace .sw-doc-workspace {
+        flex: 1 1 auto;
+        align-items: stretch !important;
+        min-height: 0;
+    }
+
     .student-workspace .sw-explorer-panel {
-        max-height: calc(100vh - 180px);
+        height: var(--sw-workspace-height, 100%);
+        max-height: var(--sw-workspace-height, 100%);
+        min-height: 0;
         overflow-y: auto;
         scrollbar-gutter: stable;
+        box-sizing: border-box;
     }
 
     .student-workspace .sw-viewer-panel {
-        max-height: calc(100vh - 180px);
+        height: var(--sw-workspace-height, 100%);
+        max-height: var(--sw-workspace-height, 100%);
+        min-height: 0;
         display: flex;
         flex-direction: column;
+        box-sizing: border-box;
     }
 
     .student-workspace .sw-preview-stage {
         flex: 1 1 auto;
-        min-height: min(50vh, 520px);
-        max-height: calc(100vh - 270px);
+        min-height: 0;
+        max-height: none;
         overflow-y: auto;
         scrollbar-gutter: stable;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .student-workspace .sw-preview-state-card.is-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        margin: auto;
+        padding: 2rem 1rem;
     }
 
     .student-workspace .sw-observations-panel {
-        max-height: calc(100vh - 180px);
+        height: var(--sw-workspace-height, 100%);
+        max-height: var(--sw-workspace-height, 100%);
+        min-height: 0;
         display: flex;
         flex-direction: column;
         overflow-y: auto;
         scrollbar-gutter: stable;
+        box-sizing: border-box;
     }
 
     .student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel [data-sw-file-observations] {
@@ -4639,7 +4667,7 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     .student-workspace .sw-doc-workspace {
         display: flex !important;
         flex-direction: row !important;
-        align-items: flex-start !important;
+        align-items: stretch !important;
         gap: 0.5rem !important;
         width: 100% !important;
         max-width: 100% !important;

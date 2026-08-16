@@ -2454,7 +2454,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    const syncWorkspaceHeight = () => {
+        const workspace = manager.querySelector('.sw-doc-workspace');
+        if (!workspace) return;
+        const rect = workspace.getBoundingClientRect();
+        const available = Math.max(320, Math.floor(window.innerHeight - rect.top - 14));
+        workspace.style.setProperty('--sw-workspace-height', `${available}px`);
+    };
+
     window.addEventListener('resize', () => {
+        syncWorkspaceHeight();
         if (selectionPopover && selectionState?.rangeRect) positionPopover(selectionState.rangeRect);
         renderHighlights();
     });
@@ -2472,6 +2481,7 @@ document.addEventListener('DOMContentLoaded', () => {
         approveDecision(decisionModalAction.fileId, decisionModalAction.finish);
     });
 
+    syncWorkspaceHeight();
     restoreReviewDraft();
     updateFileIndicators();
     renderReviewCenter();

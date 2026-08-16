@@ -653,11 +653,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
     const reviewPendingMessage = (preview) => {
+        const isTeacherReviewMode = manager.classList.contains('is-teacher-review') || Boolean(manager.dataset.swReviewMode);
+
         renderPreviewState({
             type: 'unsupported',
             title: 'Vista de revisión pendiente',
-            message: 'Este documento está guardado correctamente, pero necesitamos una copia PDF para mostrarlo durante la revisión académica.'
+            message: 'Este documento está guardado correctamente, pero necesitamos una copia PDF para mostrarlo durante la revisión académica.',
+            actionText: isTeacherReviewMode && currentDownloadUrl ? 'Descargar archivo' : '',
+            actionHref: isTeacherReviewMode ? currentDownloadUrl : ''
         });
+
+        if (isTeacherReviewMode) {
+            return;
+        }
+
         if (!previewStage) return;
         const card = previewStage.querySelector('.sw-preview-state-card');
         if (!card) return;

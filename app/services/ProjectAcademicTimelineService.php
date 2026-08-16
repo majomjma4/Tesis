@@ -24,9 +24,7 @@ final class ProjectAcademicTimelineService
         $next=$offset+count($events);
         return ['events'=>$events,'total'=>$total,'loaded'=>count($events),'has_more'=>$next<$total,'next_offset'=>$next,
             'cursor'=>$events===[]?null:$this->cursor($events[array_key_last($events)])];
-    }
-
-    private function unionSql(): string
+    }    private function unionSql(): string
     {
         return <<<'SQL'
 SELECT CONCAT('registration:',p.id) event_key,'project_registered' event_type,'project' source_type,p.id source_id,p.created_at occurred_at,u.id actor_id,u.full_name actor_name,NULL previous_state,NULL new_state,
@@ -34,7 +32,17 @@ SELECT CONCAT('registration:',p.id) event_key,'project_registered' event_type,'p
 FROM projects p LEFT JOIN users u ON u.id=p.created_by WHERE p.id=? AND p.deleted_at IS NULL
 UNION ALL
 SELECT CONCAT('delivery:',d.id),'delivery_registered','project_delivery',d.id,d.submitted_at,u.id,u.full_name,NULL,NULL,
-       JSON_OBJECT('title',d.title,'comment',d.comment,'version_number',d.version_number,'status',d.status)
+       JSON_OBJECT('title',d.title,'comment',d.comment,'version_number',d.version_number,'status',d.status,
+                   'file_count',COALESCE(
+                       (SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(l.new_state,'$.submitted_file_count')) AS UNSIGNED)
+                        FROM project_audit_log l
+                        WHERE l.project_id=d.project_id
+                          AND l.action='project_submitted_for_review'
+                          AND (JSON_UNQUOTE(JSON_EXTRACT(l.new_state,'$.delivery_id'))=CAST(d.id AS CHAR) OR l.entity_id=d.id)
+                        ORDER BY l.id DESC LIMIT 1),
+                       (SELECT COUNT(*) FROM project_files f WHERE f.project_id=d.project_id AND f.delivery_id=d.id),
+                       1
+                   )) payload
 FROM project_deliveries d LEFT JOIN users u ON u.id=d.submitted_by WHERE d.project_id=?
 UNION ALL
 SELECT CONCAT('observation:',o.id),'observation_created','project_observation',o.id,o.created_at,u.id,u.full_name,NULL,JSON_OBJECT('status',o.status),
@@ -68,7 +76,9 @@ UNION ALL
 SELECT CONCAT('document-status:',s.id),'document_status_recorded','project_file_review_state',s.id,s.updated_at,u.id,u.full_name,NULL,JSON_OBJECT('status',s.status),
        JSON_OBJECT('file_id',s.file_id,'file_name',f.original_name,'checksum',s.checksum_sha256,'status',s.status)
 FROM project_file_review_states s JOIN project_files f ON f.id=s.file_id LEFT JOIN users u ON u.id=s.reviewed_by
-WHERE s.project_id=? AND NOT EXISTS(SELECT 1 FROM project_audit_log l WHERE l.project_id=s.project_id AND l.action='project_document_review_completed' AND JSON_SEARCH(l.new_state,'one',s.checksum_sha256) IS NOT NULL)
+WHERE s.project_id=?
+  AND NOT (s.status='under_review' AND EXISTS(SELECT 1 FROM project_deliveries d WHERE d.project_id=s.project_id))
+  AND NOT EXISTS(SELECT 1 FROM project_audit_log l WHERE l.project_id=s.project_id AND l.action='project_document_review_completed' AND JSON_SEARCH(l.new_state,'one',s.checksum_sha256) IS NOT NULL)
 UNION ALL
 SELECT CONCAT('document-version:',c.id),'document_version_uploaded','project_file_version_change',c.id,c.changed_at,u.id,u.full_name,
        JSON_OBJECT('checksum',c.previous_checksum,'version_number',c.previous_version_number,'document_status',c.previous_document_status),
@@ -91,10 +101,10 @@ UNION ALL
 SELECT CONCAT('academic:',l.id),l.action,'project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason)
 FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=? AND (
- (l.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished','project_publication_reverted','project_corrections_requested','project_status_changed','project_participants_updated','tribunal_assigned','tribunal_updated','thesis_defense_information_updated','tribunal_result_registered','defense_attempt_started')
-  AND NOT (l.action='project_unpublished' AND EXISTS(SELECT 1 FROM project_audit_log semantic WHERE semantic.project_id=l.project_id AND semantic.action='project_publication_reverted' AND semantic.created_at=l.created_at)))
- OR (l.action='project_updated'
-  AND NOT EXISTS(SELECT 1 FROM project_audit_log semantic WHERE semantic.project_id=l.project_id AND semantic.created_at=l.created_at AND semantic.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_republished','project_publication_reverted','project_corrections_requested'))))
+  (l.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished','project_publication_reverted','project_corrections_requested','project_status_changed','project_participants_updated','tribunal_assigned','tribunal_updated','thesis_defense_information_updated','tribunal_result_registered','defense_attempt_started')
+   AND NOT (l.action='project_unpublished' AND EXISTS(SELECT 1 FROM project_audit_log semantic WHERE semantic.project_id=l.project_id AND semantic.action='project_publication_reverted' AND semantic.created_at=l.created_at)))
+  OR (l.action='project_updated'
+   AND NOT EXISTS(SELECT 1 FROM project_audit_log semantic WHERE semantic.project_id=l.project_id AND semantic.created_at=l.created_at AND semantic.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_republished','project_publication_reverted','project_corrections_requested'))))
 UNION ALL
 SELECT CONCAT('publication-fallback:',p.id),'project_published','project',p.id,p.published_at,NULL,NULL,NULL,JSON_OBJECT('status','published'),
        JSON_OBJECT('fallback',TRUE)
@@ -129,8 +139,8 @@ SQL;
     private function copy(string $type,array $p,array $previous,array $new): array
     {
         return match($type){
-            'project_registered'=>['Proyecto registrado',!empty($p['has_delivery'])?'Se registró el proyecto. La entrega inicial consta como un evento independiente.':'Se registró el proyecto sin una entrega documental inicial.','registration'],
-            'delivery_registered'=>[(int)($p['version_number']??0)>1?'Nueva versión enviada':'Entrega documental registrada',trim((string)($p['comment']??$p['title']??'')),'delivery'],
+            'project_registered'=>['Proyecto registrado',!empty($p['has_delivery'])?'Se registró el proyecto.':'Se registró el proyecto sin una entrega documental inicial.','registration'],
+            'delivery_registered'=>['Entrega enviada a revisión',$this->deliveryDescription($p),'delivery'],
             'observation_created'=>['Observación académica registrada',(string)($p['body']??''),'observation'],
             'observation_responded'=>['Respuesta a observación registrada',(string)($p['body']??''),'response'],
             'adjustment_requested'=>['Solicitud de ajuste',(string)($p['message']??''),'adjustment'],
@@ -140,7 +150,7 @@ SQL;
             'document_review_completed'=>['Revisión documental confirmada',$this->reviewDescription($new),'document-review'],
             'document_status_recorded'=>['Estado documental registrado',$this->documentStatusLabel((string)($p['status']??'')),'document-review'],
             'file_version_registered'=>['Nueva versión documental registrada',trim((string)($p['reason']??$p['file_name']??'')),'file'],
-            'document_version_uploaded'=>['Nueva versión documental registrada',(string)($p['declared_summary']??''),'file'],
+            'document_version_uploaded'=>['Nueva versión documental registrada',!empty($p['declared_summary'])?(string)$p['declared_summary']:(!empty($p['file_name'])?(string)$p['file_name'].' fue actualizada.':'Se actualizó la versión de un documento.'),'file'],
             'document_version_archived'=>['Versiones documentales archivadas','Se archivaron '.(int)($p['archived_count']??0).' versiones históricas.','file'],
             'project.file_added','project_file_added'=>['Archivo agregado','Se registró un cambio documental relevante.','file'],
             'project.file_replaced','project_file_replaced'=>['Archivo reemplazado','Se registró un cambio documental relevante.','file'],
@@ -159,20 +169,102 @@ SQL;
         };
     }
 
+    private function deliveryDescription(array $p): string
+    {
+        $count = (int)($p['file_count'] ?? 0);
+        if ($count <= 0) $count = 1;
+        $filesLabel = $count === 1 ? '1 archivo enviado a revisión por el estudiante.' : $count . ' archivos enviados a revisión por el estudiante.';
+        $comment = trim((string)($p['comment'] ?? ''));
+        if ($comment !== '' && !in_array(strtolower($comment), ['entrega inicial', 'entrega de prueba', 'contenido de entrega'], true)) {
+            return $filesLabel . ' ' . $comment;
+        }
+        return $filesLabel;
+    }
+
     private function badges(string $type,array $p,array $previous,array $new): array
     {
         $values=[];
-        if(isset($p['version_number'])&&(int)$p['version_number']>0)$values[]='Versión '.(int)$p['version_number'];
-        if($type==='document_version_uploaded'){$values[]='Versión '.(int)($p['previous_version_number']??0).' → '.(int)($p['new_version_number']??0);$values[]=$this->documentStatusLabel((string)($p['previous_document_status']??'')).' → '.$this->documentStatusLabel((string)($p['new_document_status']??''));if((int)($p['addressed_observation_count']??0)>0)$values[]=(int)$p['addressed_observation_count'].' observaciones atendidas';foreach($this->json($p['sections_json']??null) as $section)$values[]=(string)$section;}
-        if(!empty($p['status']))$values[]=$type==='delivery_registered'?project_delivery_status_label((string)$p['status']):$this->documentStatusLabel((string)$p['status']);
+        if($type==='delivery_registered'){
+            if(isset($p['version_number'])&&(int)$p['version_number']>0)$values[]='Versión '.(int)$p['version_number'];
+            $values[]='En revisión';
+        } elseif(isset($p['version_number'])&&(int)$p['version_number']>0) {
+            $values[]='Versión '.(int)$p['version_number'];
+        }
+        if($type==='document_version_uploaded'){
+            $prevVer = (int)($p['previous_version_number'] ?? 0);
+            $newVer = (int)($p['new_version_number'] ?? 0);
+            if ($prevVer > 0 && $newVer > 0) $values[] = 'Versión ' . $prevVer . ' → ' . $newVer;
+            $prevStatus = (string)($p['previous_document_status'] ?? '');
+            $newStatus = (string)($p['new_document_status'] ?? '');
+            if ($prevStatus !== '' && $newStatus !== '' && $prevStatus !== $newStatus) {
+                $values[] = $this->documentStatusLabel($prevStatus) . ' → ' . $this->documentStatusLabel($newStatus);
+            }
+            if((int)($p['addressed_observation_count']??0)>0)$values[]=(int)$p['addressed_observation_count'].' observaciones atendidas';
+            foreach($this->json($p['sections_json']??null) as $section)$values[]=(string)$section;
+        }
+        if(!empty($p['status']) && $type!=='delivery_registered')$values[]=$this->documentStatusLabel((string)$p['status']);
         foreach(['section'=>'Sección: ','field'=>'Campo: ','category'=>'Categoría: ','reference'=>'Referencia: '] as $key=>$prefix)if(!empty($p[$key]))$values[]=$prefix.(string)$p[$key];
         $from=$this->stateCode($previous);$to=$this->stateCode($new);if($from!==null&&$to!==null&&$from!==$to)$values[]=$this->stateLabel($from).' → '.$this->stateLabel($to);
         return array_values(array_unique(array_filter($values)));
     }
 
     private function reviewDescription(array $state): string
-    { return sprintf('Documentos revisados: %d. Aprobados: %d. En revisión: %d. Con correcciones: %d. Observaciones creadas: %d.',(int)($state['reviewed_documents']??0),(int)($state['approved']??0),(int)($state['under_review']??0),(int)($state['corrections_requested']??0),(int)($state['observation_count']??0)); }
-    private function projectInformationDescription(array $state): string { $changes=(array)($state['_history_changes']??[]); if($changes===[])return 'Se actualizaron datos académicos del proyecto.'; return implode('; ',array_map(static fn(array $change):string => (string)($change['field']??'Información').' actualizado', $changes)).'.'; }
+    {
+        $reviewed = (int)($state['reviewed_documents'] ?? 0);
+        $approved = (int)($state['approved'] ?? 0);
+        $underReview = (int)($state['under_review'] ?? 0);
+        $corrections = (int)($state['corrections_requested'] ?? 0);
+        $obsCount = (int)($state['observation_count'] ?? 0);
+
+        if ($reviewed > 0 || $approved > 0 || $corrections > 0) {
+            return sprintf(
+                'Documentos revisados: %d. Aprobados: %d. En revisión: %d. Con correcciones: %d. Observaciones creadas: %d.',
+                $reviewed, $approved, $underReview, $corrections, $obsCount
+            );
+        }
+
+        return 'El docente finalizó la revisión documental.';
+    }
+
+    private function projectInformationDescription(array $state): string
+    {
+        $changes = (array)($state['_history_changes'] ?? []);
+        if ($changes === []) return 'Se actualizaron datos académicos del proyecto.';
+
+        $labels = [
+            'title' => 'Título',
+            'Título' => 'Título',
+            'tutor_id' => 'Tutoría',
+            'tutor_reference_id' => 'Tutoría',
+            'Tutoría' => 'Tutoría',
+            'description' => 'Descripción',
+            'summary' => 'Descripción',
+            'Descripción' => 'Descripción',
+            'career' => 'Carrera',
+            'academic_period' => 'Período académico',
+            'project_type' => 'Tipo de proyecto',
+        ];
+
+        $fieldNames = [];
+        foreach ($changes as $change) {
+            $raw = (string)($change['field'] ?? '');
+            if ($raw === '') continue;
+            $name = $labels[$raw] ?? ucfirst(str_replace(['_', '.'], ' ', $raw));
+            if ($name !== '' && !in_array($name, $fieldNames, true)) {
+                $fieldNames[] = $name;
+            }
+        }
+
+        if ($fieldNames === []) return 'Se actualizaron datos académicos del proyecto.';
+
+        if (count($fieldNames) === 1) {
+            return 'Se actualizó: ' . $fieldNames[0] . '.';
+        }
+
+        $last = array_pop($fieldNames);
+        return 'Se actualizaron: ' . implode(', ', $fieldNames) . ' y ' . $last . '.';
+    }
+
     private function transitionDescription(array $previous,array $new): string { $from=$this->stateCode($previous);$to=$this->stateCode($new);return $from!==null&&$to!==null?$this->stateLabel($from)."\n↓\n".$this->stateLabel($to):''; }
     private function statusTitle(array $new): string { return $this->stateCode($new)==='under_review'?'Proyecto enviado a revisión':($this->stateCode($new)==='approved'?'Proyecto aprobado':($this->stateCode($new)==='defense'?'Proyecto enviado a Tribunal':'Cambio de estado del proyecto')); }
     private function stateCode(array $state): ?string
