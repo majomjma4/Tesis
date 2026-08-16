@@ -1010,10 +1010,21 @@ document.addEventListener('DOMContentLoaded', () => {
         viewerMeta.textContent=downloadUrl ? `${extension||'Archivo'} · ${size||'Tamaño no disponible'}` : 'Exploración y consulta documental';
         if (viewerEmpty) viewerEmpty.hidden=true;
         if (viewerDownload) {
-            viewerDownload.hidden=!downloadUrl;
-            viewerDownload.href=downloadUrl||'#';
+            viewerDownload.hidden = false;
+            viewerDownload.disabled = !downloadUrl;
+            if (downloadUrl) {
+                viewerDownload.dataset.downloadUrl = downloadUrl;
+            } else {
+                delete viewerDownload.dataset.downloadUrl;
+            }
         }
     };
+    viewerDownload?.addEventListener('click', (event) => {
+        event.preventDefault();
+        const url = viewerDownload.dataset.downloadUrl;
+        if (!url || viewerDownload.disabled) return;
+        window.location.href = url;
+    });
     let zipCanvasContext = null;
     const measureZipTextWidth = (text, font) => {
         if (!zipCanvasContext) {
@@ -1161,6 +1172,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const previewUrl = node.preview_url || zipEntryUrl(rootButton.dataset.fileZipPreviewUrl, node.path);
                 button.addEventListener('click',()=>{
+                    if (button.classList.contains('is-selected')) {
+                        deselectCurrentWorkspaceFile();
+                        return;
+                    }
                     cancelPreviewRequest();
                     selectItem(button);
                     selectedObservationFileId=Number(rootButton.dataset.fileId||0);
@@ -1188,12 +1203,35 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         setTimeout(updateAllZipNames, 0);
     };
+    const deselectCurrentWorkspaceFile = () => {
+        cancelPreviewRequest();
+        workspace.dispatchEvent(new CustomEvent('workspace:zip-entry-closed', { bubbles: true, detail: {} }));
+        selectItem(null);
+        selectedObservationFileId = 0;
+        currentPreviewUrl = '';
+        renderStudentObservations();
+        updateSelectedFileHeader('Visor de documentos', 'Exploración y consulta documental', '', '');
+        renderPreviewState({
+            type: 'empty',
+            title: 'Visualiza tus archivos',
+            message: 'Selecciona un documento del explorador para consultar su contenido y observaciones.'
+        });
+    };
+
     const loadZipDirectory=async(rootButton,path,tree)=>{if(!tree)return;if(tree.dataset.loaded==='true'){tree.hidden=!tree.hidden;return;}tree.hidden=false;tree.textContent='Cargando…';try{const target=new URL(rootButton.dataset.fileZipUrl,window.location.origin);if(path)target.searchParams.set('path',path);const payload=await readJsonResponse(await fetch(target,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible abrir el ZIP.');renderZipTree(tree,payload.data?.archive?.items||payload.data?.archive||[],rootButton);tree.dataset.loaded='true';}catch(error){console.error('No fue posible cargar la estructura del ZIP.',error);tree.textContent=error.code==='session_expired'?error.message:'No fue posible abrir esta carpeta.';}};
     const selectFile=(button)=>{
+        const fileId = Number(button.dataset.fileId || 0);
+
+        // TOGGLE: Si el archivo ya tiene la clase visual .is-selected en el DOM, deseleccionar y cerrar visor
+        if (button.classList.contains('is-selected')) {
+            deselectCurrentWorkspaceFile();
+            return;
+        }
+
         cancelPreviewRequest();
         workspace.dispatchEvent(new CustomEvent('workspace:zip-entry-closed', { bubbles: true, detail: {} }));
         selectItem(button);
-        selectedObservationFileId=Number(button.dataset.fileId||0);
+        selectedObservationFileId=fileId;
         observationFilter='all';
         renderStudentObservations();
         updateSelectedFileHeader(button.dataset.fileName,button.dataset.fileExtension,button.dataset.fileSize,button.dataset.fileDownload);

@@ -709,7 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const viewerZoom = manager.querySelector('[data-sw-viewer-zoom]');
         if (viewerName) viewerName.textContent = 'Visor de documentos';
         if (viewerMeta) viewerMeta.textContent = 'Exploración y consulta documental';
-        if (viewerDownload) { viewerDownload.hidden = true; viewerDownload.href = '#'; }
+        if (viewerDownload) { viewerDownload.hidden = false; viewerDownload.disabled = true; delete viewerDownload.dataset.downloadUrl; }
         if (viewerZoom) viewerZoom.hidden = true;
 
         if (previewStage) {
@@ -1109,171 +1109,293 @@ document.addEventListener('DOMContentLoaded', () => {
         return section;
     };
 
-    const createDraftSection = (file) => {
+    const createReviewSections = (file) => {
         const draft = draftFor(file.file_id);
         const items = draft?.observations || [];
         const metas = metadataFor(file.file_id);
-        const section = document.createElement('section');
-        section.className = 'sw-review-observation-group is-draft';
-        const heading = document.createElement('div');
-        heading.className = 'sw-review-group-heading';
-        heading.innerHTML = `<strong>Observaciones de esta revision</strong><span>${items.length}</span>`;
-        section.append(heading);
-        if (!items.length) {
-            const empty = document.createElement('p');
-            empty.className = 'sw-review-empty-inline';
-            empty.textContent = 'Todavia no agregas observaciones al borrador.';
-            section.append(empty);
-            return section;
-        }
-        const list = document.createElement('div');
-        list.className = 'sw-review-card-list';
         const contextualMap = getContextualObservationMap(file.file_id);
 
+        const generalIndices = [];
+        const contextualIndices = [];
+
         items.forEach((item, index) => {
-            const selectedText = metas[index]?.selected_text || '';
-            const compactLoc = formatCompactLocation(item.location_reference);
-            const contextualInfo = contextualMap.get(index);
-            const obsNumber = contextualInfo?.obsNumber || null;
-            const colorClass = contextualInfo?.colorClass || '';
-
-            const card = document.createElement('article');
-            card.className = `sw-review-observation-card is-draft ${colorClass}`.trim();
-
-            const renderCardContent = () => {
-                card.innerHTML = '';
-                const isExpanded = card.dataset.expanded === 'true';
-
-                // Header
-                const meta = document.createElement('div');
-                meta.className = 'sw-review-card-meta';
-
-                if (obsNumber) {
-                    const numberBadge = document.createElement('span');
-                    numberBadge.className = `sw-review-card-number-badge ${colorClass}`;
-                    numberBadge.textContent = String(obsNumber);
-                    meta.append(numberBadge);
-                }
-
-                if (item.category && item.category !== 'General') {
-                    const category = document.createElement('strong');
-                    category.className = 'sw-review-category-badge';
-                    category.textContent = item.category;
-                    meta.append(category);
-                } else {
-                    const typeLabel = document.createElement('span');
-                    typeLabel.className = 'sw-review-type-label';
-                    typeLabel.textContent = selectedText ? 'Texto seleccionado' : 'Observación general';
-                    meta.append(typeLabel);
-                }
-
-                const pending = document.createElement('span');
-                pending.textContent = 'Borrador';
-                meta.append(pending);
-                card.append(meta);
-
-                // Body Comment (Primary Focus)
-                const commentBody = document.createElement('p');
-                commentBody.className = 'sw-review-card-comment';
-                const commentTrunc = truncateText(item.body, 140);
-                if (!isExpanded && commentTrunc.isTruncated) {
-                    commentBody.textContent = commentTrunc.truncated;
-                } else {
-                    commentBody.textContent = item.body;
-                }
-                card.append(commentBody);
-
-                // Compact Location Line
-                if (compactLoc) {
-                    const metaLine = document.createElement('div');
-                    metaLine.className = 'sw-review-card-meta-line';
-                    const locSmall = document.createElement('small');
-                    locSmall.textContent = isExpanded ? (item.location_reference || compactLoc) : compactLoc;
-                    metaLine.append(locSmall);
-                    card.append(metaLine);
-                }
-
-                // Selected Text Fragment
-                if (selectedText) {
-                    const fragment = document.createElement('blockquote');
-                    fragment.className = 'sw-review-card-quote';
-                    const quoteTrunc = truncateText(selectedText, 100);
-                    if (!isExpanded && quoteTrunc.isTruncated) {
-                        fragment.textContent = `"${quoteTrunc.truncated}"`;
-                    } else {
-                        fragment.textContent = `"${selectedText}"`;
-                    }
-                    card.append(fragment);
-                }
-
-                // "Ver más" / "Ver menos" toggle
-                const isCommentTruncated = commentTrunc.isTruncated;
-                const isQuoteTruncated = selectedText && selectedText.length > 100;
-                if (isCommentTruncated || isQuoteTruncated) {
-                    const toggleBtn = document.createElement('button');
-                    toggleBtn.type = 'button';
-                    toggleBtn.className = 'sw-review-toggle-more-btn';
-                    toggleBtn.innerHTML = isExpanded
-                        ? '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i> Ver menos'
-                        : '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Ver más';
-
-                    toggleBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        card.dataset.expanded = isExpanded ? 'false' : 'true';
-                        renderCardContent();
-                    });
-                    card.append(toggleBtn);
-                }
-
-                // Actions (Editar / Eliminar)
-                const actions = document.createElement('div');
-                actions.className = 'sw-review-card-actions';
-                actions.innerHTML = '<button type="button" data-action="edit"><i class="fa-solid fa-pen" aria-hidden="true"></i> Editar</button><button type="button" data-action="delete"><i class="fa-regular fa-trash-can" aria-hidden="true"></i> Eliminar</button>';
-                actions.querySelectorAll('button').forEach((button) => {
-                    button.disabled = isSubmitting;
-                });
-                actions.querySelector('[data-action="edit"]').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openEditor('edit', file.file_id, {
-                        index,
-                        category: item.category,
-                        body: item.body,
-                        locationReference: item.location_reference || '',
-                        selectedText: selectedText,
-                    });
-                });
-                actions.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (isSubmitting) return;
-                    draft.observations.splice(index, 1);
-                    metas.splice(index, 1);
-                    completedFileIds.delete(file.file_id);
-                    if (!draft.observations.length && draft.status === 'corrections_requested' && draft.decisionSource === 'auto') {
-                        delete reviewDraft[file.file_id];
-                        observationMeta.delete(file.file_id);
-                    }
-                    removeActiveNotePopover();
-                    reviewError = '';
-                    saveReviewDraft();
-                    renderReviewCenter();
-                });
-                card.append(actions);
-            };
-
-            renderCardContent();
-
-            card.addEventListener('click', () => {
-                const highlights = previewStage?.querySelectorAll(`[data-observation-index="${index}"]`);
-                if (highlights && highlights.length) {
-                    highlights[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    showHighlightNote(highlights[0], item, index, file.file_id);
-                }
-            });
-
-            list.append(card);
+            if (contextualMap.has(index)) {
+                contextualIndices.push(index);
+            } else {
+                generalIndices.push(index);
+            }
         });
-        section.append(list);
-        return section;
+
+        // 1. OBSERVACIONES GENERALES
+        const generalSection = document.createElement('section');
+        generalSection.className = 'sw-review-observation-group is-general';
+
+        const generalHeading = document.createElement('div');
+        generalHeading.className = 'sw-review-group-heading';
+        generalHeading.innerHTML = `<strong>Observaciones generales</strong><span>${generalIndices.length}</span>`;
+        generalSection.append(generalHeading);
+
+        if (!generalIndices.length) {
+            const empty = document.createElement('p');
+            empty.className = 'sw-review-empty-inline';
+            empty.textContent = 'No hay observaciones generales.';
+            generalSection.append(empty);
+        } else {
+            const list = document.createElement('div');
+            list.className = 'sw-review-card-list';
+
+            generalIndices.forEach((index) => {
+                const item = items[index];
+                const selectedText = metas[index]?.selected_text || '';
+                const compactLoc = formatCompactLocation(item.location_reference);
+
+                const card = document.createElement('article');
+                card.className = 'sw-review-observation-card is-draft';
+
+                const renderCardContent = () => {
+                    card.innerHTML = '';
+                    const isExpanded = card.dataset.expanded === 'true';
+
+                    const meta = document.createElement('div');
+                    meta.className = 'sw-review-card-meta';
+
+                    if (item.category && item.category !== 'General') {
+                        const category = document.createElement('strong');
+                        category.className = 'sw-review-category-badge';
+                        category.textContent = item.category;
+                        meta.append(category);
+                    } else {
+                        const typeLabel = document.createElement('span');
+                        typeLabel.className = 'sw-review-type-label';
+                        typeLabel.textContent = 'Observación general';
+                        meta.append(typeLabel);
+                    }
+
+                    const pending = document.createElement('span');
+                    pending.textContent = 'Borrador';
+                    meta.append(pending);
+                    card.append(meta);
+
+                    const commentBody = document.createElement('p');
+                    commentBody.className = 'sw-review-card-comment';
+                    const commentTrunc = truncateText(item.body, 140);
+                    commentBody.textContent = (!isExpanded && commentTrunc.isTruncated) ? commentTrunc.truncated : item.body;
+                    card.append(commentBody);
+
+                    if (compactLoc) {
+                        const metaLine = document.createElement('div');
+                        metaLine.className = 'sw-review-card-meta-line';
+                        const locSmall = document.createElement('small');
+                        locSmall.textContent = isExpanded ? (item.location_reference || compactLoc) : compactLoc;
+                        metaLine.append(locSmall);
+                        card.append(metaLine);
+                    }
+
+                    if (commentTrunc.isTruncated) {
+                        const toggleBtn = document.createElement('button');
+                        toggleBtn.type = 'button';
+                        toggleBtn.className = 'sw-review-toggle-more-btn';
+                        toggleBtn.innerHTML = isExpanded
+                            ? '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i> Ver menos'
+                            : '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Ver más';
+
+                        toggleBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            card.dataset.expanded = isExpanded ? 'false' : 'true';
+                            renderCardContent();
+                        });
+                        card.append(toggleBtn);
+                    }
+
+                    const actions = document.createElement('div');
+                    actions.className = 'sw-review-card-actions';
+                    actions.innerHTML = '<button type="button" data-action="edit"><i class="fa-solid fa-pen" aria-hidden="true"></i> Editar</button><button type="button" data-action="delete"><i class="fa-regular fa-trash-can" aria-hidden="true"></i> Eliminar</button>';
+                    actions.querySelectorAll('button').forEach((b) => b.disabled = isSubmitting);
+
+                    actions.querySelector('[data-action="edit"]').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        openEditor('edit', file.file_id, {
+                            index,
+                            category: item.category,
+                            body: item.body,
+                            locationReference: item.location_reference || '',
+                            selectedText: selectedText,
+                        });
+                    });
+                    actions.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (isSubmitting) return;
+                        draft.observations.splice(index, 1);
+                        metas.splice(index, 1);
+                        completedFileIds.delete(file.file_id);
+                        if (!draft.observations.length && draft.status === 'corrections_requested' && draft.decisionSource === 'auto') {
+                            delete reviewDraft[file.file_id];
+                            observationMeta.delete(file.file_id);
+                        }
+                        removeActiveNotePopover();
+                        reviewError = '';
+                        saveReviewDraft();
+                        renderReviewCenter();
+                    });
+                    card.append(actions);
+                };
+
+                renderCardContent();
+                list.append(card);
+            });
+            generalSection.append(list);
+        }
+
+        // 2. OBSERVACIONES SOBRE EL TEXTO
+        const contextualSection = document.createElement('section');
+        contextualSection.className = 'sw-review-observation-group is-contextual';
+
+        const contextualHeading = document.createElement('div');
+        contextualHeading.className = 'sw-review-group-heading';
+        contextualHeading.innerHTML = `<strong>Observaciones sobre el texto</strong><span>${contextualIndices.length}</span>`;
+        contextualSection.append(contextualHeading);
+
+        if (!contextualIndices.length) {
+            const empty = document.createElement('p');
+            empty.className = 'sw-review-empty-inline';
+            empty.textContent = 'No hay observaciones sobre el texto.';
+            contextualSection.append(empty);
+        } else {
+            const list = document.createElement('div');
+            list.className = 'sw-review-card-list';
+
+            contextualIndices.forEach((index) => {
+                const item = items[index];
+                const selectedText = metas[index]?.selected_text || '';
+                const compactLoc = formatCompactLocation(item.location_reference);
+                const contextualInfo = contextualMap.get(index);
+                const obsNumber = contextualInfo?.obsNumber || null;
+                const colorClass = contextualInfo?.colorClass || '';
+
+                const card = document.createElement('article');
+                card.className = `sw-review-observation-card is-draft ${colorClass}`.trim();
+
+                const renderCardContent = () => {
+                    card.innerHTML = '';
+                    const isExpanded = card.dataset.expanded === 'true';
+
+                    const meta = document.createElement('div');
+                    meta.className = 'sw-review-card-meta';
+
+                    if (obsNumber) {
+                        const numberBadge = document.createElement('span');
+                        numberBadge.className = `sw-review-card-number-badge ${colorClass}`;
+                        numberBadge.textContent = String(obsNumber);
+                        meta.append(numberBadge);
+                    }
+
+                    if (item.category && item.category !== 'General') {
+                        const category = document.createElement('strong');
+                        category.className = 'sw-review-category-badge';
+                        category.textContent = item.category;
+                        meta.append(category);
+                    } else {
+                        const typeLabel = document.createElement('span');
+                        typeLabel.className = 'sw-review-type-label';
+                        typeLabel.textContent = 'Texto seleccionado';
+                        meta.append(typeLabel);
+                    }
+
+                    const pending = document.createElement('span');
+                    pending.textContent = 'Borrador';
+                    meta.append(pending);
+                    card.append(meta);
+
+                    const commentBody = document.createElement('p');
+                    commentBody.className = 'sw-review-card-comment';
+                    const commentTrunc = truncateText(item.body, 140);
+                    commentBody.textContent = (!isExpanded && commentTrunc.isTruncated) ? commentTrunc.truncated : item.body;
+                    card.append(commentBody);
+
+                    if (compactLoc) {
+                        const metaLine = document.createElement('div');
+                        metaLine.className = 'sw-review-card-meta-line';
+                        const locSmall = document.createElement('small');
+                        locSmall.textContent = isExpanded ? (item.location_reference || compactLoc) : compactLoc;
+                        metaLine.append(locSmall);
+                        card.append(metaLine);
+                    }
+
+                    if (selectedText) {
+                        const fragment = document.createElement('blockquote');
+                        fragment.className = 'sw-review-card-quote';
+                        const quoteTrunc = truncateText(selectedText, 100);
+                        fragment.textContent = (!isExpanded && quoteTrunc.isTruncated) ? `"${quoteTrunc.truncated}"` : `"${selectedText}"`;
+                        card.append(fragment);
+                    }
+
+                    const isCommentTruncated = commentTrunc.isTruncated;
+                    const isQuoteTruncated = selectedText && selectedText.length > 100;
+                    if (isCommentTruncated || isQuoteTruncated) {
+                        const toggleBtn = document.createElement('button');
+                        toggleBtn.type = 'button';
+                        toggleBtn.className = 'sw-review-toggle-more-btn';
+                        toggleBtn.innerHTML = isExpanded
+                            ? '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i> Ver menos'
+                            : '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Ver más';
+
+                        toggleBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            card.dataset.expanded = isExpanded ? 'false' : 'true';
+                            renderCardContent();
+                        });
+                        card.append(toggleBtn);
+                    }
+
+                    const actions = document.createElement('div');
+                    actions.className = 'sw-review-card-actions';
+                    actions.innerHTML = '<button type="button" data-action="edit"><i class="fa-solid fa-pen" aria-hidden="true"></i> Editar</button><button type="button" data-action="delete"><i class="fa-regular fa-trash-can" aria-hidden="true"></i> Eliminar</button>';
+                    actions.querySelectorAll('button').forEach((b) => b.disabled = isSubmitting);
+
+                    actions.querySelector('[data-action="edit"]').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        openEditor('edit', file.file_id, {
+                            index,
+                            category: item.category,
+                            body: item.body,
+                            locationReference: item.location_reference || '',
+                            selectedText: selectedText,
+                        });
+                    });
+                    actions.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (isSubmitting) return;
+                        draft.observations.splice(index, 1);
+                        metas.splice(index, 1);
+                        completedFileIds.delete(file.file_id);
+                        if (!draft.observations.length && draft.status === 'corrections_requested' && draft.decisionSource === 'auto') {
+                            delete reviewDraft[file.file_id];
+                            observationMeta.delete(file.file_id);
+                        }
+                        removeActiveNotePopover();
+                        reviewError = '';
+                        saveReviewDraft();
+                        renderReviewCenter();
+                    });
+                    card.append(actions);
+                };
+
+                renderCardContent();
+
+                card.addEventListener('click', () => {
+                    const highlights = previewStage?.querySelectorAll(`[data-observation-index="${index}"]`);
+                    if (highlights && highlights.length) {
+                        highlights[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        showHighlightNote(highlights[0], item, index, file.file_id, obsNumber, colorClass);
+                    }
+                });
+
+                list.append(card);
+            });
+            contextualSection.append(list);
+        }
+
+        return { generalSection, contextualSection };
     };
 
     const closeDecisionModal = () => {
@@ -1534,6 +1656,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const isCompletedReadOnly = completedFileIds.has(file.file_id) && editingCompletedFileId !== file.file_id;
+        const { generalSection, contextualSection } = createReviewSections(file);
+
         if (isCompletedReadOnly) {
             const draft = draftFor(file.file_id);
             const isApproved = draft?.status === 'approved';
@@ -1562,11 +1686,11 @@ document.addEventListener('DOMContentLoaded', () => {
             editBtn.addEventListener('click', () => startEditingCompletedReview(file.file_id));
 
             banner.append(header, message, editBtn);
-            observationPanel.append(banner, createExistingSection(file), createDraftSection(file));
+            observationPanel.append(banner, generalSection, contextualSection);
             return;
         }
 
-        observationPanel.append(createReviewActions(file), createExistingSection(file), createDraftSection(file));
+        observationPanel.append(createReviewActions(file), generalSection, contextualSection);
         if (editorState?.fileId === file.file_id) observationPanel.append(createEditor());
         if (reviewError && !editorState) {
             const error = document.createElement('p');

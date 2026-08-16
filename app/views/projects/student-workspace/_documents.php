@@ -69,7 +69,7 @@ $docLimits = (new ProjectDocumentFileService())->limits();
                 <a class="sw-viewer-action" href="<?= e($packageUrl) ?>"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</a>
             </div>
             <div class="sw-project-actions-file">
-                <a class="sw-viewer-action is-file-download" data-sw-viewer-download hidden><i class="fa-solid fa-download" aria-hidden="true"></i> Descargar</a>
+                <button type="button" class="sw-viewer-action is-file-download" data-sw-viewer-download disabled><i class="fa-solid fa-download" aria-hidden="true"></i> Descargar</button>
                 <button type="button" class="sw-viewer-action" data-sw-print disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Imprimir</button>
             </div>
         </div>
@@ -81,13 +81,24 @@ $docLimits = (new ProjectDocumentFileService())->limits();
                     <span data-sw-viewer-meta>Exploración y consulta documental</span>
                 </div>
             </div>
+        </header>
+        <?php if ($canReviewDocuments): ?>
+        <div class="sw-viewer-help-banner">
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+            <div class="sw-viewer-help-content">
+                <strong>¿Cómo agregar observaciones?</strong>
+                <span>Selecciona un fragmento del documento para agregar una observación. Para comentar todo el archivo, usa <strong>“Observación general”</strong>.</span>
+            </div>
+        </div>
+        <?php endif; ?>
+        <div class="sw-viewer-zoom-wrapper">
             <div class="sw-viewer-zoom" data-sw-viewer-zoom hidden>
                 <button type="button" data-sw-zoom-minus aria-label="Alejar" title="Alejar (−)">−</button>
                 <button type="button" data-sw-zoom-fit aria-label="Ajustar al ancho" title="Ajustar al ancho">Ajustar</button>
                 <button type="button" data-sw-zoom-plus aria-label="Acercar" title="Acercar (+)">+</button>
                 <span data-sw-zoom-percentage>100%</span>
             </div>
-        </header>
+        </div>
         <div class="sw-viewer-canvas"><div class="sw-preview-stage" data-sw-preview-stage></div></div>
     </section>
     <div class="sw-resizer sw-resizer-observations" data-sw-resizer="observations" role="separator" aria-orientation="vertical" aria-label="Redimensionar panel de observaciones" tabindex="0" title="Arrastra para redimensionar (Doble clic para restablecer)"></div>

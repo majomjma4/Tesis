@@ -596,9 +596,96 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
 .student-workspace .sw-preview-stage { align-self:stretch;width:100%;min-width:0;min-height:min(62vh,720px);background:#eef2f6;border:0;border-radius:6px;overflow:auto;scrollbar-gutter:stable; }
 .sw-viewer-zoom { display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.3rem .6rem;background:#fff;border:1px solid var(--sw-border,#cbd5e1);border-radius:8px;box-shadow:0 1px 3px rgba(15,23,42,.08);margin:0 auto;white-space:nowrap; }
 .sw-viewer-zoom[hidden] { display:none !important; }
+.sw-viewer-zoom-wrapper { display:flex; justify-content:center; align-items:center; margin:0.35rem 0; flex-shrink:0; }
 .sw-viewer-zoom button { border:1px solid var(--sw-border,#cbd5e1);border-radius:6px;background:var(--sw-bg-soft,#f8fafc);color:var(--sw-text,#1e293b);padding:.32rem .65rem;font:inherit;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .15s ease;min-width:32px; }
 .sw-viewer-zoom button:hover { background:#eff6ff;border-color:#bfdbfe;color:var(--sw-primary,#2563eb); }
 .sw-viewer-zoom span { font-size:.88rem;font-weight:700;color:var(--sw-text,#1e293b);padding:0 .45rem;min-width:48px;text-align:center; }
+
+.student-workspace .sw-viewer-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid var(--sw-border, #cbd5e1);
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--sw-text, #1e293b);
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.student-workspace .sw-viewer-action.is-file-download:not(:disabled) {
+    background: var(--sw-primary, #2563eb);
+    border-color: var(--sw-primary, #2563eb);
+    color: #ffffff;
+}
+
+.student-workspace .sw-viewer-action.is-file-download:not(:disabled):hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.student-workspace .sw-viewer-action:disabled,
+.student-workspace .sw-viewer-action[disabled] {
+    opacity: 0.55 !important;
+    background: var(--sw-bg-soft, #f8fafc) !important;
+    border-color: var(--sw-border, #cbd5e1) !important;
+    color: var(--sw-text-muted, #64748b) !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+    box-shadow: none !important;
+}
+
+.student-workspace .sw-viewer-help-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    margin: 0.35rem 0.85rem 0.25rem;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: #334155;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    flex-shrink: 0;
+}
+
+.student-workspace .sw-viewer-help-banner i {
+    color: #2563eb;
+    font-size: 0.88rem;
+    margin-top: 0.12rem;
+    flex-shrink: 0;
+}
+
+.student-workspace .sw-viewer-help-content {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.2rem 0.4rem;
+}
+
+.student-workspace .sw-viewer-help-content strong:first-child {
+    color: #1e40af;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.student-workspace .sw-viewer-help-content span {
+    color: #475569;
+    font-size: 0.74rem;
+}
+
+.student-workspace .sw-viewer-help-content span strong {
+    color: #0f172a;
+    font-weight: 600;
+}
 .student-workspace .sw-preview-error-wrapper { display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:260px;padding:1.5rem 1rem;gap:.75rem;text-align:center; }
 .student-workspace .sw-preview-error-wrapper .sw-preview-message { min-height:auto;padding:0; }
 .student-workspace .sw-retry-preview-btn { display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.48rem 1.1rem;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#1e293b;font:inherit;font-size:.84rem;font-weight:600;cursor:pointer;transition:all .15s ease;box-shadow:0 1px 2px rgba(0,0,0,.05); }
