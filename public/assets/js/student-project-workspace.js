@@ -748,93 +748,139 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     let pdfZoomMultiplier=1.0;
     let pdfRenderGeneration=0;
+    let currentPdfRenderTask=null;
+    const cancelActivePdfRenderTask=()=>{
+        if(currentPdfRenderTask){
+            try{ currentPdfRenderTask.cancel(); }catch(e){}
+            currentPdfRenderTask=null;
+        }
+    };
     const renderPdfPoc=async(preview,restore=null)=>{
         activePdfPreview=preview;
         const generation=++pdfRenderGeneration;
+        cancelActivePdfRenderTask();
 
-        const pdfDoc=await loadPdfDocument(preview);
-        if(generation!==pdfRenderGeneration)return;
-
-        const api=await pdfjs();
-        if(generation!==pdfRenderGeneration)return;
-
-        const first=await pdfDoc.getPage(1);
-        if(generation!==pdfRenderGeneration)return;
-
-        const natural=first.getViewport({scale:1.0});
-        const availableWidth=Math.max(280,(previewStage.clientWidth||600)-24);
-        const usableWidth=availableWidth*0.92;
-        pdfFitScale=Math.min(3.0,Math.max(0.2,usableWidth/natural.width));
-        const effectiveScale=pdfFitScale*pdfZoomMultiplier;
-        const relativePercentage=Math.round(pdfZoomMultiplier*100);
-
-
-        if (viewerZoom) viewerZoom.hidden = false;
-        if (zoomPercentageLabel) zoomPercentageLabel.textContent = `${relativePercentage}%`;
-
-        const nextPages=document.createElement('div');
-        nextPages.className='sw-poc-pages';
-
-        for(let number=1;number<=pdfDoc.numPages;number++){
+        try {
+            const pdfDoc=await loadPdfDocument(preview);
             if(generation!==pdfRenderGeneration)return;
 
-            const page=await pdfDoc.getPage(number);
+            const api=await pdfjs();
             if(generation!==pdfRenderGeneration)return;
 
-            const viewport=page.getViewport({scale:effectiveScale}),host=document.createElement('div');
-            host.className='sw-poc-page';
-            host.dataset.pocPage=String(number);
-            host.style.width=`${viewport.width}px`;
-            host.style.height=`${viewport.height}px`;
-            host.style.setProperty('--scale-factor',String(effectiveScale));
-            const outputScale=window.devicePixelRatio||1,canvas=document.createElement('canvas');
-            canvas.width=Math.floor(viewport.width*outputScale);
-            canvas.height=Math.floor(viewport.height*outputScale);
-            canvas.style.width=`${viewport.width}px`;
-            canvas.style.height=`${viewport.height}px`;
-            host.append(canvas);
-
-            await page.render({canvasContext:canvas.getContext('2d'),viewport,transform:outputScale===1?null:[outputScale,0,0,outputScale,0,0]}).promise;
+            const first=await pdfDoc.getPage(1);
             if(generation!==pdfRenderGeneration)return;
 
-            const text=document.createElement('div');
-            text.className='sw-poc-text-layer';
-            text.style.width=`${viewport.width}px`;
-            text.style.height=`${viewport.height}px`;
-            host.append(text);
+            const natural=first.getViewport({scale:1.0});
+            const availableWidth=Math.max(280,(previewStage.clientWidth||600)-24);
+            const usableWidth=availableWidth*0.92;
+            pdfFitScale=Math.min(3.0,Math.max(0.2,usableWidth/natural.width));
+            const effectiveScale=pdfFitScale*pdfZoomMultiplier;
+            const relativePercentage=Math.round(pdfZoomMultiplier*100);
 
-            await new api.TextLayer({textContentSource:await page.getTextContent(),container:text,viewport}).render();
+            if (viewerZoom) viewerZoom.hidden = false;
+            if (zoomPercentageLabel) zoomPercentageLabel.textContent = `${relativePercentage}%`;
+
+            const nextPages=document.createElement('div');
+            nextPages.className='sw-poc-pages';
+
+            for(let number=1;number<=pdfDoc.numPages;number++){
+                if(generation!==pdfRenderGeneration)return;
+
+                const page=await pdfDoc.getPage(number);
+                if(generation!==pdfRenderGeneration)return;
+
+                const viewport=page.getViewport({scale:effectiveScale}),host=document.createElement('div');
+                host.className='sw-poc-page';
+                host.dataset.pocPage=String(number);
+                host.style.width=`${viewport.width}px`;
+                host.style.height=`${viewport.height}px`;
+                host.style.setProperty('--scale-factor',String(effectiveScale));
+                const outputScale=window.devicePixelRatio||1,canvas=document.createElement('canvas');
+                canvas.width=Math.floor(viewport.width*outputScale);
+                canvas.height=Math.floor(viewport.height*outputScale);
+                canvas.style.width=`${viewport.width}px`;
+                canvas.style.height=`${viewport.height}px`;
+                host.append(canvas);
+
+                const renderTask=page.render({canvasContext:canvas.getContext('2d'),viewport,transform:outputScale===1?null:[outputScale,0,0,outputScale,0,0]});
+                currentPdfRenderTask=renderTask;
+                try {
+                    await renderTask.promise;
+                } catch (renderError) {
+                    if (
+                        renderError?.name === 'RenderingCancelledException' ||
+                        renderError?.name === 'AbortException' ||
+                        (typeof renderError?.message === 'string' && (renderError.message.includes('Rendering cancelled') || renderError.message.includes('RenderingCancelledException')))
+                    ) {
+                        return;
+                    }
+                    throw renderError;
+                } finally {
+                    if (currentPdfRenderTask === renderTask) {
+                        currentPdfRenderTask = null;
+                    }
+                }
+                if(generation!==pdfRenderGeneration)return;
+
+                const text=document.createElement('div');
+                text.className='sw-poc-text-layer';
+                text.style.width=`${viewport.width}px`;
+                text.style.height=`${viewport.height}px`;
+                host.append(text);
+
+                try {
+                    await new api.TextLayer({textContentSource:await page.getTextContent(),container:text,viewport}).render();
+                } catch (textLayerError) {
+                    if (
+                        textLayerError?.name === 'RenderingCancelledException' ||
+                        textLayerError?.name === 'AbortException' ||
+                        (typeof textLayerError?.message === 'string' && (textLayerError.message.includes('Rendering cancelled') || textLayerError.message.includes('RenderingCancelledException')))
+                    ) {
+                        return;
+                    }
+                    console.warn('TextLayer non-fatal warning:', textLayerError);
+                }
+                if(generation!==pdfRenderGeneration)return;
+
+                nextPages.append(host);
+            }
+
             if(generation!==pdfRenderGeneration)return;
 
-            nextPages.append(host);
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed) {
+                sel.removeAllRanges();
+            }
+
+            const existingPages=previewStage.querySelector('.sw-poc-pages');
+            if(existingPages){
+                existingPages.replaceWith(nextPages);
+            }else{
+                previewStage.append(nextPages);
+            }
+
+            if(restore){
+                previewStage.scrollTop=(previewStage.scrollHeight-previewStage.clientHeight)*restore.top;
+                previewStage.scrollLeft=(previewStage.scrollWidth-previewStage.clientWidth)*restore.left;
+            }
+
+            drawPocAnnotations();
+            drawStudentObservationHighlights();
+
+            if(previewStage){
+                previewStage.hidden=false;
+            }
+            workspace.dispatchEvent(new CustomEvent('workspace:document-preview-rendered', { bubbles: true }));
+        } catch (error) {
+            if (
+                error?.name === 'RenderingCancelledException' ||
+                error?.name === 'AbortException' ||
+                (typeof error?.message === 'string' && (error.message.includes('Rendering cancelled') || error.message.includes('RenderingCancelledException')))
+            ) {
+                return;
+            }
+            throw error;
         }
-
-        if(generation!==pdfRenderGeneration)return;
-
-        const sel = window.getSelection();
-        if (sel && !sel.isCollapsed) {
-            sel.removeAllRanges();
-        }
-
-        const existingPages=previewStage.querySelector('.sw-poc-pages');
-        if(existingPages){
-            existingPages.replaceWith(nextPages);
-        }else{
-            previewStage.append(nextPages);
-        }
-
-        if(restore){
-            previewStage.scrollTop=(previewStage.scrollHeight-previewStage.clientHeight)*restore.top;
-            previewStage.scrollLeft=(previewStage.scrollWidth-previewStage.clientWidth)*restore.left;
-        }
-
-        drawPocAnnotations();
-        drawStudentObservationHighlights();
-
-        if(previewStage){
-            previewStage.hidden=false;
-        }
-        workspace.dispatchEvent(new CustomEvent('workspace:document-preview-rendered', { bubbles: true }));
     };
     const renderPreview = async (preview, originalUrl = '') => {
         clearPreview();
@@ -970,7 +1016,12 @@ document.addEventListener('DOMContentLoaded', () => {
             await renderPreview(preview,url);
             if(generation!==previewGeneration)throw Object.assign(new Error('Preview superseded.'),{code:'preview_superseded'});
         }catch(error){
-            if(error.name==='AbortError'||error.code==='preview_superseded')return;
+            const isCancelled = error?.name === 'AbortError' ||
+                error?.code === 'preview_superseded' ||
+                error?.name === 'RenderingCancelledException' ||
+                error?.name === 'AbortException' ||
+                (typeof error?.message === 'string' && (error.message.includes('Rendering cancelled') || error.message.includes('RenderingCancelledException')));
+            if (isCancelled) return;
             console.error('No fue posible cargar la vista previa.',error);
             if(error.code==='session_expired'){
                 previewMessage(error.message,'is-error');
