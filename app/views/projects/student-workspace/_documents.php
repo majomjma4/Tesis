@@ -163,7 +163,7 @@ $docLimits = (new ProjectDocumentFileService())->limits();
     <div class="sw-operation-modal sw-review-confirm-modal" data-sw-review-confirm-modal hidden>
         <section role="dialog" aria-modal="true" aria-labelledby="swReviewConfirmTitle" class="sw-review-confirm-card">
             <header class="sw-review-confirm-header">
-                <h2 id="swReviewConfirmTitle">Confirmar revisión</h2>
+                <h2 id="swReviewConfirmTitle">¿Terminar revisión?</h2>
                 <button type="button" data-sw-review-confirm-close aria-label="Cerrar ventana">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
@@ -171,7 +171,8 @@ $docLimits = (new ProjectDocumentFileService())->limits();
             <div class="sw-review-confirm-body">
                 <div class="sw-review-confirm-copy">
                     <strong data-sw-review-confirm-heading>Has terminado la revisión de los documentos.</strong>
-                    <p data-sw-review-confirm-message>Al confirmar, el sistema registrará el resultado de esta revisión.</p>
+                    <p data-sw-review-confirm-message>Al enviar esta revisión al estudiante ya no podrás modificar las decisiones ni observaciones de esta revisión.</p>
+                    <p data-sw-review-confirm-lock>Una vez enviada, esta revisión quedará bloqueada.</p>
                 </div>
                 <div class="sw-review-confirm-stats" data-sw-review-confirm-stats>
                     <span data-sw-review-approved-count>0 aprobados</span>
@@ -183,7 +184,7 @@ $docLimits = (new ProjectDocumentFileService())->limits();
             <footer class="sw-review-confirm-footer">
                 <button type="button" class="sw-review-confirm-cancel" data-sw-review-confirm-cancel>Cancelar</button>
                 <button type="button" class="sw-review-confirm-submit" data-sw-review-confirm-submit>
-                    <i class="fa-solid fa-check" aria-hidden="true"></i> <span>Confirmar revisión</span>
+                    <i class="fa-solid fa-check" aria-hidden="true"></i> <span>Terminar revisión</span>
                 </button>
             </footer>
         </section>

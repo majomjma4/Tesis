@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmMessage = confirmModal?.querySelector('[data-sw-review-confirm-message]');
     const confirmApprovedCount = confirmModal?.querySelector('[data-sw-review-approved-count]');
     const confirmCorrectionsCount = confirmModal?.querySelector('[data-sw-review-corrections-count]');
+    const confirmLock = confirmModal?.querySelector('[data-sw-review-confirm-lock]');
     const confirmStatus = confirmModal?.querySelector('[data-sw-review-confirm-status]');
     const confirmError = confirmModal?.querySelector('[data-sw-review-confirm-error]');
     const confirmSubmitButton = confirmModal?.querySelector('[data-sw-review-confirm-submit]');
@@ -1606,7 +1607,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const createReadySummary = () => {
         const value = summary();
         const confirmState = getConfirmState();
-        const buttonText = isSubmitting ? 'Guardando revision...' : 'Confirmar revision';
+        const buttonText = isSubmitting ? 'Finalizando revision...' : 'Terminar revision';
         const helperText = confirmState.enabled
             ? 'La confirmacion enviara el lote completo al backend y aplicara las transiciones reales del proyecto.'
             : confirmState.reason;
@@ -1633,7 +1634,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderHighlights();
         observationPanel.replaceChildren(createProgress());
         const value = summary();
-        if (value.total > 0 && value.pending === 0) observationPanel.append(createReadySummary());
         if (!reviewIsAvailable) {
             const unavailable = document.createElement('div');
             unavailable.className = 'sw-review-unavailable';
@@ -1641,6 +1641,7 @@ document.addEventListener('DOMContentLoaded', () => {
             observationPanel.append(unavailable);
             return;
         }
+        if (value.total > 0) observationPanel.append(createReadySummary());
         const file = filesById.get(activeFileId);
         if (!file) {
             observationPanel.append(createProjectGeneralSection());
@@ -2228,12 +2229,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirmHeading) {
             confirmHeading.textContent = currentSummary.total > 0
                 ? 'Has terminado la revision de los documentos.'
-                : 'Todavia no hay una revision lista para confirmar.';
+                : 'Todavia no hay una revision lista para terminar.';
         }
         if (confirmMessage) {
             confirmMessage.textContent = hasCorrections
-                ? 'Al confirmar, los estudiantes recibiran el resultado de la revision y se solicitaran correcciones en los documentos observados.'
-                : 'Al confirmar, los documentos revisados quedaran registrados como aprobados por esta revision.';
+                ? 'Al enviar esta revision, el estudiante vera las observaciones, comentarios y marcas de los documentos que requieren correcciones. Solo esos documentos deberan modificarse y reenviarse.'
+                : 'Todos los documentos fueron aprobados y el proyecto pasara a estado Aprobado.';
         }
         if (confirmApprovedCount) confirmApprovedCount.textContent = `${currentSummary.approved} aprobados`;
         if (confirmCorrectionsCount) confirmCorrectionsCount.textContent = `${currentSummary.corrections} con correcciones`;
@@ -2245,9 +2246,10 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmError.hidden = confirmModalError === '';
             confirmError.textContent = confirmModalError;
         }
+        if (confirmLock) confirmLock.textContent = 'Una vez enviada, esta revisión quedará bloqueada.';
         if (confirmSubmitButton) {
             confirmSubmitButton.disabled = !confirmState.enabled || isSubmitting;
-            confirmSubmitButton.querySelector('span').textContent = isSubmitting ? 'Guardando revision...' : 'Confirmar revision';
+            confirmSubmitButton.querySelector('span').textContent = isSubmitting ? 'Finalizando revision...' : 'Terminar revision';
         }
     };
 
@@ -2298,7 +2300,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isSubmitting = true;
         reviewError = '';
         confirmModalError = '';
-        confirmModalStatus = 'Guardando revision...';
+        confirmModalStatus = 'Finalizando revision...';
         removeSelectionPopover(true);
         renderReviewCenter();
         refreshConfirmModal();
