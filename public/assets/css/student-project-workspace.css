@@ -3273,6 +3273,14 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     scrollbar-gutter: stable;
 }
 
+.student-workspace .sw-observations-panel.is-collapsed > *:not(.sw-panel-reopen-btn),
+.student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel.is-collapsed > *:not(.sw-panel-reopen-btn),
+.student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel.is-collapsed [data-sw-file-observations],
+.student-workspace.sw-observations-collapsed .sw-observations-panel > *:not(.sw-panel-reopen-btn),
+.student-workspace.sw-observations-collapsed .sw-observations-panel [data-sw-file-observations] {
+    display: none !important;
+}
+
 .student-workspace .sw-review-progress,
 .student-workspace .sw-review-actions,
 .student-workspace .sw-review-observation-group,
@@ -3320,6 +3328,14 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     white-space: nowrap;
 }
 
+.student-workspace .sw-review-parent-zip-subtitle {
+    display: block;
+    color: #64748b;
+    font-size: 0.71rem;
+    font-weight: 500;
+    margin-top: 0.15rem;
+}
+
 .student-workspace .sw-review-progress-track {
     height: 5px;
     margin: 0.55rem 0;
@@ -3352,6 +3368,128 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
 .student-workspace .sw-review-progress-counts .is-approved i { color: #15803d; }
 .student-workspace .sw-review-progress-counts .is-corrections i { color: #d97706; }
 .student-workspace .sw-review-progress-counts .is-pending i { color: #94a3b8; }
+.student-workspace .sw-review-draft-meta-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.45rem;
+    padding-top: 0.45rem;
+    border-top: 1px dashed var(--sw-border, #e2e8f0);
+    font-size: 0.68rem;
+    color: #64748b;
+}
+.student-workspace .sw-review-autosave-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #0284c7;
+    font-weight: 500;
+}
+.student-workspace .sw-review-discard-draft-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 0;
+    background: transparent;
+    color: #dc2626;
+    font: inherit;
+    font-size: 0.68rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.15rem 0.35rem;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+}
+.student-workspace .sw-review-discard-draft-btn:hover {
+    background: #fef2f2;
+}
+.student-workspace .sw-review-category-wrapper {
+    position: relative;
+    width: 100%;
+    margin-top: 0.25rem;
+}
+.student-workspace .sw-review-category-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 38px;
+    padding: 0 0.85rem;
+    border: 1px solid var(--sw-border, #cbd5e1);
+    border-radius: 8px;
+    background: #ffffff;
+    color: #1e293b;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.student-workspace .sw-review-category-trigger:hover {
+    border-color: #94a3b8;
+}
+.student-workspace .sw-review-category-trigger:focus,
+.student-workspace .sw-review-category-trigger[aria-expanded="true"] {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.student-workspace .sw-review-category-trigger i {
+    font-size: 0.75rem;
+    color: #64748b;
+    transition: transform 0.2s ease;
+}
+.student-workspace .sw-review-category-trigger[aria-expanded="true"] i {
+    transform: rotate(180deg);
+}
+.student-workspace .sw-review-category-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 50;
+    margin: 0;
+    padding: 0.35rem 0;
+    list-style: none;
+    background: #ffffff;
+    border: 1px solid var(--sw-border, #e2e8f0);
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
+    max-height: 220px;
+    overflow-y: auto;
+}
+.student-workspace .sw-review-category-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.83rem;
+    color: #334155;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.12s ease, color 0.12s ease;
+}
+.student-workspace .sw-review-category-option:hover,
+.student-workspace .sw-review-category-option.is-focused {
+    background-color: #f1f5f9;
+    color: #0f172a;
+}
+.student-workspace .sw-review-category-option[aria-selected="true"] {
+    background-color: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 600;
+}
+.student-workspace .sw-review-category-option i {
+    font-size: 0.78rem;
+    color: #2563eb;
+    opacity: 0;
+}
+.student-workspace .sw-review-category-option[aria-selected="true"] i {
+    opacity: 1;
+}
 
 .student-workspace .sw-review-current-file {
     align-items: flex-start;
@@ -3485,6 +3623,11 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     padding: 0.85rem;
     border-bottom: 1px solid var(--sw-border, #e2e8f0);
     background: #f8fafc;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: hidden;
 }
 
 .student-workspace .sw-review-form-heading {
@@ -3494,6 +3637,8 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     gap: 0.5rem;
     color: #0f172a;
     font-size: 0.84rem;
+    min-width: 0;
+    width: 100%;
 }
 
 .student-workspace .sw-review-form-heading button {
@@ -3501,20 +3646,24 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     background: transparent;
     color: #64748b;
     cursor: pointer;
+    flex-shrink: 0;
 }
 
 .student-workspace .sw-review-form label {
     display: grid;
     gap: 0.35rem;
     min-width: 0;
+    width: 100%;
     color: #334155;
     font-size: 0.73rem;
     font-weight: 700;
+    box-sizing: border-box;
 }
 
 .student-workspace .sw-review-form select,
 .student-workspace .sw-review-form textarea {
     width: 100%;
+    max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
     border: 1px solid #cbd5e1;
@@ -3526,11 +3675,13 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
 }
 
 .student-workspace .sw-review-form select { min-height: 38px; padding: 0.45rem 0.55rem; }
-.student-workspace .sw-review-form textarea { resize: vertical; min-height: 96px; max-height: 260px; padding: 0.6rem; line-height: 1.45; }
+.student-workspace .sw-review-form textarea { resize: vertical; min-height: 96px; max-height: 260px; padding: 0.6rem; line-height: 1.45; overflow-x: hidden; }
 .student-workspace .sw-review-character-count { justify-self: end; color: #94a3b8; font-size: 0.66rem; font-weight: 400; }
 
 .student-workspace .sw-review-selection-context {
     min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
     padding: 0.6rem;
     border: 1px solid #bfdbfe;
     border-radius: 8px;
@@ -3543,11 +3694,27 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
 
 .student-workspace .sw-review-form-actions {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
+    flex-wrap: wrap;
     gap: 0.45rem;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
-.student-workspace .sw-review-form-actions button { min-height: 36px; padding: 0.45rem 0.65rem; }
+.student-workspace .sw-review-form-actions button {
+    min-height: 36px;
+    padding: 0.45rem 0.65rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    text-align: center;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.25;
+    box-sizing: border-box;
+}
 .student-workspace .sw-review-form-actions .is-primary { border-color: var(--sw-primary, #2563eb); background: var(--sw-primary, #2563eb); color: #fff; }
 
 .student-workspace .sw-review-error {
@@ -3629,25 +3796,421 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
 .student-workspace .sw-review-file-indicator.is-corrections { background: #fef3c7; color: #b45309; }
 .student-workspace .sw-review-file-indicator.is-draft { background: #dbeafe; color: #1d4ed8; }
 
-.sw-review-selection-popover {
-    position: fixed;
+.student-workspace .sw-review-selection-editor {
+    position: absolute;
     z-index: 10100;
+    display: grid;
+    gap: 0.6rem;
+    width: min(320px, calc(100vw - 24px));
+    padding: 0.85rem;
+    border: 1px solid var(--sw-border, #cbd5e1);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.22);
+    font-family: inherit;
+    font-size: 0.82rem;
+    animation: swFadeInScale 0.18s ease;
+}
+
+.sw-viewer-panel { position: relative; }
+.sw-review-floating-layer { position:absolute; inset:0; z-index:10100; pointer-events:none !important; overflow:hidden; }
+.sw-review-floating-layer .sw-review-selection-editor,
+.sw-review-floating-layer .sw-review-note-popover,
+.sw-review-floating-layer .sw-review-highlight-overlay,
+.sw-review-floating-layer .sw-review-highlight-badge { pointer-events:auto !important; }
+
+@keyframes swFadeInScale {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.student-workspace .sw-review-selection-quote {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.5rem 0.65rem;
+    border-left: 3px solid #2563eb;
+    border-radius: 4px;
+    background: #f8fafc;
+}
+
+.student-workspace .sw-review-selection-quote span {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+}
+
+.student-workspace .sw-review-selection-quote blockquote {
+    margin: 0;
+    font-size: 0.78rem;
+    font-style: italic;
+    color: #0f172a;
+    line-height: 1.35;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.student-workspace .sw-review-selection-quote small {
+    font-size: 0.7rem;
+    color: #475569;
+}
+
+.student-workspace .sw-review-selection-body {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.student-workspace .sw-review-selection-body textarea {
+    width: 100%;
+    min-height: 64px;
+    max-height: 140px;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.student-workspace .sw-review-selection-body textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.student-workspace .sw-review-selection-count {
+    text-align: right;
+    font-size: 0.68rem;
+    color: #94a3b8;
+}
+
+.student-workspace .sw-review-selection-error {
+    margin: 0;
+    padding: 0.4rem 0.55rem;
+    border-radius: 6px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    font-size: 0.74rem;
+}
+
+.student-workspace .sw-review-selection-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.student-workspace .sw-review-selection-cancel,
+.student-workspace .sw-review-selection-submit {
+    height: 32px;
+    padding: 0 0.85rem;
+    border-radius: 7px;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.student-workspace .sw-review-selection-cancel {
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+}
+
+.student-workspace .sw-review-selection-cancel:hover {
+    background: #f1f5f9;
+}
+
+.student-workspace .sw-review-selection-submit {
+    border: 1px solid #2563eb;
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.student-workspace .sw-review-selection-submit:hover {
+    background: #1d4ed8;
+}
+
+/* Color Families for Contextual Observations (1 to 5 cyclic) */
+.sw-review-color-1 { --sw-color-bg: rgba(250, 204, 21, 0.16); --sw-color-border: rgba(202, 138, 4, 0.75); --sw-color-badge-bg: #fef08a; --sw-color-badge-text: #854d0e; --sw-color-badge-border: #ca8a04; --sw-color-card-bg: #fefce8; --sw-color-card-border: rgba(250, 204, 21, 0.75); --sw-color-pulse: #fef08a; }
+.sw-review-color-2 { --sw-color-bg: rgba(59, 130, 246, 0.14); --sw-color-border: rgba(37, 99, 235, 0.7); --sw-color-badge-bg: #dbeafe; --sw-color-badge-text: #1e40af; --sw-color-badge-border: #2563eb; --sw-color-card-bg: #eff6ff; --sw-color-card-border: rgba(147, 197, 253, 0.75); --sw-color-pulse: #dbeafe; }
+.sw-review-color-3 { --sw-color-bg: rgba(34, 197, 94, 0.14); --sw-color-border: rgba(22, 163, 74, 0.7); --sw-color-badge-bg: #dcfce7; --sw-color-badge-text: #166534; --sw-color-badge-border: #16a34a; --sw-color-card-bg: #f0fdf4; --sw-color-card-border: rgba(134, 239, 172, 0.75); --sw-color-pulse: #dcfce7; }
+.sw-review-color-4 { --sw-color-bg: rgba(249, 115, 22, 0.14); --sw-color-border: rgba(234, 88, 12, 0.7); --sw-color-badge-bg: #ffedd5; --sw-color-badge-text: #9a3412; --sw-color-badge-border: #ea580c; --sw-color-card-bg: #fff7ed; --sw-color-card-border: rgba(253, 186, 116, 0.75); --sw-color-pulse: #ffedd5; }
+.sw-review-color-5 { --sw-color-bg: rgba(168, 85, 247, 0.14); --sw-color-border: rgba(147, 51, 234, 0.7); --sw-color-badge-bg: #f3e8ff; --sw-color-badge-text: #6b21a8; --sw-color-badge-border: #9333ea; --sw-color-card-bg: #faf5ff; --sw-color-card-border: rgba(216, 180, 254, 0.75); --sw-color-pulse: #f3e8ff; }
+
+.sw-review-highlight-overlay {
+    position: absolute;
+    border-radius: 2px;
+    background: var(--sw-color-bg, rgba(250, 204, 21, 0.16));
+    border-bottom: 1.5px solid var(--sw-color-border, rgba(202, 138, 4, 0.75));
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.sw-review-highlight-overlay:hover {
+    background: var(--sw-color-bg, rgba(250, 204, 21, 0.32));
+    filter: brightness(0.95);
+}
+
+.sw-review-highlight-overlay.is-active {
+    filter: brightness(0.9);
+    box-shadow: 0 0 0 1px var(--sw-color-badge-border, #ca8a04);
+}
+
+.student-workspace .sw-review-observation-card[class*="sw-review-color-"],
+.student-workspace .sw-obs-card[class*="sw-review-color-"] {
+    background: var(--sw-color-card-bg, #ffffff);
+    border-color: var(--sw-color-card-border, #cbd5e1);
+}
+
+.student-workspace .sw-review-observation-card[class*="sw-review-color-"]:hover,
+.student-workspace .sw-obs-card[class*="sw-review-color-"]:hover {
+    filter: brightness(0.98);
+}
+
+.student-workspace .sw-review-observation-card[class*="sw-review-color-"] .sw-review-card-quote,
+.student-workspace .sw-obs-card[class*="sw-review-color-"] .sw-review-card-quote {
+    border-left-color: var(--sw-color-badge-border, #cbd5e1);
+}
+
+.student-workspace .sw-review-note-popover[class*="sw-review-color-"] {
+    border-color: var(--sw-color-card-border, #cbd5e1);
+}
+
+.student-workspace .sw-review-observation-card.is-highlighted-temp[class*="sw-review-color-"],
+.student-workspace .sw-obs-card.is-highlighted-temp[class*="sw-review-color-"] {
+    animation: swPulseCardFamily 1.5s ease;
+}
+
+@keyframes swPulseCardFamily {
+    0%, 100% { background: var(--sw-color-card-bg, inherit); }
+    50% { background: var(--sw-color-pulse, #fef9c3); border-color: var(--sw-color-badge-border, #fde047); }
+}
+
+.sw-review-highlight-badge {
+    position: absolute;
+    z-index: 25;
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    max-width: calc(100vw - 16px);
-    min-height: 32px;
-    padding: 0.42rem 0.62rem;
-    border: 1px solid #1e3a8a;
-    border-radius: 8px;
-    background: #0f172a;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
-    color: #fff;
-    font: inherit;
-    font-size: 0.74rem;
-    font-weight: 700;
-    white-space: nowrap;
+    justify-content: center;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 4px;
+    border-radius: 10px;
+    background: var(--sw-color-badge-bg, #fef08a);
+    color: var(--sw-color-badge-text, #854d0e);
+    border: 1.5px solid var(--sw-color-badge-border, #ca8a04);
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2);
+    pointer-events: auto;
     cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    user-select: none;
+}
+
+.sw-review-highlight-badge:hover {
+    transform: scale(1.12);
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.3);
+}
+
+.sw-review-card-number-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 6px;
+    background: var(--sw-color-badge-bg, #fef08a);
+    color: var(--sw-color-badge-text, #854d0e);
+    border: 1.5px solid var(--sw-color-badge-border, #ca8a04);
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.student-workspace .sw-review-note-popover {
+    position: absolute;
+    z-index: 10150;
+    display: grid;
+    gap: 0.45rem;
+    width: min(290px, calc(100vw - 24px));
+    padding: 0.75rem 0.85rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #ffffff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+    font-family: inherit;
+    font-size: 0.8rem;
+    color: #0f172a;
+    animation: swFadeInScale 0.15s ease;
+}
+
+.student-workspace .sw-review-note-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #475569;
+}
+
+.student-workspace .sw-review-note-header span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #1e3a8a;
+}
+
+.student-workspace .sw-review-note-close {
+    border: 0;
+    background: transparent;
+    color: #64748b;
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0 0.2rem;
+}
+
+.student-workspace .sw-review-note-close:hover {
+    color: #0f172a;
+}
+
+.student-workspace .sw-review-note-body {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: #0f172a;
+    word-break: break-word;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.student-workspace .sw-review-note-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.15rem;
+    padding-top: 0.35rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.student-workspace .sw-review-note-location {
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+.student-workspace .sw-review-note-link {
+    border: 0;
+    background: transparent;
+    color: #2563eb;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.student-workspace .sw-review-note-link:hover {
+    color: #1d4ed8;
+}
+
+.student-workspace .sw-review-card-comment,
+.student-workspace .sw-obs-card-body,
+.student-workspace .sw-obs-card p,
+.student-workspace .sw-review-observation-card p {
+    margin: 0;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.4;
+    word-break: break-word;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.student-workspace .sw-review-card-quote {
+    margin: 0.35rem 0 0 0;
+    padding: 0.35rem 0.5rem;
+    border-left: 2.5px solid #cbd5e1;
+    border-radius: 3px;
+    background: #f8fafc;
+    font-size: 0.75rem;
+    font-style: italic;
+    color: #475569;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.student-workspace .sw-review-card-meta-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.71rem;
+    color: #64748b;
+    margin-top: 0.3rem;
+}
+
+.student-workspace .sw-review-category-badge {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.student-workspace .sw-review-type-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.student-workspace .sw-review-toggle-more-btn {
+    border: 0;
+    background: transparent;
+    color: #2563eb;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.2rem 0;
+    margin-top: 0.2rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.student-workspace .sw-review-toggle-more-btn:hover {
+    color: #1d4ed8;
+    text-decoration: underline;
+}
+
+.student-workspace .sw-review-observation-card.is-highlighted-temp {
+    animation: swPulseHighlight 1.5s ease;
+}
+
+@keyframes swPulseHighlight {
+    0%, 100% { background: inherit; }
+    50% { background: #fef9c3; border-color: #fde047; }
 }
 
 .student-workspace .sw-review-confirm-modal {
@@ -3791,12 +4354,109 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     border-color: var(--sw-primary, #2563eb);
     background: var(--sw-primary, #2563eb);
     color: #fff;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.student-workspace .sw-review-confirm-submit.is-success {
+    border-color: #16a34a;
+    background: #16a34a;
+    color: #ffffff;
+}
+.student-workspace .sw-review-confirm-submit.is-success:hover {
+    background: #15803d;
+    border-color: #15803d;
+}
+
+.student-workspace .sw-review-confirm-submit.is-primary-blue {
+    border-color: #2563eb;
+    background: #2563eb;
+    color: #ffffff;
+}
+.student-workspace .sw-review-confirm-submit.is-primary-blue:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.student-workspace .sw-review-confirm-submit.is-danger-red {
+    border-color: #dc2626;
+    background: #dc2626;
+    color: #ffffff;
+}
+.student-workspace .sw-review-confirm-submit.is-danger-red:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
 }
 
 .student-workspace .sw-review-confirm-cancel:disabled,
 .student-workspace .sw-review-confirm-submit:disabled {
     opacity: 0.58;
     cursor: not-allowed;
+}
+
+.student-workspace .sw-review-completed-banner {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0.9rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #f8fafc;
+    margin: 0.85rem;
+}
+.student-workspace .sw-review-completed-banner.is-approved {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+}
+.student-workspace .sw-review-completed-banner.is-corrections {
+    border-color: #fde68a;
+    background: #fffbeb;
+}
+.student-workspace .sw-review-completed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.student-workspace .sw-review-completed-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+.student-workspace .sw-review-completed-banner.is-approved .sw-review-completed-badge { color: #166534; }
+.student-workspace .sw-review-completed-banner.is-corrections .sw-review-completed-badge { color: #92400e; }
+.student-workspace .sw-review-completed-message {
+    margin: 0;
+    font-size: 0.76rem;
+    color: #475569;
+    line-height: 1.4;
+}
+.student-workspace .sw-review-edit-completed-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 100%;
+    height: 36px;
+    margin-top: 0.25rem;
+    border: 1px solid #2563eb;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #2563eb;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.student-workspace .sw-review-edit-completed-btn:hover {
+    background: #eff6ff;
+}
+
+.student-workspace .sw-review-file-indicator.is-editing {
+    background: #eff6ff;
+    border-color: #2563eb;
+    color: #2563eb;
 }
 
 @media (max-width: 768px) {

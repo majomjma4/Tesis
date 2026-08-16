@@ -10,6 +10,10 @@ require APP_PATH . '/Core/Autoloader.php';
 Autoloader::register();
 
 $db = Database::connection();
+if (in_array('--migrate', $argv, true)) {
+    $sql = file_get_contents(ROOT_PATH . '/database/migrations/20260910_project_observation_selection_anchor.sql');
+    foreach (array_filter(array_map('trim', explode(';', (string) $sql))) as $statement) $db->exec($statement);
+}
 $passed = 0;
 $failed = 0;
 $trackedTables = ['projects','project_participants','project_files','project_file_review_states','project_observations','project_audit_log','notifications'];
@@ -174,7 +178,7 @@ try {
         $f = fixture($db, ++$case);
         [$fileA, $fileB] = $f['files'];
         $result = (new ProjectDocumentReviewBatchService())->confirmInTransaction($db, $f['project'], 'under_review', [
-            $fileA + ['status'=>'approved', 'observations'=>[]],
+            $fileA + ['status'=>'approved', 'observations'=>[['body'=>'Comentario opcional para el archivo A.', 'category'=>'Formato']]],
             $fileB + ['status'=>'corrections_requested', 'observations'=>[['body'=>'El archivo B requiere una corrección puntual.', 'category'=>'Contenido']]],
         ], $f['teacher']);
         $states = $db->query("SELECT file_id,checksum_sha256,status,reviewed_by FROM project_file_review_states WHERE project_id={$f['project']}")->fetchAll();
@@ -182,8 +186,12 @@ try {
         check(($byFile[$fileA['file_id']]['status'] ?? '') === 'approved' && ($byFile[$fileA['file_id']]['checksum_sha256'] ?? '') === $fileA['expected_checksum'], 'El estado aprobado de A es incorrecto.');
         check(($byFile[$fileB['file_id']]['status'] ?? '') === 'corrections_requested' && ($byFile[$fileB['file_id']]['checksum_sha256'] ?? '') === $fileB['expected_checksum'], 'El estado de corrección de B es incorrecto.');
         check((int)$byFile[$fileA['file_id']]['reviewed_by'] === $f['teacher'] && (int)$byFile[$fileB['file_id']]['reviewed_by'] === $f['teacher'], 'reviewed_by fue contaminado en el lote mixto.');
-        $observation = $db->query("SELECT file_id,file_checksum_sha256,author_id FROM project_observations WHERE project_id={$f['project']}")->fetch();
-        check((int)$observation['file_id'] === $fileB['file_id'] && $observation['file_checksum_sha256'] === $fileB['expected_checksum'] && (int)$observation['author_id'] === $f['teacher'], 'La observación del lote mixto no pertenece exclusivamente a B.');
+        $observations = $db->query("SELECT file_id,file_checksum_sha256,author_id FROM project_observations WHERE project_id={$f['project']} ORDER BY file_id")->fetchAll();
+        check(count($observations) === 2, 'El lote mixto no persistió ambas observaciones.');
+        foreach ($observations as $observation) {
+            $expected = (int)$observation['file_id'] === $fileA['file_id'] ? $fileA : $fileB;
+            check($observation['file_checksum_sha256'] === $expected['expected_checksum'] && (int)$observation['author_id'] === $f['teacher'], 'Una observación del lote mixto no conservó checksum o actor.');
+        }
         check($result['project_status'] === 'development' && (int)$result['summary']['approved'] === 1 && (int)$result['summary']['corrections_requested'] === 1, 'El resumen del lote mixto es incorrecto.');
     });
     runCase($db, 'múltiples observaciones conservan archivo checksum y actor', function() use ($db, &$case): void {
@@ -200,24 +208,43 @@ try {
         check(count($rows) === 2, 'No se conservaron las dos observaciones del archivo A.');
         foreach ($rows as $row) check((int)$row['file_id'] === $fileA['file_id'] && $row['file_checksum_sha256'] === $fileA['expected_checksum'] && (int)$row['author_id'] === $f['teacher'], 'Una observación múltiple tomó otro archivo, checksum o actor.');
     });
-    runCase($db, 'observación fuerza correcciones y notificación consolidada', function() use ($db, &$case): void {
+    runCase($db, 'correcciones con observación y notificación consolidada', function() use ($db, &$case): void {
         $f = fixture($db, ++$case);
         $decisions = [
-            $f['files'][0] + ['status'=>'under_review', 'observations'=>[['body'=>'Corregir la metodología descrita.', 'category'=>'Metodología', 'location_reference'=>'Página 4']]],
+            $f['files'][0] + ['status'=>'corrections_requested', 'observations'=>[['body'=>'Corregir la metodología descrita.', 'category'=>'Metodología', 'location_reference'=>'Página 4']]],
             $f['files'][1] + ['status'=>'under_review', 'observations'=>[]],
         ];
         $result = (new ProjectDocumentReviewBatchService())->confirmInTransaction($db, $f['project'], 'under_review', $decisions, $f['teacher']);
         check($result['project_status'] === 'development' && $result['observations_created'] === 1, 'No se aplicaron las correcciones.');
-        check((int)$result['summary']['corrections_requested'] === 1, 'La observación no forzó el estado.');
+        check((int)$result['summary']['corrections_requested'] === 1, 'No se conservó el estado de correcciones.');
         check((int)$db->query("SELECT COUNT(*) FROM notifications WHERE project_id={$f['project']}")->fetchColumn() === 1, 'La notificación no fue consolidada.');
     });
-    runCase($db, 'aprobado con observación es rechazado', function() use ($db, &$case): void {
+    runCase($db, 'aprobado con una observación persiste comentario y estado', function() use ($db, &$case): void {
         $f = fixture($db, ++$case);
-        $before = reviewFootprint($db, $f['project']);
-        expectReviewRejection(fn() => (new ProjectDocumentReviewBatchService())->confirmInTransaction($db, $f['project'], 'under_review', [
-            $f['files'][0] + ['status'=>'approved', 'observations'=>[['body'=>'Esta observación impide aprobar.']]],
-        ], $f['teacher']), 'aprobado no puede incluir observaciones');
-        check(reviewFootprint($db, $f['project']) === $before, 'Aprobar con observaciones dejó efectos parciales.');
+        [$fileA, $fileB] = $f['files'];
+        $result = (new ProjectDocumentReviewBatchService())->confirmInTransaction($db, $f['project'], 'under_review', [
+            $fileA + ['status'=>'approved', 'observations'=>[['body'=>'Sugerencia opcional que no requiere reentrega.', 'category'=>'Contenido', 'anchor'=>['selected_text'=>'Cumple','page_number'=>1,'relative_rects'=>[['left'=>0.4,'top'=>0.32,'width'=>0.08,'height'=>0.02]],'internal_entry'=>null]]]],
+            $fileB + ['status'=>'approved', 'observations'=>[]],
+        ], $f['teacher']);
+        $state = $db->query("SELECT status FROM project_file_review_states WHERE project_id={$f['project']} AND file_id={$fileA['file_id']}")->fetchColumn();
+        check($state === 'approved', 'La observación cambió indebidamente el archivo aprobado.');
+        $storedAnchor = $db->query("SELECT selection_anchor FROM project_observations WHERE project_id={$f['project']} AND file_id={$fileA['file_id']}")->fetchColumn();
+        $anchor = json_decode((string)$storedAnchor, true);
+        check(is_array($anchor) && $anchor['page_number'] === 1 && $anchor['selected_text'] === 'Cumple' && $anchor['relative_rects'][0]['left'] === 0.4, 'No se persistió intacto el ancla contextual.');
+        check($result['project_status'] === 'approved' && !empty($db->query("SELECT approved_at FROM projects WHERE id={$f['project']}")->fetchColumn()), 'Los comentarios aprobados alteraron la aprobación global.');
+    });
+    runCase($db, 'aprobado con múltiples observaciones es válido', function() use ($db, &$case): void {
+        $f = fixture($db, ++$case);
+        [$fileA, $fileB] = $f['files'];
+        (new ProjectDocumentReviewBatchService())->confirmInTransaction($db, $f['project'], 'under_review', [
+            $fileA + ['status'=>'approved', 'observations'=>[
+                ['body'=>'Primera recomendación no obligatoria.', 'category'=>'Contenido'],
+                ['body'=>'Segunda recomendación no obligatoria.', 'category'=>'Formato'],
+            ]],
+            $fileB + ['status'=>'approved', 'observations'=>[]],
+        ], $f['teacher']);
+        check((int)$db->query("SELECT COUNT(*) FROM project_observations WHERE project_id={$f['project']} AND file_id={$fileA['file_id']}")->fetchColumn() === 2, 'No se persistieron múltiples comentarios aprobados.');
+        check($db->query("SELECT status FROM project_file_review_states WHERE project_id={$f['project']} AND file_id={$fileA['file_id']}")->fetchColumn() === 'approved', 'Múltiples comentarios cambiaron el estado aprobado.');
     });
     runCase($db, 'checksum obsoleto produce 409 y cero escrituras', function() use ($db, &$case): void {
         $f = fixture($db, ++$case);

@@ -75,8 +75,8 @@ final class ProjectDocumentReviewBatchService
 
         $observationInsert = $db->prepare(
             "INSERT INTO project_observations
-             (project_id,delivery_id,file_id,file_checksum_sha256,author_id,category,location_reference,body,status)
-             VALUES (:project,NULL,:file,:checksum,:actor,:category,:location,:body,'pending')"
+             (project_id,delivery_id,file_id,file_checksum_sha256,author_id,category,location_reference,selection_anchor,body,status)
+             VALUES (:project,NULL,:file,:checksum,:actor,:category,:location,:anchor,:body,'pending')"
         );
         $observationCount = 0;
         $auditDocuments = [];
@@ -86,7 +86,9 @@ final class ProjectDocumentReviewBatchService
             foreach ($decision['observations'] as $observation) {
                 $observationInsert->execute([
                     'project'=>$projectId, 'file'=>$decision['file_id'], 'checksum'=>$decisionChecksum, 'actor'=>$actor,
-                    'category'=>$observation['category'], 'location'=>$observation['location_reference'], 'body'=>$observation['body'],
+                    'category'=>$observation['category'], 'location'=>$observation['location_reference'],
+                    'anchor'=>$observation['anchor'] === null ? null : json_encode($observation['anchor'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
+                    'body'=>$observation['body'],
                 ]);
                 $observationCount++;
             }
@@ -185,20 +187,50 @@ final class ProjectDocumentReviewBatchService
                 if ($category === '' || mb_strlen($category) > 60 || mb_strlen($location) > 180) {
                     throw new ProjectStatusTransitionException('La categoría o referencia de una observación no es válida.');
                 }
-                $observations[] = ['body'=>$body, 'category'=>$category, 'location_reference'=>$location !== '' ? $location : null];
-            }
-            if ($observations !== [] && $status === 'approved') {
-                throw new ProjectStatusTransitionException('Un documento aprobado no puede incluir observaciones pendientes.');
+                $observations[] = [
+                    'body'=>$body, 'category'=>$category, 'location_reference'=>$location !== '' ? $location : null,
+                    'anchor'=>$this->normalizeAnchor($raw['anchor'] ?? null),
+                ];
             }
             if ($status === 'corrections_requested' && $observations === []) {
                 throw new ProjectStatusTransitionException('Debes agregar al menos una observación para solicitar correcciones en este documento.');
             }
-            if ($observations !== []) $status = 'corrections_requested';
             $normalized[$fileId] = [
                 'file_id'=>$fileId, 'expected_checksum'=>$checksum, 'status'=>$status, 'observations'=>$observations,
             ];
         }
         return $normalized;
+    }
+
+    private function normalizeAnchor(mixed $raw): ?array
+    {
+        if ($raw === null || $raw === '') return null;
+        if (!is_array($raw)) throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+        $page = filter_var($raw['page_number'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1, 'max_range'=>10000]]);
+        $text = trim((string)($raw['selected_text'] ?? ''));
+        $rects = $raw['relative_rects'] ?? null;
+        if ($page === false || $text === '' || mb_strlen($text) > 500 || !is_array($rects) || count($rects) < 1 || count($rects) > 50) {
+            throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+        }
+        $entry = $raw['internal_entry'] ?? $raw['entry_name'] ?? null;
+        if ($entry !== null) {
+            $entry = trim((string)$entry);
+            if ($entry === '' || mb_strlen($entry) > 500 || str_contains($entry, '<') || preg_match('#^(?:[A-Za-z]:|/|\\\\)#', $entry)) {
+                throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+            }
+        }
+        $normalizedRects = [];
+        foreach ($rects as $rect) {
+            if (!is_array($rect)) throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+            $values = [];
+            foreach (['left','top','width','height'] as $key) {
+                if (!isset($rect[$key]) || !is_numeric($rect[$key])) throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+                $values[$key] = (float)$rect[$key];
+            }
+            if ($values['left'] < 0 || $values['top'] < 0 || $values['width'] <= 0 || $values['height'] <= 0 || $values['left'] + $values['width'] > 1 || $values['top'] + $values['height'] > 1) throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+            $normalizedRects[] = $values;
+        }
+        return ['selected_text'=>$text, 'page_number'=>$page, 'relative_rects'=>$normalizedRects, 'internal_entry'=>$entry];
     }
 
     private function notifyStudents(PDO $db, int $projectId, int $documentCount, int $auditId): void

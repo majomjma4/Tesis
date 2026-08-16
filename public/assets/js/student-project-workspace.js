@@ -829,10 +829,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         drawPocAnnotations();
+        drawStudentObservationHighlights();
 
         if(previewStage){
             previewStage.hidden=false;
         }
+        workspace.dispatchEvent(new CustomEvent('workspace:document-preview-rendered', { bubbles: true }));
     };
     const renderPreview = async (preview, originalUrl = '') => {
         clearPreview();
@@ -1167,6 +1169,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateSelectedFileHeader(`${rootButton.dataset.fileName} → ${node.name}`,node.extension||'',sizeLabel,node.download_url||zipEntryUrl(rootButton.dataset.fileZipDownloadUrl, node.path));
                     currentPreviewUrl=previewUrl;
                     if(node.type!=='directory'&&window.innerWidth<=768){ switchMobileTab('viewer'); }
+                    workspace.dispatchEvent(new CustomEvent('workspace:zip-entry-opened', {
+                        bubbles: true,
+                        detail: {
+                            parentFileId: Number(rootButton.dataset.fileId || 0),
+                            parentFileName: String(rootButton.dataset.fileName || '').trim(),
+                            parentChecksum: String(rootButton.dataset.fileChecksum || '').trim(),
+                            entryPath: String(node.path || '').trim(),
+                            entryName: String(node.name || '').trim(),
+                            extension: String(node.extension || '').trim()
+                        }
+                    }));
                     void loadPreview(previewUrl);
                 });
                 entry.append(button);
@@ -1178,6 +1191,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadZipDirectory=async(rootButton,path,tree)=>{if(!tree)return;if(tree.dataset.loaded==='true'){tree.hidden=!tree.hidden;return;}tree.hidden=false;tree.textContent='Cargando…';try{const target=new URL(rootButton.dataset.fileZipUrl,window.location.origin);if(path)target.searchParams.set('path',path);const payload=await readJsonResponse(await fetch(target,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible abrir el ZIP.');renderZipTree(tree,payload.data?.archive?.items||payload.data?.archive||[],rootButton);tree.dataset.loaded='true';}catch(error){console.error('No fue posible cargar la estructura del ZIP.',error);tree.textContent=error.code==='session_expired'?error.message:'No fue posible abrir esta carpeta.';}};
     const selectFile=(button)=>{
         cancelPreviewRequest();
+        workspace.dispatchEvent(new CustomEvent('workspace:zip-entry-closed', { bubbles: true, detail: {} }));
         selectItem(button);
         selectedObservationFileId=Number(button.dataset.fileId||0);
         observationFilter='all';
@@ -1194,6 +1208,193 @@ document.addEventListener('DOMContentLoaded', () => {
         void loadPreview(button.dataset.filePreview);
     };
     manager.querySelectorAll('[data-sw-file]').forEach((button)=>button.addEventListener('click',(event)=>{event.preventDefault();selectFile(event.currentTarget);}));
+    let studentActiveNotePopover = null;
+    const removeStudentActiveNotePopover = () => {
+        if (studentActiveNotePopover) {
+            studentActiveNotePopover.remove();
+            studentActiveNotePopover = null;
+        }
+        previewStage?.querySelectorAll('.sw-review-highlight-overlay.is-active').forEach((node) => node.classList.remove('is-active'));
+    };
+
+    const viewerPanel = workspace?.querySelector('.sw-viewer-panel');
+    const floatingLayer = (() => {
+        if (!viewerPanel) return null;
+        let layer = viewerPanel.querySelector('[data-sw-review-floating-layer]');
+        if (!layer) {
+            layer = document.createElement('div');
+            layer.dataset.swReviewFloatingLayer = '';
+            layer.className = 'sw-review-floating-layer';
+            viewerPanel.append(layer);
+        }
+        if (layer) {
+            layer.style.pointerEvents = 'none';
+        }
+        return layer;
+    })();
+
+    const positionPopoverElement = (popoverEl, rangeRect) => {
+        if (!popoverEl || !previewStage || !floatingLayer) return;
+        const viewportPadding = 12;
+        const stageRect = previewStage.getBoundingClientRect();
+        const layerRect = floatingLayer.getBoundingClientRect();
+        const popoverRect = popoverEl.getBoundingClientRect();
+        const minLeft = Math.max(viewportPadding, stageRect.left + viewportPadding);
+        const maxLeft = Math.max(minLeft, Math.min(window.innerWidth - popoverRect.width - viewportPadding, stageRect.right - popoverRect.width - viewportPadding));
+        let left = rangeRect.left + (rangeRect.width - popoverRect.width) / 2;
+        left = Math.min(maxLeft, Math.max(minLeft, left));
+        let top = rangeRect.top - popoverRect.height - 10;
+        const minTop = Math.max(viewportPadding, stageRect.top + viewportPadding);
+        if (top < minTop) {
+            top = rangeRect.bottom + 10;
+        }
+        top = Math.min(window.innerHeight - popoverRect.height - viewportPadding, Math.max(minTop, top));
+        popoverEl.style.left = `${Math.round(left - layerRect.left)}px`;
+        popoverEl.style.top = `${Math.round(top - layerRect.top)}px`;
+    };
+
+    const showStudentHighlightNote = (highlightEl, item, obsNumber = null, colorClass = '') => {
+        removeStudentActiveNotePopover();
+        if (!floatingLayer) return;
+
+        highlightEl.classList.add('is-active');
+
+        const note = document.createElement('div');
+        note.className = `sw-review-note-popover ${colorClass}`;
+        note.setAttribute('role', 'dialog');
+        note.setAttribute('aria-label', 'Observación del docente');
+
+        let anchor = item.selection_anchor;
+        try { if (typeof anchor === 'string') anchor = JSON.parse(anchor); } catch (e) { anchor = null; }
+
+        const rawLoc = item.location_reference || (anchor?.page_number ? `Página ${anchor.page_number}` : '');
+        const zipArrow = ' → ';
+        const compactLoc = rawLoc.includes(zipArrow) ? rawLoc.split(zipArrow).pop() : rawLoc;
+
+        const escapeHtml = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
+        const headerBadgeHtml = obsNumber
+            ? `<span class="sw-review-card-number-badge ${colorClass}">${obsNumber}</span>`
+            : '<i class="fa-solid fa-comment" aria-hidden="true"></i>';
+
+        note.innerHTML = `
+            <div class="sw-review-note-header">
+                <span>${headerBadgeHtml} Observación docente</span>
+                <button type="button" class="sw-review-note-close" aria-label="Cerrar nota"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            </div>
+            <p class="sw-review-note-body">${escapeHtml(item.comment || item.observation_text || item.body || '')}</p>
+            <div class="sw-review-note-footer">
+                <span class="sw-review-note-location">${escapeHtml(compactLoc || 'Página 1')}</span>
+                <button type="button" class="sw-review-note-link">Ver en observaciones</button>
+            </div>
+        `;
+
+        note.addEventListener('mousedown', (e) => e.stopPropagation());
+
+        note.querySelector('.sw-review-note-close').addEventListener('click', () => {
+            removeStudentActiveNotePopover();
+        });
+
+        note.querySelector('.sw-review-note-link').addEventListener('click', () => {
+            removeStudentActiveNotePopover();
+            const card = observationPanel?.querySelector(`[data-observation-id="${item.id}"]`);
+            if (card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                card.classList.add('is-highlighted-temp');
+                setTimeout(() => card?.classList.remove('is-highlighted-temp'), 1500);
+            }
+        });
+
+        studentActiveNotePopover = note;
+        floatingLayer.append(note);
+
+        const rangeRect = highlightEl.getBoundingClientRect();
+        positionPopoverElement(note, rangeRect);
+    };
+
+    document.addEventListener('pointerdown', (e) => {
+        if (studentActiveNotePopover && !studentActiveNotePopover.contains(e.target) && !e.target.closest('.sw-review-highlight-overlay')) {
+            removeStudentActiveNotePopover();
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && studentActiveNotePopover) {
+            removeStudentActiveNotePopover();
+        }
+    });
+
+    const drawStudentObservationHighlights=()=>{
+        if (workspace?.classList.contains('is-teacher-review')) return;
+        previewStage?.querySelectorAll('[data-sw-observation-highlight], .sw-review-highlight-badge').forEach((node)=>node.remove());
+        removeStudentActiveNotePopover();
+        const fileId=Number(selectedObservationFileId||0);
+        if(!fileId)return;
+        const selected=manager.querySelector('[data-sw-file].is-selected');
+        const version=new URL(selected?.dataset.filePreview||window.location.href,window.location.href).searchParams.get('v')||'';
+        const entry=manager.querySelector('[data-sw-zip-entry].is-selected')?.dataset?.zipEntryName||'';
+        let contextualCount = 0;
+        const usedTopsByPage = {};
+
+        allStudentObservations.filter((item)=>Number(item.file_id||0)===fileId&&(!version||String(item.file_checksum_sha256||'').startsWith(version))).forEach((item)=>{
+            let anchor=item.selection_anchor;
+            try{if(typeof anchor==='string')anchor=JSON.parse(anchor);}catch(e){anchor=null;}
+            if(!anchor?.page_number||!Array.isArray(anchor.relative_rects)||((anchor.internal_entry||anchor.entry_name)&&String(anchor.internal_entry||anchor.entry_name)!==entry))return;
+            const page=previewStage?.querySelector(`[data-poc-page="${anchor.page_number}"]`);
+            if(!page)return;
+
+            contextualCount++;
+            const obsNumber = contextualCount;
+            const colorClass = `sw-review-color-${((obsNumber - 1) % 5) + 1}`;
+
+            anchor.relative_rects.forEach((rect)=>{
+                const mark=document.createElement('button');
+                mark.type='button';
+                mark.dataset.swObservationHighlight=String(item.id||'');
+                mark.className=`sw-review-highlight-overlay ${colorClass}`;
+                mark.setAttribute('aria-label',`Ver observación docente ${obsNumber}`);
+                Object.assign(mark.style,{left:`${Number(rect.left)*100}%`,top:`${Number(rect.top)*100}%`,width:`${Number(rect.width)*100}%`,height:`${Number(rect.height)*100}%`});
+
+                mark.addEventListener('click',(e)=>{
+                    e.stopPropagation();
+                    showStudentHighlightNote(mark, item, obsNumber, colorClass);
+                });
+                page.append(mark);
+            });
+
+            // Badge al margen real de la página
+            const firstRect = anchor.relative_rects[0];
+            if (firstRect) {
+                const badge = document.createElement('span');
+                badge.className = `sw-review-highlight-badge ${colorClass}`;
+                badge.textContent = String(obsNumber);
+                badge.setAttribute('aria-label', `Ver observación docente ${obsNumber}`);
+
+                const finalLeftCss = `calc(0% - 24px)`;
+
+                let badgeTop = Number(firstRect.top) * 100;
+                const pageKey = String(anchor.page_number);
+                usedTopsByPage[pageKey] = usedTopsByPage[pageKey] || [];
+                while (usedTopsByPage[pageKey].some((t) => Math.abs(t - badgeTop) < 2.5)) {
+                    badgeTop += 2.5;
+                }
+                usedTopsByPage[pageKey].push(badgeTop);
+
+                Object.assign(badge.style, {
+                    left: finalLeftCss,
+                    top: `calc(${badgeTop.toFixed(3)}% - 2px)`,
+                });
+
+                badge.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const firstMark = page.querySelector(`[data-sw-observation-highlight="${item.id}"]`);
+                    showStudentHighlightNote(firstMark || badge, item, obsNumber, colorClass);
+                });
+
+                page.append(badge);
+            }
+        });
+    };
     const drawPocAnnotations=()=>{previewStage?.querySelectorAll('[data-poc-overlay]').forEach((node)=>node.remove());if(!annotationsVisible)return;pocAnnotations.forEach((annotation,index)=>{const page=previewStage?.querySelector(`[data-poc-page="${annotation.page}"]`);if(!page)return;annotation.rects.forEach((rect)=>{const overlay=document.createElement('span');overlay.dataset.pocOverlay='';overlay.className=`sw-poc-annotation is-${annotation.style}`;Object.assign(overlay.style,{left:`${rect.x*100}%`,top:`${rect.y*100}%`,width:`${rect.width*100}%`,height:`${rect.height*100}%`});page.append(overlay);});const marker=document.createElement('button');marker.type='button';marker.dataset.pocOverlay='';marker.className='sw-poc-marker';marker.textContent=String(index+1);marker.setAttribute('aria-label',`Abrir observación ${index+1}`);Object.assign(marker.style,{left:`${annotation.rects[0].x*100}%`,top:`${annotation.rects[0].y*100}%`});marker.addEventListener('click',()=>page.scrollIntoView({behavior:'smooth',block:'center'}));page.append(marker);});};
     const renderPocPanel=()=>{};
 
