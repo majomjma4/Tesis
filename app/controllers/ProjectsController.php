@@ -308,7 +308,7 @@ final class ProjectsController
         $studentVersions = [];
         $historicalVersion = null;
         $studentDefense = null;
-        if (!$isAdministrator && !$isTeacher) {
+        if (!$isAdministrator) {
             $studentDocumentReview = (new ProjectDocumentReviewService())->describeCurrentFiles((int) $project['id'], (array) $project['files']);
             $project['files'] = $studentDocumentReview['files'];
             $studentVersions = (new ProjectDocumentModel())->versions((int) $project['id']);
@@ -350,20 +350,20 @@ final class ProjectsController
             'title' => ($isAdministrator || $isTeacher)
                 ? (string) $project['code'] . ' · Gestión académica'
                 : ($project['title'] ?? 'Proyecto no encontrado') . ' | Gestión Académica',
-            'bodyClass' => 'project-detail-page' . (!$isAdministrator && !$isTeacher ? ' student-project-workspace-page workspace-fullscreen' : ''),
-            'studentWorkspaceFullscreen' => !$isAdministrator && !$isTeacher,
+            'bodyClass' => 'project-detail-page' . (!$isAdministrator ? ' student-project-workspace-page workspace-fullscreen' : ''),
+            'studentWorkspaceFullscreen' => !$isAdministrator,
             'isTeacherContext' => $isTeacher,
             'pageStyles' => array_values(array_filter([
                 asset('css/project-simplified.css'), asset('css/project-description.css'),
                 asset('css/project-adjustments.css'), asset('css/project-academic-timeline.css'),
-                ($isAdministrator || $isTeacher) ? asset('css/admin-projects.css') : asset('css/student-project-workspace.css'),
+                $isAdministrator ? asset('css/admin-projects.css') : asset('css/student-project-workspace.css'),
             ])),
             'pageScript' => asset('js/repository-detail.js'),
             'pageScripts' => array_values(array_filter([
                 $descriptionReminder ? asset('js/project-description.js') : null,
                 $hasAdjustmentUi ? asset('js/project-adjustments.js') : null,
-                (!$isAdministrator && !$isTeacher) ? asset('vendor/jszip/3.10.1/jszip.min.js') : null,
-                $isAdministrator ? asset('js/admin-projects.js') : (!$isTeacher ? asset('js/student-project-workspace.js') : null),
+                !$isAdministrator ? asset('vendor/jszip/3.10.1/jszip.min.js') : null,
+                $isAdministrator ? asset('js/admin-projects.js') : asset('js/student-project-workspace.js'),
                 $isAdministrator && $projectStatusTransitions !== [] ? asset('js/project-status-transition.js') : null,
             ])),
             'project' => $project,

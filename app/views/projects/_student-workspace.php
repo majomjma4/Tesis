@@ -59,11 +59,13 @@ $tabs = [
 ];
 if ($showTribunalTab) $tabs['tribunal'] = ['Tribunal y defensa', 'fa-gavel'];
 $formatDate = static function (?string $date, bool $time = false): string { if (!$date) return 'No disponible'; $stamp = strtotime($date); return $stamp === false ? 'No disponible' : date($time ? 'd/m/Y H:i' : 'd/m/Y', $stamp); };
-?>
+    $backUrl = !empty($isTeacherContext) ? route('assigned-projects') : route('projects');
+    $backLabel = !empty($isTeacherContext) ? 'Volver a Proyectos asignados' : 'Volver a Mis proyectos';
+    ?>
 <div class="student-workspace" data-student-workspace data-project-url="<?= e($detailUrl) ?>" data-sw-project-status="<?= e($status) ?>">
     <div class="sw-top-bar">
-        <a class="sw-back-link" href="<?= e(route('projects')) ?>">
-            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Volver a Mis proyectos
+        <a class="sw-back-link" href="<?= e($backUrl) ?>">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i> <?= e($backLabel) ?>
         </a>
     </div>
 
