@@ -1057,6 +1057,49 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const selectItem=(item)=>manager.querySelectorAll('[data-sw-file], [data-sw-zip-entry]').forEach((entry)=>entry.classList.toggle('is-selected',entry===item));
     const viewerIcon = workspace.querySelector('[data-sw-viewer-icon]');
+    const getFileIconClass = (extension = '', mimeType = '', filename = '') => {
+        let ext = String(extension || '').toLowerCase().trim();
+        const mime = String(mimeType || '').toLowerCase().trim();
+        const name = String(filename || '').toLowerCase().trim();
+
+        if (!ext && name) {
+            const parts = name.split('.');
+            if (parts.length > 1) {
+                ext = parts.pop().toLowerCase();
+            }
+        }
+
+        if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext) || mime.includes('zip') || mime.includes('compressed') || mime.includes('tar') || mime.includes('archive')) {
+            return 'fa-solid fa-file-zipper';
+        }
+
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff', 'ico'].includes(ext) || mime.startsWith('image/')) {
+            return 'fa-solid fa-file-image';
+        }
+
+        if (ext === 'pdf' || mime === 'application/pdf') {
+            return 'fa-solid fa-file-pdf';
+        }
+
+        if (['doc', 'docx', 'odt', 'rtf'].includes(ext) || mime.includes('word') || mime.includes('officedocument.wordprocessingml')) {
+            return 'fa-solid fa-file-word';
+        }
+
+        if (['xls', 'xlsx', 'csv', 'ods'].includes(ext) || mime.includes('excel') || mime.includes('spreadsheet')) {
+            return 'fa-solid fa-file-excel';
+        }
+
+        if (['ppt', 'pptx', 'odp'].includes(ext) || mime.includes('powerpoint') || mime.includes('presentation')) {
+            return 'fa-solid fa-file-powerpoint';
+        }
+
+        if (['txt', 'md', 'json', 'xml', 'log'].includes(ext) || mime.startsWith('text/')) {
+            return 'fa-solid fa-file-lines';
+        }
+
+        return 'fa-regular fa-file';
+    };
+
     let currentFileName = '';
     let currentFileExtension = '';
     const updateSelectedFileHeader=(name,extension,size,downloadUrl)=>{
@@ -1064,7 +1107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentFileExtension = String(extension || '').toLowerCase().trim();
         currentDownloadUrl = downloadUrl || '';
         if (viewerIcon) {
-            viewerIcon.className = downloadUrl ? 'fa-regular fa-file' : 'fa-solid fa-folder-open';
+            viewerIcon.className = downloadUrl ? getFileIconClass(currentFileExtension, '', currentFileName) : 'fa-solid fa-folder-open';
         }
         viewerName.textContent=name||'Visor de documentos';
         viewerMeta.textContent=downloadUrl ? `${extension||'Archivo'} · ${size||'Tamaño no disponible'}` : 'Exploración y consulta documental';
@@ -1205,7 +1248,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 button.dataset.swZipEntry='';
                 const sizeLabel = node.size_label || node.size || '';
                 button.dataset.fileSize = sizeLabel;
-                button.innerHTML=`<i class="fa-regular fa-file" aria-hidden="true"></i><span class="sw-zip-entry-name">${node.name}</span>`;
+                const entryIconClass = getFileIconClass(node.extension, '', node.name);
+                button.innerHTML=`<i class="${entryIconClass}" aria-hidden="true"></i><span class="sw-zip-entry-name">${node.name}</span>`;
                 const nameSpan = button.querySelector('.sw-zip-entry-name');
                 if (nameSpan) {
                     nameSpan.dataset.fullName = node.name;
@@ -1225,7 +1269,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tooltipStatus.className = 'sw-file-tooltip-status';
                 const extLabel = (node.extension || 'Archivo').toUpperCase();
                 const sizeText = sizeLabel && sizeLabel !== '—' ? ` · ${sizeLabel}` : '';
-                tooltipStatus.innerHTML = `<i class="fa-regular fa-file" aria-hidden="true"></i> <span class="sw-file-tooltip-label">${extLabel}${sizeText}</span>`;
+                tooltipStatus.innerHTML = `<i class="${entryIconClass}" aria-hidden="true"></i> <span class="sw-file-tooltip-label">${extLabel}${sizeText}</span>`;
 
                 tooltip.append(tooltipName, tooltipStatus);
                 button.append(tooltip);

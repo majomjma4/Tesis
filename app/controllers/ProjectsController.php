@@ -182,11 +182,6 @@ final class ProjectsController
         $projectModel = new ProjectModel();
         $projects = $projectModel->getProjectsForUser($access->currentUserId());
 
-        if (count($projects) === 1) {
-            header('Location: ' . route('project-detail') . '&id=' . (int) $projects[0]['id']);
-            exit;
-        }
-
         View::render('projects/index', [
             'currentPage' => 'projects',
             'title' => 'Mis Proyectos | Gestión Documental Académica',

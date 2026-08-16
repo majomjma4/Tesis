@@ -49,9 +49,50 @@ $docLimits = (new ProjectDocumentFileService())->limits();
         <button type="button" class="sw-panel-reopen-btn" data-sw-open-explorer hidden aria-label="Abrir panel de archivos" title="Abrir panel de archivos"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
         <header class="sw-explorer-header"><span class="sw-explorer-title"><i class="fa-solid fa-folder-open" aria-hidden="true"></i> Archivos</span><button type="button" class="sw-panel-toggle" data-sw-toggle-explorer aria-controls="swExplorerPanel" aria-label="Contraer panel de archivos" aria-expanded="true"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button></header>
         <?php if ($canManageFiles): ?><button type="button" class="sw-add-files" data-sw-add-files><i class="fa-solid fa-plus" aria-hidden="true"></i> Agregar archivos</button><input type="file" data-sw-file-input hidden multiple><?php endif; ?>
+<?php
+$getFileIconClass = static function (?string $extension, ?string $mimeType = null, ?string $filename = null): string {
+    $ext = strtolower(trim((string)$extension));
+    $mime = strtolower(trim((string)$mimeType));
+    $name = strtolower(trim((string)$filename));
+
+    if ($ext === '' && $name !== '') {
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    }
+
+    if (in_array($ext, ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'], true) || str_contains($mime, 'zip') || str_contains($mime, 'compressed') || str_contains($mime, 'tar') || str_contains($mime, 'archive')) {
+        return 'fa-solid fa-file-zipper';
+    }
+
+    if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff', 'ico'], true) || str_starts_with($mime, 'image/')) {
+        return 'fa-solid fa-file-image';
+    }
+
+    if ($ext === 'pdf' || $mime === 'application/pdf') {
+        return 'fa-solid fa-file-pdf';
+    }
+
+    if (in_array($ext, ['doc', 'docx', 'odt', 'rtf'], true) || str_contains($mime, 'word') || str_contains($mime, 'officedocument.wordprocessingml')) {
+        return 'fa-solid fa-file-word';
+    }
+
+    if (in_array($ext, ['xls', 'xlsx', 'csv', 'ods'], true) || str_contains($mime, 'excel') || str_contains($mime, 'spreadsheet')) {
+        return 'fa-solid fa-file-excel';
+    }
+
+    if (in_array($ext, ['ppt', 'pptx', 'odp'], true) || str_contains($mime, 'powerpoint') || str_contains($mime, 'presentation')) {
+        return 'fa-solid fa-file-powerpoint';
+    }
+
+    if (in_array($ext, ['txt', 'md', 'json', 'xml', 'log'], true) || str_starts_with($mime, 'text/')) {
+        return 'fa-solid fa-file-lines';
+    }
+
+    return 'fa-regular fa-file';
+};
+?>
         <?php if (!$files): ?><p class="sw-empty-state">Todavía no hay archivos en este proyecto.</p><?php else: ?><ul class="sw-tree-list"><?php foreach ($files as $file):
             $fileId=(int)$file['id']; $observationCount=count(array_filter($observations, static fn(array $obs): bool => (int)($obs['file_id'] ?? 0) === $fileId));
-            $extension=strtolower((string)$file['extension']); $documentStatus=(string)($file['document_status'] ?? 'development');
+            $extension=strtolower((string)$file['extension']); $mimeType=strtolower((string)($file['mime_type'] ?? '')); $documentStatus=(string)($file['document_status'] ?? 'development');
             $statusLabel=(string)($file['document_status_label'] ?? 'En desarrollo'); $protected=$documentStatus !== 'development';
             $previewVersion=!empty($file['checksum_sha256']) ? '&v='.rawurlencode(substr((string)$file['checksum_sha256'],0,16)) : '';
             $previewUrl=route('project-file-preview').'&project_id='.$projectId.'&file_id='.$fileId.$previewVersion;
@@ -59,7 +100,8 @@ $docLimits = (new ProjectDocumentFileService())->limits();
             $zipUrl=$extension==='zip' ? route('project-zip-list').'&context=academic&project_id='.$projectId.'&file_id='.$fileId.$previewVersion : '';
             $zipPreviewUrl=$extension==='zip' ? route('project-zip-entry-preview').'&context=academic&project_id='.$projectId.'&file_id='.$fileId : '';
             $zipDownloadUrl=$extension==='zip' ? route('project-zip-entry-download').'&context=academic&project_id='.$projectId.'&file_id='.$fileId : '';
-        ?><li class="sw-archive-node"><div class="sw-file-row"><button type="button" class="sw-tree-item" aria-label="<?= e((string)$file['original_name']) ?>. Estado: <?= e($statusLabel) ?>" data-sw-file data-file-id="<?= $fileId ?>" data-file-name="<?= e((string)$file['original_name']) ?>" data-file-extension="<?= e(strtoupper($extension)) ?>" data-file-size="<?= e(ArchiveService::formatBytes((int)($file['size_bytes'] ?? 0))) ?>" data-file-preview="<?= e($previewUrl) ?>" data-file-download="<?= e($downloadUrl) ?>" data-file-zip-url="<?= e($zipUrl) ?>" data-file-zip-preview-url="<?= e($zipPreviewUrl) ?>" data-file-zip-download-url="<?= e($zipDownloadUrl) ?>" data-file-observations="<?= $observationCount ?>"><span class="sw-tree-item-info"><span class="sw-status-dot is-<?= e($documentStatus) ?>" aria-label="Estado: <?= e($statusLabel) ?>" role="img"></span><i class="fa-regular fa-file" aria-hidden="true"></i><span><?= e((string)$file['original_name']) ?></span></span><span class="sw-file-tooltip" role="tooltip" aria-hidden="true" hidden><span class="sw-file-tooltip-name"><?= e((string)$file['original_name']) ?></span><span class="sw-file-tooltip-status"><span class="sw-status-dot is-<?= e($documentStatus) ?>" aria-hidden="true"></span><span class="sw-file-tooltip-label"><?= e($statusLabel) ?></span></span></span></button><div class="sw-file-row-actions"><?php if ($canManageFiles && !$protected): ?><button type="button" class="sw-file-menu-trigger" data-sw-menu-trigger aria-label="Acciones de <?= e((string)$file['original_name']) ?>" aria-expanded="false"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i></button><div class="sw-file-menu" data-sw-file-menu hidden><button type="button" data-sw-replace data-file-id="<?= $fileId ?>" data-file-name="<?= e((string)$file['original_name']) ?>" data-file-checksum="<?= e((string)$file['checksum_sha256']) ?>">Reemplazar archivo</button><a href="<?= e($downloadUrl) ?>">Descargar</a><button type="button" data-sw-remove data-file-id="<?= $fileId ?>" data-file-name="<?= e((string)$file['original_name']) ?>">Quitar archivo</button></div><?php elseif ($protected && !$canReviewDocuments): ?><span class="sw-file-lock-badge" tabindex="0" role="img" aria-label="Bloqueado durante la revisión. No puedes modificar este archivo mientras se encuentra en revisión."><i class="fa-solid fa-lock" aria-hidden="true"></i><span class="sw-file-lock-tooltip" role="tooltip" aria-hidden="true"><strong>Bloqueado durante la revisión</strong><span>No puedes modificar este archivo mientras se encuentra en revisión.</span></span></span><?php endif; ?></div></div><?php if ($extension === 'zip'): ?><ul class="sw-zip-tree" data-sw-zip-tree hidden></ul><?php endif; ?></li><?php endforeach; ?></ul><?php endif; ?>
+            $iconClass=$getFileIconClass($extension, $mimeType, (string)($file['original_name'] ?? ''));
+        ?><li class="sw-archive-node"><div class="sw-file-row"><button type="button" class="sw-tree-item" aria-label="<?= e((string)$file['original_name']) ?>. Estado: <?= e($statusLabel) ?>" data-sw-file data-file-id="<?= $fileId ?>" data-file-name="<?= e((string)$file['original_name']) ?>" data-file-extension="<?= e(strtoupper($extension)) ?>" data-file-size="<?= e(ArchiveService::formatBytes((int)($file['size_bytes'] ?? 0))) ?>" data-file-preview="<?= e($previewUrl) ?>" data-file-download="<?= e($downloadUrl) ?>" data-file-zip-url="<?= e($zipUrl) ?>" data-file-zip-preview-url="<?= e($zipPreviewUrl) ?>" data-file-zip-download-url="<?= e($zipDownloadUrl) ?>" data-file-observations="<?= $observationCount ?>"><span class="sw-tree-item-info"><span class="sw-status-dot is-<?= e($documentStatus) ?>" aria-label="Estado: <?= e($statusLabel) ?>" role="img"></span><i class="<?= e($iconClass) ?>" aria-hidden="true"></i><span><?= e((string)$file['original_name']) ?></span></span><span class="sw-file-tooltip" role="tooltip" aria-hidden="true" hidden><span class="sw-file-tooltip-name"><?= e((string)$file['original_name']) ?></span><span class="sw-file-tooltip-status"><span class="sw-status-dot is-<?= e($documentStatus) ?>" aria-hidden="true"></span><span class="sw-file-tooltip-label"><?= e($statusLabel) ?></span></span></span></button><div class="sw-file-row-actions"><?php if ($canManageFiles && !$protected): ?><button type="button" class="sw-file-menu-trigger" data-sw-menu-trigger aria-label="Acciones de <?= e((string)$file['original_name']) ?>" aria-expanded="false"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i></button><div class="sw-file-menu" data-sw-file-menu hidden><button type="button" data-sw-replace data-file-id="<?= $fileId ?>" data-file-name="<?= e((string)$file['original_name']) ?>" data-file-checksum="<?= e((string)$file['checksum_sha256']) ?>">Reemplazar archivo</button><a href="<?= e($downloadUrl) ?>">Descargar</a><button type="button" data-sw-remove data-file-id="<?= $fileId ?>" data-file-name="<?= e((string)$file['original_name']) ?>">Quitar archivo</button></div><?php elseif ($protected && !$canReviewDocuments): ?><span class="sw-file-lock-badge" tabindex="0" role="img" aria-label="Bloqueado durante la revisión. No puedes modificar este archivo mientras se encuentra en revisión."><i class="fa-solid fa-lock" aria-hidden="true"></i><span class="sw-file-lock-tooltip" role="tooltip" aria-hidden="true"><strong>Bloqueado durante la revisión</strong><span>No puedes modificar este archivo mientras se encuentra en revisión.</span></span></span><?php endif; ?></div></div><?php if ($extension === 'zip'): ?><ul class="sw-zip-tree" data-sw-zip-tree hidden></ul><?php endif; ?></li><?php endforeach; ?></ul><?php endif; ?>
     </aside>
     <div class="sw-resizer sw-resizer-explorer" data-sw-resizer="explorer" role="separator" aria-orientation="vertical" aria-label="Redimensionar panel de archivos" tabindex="0" title="Arrastra para redimensionar (Doble clic para restablecer)"></div>
     <section class="sw-viewer-panel">

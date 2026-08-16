@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasRemoteConfig = reviewEndpoint !== '' && reviewCsrf !== '' && projectId > 0 && reviewContext === 'academic';
 
     const observationPanel = manager.querySelector('[data-sw-file-observations]');
+    const obsFooter = manager.querySelector('.sw-obs-footer') || observationPanel?.parentElement?.querySelector('.sw-obs-footer');
     const previewStage = manager.querySelector('[data-sw-preview-stage]');
     const viewerPanel = manager.querySelector('.sw-viewer-panel');
     const floatingLayer = (() => {
@@ -90,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let confirmModalOpen = false;
     let confirmModalError = '';
     let confirmModalStatus = '';
+    let decisionModalAction = null;
 
     const showDecisionDialog = ({ title, message, confirmText, confirmIcon = 'fa-check', confirmClass = 'is-success', onConfirm, onCancel }) => {
         if (!decisionModal) {
@@ -1605,26 +1607,32 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const createReadySummary = () => {
-        const value = summary();
         const confirmState = getConfirmState();
-        const buttonText = isSubmitting ? 'Finalizando revision...' : 'Terminar revision';
-        const helperText = confirmState.enabled
-            ? 'La confirmacion enviara el lote completo al backend y aplicara las transiciones reales del proyecto.'
-            : confirmState.reason;
+        const buttonText = isSubmitting ? 'Finalizando revisión...' : 'Terminar revisión';
         const section = document.createElement('section');
-        section.className = 'sw-review-ready-summary';
-        section.innerHTML = `
-            <i class="fa-solid fa-clipboard-check" aria-hidden="true"></i>
-            <div><strong>Revision preparada</strong><span>${value.reviewed} documentos revisados</span></div>
-            <ul><li>${value.approved} aprobados</li><li>${value.corrections} requieren correcciones</li><li>${value.newObservations} observaciones nuevas</li></ul>
-            <button type="button" ${confirmState.enabled ? '' : 'disabled'}>${buttonText}</button>
-            <small>${helperText}</small>`;
-        const button = section.querySelector('button');
-        button.title = confirmState.enabled ? 'Confirmar revision documental' : helperText;
+        section.className = 'sw-review-finish-action';
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'sw-review-finish-btn';
+        button.disabled = !confirmState.enabled || isSubmitting;
+        button.textContent = buttonText;
+        button.title = confirmState.enabled ? 'Confirmar revisión documental' : (confirmState.reason || 'Completa los documentos pendientes antes de confirmar.');
+
         button.addEventListener('click', () => {
             if (!confirmState.enabled || isSubmitting) return;
             openConfirmModal();
         });
+
+        section.append(button);
+
+        if (!confirmState.enabled && !isSubmitting) {
+            const helper = document.createElement('small');
+            helper.className = 'sw-review-finish-helper';
+            helper.textContent = 'Completa los documentos pendientes antes de confirmar.';
+            section.append(helper);
+        }
+
         return section;
     };
 
@@ -1632,27 +1640,47 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!observationPanel) return;
         updateFileIndicators();
         renderHighlights();
-        observationPanel.replaceChildren(createProgress());
+
+        const progressNode = createProgress();
         const value = summary();
+
+        const scrollBody = document.createElement('div');
+        scrollBody.className = 'sw-review-scroll-body';
+
+        observationPanel.replaceChildren(progressNode, scrollBody);
+
+        if (obsFooter) {
+            if (reviewIsAvailable && value.total > 0) {
+                obsFooter.replaceChildren(createReadySummary());
+                obsFooter.hidden = false;
+                obsFooter.style.display = 'block';
+            } else {
+                obsFooter.replaceChildren();
+                obsFooter.hidden = true;
+                obsFooter.style.display = 'none';
+            }
+        }
+
         if (!reviewIsAvailable) {
             const unavailable = document.createElement('div');
             unavailable.className = 'sw-review-unavailable';
             unavailable.innerHTML = '<i class="fa-solid fa-lock" aria-hidden="true"></i><strong>Revision no disponible</strong><span>El proyecto debe encontrarse en revision para confirmar decisiones documentales.</span>';
-            observationPanel.append(unavailable);
+            scrollBody.append(unavailable);
             return;
         }
-        if (value.total > 0) observationPanel.append(createReadySummary());
+
         const file = filesById.get(activeFileId);
         if (!file) {
-            observationPanel.append(createProjectGeneralSection());
-            if (editorState?.fileId === 0) observationPanel.append(createEditor());
+            scrollBody.append(createProjectGeneralSection());
+            if (editorState?.fileId === 0) scrollBody.append(createEditor());
             return;
         }
+
         if (file.status === 'approved') {
             const approved = document.createElement('div');
             approved.className = 'sw-review-persisted-approved';
             approved.innerHTML = '<i class="fa-solid fa-circle-check" aria-hidden="true"></i><div><strong>Documento aprobado</strong><span>Este checksum ya fue aprobado y no requiere una nueva decision.</span></div>';
-            observationPanel.append(approved, createExistingSection(file));
+            scrollBody.append(approved, createExistingSection(file));
             return;
         }
 
@@ -1687,19 +1715,20 @@ document.addEventListener('DOMContentLoaded', () => {
             editBtn.addEventListener('click', () => startEditingCompletedReview(file.file_id));
 
             banner.append(header, message, editBtn);
-            observationPanel.append(banner, generalSection, contextualSection);
+            scrollBody.append(banner, generalSection, contextualSection);
             return;
         }
 
-        observationPanel.append(createReviewActions(file), generalSection, contextualSection);
-        if (editorState?.fileId === file.file_id) observationPanel.append(createEditor());
+        scrollBody.append(createReviewActions(file), generalSection, contextualSection);
+        if (editorState?.fileId === file.file_id) scrollBody.append(createEditor());
         if (reviewError && !editorState) {
             const error = document.createElement('p');
             error.className = 'sw-review-error';
             error.setAttribute('role', 'alert');
             error.textContent = reviewError;
-            observationPanel.append(error);
+            scrollBody.append(error);
         }
+
         const footer = document.createElement('div');
         footer.className = 'sw-review-ready-action';
         const complete = completedFileIds.has(file.file_id);
@@ -1712,7 +1741,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const footerButton = footer.querySelector('button');
         footerButton.disabled = isSubmitting;
         footerButton.addEventListener('click', () => finishFile(file.file_id));
-        observationPanel.append(footer);
+        scrollBody.append(footer);
+
         if (mobileBadge) {
             const total = observationsForFile(file.file_id).length + (draftFor(file.file_id)?.observations.length || 0);
             mobileBadge.textContent = String(total);
