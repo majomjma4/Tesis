@@ -28,7 +28,7 @@ final class ProjectDocumentReviewBatchService
         }
 
         $projectQuery = $db->prepare(
-            'SELECT id,title,status,tutor_id,deleted_at FROM projects WHERE id=:id FOR UPDATE'
+            'SELECT id,code,title,status,tutor_id,deleted_at FROM projects WHERE id=:id FOR UPDATE'
         );
         $projectQuery->execute(['id'=>$projectId]);
         $project = $projectQuery->fetch();
@@ -81,9 +81,11 @@ final class ProjectDocumentReviewBatchService
         $observationCount = 0;
         $auditDocuments = [];
         foreach ($normalized as $decision) {
+            $decisionFile = $byId[$decision['file_id']];
+            $decisionChecksum = strtolower((string)$decisionFile['checksum_sha256']);
             foreach ($decision['observations'] as $observation) {
                 $observationInsert->execute([
-                    'project'=>$projectId, 'file'=>$decision['file_id'], 'checksum'=>(string)$file['checksum_sha256'], 'actor'=>$actor,
+                    'project'=>$projectId, 'file'=>$decision['file_id'], 'checksum'=>$decisionChecksum, 'actor'=>$actor,
                     'category'=>$observation['category'], 'location'=>$observation['location_reference'], 'body'=>$observation['body'],
                 ]);
                 $observationCount++;
@@ -100,10 +102,21 @@ final class ProjectDocumentReviewBatchService
 
         $after = $reviewService->describeCurrentFiles($projectId, $files);
         $summary = $after['summary'];
-        $finalProjectStatus = $summary['corrections_requested'] > 0 ? 'development' : 'under_review';
+        $finalProjectStatus = $summary['corrections_requested'] > 0
+            ? 'development'
+            : (!empty($summary['all_active_documents_approved']) ? 'approved' : 'under_review');
         if ($finalProjectStatus !== (string)$project['status']) {
-            $update = $db->prepare('UPDATE projects SET status=:status WHERE id=:project AND status=:expected');
-            $update->execute(['status'=>$finalProjectStatus, 'project'=>$projectId, 'expected'=>$expectedProjectStatus]);
+            $update = $db->prepare(
+                'UPDATE projects SET status=:status,
+                 approved_at=CASE WHEN :completion=1 AND approved_at IS NULL THEN CURRENT_TIMESTAMP ELSE approved_at END
+                 WHERE id=:project AND status=:expected'
+            );
+            $update->execute([
+                'status'=>$finalProjectStatus,
+                'completion'=>$finalProjectStatus === 'approved' ? 1 : 0,
+                'project'=>$projectId,
+                'expected'=>$expectedProjectStatus,
+            ]);
             if ($update->rowCount() !== 1) throw new ProjectStatusTransitionException('El proyecto cambió de estado mientras realizabas la revisión. Recarga el expediente antes de continuar.', 409);
         }
 
@@ -120,6 +133,12 @@ final class ProjectDocumentReviewBatchService
         );
         if ((int)$summary['corrections_requested'] > 0) {
             $this->notifyStudents($db, $projectId, (int)$summary['corrections_requested'], $auditId);
+        } elseif ($finalProjectStatus === 'approved') {
+            $labels = project_academic_labels('approved');
+            (new ProjectAcademicNotificationService())->finalApproval(
+                $db, $projectId, (string)$project['code'], (string)$project['title'],
+                'approved', (string)$labels['status'], $auditId
+            );
         }
 
         return [
@@ -170,6 +189,9 @@ final class ProjectDocumentReviewBatchService
             }
             if ($observations !== [] && $status === 'approved') {
                 throw new ProjectStatusTransitionException('Un documento aprobado no puede incluir observaciones pendientes.');
+            }
+            if ($status === 'corrections_requested' && $observations === []) {
+                throw new ProjectStatusTransitionException('Debes agregar al menos una observación para solicitar correcciones en este documento.');
             }
             if ($observations !== []) $status = 'corrections_requested';
             $normalized[$fileId] = [

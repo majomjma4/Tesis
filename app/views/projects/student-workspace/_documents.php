@@ -4,13 +4,33 @@ $observations = (array) ($project['observations'] ?? []);
 $historical = is_array($historicalVersion ?? null) ? $historicalVersion : null;
 $canManageFiles = !$historical && !empty($projectCapabilities['manage_workspace_files']);
 $canSendForReview = !$historical && !empty($projectCapabilities['send_for_review']);
+$canReviewDocuments = !$historical && !empty($projectCapabilities['review_documents']);
+$reviewCategories = ['General', 'Contenido', 'Formato', 'Redacción', 'Referencias'];
+$reviewFiles = array_map(static fn(array $file): array => [
+    'file_id' => (int) $file['id'],
+    'expected_checksum' => strtolower((string) ($file['checksum_sha256'] ?? '')),
+    'status' => (string) ($file['document_status'] ?? 'development'),
+    'name' => (string) ($file['original_name'] ?? 'Documento'),
+], $files);
 $documentEndpoint = (string) ($studentDocumentEndpoint ?? '');
 $documentCsrf = (string) ($studentDocumentCsrf ?? '');
 $historicalPreviewUrl = $historical ? route('project-file-version-preview').'&project_id='.$projectId.'&version_id='.(int)$historical['id'] : '';
 $docLimits = (new ProjectDocumentFileService())->limits();
 ?>
-<script type="application/json" data-sw-observations-json><?= e(json_encode($observations, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)) ?></script>
-<section class="sw-doc-workspace<?= $historical ? ' is-historical' : '' ?>" data-sw-document-manager data-sw-active-tab="explorer" data-endpoint="<?= e($documentEndpoint) ?>" data-csrf="<?= e($documentCsrf) ?>" data-submit-endpoint="<?= e((string) ($studentProjectSubmitEndpoint ?? '')) ?>" data-submit-csrf="<?= e((string) ($studentProjectSubmitCsrf ?? '')) ?>" data-max-file-bytes="<?= (int) $docLimits['max_file_bytes'] ?>" data-max-file-mb="<?= (int) $docLimits['max_file_mb'] ?>" data-review-representation-endpoint="<?= e(route('student-project-review-representation')) ?>" data-review-representation-csrf="<?= e((new AuthSessionService())->csrfToken('student_project_review_representation')) ?>" data-project-id="<?= (int) $projectId ?>" data-historical-preview="<?= e($historicalPreviewUrl) ?>" data-pdfjs-url="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.mjs')) ?>" data-pdfjs-worker="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.worker.mjs')) ?>" data-pdfjs-fonts="<?= e(asset('vendor/pdfjs/4.10.38/web/standard_fonts/')) ?>">
+<script type="application/json" data-sw-observations-json><?= json_encode($observations, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
+<?php if ($canReviewDocuments): ?>
+<script type="application/json" data-sw-review-config-json><?= json_encode([
+    'project_id' => $projectId,
+    'expected_project_status' => $status,
+    'context' => 'academic',
+    'endpoint' => route('project-document-review-save'),
+    'csrf' => (new AuthSessionService())->csrfToken('project_document_review'),
+    'files' => $reviewFiles,
+    'categories' => $reviewCategories,
+    'limits' => ['body_min' => 5, 'body_max' => 2000, 'category_max' => 60, 'location_max' => 180],
+], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
+<?php endif; ?>
+<section class="sw-doc-workspace<?= $historical ? ' is-historical' : '' ?><?= $canReviewDocuments ? ' is-teacher-review' : '' ?>" data-sw-document-manager data-sw-active-tab="explorer"<?= $canReviewDocuments ? ' data-sw-review-mode="draft"' : '' ?> data-endpoint="<?= e($documentEndpoint) ?>" data-csrf="<?= e($documentCsrf) ?>" data-submit-endpoint="<?= e((string) ($studentProjectSubmitEndpoint ?? '')) ?>" data-submit-csrf="<?= e((string) ($studentProjectSubmitCsrf ?? '')) ?>" data-max-file-bytes="<?= (int) $docLimits['max_file_bytes'] ?>" data-max-file-mb="<?= (int) $docLimits['max_file_mb'] ?>" data-review-representation-endpoint="<?= e(route('student-project-review-representation')) ?>" data-review-representation-csrf="<?= e((new AuthSessionService())->csrfToken('student_project_review_representation')) ?>" data-project-id="<?= (int) $projectId ?>" data-historical-preview="<?= e($historicalPreviewUrl) ?>" data-pdfjs-url="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.mjs')) ?>" data-pdfjs-worker="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.worker.mjs')) ?>" data-pdfjs-fonts="<?= e(asset('vendor/pdfjs/4.10.38/web/standard_fonts/')) ?>">
     <?php if ($historical): ?><div class="sw-historical-banner" role="status"><strong>Versión <?= (int)$historical['version_number'] ?> · Historial</strong><span>Estás consultando una versión anterior de este documento.</span><a href="<?= e($detailUrl.'&tab=documents') ?>">Volver a versión actual</a></div><?php endif; ?>
     <nav class="sw-mobile-switcher" data-sw-mobile-switcher aria-label="Navegación móvil del espacio de trabajo">
         <button type="button" class="sw-mobile-tab is-active" data-sw-mobile-tab="explorer">
@@ -127,4 +147,34 @@ $docLimits = (new ProjectDocumentFileService())->limits();
             </footer>
         </section>
     </div>
+    <?php if ($canReviewDocuments): ?>
+    <div class="sw-operation-modal sw-review-confirm-modal" data-sw-review-confirm-modal hidden>
+        <section role="dialog" aria-modal="true" aria-labelledby="swReviewConfirmTitle" class="sw-review-confirm-card">
+            <header class="sw-review-confirm-header">
+                <h2 id="swReviewConfirmTitle">Confirmar revisión</h2>
+                <button type="button" data-sw-review-confirm-close aria-label="Cerrar ventana">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </header>
+            <div class="sw-review-confirm-body">
+                <div class="sw-review-confirm-copy">
+                    <strong data-sw-review-confirm-heading>Has terminado la revisión de los documentos.</strong>
+                    <p data-sw-review-confirm-message>Al confirmar, el sistema registrará el resultado de esta revisión.</p>
+                </div>
+                <div class="sw-review-confirm-stats" data-sw-review-confirm-stats>
+                    <span data-sw-review-approved-count>0 aprobados</span>
+                    <span data-sw-review-corrections-count>0 con correcciones</span>
+                </div>
+                <p class="sw-review-confirm-status" data-sw-review-confirm-status hidden></p>
+                <p class="sw-review-confirm-error" data-sw-review-confirm-error hidden role="alert"></p>
+            </div>
+            <footer class="sw-review-confirm-footer">
+                <button type="button" class="sw-review-confirm-cancel" data-sw-review-confirm-cancel>Cancelar</button>
+                <button type="button" class="sw-review-confirm-submit" data-sw-review-confirm-submit>
+                    <i class="fa-solid fa-check" aria-hidden="true"></i> <span>Confirmar revisión</span>
+                </button>
+            </footer>
+        </section>
+    </div>
+    <?php endif; ?>
 </section>

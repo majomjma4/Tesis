@@ -364,6 +364,7 @@ final class ProjectsController
                 $hasAdjustmentUi ? asset('js/project-adjustments.js') : null,
                 !$isAdministrator ? asset('vendor/jszip/3.10.1/jszip.min.js') : null,
                 $isAdministrator ? asset('js/admin-projects.js') : asset('js/student-project-workspace.js'),
+                !$isAdministrator && !empty($projectCapabilities['review_documents']) ? asset('js/teacher-project-review.js') : null,
                 $isAdministrator && $projectStatusTransitions !== [] ? asset('js/project-status-transition.js') : null,
             ])),
             'project' => $project,
