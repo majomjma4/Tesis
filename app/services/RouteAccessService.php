@@ -7,11 +7,11 @@ final class RouteAccessService
     private const ADMIN_ROUTES = ['admin-users','admin-user-save','admin-user-status','admin-user-password','admin-users-import','admin-project-save','admin-project-trash','admin-project-history','admin-project-file','admin-academic','admin-academic-save','admin-academic-promote','admin-academic-revert','admin-repository','admin-repository-publish','admin-support-material-save','admin-support-material-history','admin-support-material-history-cleanup','admin-support-material-status','admin-support-material-file','admin-notification-send','admin-notification-audience-send','admin-notification-recipients','admin-reports','admin-report-export','admin-settings','admin-settings-save','admin-trash','admin-trash-user','admin-trash-restore','admin-trash-restore-batch','admin-trash-restore-all','admin-trash-delete','admin-trash-delete-batch','admin-trash-empty-category','admin-trash-purge'];
     public function enforce(string $page): void
     {
-        $config = $GLOBALS['config'] ?? [];
-        if (!($config['auth_required'] ?? false) || in_array($page, self::PUBLIC_ROUTES, true)) return;
+        if (in_array($page, self::PUBLIC_ROUTES, true)) return;
         $session=new AuthSessionService();
         if (!$session->isAuthenticated()) {
-            if($this->isAjaxOrJsonRequest($page))$this->denyJson('La sesión no está activa.', 401);
+            if($this->isAjaxOrJsonRequest($page))$this->denyJson('Tu sesión expiró. Inicia sesión nuevamente para continuar.', 401);
+            $session->logout('Tu sesión expiró. Inicia sesión nuevamente para continuar.');
             header('Location: ' . route('login')); exit;
         }
         try { $identity=(new AuthModel())->sessionIdentity((int)$session->userId()); } catch(Throwable){ $identity=null; }

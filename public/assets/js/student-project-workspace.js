@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.appendChild(toastContainer);
     }
 
+    const escapeHtml = (str = '') => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
     const showVisualToast = (message, kind = false, title = '') => {
         if (!message) return;
 
@@ -443,17 +445,25 @@ document.addEventListener('DOMContentLoaded', () => {
     let pdfjsPromise=null, pdfDocument=null, pdfDocumentKey='', pdfDocumentLoading=null, pdfDocumentGeneration=0, previewGeneration=0, previewController=null, currentPreviewUrl='', pdfScale=1, pdfFitScale=1, activePdfPreview=null, pocAnnotations=[], annotationsVisible=true;
     const pdfjs=async()=>{if(!pdfjsPromise)pdfjsPromise=import(manager.dataset.pdfjsUrl).then((module)=>{module.GlobalWorkerOptions.workerSrc=manager.dataset.pdfjsWorker;return module;});return pdfjsPromise;};
     const jsonRequestInit=(options={})=>({...options,credentials:'same-origin',headers:{Accept:'application/json',...(options.headers||{})}});
+    let isRedirectingToLogin = false;
     const handleExpiredSession = (notice) => {
-        const message = notice || 'Tu sesión ha caducado. Inicia sesión nuevamente.';
+        if (isRedirectingToLogin) return;
+        isRedirectingToLogin = true;
+        const message = notice || 'Tu sesión expiró. Inicia sesión nuevamente para continuar.';
+        showVisualToast(message, 'error', 'Sesión expirada');
+        if (manager) {
+            manager.style.pointerEvents = 'none';
+            manager.style.opacity = '0.6';
+        }
         setTimeout(() => {
             const loginUrl = 'index.php?page=login&notice=' + encodeURIComponent(message);
-            window.location.href = loginUrl;
-        }, 200);
+            window.location.assign(loginUrl);
+        }, 300);
     };
 
     const readJsonResponse = async (response) => {
         const redirectedToLogin = response.redirected && /([?&]page=login)(?:&|$)/i.test(response.url || '');
-        const is401 = response.status === 401 || response.status === 419;
+        const is401 = response.status === 401;
 
         let payload = null;
         const contentType = (response.headers.get('content-type') || '').toLowerCase();
@@ -466,7 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isSessionExpiredPayload = payload && (payload.authenticated === false || payload.code === 'session_expired');
 
         if (is401 || redirectedToLogin || isSessionExpiredPayload) {
-            const notice = payload?.message || 'Tu sesión ha caducado. Inicia sesión nuevamente.';
+            const notice = payload?.message || 'Tu sesión expiró. Inicia sesión nuevamente para continuar.';
             handleExpiredSession(notice);
             const error = new Error(notice);
             error.status = 401;
@@ -512,7 +522,448 @@ document.addEventListener('DOMContentLoaded', () => {
     let observationFilter='all', selectedObservationFileId=0;
     const observationIsAddressed=(item)=>['addressed','resolved'].includes(String(item.status||'').toLowerCase());
     const observationTone=(item,index)=>['amber','blue','green','violet','rose'][(Number(item.id||index)||index)%5];
-    const renderStudentObservations=()=>{if(!observationPanel)return;const items=allStudentObservations.filter((item)=>Number(item.file_id||0)===selectedObservationFileId);const pending=items.filter((item)=>!observationIsAddressed(item)).length;const addressed=items.length-pending;if(mobileObsBadge){mobileObsBadge.textContent=String(items.length);mobileObsBadge.hidden=items.length===0;}observationPanel.replaceChildren();const filters=document.createElement('div');filters.className='sw-obs-filters';[['all','Todas',items.length,'is-all'],['pending','Pendientes',pending,'is-pending'],['addressed','Atendidas',addressed,'is-addressed']].forEach(([key,label,count,toneClass])=>{const button=document.createElement('button');button.type='button';const isActive=observationFilter===key;button.className=`sw-obs-filter ${toneClass}${isActive?' is-active':''}`;button.setAttribute('aria-pressed',isActive?'true':'false');button.textContent=`${label} (${count})`;button.addEventListener('click',()=>{observationFilter=key;renderStudentObservations();});filters.append(button);});observationPanel.append(filters);const visible=items.filter((item)=>observationFilter==='all'||(observationFilter==='addressed'?observationIsAddressed(item):!observationIsAddressed(item)));if(!visible.length){const empty=document.createElement('div');empty.className='sw-obs-empty';const emptySubtitle=selectedObservationFileId===0?'Selecciona un archivo para consultar sus observaciones.':'Cuando el docente registre comentarios sobre este archivo aparecerán aquí.';empty.innerHTML=`<i class="fa-regular fa-comments" aria-hidden="true"></i><strong>Sin observaciones</strong><span>${emptySubtitle}</span>`;observationPanel.append(empty);return;}const list=document.createElement('div');list.className='sw-obs-list';visible.forEach((item,index)=>{const card=document.createElement('article');card.className=`sw-obs-card is-${observationTone(item,index)}`;const marker=document.createElement('span');marker.className='sw-obs-marker';marker.textContent=String(index+1);const content=document.createElement('div');content.className='sw-obs-card-content';const meta=document.createElement('div');meta.className='sw-obs-card-meta';meta.innerHTML=`<span>${item.location_reference||item.category||'Observación general'}</span><b class="sw-obs-status ${observationIsAddressed(item)?'is-addressed':'is-pending'}">${observationIsAddressed(item)?'Atendida':'Pendiente'}</b>`;const body=document.createElement('p');body.textContent=String(item.body||'');const author=document.createElement('small');author.textContent=`${item.author_name||'Docente'} · ${item.created_at||''}`;content.append(meta,body,author);card.append(marker,content);list.append(card);});observationPanel.append(list);};
+
+    const canResubmitCorrections = () => {
+        const hasProjectDeliveries = Number(manager.dataset.deliveryCount || 0) > 0 || Boolean(manager.querySelector('[data-document-status="approved"], [data-document-status="corrections_requested"]'));
+        const files = [...manager.querySelectorAll('[data-sw-file]')];
+
+        const correctionsRequestedFiles = files.filter((f) => f.dataset.documentStatus === 'corrections_requested');
+        const replacedFiles = files.filter((f) => f.dataset.documentStatus === 'development' && hasProjectDeliveries);
+
+        const totalNeeded = correctionsRequestedFiles.length + replacedFiles.length;
+        const completed = replacedFiles.length;
+        const unreplaced = correctionsRequestedFiles.length;
+        const eligible = !hasProjectDeliveries || (totalNeeded > 0 ? unreplaced === 0 : true);
+
+        return { eligible, totalNeeded, completed, unreplaced, hasDeliveries: hasProjectDeliveries };
+    };
+
+    const checkStudentResubmissionEligibility = () => {
+        const sendBtn = manager.querySelector('[data-sw-send-for-review]') || manager.parentElement?.querySelector('[data-sw-send-for-review]');
+        if (!sendBtn) return;
+
+        const res = canResubmitCorrections();
+
+        let helperEl = manager.querySelector('[data-sw-resubmission-helper]');
+        if (!helperEl) {
+            helperEl = document.createElement('p');
+            helperEl.className = 'sw-resubmission-helper-text';
+            helperEl.dataset.swResubmissionHelper = '';
+            Object.assign(helperEl.style, {
+                fontSize: '0.78rem',
+                color: '#b45309',
+                margin: '6px 0 0 0',
+                lineHeight: '1.3',
+                fontWeight: '600',
+            });
+            sendBtn.parentElement?.append(helperEl);
+        }
+
+        if (res.hasDeliveries && !res.eligible) {
+            sendBtn.disabled = true;
+            const progressText = `Correcciones realizadas: ${res.completed} de ${res.totalNeeded}`;
+            sendBtn.title = `Debes corregir todos los documentos observados antes de reenviar el proyecto. (${progressText})`;
+            helperEl.textContent = `Debes corregir todos los documentos observados antes de reenviar el proyecto. (${progressText})`;
+            helperEl.style.color = '#b45309';
+            helperEl.hidden = false;
+        } else {
+            sendBtn.disabled = false;
+            sendBtn.title = '';
+            if (res.hasDeliveries && res.totalNeeded > 0) {
+                helperEl.textContent = `Correcciones realizadas: ${res.completed} de ${res.totalNeeded}`;
+                helperEl.style.color = '#15803d';
+                helperEl.hidden = false;
+            } else {
+                helperEl.hidden = true;
+            }
+        }
+    };
+
+    const toggleStudentObservationStatusInBackend = async (item, newStatus, buttonEl) => {
+        if (!item.id || isRedirectingToLogin) return;
+        buttonEl.disabled = true;
+        try {
+            const body = new FormData();
+            body.set('_csrf', csrf);
+            body.set('project_id', String(projectId));
+            body.set('observation_id', String(item.id));
+            body.set('status', newStatus);
+
+            const response = await fetch('index.php?page=student-project-observation-toggle-status', jsonRequestInit({ method: 'POST', body }));
+            const payload = await readJsonResponse(response);
+
+            if (!payload.success) {
+                throw new Error(payload.message || 'No se pudo actualizar el estado de la observación.');
+            }
+
+            item.status = newStatus;
+            toast(newStatus === 'addressed' ? 'Observación marcada como atendida.' : 'Observación marcada como pendiente.', 'info');
+            renderStudentObservations();
+        } catch (error) {
+            if (error.code === 'session_expired' || error.status === 401 || error.status === 419) {
+                return;
+            }
+            console.error('Error al cambiar estado de observación:', error);
+            toast(error.message || 'No fue posible cambiar el estado de la observación.', true);
+        } finally {
+            if (!isRedirectingToLogin) buttonEl.disabled = false;
+        }
+    };
+
+    const sortStudentObservations = (itemList) => {
+        return [...itemList].map((item, originalIndex) => {
+            let anchorObj = null;
+            if (item.selection_anchor) {
+                try {
+                    anchorObj = typeof item.selection_anchor === 'string' ? JSON.parse(item.selection_anchor) : item.selection_anchor;
+                } catch (e) {}
+            }
+            const pageNum = anchorObj?.page_number || (item.location_reference ? Number((item.location_reference.match(/Página\s+(\d+)/i) || [])[1] || 0) : 0);
+            const selectedText = String(anchorObj?.selected_text || '').trim();
+            const hasRects = Array.isArray(anchorObj?.relative_rects) && anchorObj.relative_rects.length > 0;
+            const pageNumber = Number(anchorObj?.page_number || pageNum || 0);
+
+            const isContextual = selectedText !== '' && Number.isInteger(pageNumber) && pageNumber >= 1 && (hasRects || Boolean(item.selection_anchor));
+            const priority = isContextual ? 1 : 0;
+            const fileId = Number(item.file_id || 0);
+
+            return { item, fileId, priority, originalIndex };
+        }).sort((a, b) => {
+            if (a.fileId !== b.fileId) {
+                return a.fileId - b.fileId;
+            }
+            if (a.priority !== b.priority) {
+                return a.priority - b.priority;
+            }
+            return a.originalIndex - b.originalIndex;
+        }).map((wrapper) => wrapper.item);
+    };
+
+    const renderStudentObservations = () => {
+        if (!observationPanel) return;
+
+        checkStudentResubmissionEligibility();
+
+        const fileObject = [...manager.querySelectorAll('[data-sw-file]')].find((f) => Number(f.dataset.fileId) === selectedObservationFileId);
+        const documentStatus = fileObject?.dataset.documentStatus || '';
+        const fileName = fileObject?.dataset.fileName || '';
+
+        // Contadores: Si selectedObservationFileId === 0, muestra total del proyecto. Sino, filtra.
+        const items = selectedObservationFileId === 0
+            ? allStudentObservations
+            : allStudentObservations.filter((item) => Number(item.file_id || 0) === selectedObservationFileId);
+
+        const pending = items.filter((item) => !observationIsAddressed(item)).length;
+        const addressed = items.length - pending;
+
+        if (mobileObsBadge) {
+            mobileObsBadge.textContent = String(allStudentObservations.length);
+            mobileObsBadge.hidden = allStudentObservations.length === 0;
+        }
+
+        observationPanel.replaceChildren();
+
+        // BANNERS INFORMATIVOS DE ESTADO ACADÉMICO DEL DOCUMENTO
+        if (selectedObservationFileId > 0 && documentStatus === 'approved') {
+            const banner = document.createElement('div');
+            banner.className = 'sw-obs-approved-banner';
+            banner.style.background = '#f0fdf4';
+            banner.style.border = '1px solid #bbf7d0';
+            banner.style.borderRadius = '8px';
+            banner.style.padding = '10px 12px';
+            banner.style.marginBottom = '12px';
+            banner.style.display = 'flex';
+            banner.style.alignItems = 'center';
+            banner.style.gap = '10px';
+            banner.innerHTML = `<i class="fa-solid fa-circle-check" style="color:#16a34a;font-size:1.25rem;"></i><div><strong style="display:block;color:#15803d;font-size:0.88rem;">Documento aprobado</strong><span style="display:block;color:#166534;font-size:0.78rem;line-height:1.3;">Este documento fue aprobado en la última revisión y no requiere cambios.</span></div>`;
+            observationPanel.append(banner);
+        } else if (selectedObservationFileId > 0 && documentStatus === 'corrections_requested') {
+            const banner = document.createElement('div');
+            banner.className = 'sw-obs-corrections-banner';
+            banner.style.background = '#fffbeb';
+            banner.style.border = '1px solid #fde68a';
+            banner.style.borderRadius = '8px';
+            banner.style.padding = '10px 12px';
+            banner.style.marginBottom = '12px';
+            banner.style.display = 'flex';
+            banner.style.alignItems = 'center';
+            banner.style.gap = '10px';
+            banner.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:#d97706;font-size:1.25rem;"></i><div><strong style="display:block;color:#92400e;font-size:0.88rem;">Requiere correcciones</strong><span style="display:block;color:#b45309;font-size:0.78rem;line-height:1.3;">Revisa las observaciones enviadas por el docente y reemplaza el archivo ajustado.</span></div>`;
+            observationPanel.append(banner);
+        }
+
+        const filters = document.createElement('div');
+        filters.className = 'sw-obs-filters';
+        [
+            ['all', 'Todas', items.length, 'is-all'],
+            ['pending', 'Pendientes', pending, 'is-pending'],
+            ['addressed', 'Atendidas', addressed, 'is-addressed'],
+        ].forEach(([key, label, count, toneClass]) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            const isActive = observationFilter === key;
+            button.className = `sw-obs-filter ${toneClass}${isActive ? ' is-active' : ''}`;
+            button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            button.textContent = `${label} (${count})`;
+            button.addEventListener('click', () => {
+                observationFilter = key;
+                renderStudentObservations();
+            });
+            filters.append(button);
+        });
+        observationPanel.append(filters);
+
+        const visibleUnsorted = items.filter((item) => observationFilter === 'all' || (observationFilter === 'addressed' ? observationIsAddressed(item) : !observationIsAddressed(item)));
+        const visible = sortStudentObservations(visibleUnsorted);
+
+        if (!visible.length) {
+            if (selectedObservationFileId > 0 && documentStatus === 'approved') {
+                return; // Si fue aprobado y no tiene observaciones, el banner superior ya explica el estado.
+            }
+            const empty = document.createElement('div');
+            empty.className = 'sw-obs-empty';
+            const emptySubtitle = selectedObservationFileId === 0
+                ? 'Selecciona un archivo para consultar sus observaciones específicas.'
+                : 'Este documento no presenta observaciones registradas en la revisión.';
+            empty.innerHTML = `<i class="fa-regular fa-comments" aria-hidden="true"></i><strong>Sin observaciones</strong><span>${emptySubtitle}</span>`;
+            observationPanel.append(empty);
+            return;
+        }
+
+        const list = document.createElement('div');
+        list.className = 'sw-obs-list';
+        let contextualCount = 0;
+        visible.forEach((item, index) => {
+            let anchorObj = null;
+            if (item.selection_anchor) {
+                try {
+                    anchorObj = typeof item.selection_anchor === 'string' ? JSON.parse(item.selection_anchor) : item.selection_anchor;
+                } catch (e) {}
+            }
+            const pageNum = anchorObj?.page_number || (item.location_reference ? Number((item.location_reference.match(/Página\s+(\d+)/i) || [])[1] || 0) : 0);
+            const selectedText = String(anchorObj?.selected_text || '').trim();
+            const hasRects = Array.isArray(anchorObj?.relative_rects) && anchorObj.relative_rects.length > 0;
+            const pageNumber = Number(anchorObj?.page_number || pageNum || 0);
+
+            const hasContextualAnchor = selectedText !== '' && Number.isInteger(pageNumber) && pageNumber >= 1 && (hasRects || Boolean(item.selection_anchor));
+
+            let obsNumber = null;
+            let colorClass = 'sw-review-color-gray';
+            if (hasContextualAnchor) {
+                contextualCount++;
+                obsNumber = contextualCount;
+                colorClass = `sw-review-color-${((obsNumber - 1) % 5) + 1}`;
+            }
+
+            const card = document.createElement('article');
+            card.className = `sw-obs-card ${colorClass}${activeStudentObservationId === item.id ? ' is-active' : ''}`;
+            card.dataset.observationId = String(item.id || '');
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.style.gap = '8px';
+            card.style.padding = '12px';
+
+            let internalEntry = anchorObj?.internal_entry || anchorObj?.entry_name;
+            if (!internalEntry && item.location_reference && item.location_reference.includes('→')) {
+                const parts = item.location_reference.split('→');
+                if (parts.length > 1) internalEntry = parts.slice(1).join('→').trim();
+            }
+
+            const itemFileId = Number(item.file_id || 0);
+            const isZip = Boolean(internalEntry) || (fileObject && (fileObject.dataset.fileExtension || '').toUpperCase() === 'ZIP');
+            const isProjectLevel = itemFileId === 0;
+
+            let typeLabel = 'General del archivo';
+            if (hasContextualAnchor) {
+                typeLabel = 'Sobre el texto';
+            } else if (isZip) {
+                typeLabel = 'General del ZIP';
+            } else if (isProjectLevel) {
+                typeLabel = 'General del proyecto';
+            }
+
+            // 1. Meta superior: Tipo de observación ("Sobre el texto", "General del archivo", etc.) + Badge de Estado
+            const meta = document.createElement('div');
+            meta.className = 'sw-obs-card-meta';
+            meta.style.display = 'flex';
+            meta.style.justifyContent = 'space-between';
+            meta.style.alignItems = 'center';
+
+            const typeSpan = document.createElement('span');
+            typeSpan.style.fontWeight = '700';
+            typeSpan.style.color = '#334155';
+            typeSpan.style.fontSize = '0.85rem';
+            typeSpan.style.display = 'flex';
+            typeSpan.style.alignItems = 'center';
+
+            if (hasContextualAnchor && obsNumber) {
+                typeSpan.innerHTML = `<span class="sw-review-card-number-badge ${colorClass}" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--sw-color-badge-bg);color:var(--sw-color-badge-text);border:1px solid var(--sw-color-badge-border);font-size:0.75rem;font-weight:700;margin-right:6px;">${obsNumber}</span> Sobre el texto`;
+            } else {
+                typeSpan.textContent = typeLabel;
+            }
+
+            const statusBadge = document.createElement('b');
+            statusBadge.className = `sw-obs-status ${observationIsAddressed(item) ? 'is-addressed' : 'is-pending'}`;
+            statusBadge.textContent = observationIsAddressed(item) ? 'Atendida' : 'Pendiente';
+            meta.append(typeSpan, statusBadge);
+
+            // 2. Ubicación y Contexto
+            const locationBox = document.createElement('div');
+            locationBox.className = 'sw-obs-card-location';
+            locationBox.style.fontSize = '0.78rem';
+            locationBox.style.padding = '6px 9px';
+            locationBox.style.borderRadius = '5px';
+
+            if (hasContextualAnchor) {
+                const textSnippet = selectedText.length > 80 ? selectedText.slice(0, 80) + '…' : selectedText;
+                let catBadge = item.category && item.category !== 'General'
+                    ? `<span style="font-size:0.7rem;color:var(--sw-color-badge-text, #475569);font-weight:500;background:var(--sw-color-badge-bg, #e2e8f0);border:1px solid var(--sw-color-badge-border, #cbd5e1);padding:1px 5px;border-radius:3px;white-space:nowrap;margin-left:auto;">${escapeHtml(item.category)}</span>`
+                    : '';
+                locationBox.innerHTML = `<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px;font-weight:600;color:#0f172a;margin-bottom:2px;"><span><i class="fa-solid fa-bookmark" style="color:var(--sw-color-badge-border, #2563eb);"></i> Página ${pageNum}</span>${catBadge}</div><div style="font-style:italic;color:#475569;font-size:0.75rem;line-height:1.2;word-break:break-word;">“${escapeHtml(textSnippet)}”</div>`;
+                card.style.cursor = 'pointer';
+                card.title = 'Haz clic para ubicar esta observación en el documento';
+            } else if (internalEntry) {
+                let catBadge = item.category && item.category !== 'General'
+                    ? `<span style="font-size:0.7rem;color:#0369a1;font-weight:500;background:#e0f2fe;padding:1px 5px;border-radius:3px;white-space:nowrap;margin-left:auto;">${escapeHtml(item.category)}</span>`
+                    : '';
+                locationBox.innerHTML = `<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px;font-weight:600;color:#0284c7;margin-bottom:2px;"><span><i class="fa-solid fa-file-zipper"></i> Archivo interno</span>${catBadge}</div><div style="font-size:0.75rem;color:#334155;word-break:break-word;">${escapeHtml(internalEntry)}</div>`;
+            } else if (isProjectLevel) {
+                locationBox.innerHTML = `<div style="display:flex;align-items:center;gap:4px;"><i class="fa-solid fa-folder-tree" style="color:#64748b;"></i> <span style="font-weight:500;color:#64748b;">Observación general del expediente</span></div>`;
+            } else {
+                let catBadge = item.category && item.category !== 'General'
+                    ? `<span style="font-size:0.7rem;color:#475569;font-weight:500;background:#e2e8f0;padding:1px 5px;border-radius:3px;white-space:nowrap;margin-left:auto;">${escapeHtml(item.category)}</span>`
+                    : '';
+                locationBox.innerHTML = `<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px;"><span style="font-weight:500;color:#64748b;"><i class="fa-solid fa-file-lines" style="color:#64748b;margin-right:4px;"></i> Observación general</span>${catBadge}</div>`;
+            }
+
+            // 3. Cuerpo del comentario
+            const body = document.createElement('p');
+            body.className = 'sw-obs-card-body';
+            body.style.margin = '2px 0';
+            body.style.color = '#1e293b';
+            body.style.fontSize = '0.86rem';
+            body.style.lineHeight = '1.4';
+            body.textContent = String(item.body || '');
+
+            // 4. Footer con Autor, Fecha y Botón Discreto de Alternar Estado
+            const footer = document.createElement('div');
+            footer.style.display = 'flex';
+            footer.style.justifyContent = 'space-between';
+            footer.style.alignItems = 'center';
+            footer.style.gap = '8px';
+            footer.style.marginTop = '4px';
+            footer.style.paddingTop = '6px';
+            footer.style.borderTop = '1px solid #f1f5f9';
+            footer.style.flexWrap = 'wrap';
+
+            const author = document.createElement('small');
+            author.style.color = '#64748b';
+            author.style.fontSize = '0.72rem';
+            author.textContent = `${item.author_name || 'Docente'} · ${item.created_at || ''}`;
+
+            const toggleBtn = document.createElement('button');
+            toggleBtn.type = 'button';
+            toggleBtn.className = 'sw-obs-toggle-status-btn';
+            const isAddressed = observationIsAddressed(item);
+            toggleBtn.style.fontSize = '0.73rem';
+            toggleBtn.style.padding = '3px 7px';
+            toggleBtn.style.borderRadius = '4px';
+            toggleBtn.style.border = '1px solid transparent';
+            toggleBtn.style.background = 'transparent';
+            toggleBtn.style.color = isAddressed ? '#64748b' : '#16a34a';
+            toggleBtn.style.cursor = 'pointer';
+            toggleBtn.style.fontWeight = '500';
+            toggleBtn.style.marginLeft = 'auto';
+            toggleBtn.style.transition = 'all 0.15s ease';
+            toggleBtn.innerHTML = isAddressed
+                ? '<i class="fa-solid fa-rotate-left" style="margin-right:4px;font-size:0.7rem;"></i> Marcar como pendiente'
+                : '<i class="fa-solid fa-check" style="margin-right:4px;font-size:0.75rem;"></i> Marcar como atendida';
+
+            toggleBtn.addEventListener('mouseenter', () => {
+                toggleBtn.style.background = isAddressed ? '#f1f5f9' : '#f0fdf4';
+                toggleBtn.style.borderColor = isAddressed ? '#cbd5e1' : '#bbf7d0';
+            });
+            toggleBtn.addEventListener('mouseleave', () => {
+                toggleBtn.style.background = 'transparent';
+                toggleBtn.style.borderColor = 'transparent';
+            });
+
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const nextStatus = isAddressed ? 'pending' : 'addressed';
+                toggleStudentObservationStatusInBackend(item, nextStatus, toggleBtn);
+            });
+
+            footer.append(author, toggleBtn);
+
+            card.dataset.observationId = String(item.id || '');
+            if (activeStudentObservationId !== null && Number(item.id) === activeStudentObservationId) {
+                card.classList.add('is-active');
+            }
+
+            card.append(meta, locationBox, body, footer);
+
+            // CLIC EN TARJETA DE OBSERVACIÓN
+            card.addEventListener('click', () => {
+                setActiveStudentObservation(item.id);
+
+                const targetFileId = Number(item.file_id || selectedObservationFileId || 0);
+                const isViewerHidden = () => {
+                    if (!previewStage) return true;
+                    const rect = previewStage.getBoundingClientRect();
+                    return rect.width === 0 || rect.height === 0;
+                };
+
+                const executeNav = () => {
+                    setActiveStudentObservation(item.id, 2500);
+                    if (!hasContextualAnchor || pageNum < 1) return;
+                    const targetPage = previewStage?.querySelector(`[data-poc-page="${pageNum}"]`)
+                        || previewStage?.querySelector(`[data-page-number="${pageNum}"]`);
+                    if (targetPage) {
+                        targetPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    const targetOverlays = previewStage?.querySelectorAll(`[data-observation-id="${item.id}"], [data-sw-observation-highlight="${item.id}"], [data-sw-observation-badge="${item.id}"]`);
+                    if (targetOverlays && targetOverlays.length > 0) {
+                        targetOverlays[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        targetOverlays.forEach((el) => {
+                            el.classList.add('sw-highlight-pulse');
+                            setTimeout(() => el.classList.remove('sw-highlight-pulse'), 1600);
+                        });
+                    }
+                };
+
+                if (targetFileId > 0 && selectedObservationFileId !== targetFileId) {
+                    const targetButton = [...manager.querySelectorAll('[data-sw-file]')].find((f) => Number(f.dataset.fileId) === targetFileId);
+                    if (targetButton && !targetButton.classList.contains('is-selected')) {
+                        targetButton.click();
+                    }
+                }
+
+                if (hasContextualAnchor && pageNum > 0) {
+                    if (isViewerHidden()) {
+                        switchMobileTab('viewer');
+                        let attempts = 0;
+                        const checkAndScroll = () => {
+                            attempts++;
+                            const pageEl = previewStage?.querySelector(`[data-poc-page="${pageNum}"]`)
+                                || previewStage?.querySelector(`[data-page-number="${pageNum}"]`);
+                            if (pageEl || attempts > 25) {
+                                executeNav();
+                            } else {
+                                requestAnimationFrame(checkAndScroll);
+                            }
+                        };
+                        requestAnimationFrame(checkAndScroll);
+                    } else {
+                        executeNav();
+                    }
+                }
+            });
+
+            list.append(card);
+        });
+        observationPanel.append(list);
+    };
     const formatObservationFilters=()=>observationPanel?.querySelectorAll('.sw-obs-filter').forEach((button)=>{if(button.dataset.formatted==='true')return;const match=button.textContent.trim().match(/^(.+?)\s*\((\d+)\)$/);if(!match)return;button.replaceChildren();const label=document.createElement('span');label.className='sw-obs-filter-label';label.textContent=match[1];const count=document.createElement('span');count.className='sw-obs-filter-count';count.textContent=`(${match[2]})`;button.append(label,count);button.dataset.formatted='true';});
     const observationFilterObserver=observationPanel&&typeof MutationObserver==='function'?new MutationObserver(formatObservationFilters):null; observationFilterObserver?.observe(observationPanel,{childList:true,subtree:true}); formatObservationFilters();
     const viewerToolbar=manager.querySelector('.sw-viewer-toolbar');
@@ -542,16 +993,142 @@ document.addEventListener('DOMContentLoaded', () => {
         if(file.size>maxFileBytes){ toast(`El archivo supera el límite máximo permitido de ${maxFileMb} MB.`,true); return false; }
         return true;
     };
-    const replaceFile=async(file,fileId,checksum)=>{
+    const replaceModal = manager.querySelector('[data-sw-replace-modal]');
+    const replaceCurrentName = replaceModal?.querySelector('[data-sw-replace-current-name]');
+    const replaceNewName = replaceModal?.querySelector('[data-sw-replace-new-name]');
+    const replaceNewLabel = replaceModal?.querySelector('[data-sw-replace-new-label]');
+    const replaceNotice = replaceModal?.querySelector('[data-sw-replace-notice]');
+    const replaceReasonGroup = replaceModal?.querySelector('[data-sw-replace-reason-group]');
+    const replaceReasonSelect = replaceModal?.querySelector('[data-sw-replace-reason-select]');
+    const replaceOtherGroup = replaceModal?.querySelector('[data-sw-replace-other-group]');
+    const replaceOtherDetail = replaceModal?.querySelector('[data-sw-replace-other-detail]');
+    const replaceErrorAlert = replaceModal?.querySelector('[data-sw-replace-error]');
+    const replaceConfirmBtn = replaceModal?.querySelector('[data-sw-replace-confirm]');
+
+    const closeReplaceModal = () => {
+        if (replaceModal) replaceModal.hidden = true;
+    };
+
+    replaceModal?.querySelectorAll('[data-sw-replace-cancel]').forEach((btn) => {
+        btn.addEventListener('click', closeReplaceModal);
+    });
+
+    const openReplaceModal = (file, fileId, checksum, currentFileName) => {
+        if (!validateFileClient(file)) return;
+        if (!replaceModal) {
+            void replaceFile(file, fileId, checksum);
+            return;
+        }
+
+        const newFileName = file.name;
+        const currentExt = currentFileName.split('.').pop().toLowerCase();
+        const newExt = newFileName.split('.').pop().toLowerCase();
+        const isNameOrExtChanged = (currentFileName !== newFileName) || (currentExt !== newExt);
+
+        if (replaceCurrentName) replaceCurrentName.textContent = currentFileName;
+        if (replaceNewName) replaceNewName.textContent = newFileName;
+
+        if (replaceErrorAlert) {
+            replaceErrorAlert.hidden = true;
+            replaceErrorAlert.textContent = '';
+        }
+
+        if (replaceReasonSelect) replaceReasonSelect.value = '';
+        if (replaceOtherDetail) replaceOtherDetail.value = '';
+
+        if (!isNameOrExtChanged) {
+            if (replaceNewLabel) replaceNewLabel.textContent = 'Nueva versión:';
+            if (replaceNotice) replaceNotice.textContent = 'Se cargará una nueva versión de este documento. La versión anterior permanecerá registrada en el historial.';
+            if (replaceReasonGroup) replaceReasonGroup.hidden = true;
+            if (replaceOtherGroup) replaceOtherGroup.hidden = true;
+            if (replaceConfirmBtn) replaceConfirmBtn.disabled = false;
+        } else {
+            if (replaceNewLabel) replaceNewLabel.textContent = 'Nuevo archivo:';
+            if (replaceNotice) replaceNotice.textContent = 'El nombre o formato del archivo seleccionado es diferente. Indica el motivo del cambio para continuar.';
+            if (replaceReasonGroup) replaceReasonGroup.hidden = false;
+            if (replaceOtherGroup) replaceOtherGroup.hidden = true;
+            if (replaceConfirmBtn) replaceConfirmBtn.disabled = true;
+        }
+
+        const updateValidation = () => {
+            if (!isNameOrExtChanged) {
+                if (replaceConfirmBtn) replaceConfirmBtn.disabled = false;
+                return;
+            }
+            const selectedReason = replaceReasonSelect?.value || '';
+            if (selectedReason === 'other') {
+                if (replaceOtherGroup) replaceOtherGroup.hidden = false;
+                const detailText = replaceOtherDetail?.value.trim() || '';
+                if (replaceConfirmBtn) replaceConfirmBtn.disabled = detailText.length < 5;
+            } else {
+                if (replaceOtherGroup) replaceOtherGroup.hidden = true;
+                if (replaceConfirmBtn) replaceConfirmBtn.disabled = selectedReason === '';
+            }
+        };
+
+        const onSelectChange = () => updateValidation();
+        const onDetailInput = () => updateValidation();
+
+        replaceReasonSelect?.removeEventListener('change', onSelectChange);
+        replaceReasonSelect?.addEventListener('change', onSelectChange);
+
+        replaceOtherDetail?.removeEventListener('input', onDetailInput);
+        replaceOtherDetail?.addEventListener('input', onDetailInput);
+
+        const onConfirmClick = async () => {
+            if (replaceConfirmBtn?.disabled) return;
+            if (replaceConfirmBtn) replaceConfirmBtn.disabled = true;
+            if (replaceErrorAlert) { replaceErrorAlert.hidden = true; replaceErrorAlert.textContent = ''; }
+
+            const payload = {
+                file_id: fileId,
+                expected_checksum: checksum,
+            };
+
+            if (isNameOrExtChanged) {
+                payload.reason_type = replaceReasonSelect?.value || '';
+                if (payload.reason_type === 'other') {
+                    payload.reason_detail = replaceOtherDetail?.value.trim() || '';
+                }
+            }
+
+            try {
+                await request('replace', file, payload);
+                closeReplaceModal();
+                setFlashToast('Archivo reemplazado correctamente.', 'success');
+                reloadDocuments();
+            } catch (error) {
+                const message = error.message || 'No fue posible reemplazar el archivo.';
+                if (replaceErrorAlert) {
+                    replaceErrorAlert.textContent = message;
+                    replaceErrorAlert.hidden = false;
+                } else {
+                    toast(message, true);
+                }
+            } finally {
+                updateValidation();
+            }
+        };
+
+        replaceConfirmBtn.onclick = onConfirmClick;
+        replaceModal.hidden = false;
+    };
+
+    const replaceFile=async(file,fileId,checksum,reasonType='',reasonDetail='')=>{
         if(!validateFileClient(file))return;
         try{
-            await request('replace',file,{file_id:fileId,expected_checksum:checksum});
+            const extra = {file_id:fileId,expected_checksum:checksum};
+            if(reasonType){
+                extra.reason_type = reasonType;
+                if(reasonDetail) extra.reason_detail = reasonDetail;
+            }
+            await request('replace',file,extra);
             setFlashToast('Archivo reemplazado correctamente.','success');
             reloadDocuments();
         }catch(error){
-            const isIdentical=error.status===409||/idéntico/i.test(error.message||'');
+            const isIdentical=error.status===422||error.status===409||/mismo contenido|idéntico/i.test(error.message||'');
             if(isIdentical){
-                toast(error.message||'El archivo no presenta cambios respecto a la versión actual.','info');
+                toast(error.message||'El archivo seleccionado tiene el mismo contenido que la versión actual. Realiza las correcciones necesarias antes de reemplazarlo.',true);
                 return;
             }
             toast(error.message||'No se pudo subir el archivo. Inténtalo nuevamente.',true);
@@ -569,7 +1146,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(error.status===409&&existing&&/existe/i.test(error.message)&&!/idéntico/i.test(error.message)){
                 const replace=existing.closest('.sw-file-row')?.querySelector('[data-sw-replace]');
                 if(replace){
-                    confirm('Ya existe este archivo',`Ya existe un archivo llamado “${file.name}”. ¿Deseas reemplazarlo?`,`Archivo actual: ${file.name}\nNuevo archivo: ${file.name}`,false,async()=>{closeModal();await replaceFile(file,replace.dataset.fileId,replace.dataset.fileChecksum);});
+                    openReplaceModal(file, replace.dataset.fileId, replace.dataset.fileChecksum, replace.dataset.fileName);
                     return false;
                 }
             }
@@ -590,8 +1167,8 @@ document.addEventListener('DOMContentLoaded', () => {
     manager.addEventListener('dragover',(event)=>{if(!fileInput||externalFiles(event).length===0)return;event.preventDefault();manager.classList.add('is-dragging');}); manager.addEventListener('dragleave',()=>manager.classList.remove('is-dragging'));
     manager.addEventListener('drop',async(event)=>{const files=externalFiles(event);if(files.length===0)return;event.preventDefault();manager.classList.remove('is-dragging');let changed=false;for(const file of files)changed=(await upload(file))||changed;if(changed)reloadDocuments();});
     manager.querySelectorAll('[data-sw-menu-trigger]').forEach((trigger)=>trigger.addEventListener('click',(event)=>{event.stopPropagation();const menu=trigger.nextElementSibling,open=!menu.hidden;closeMenus();menu.hidden=open;trigger.setAttribute('aria-expanded',open?'false':'true');}));
-    document.addEventListener('click',(event)=>{if(!manager.contains(event.target))closeMenus();});
-    manager.querySelectorAll('[data-sw-replace]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();const chooser=document.createElement('input');chooser.type='file';chooser.hidden=true;document.body.appendChild(chooser);chooser.addEventListener('change',()=>{const file=chooser.files?.[0];chooser.remove();if(!file)return;confirm('Reemplazar archivo','Se conservará el historial técnico del archivo anterior.',`Archivo actual: ${button.dataset.fileName}\nNuevo archivo: ${file.name}`,false,async()=>{closeModal();await replaceFile(file,button.dataset.fileId,button.dataset.fileChecksum);});});chooser.click();}));
+    document.addEventListener('click',(event)=>{if(!event.target.closest('[data-sw-menu-trigger]')&&!event.target.closest('[data-sw-file-menu]'))closeMenus();});
+    manager.querySelectorAll('[data-sw-replace]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();const chooser=document.createElement('input');chooser.type='file';chooser.hidden=true;document.body.appendChild(chooser);chooser.addEventListener('change',()=>{const file=chooser.files?.[0];chooser.remove();if(!file)return;openReplaceModal(file,button.dataset.fileId,button.dataset.fileChecksum,button.dataset.fileName);});chooser.click();}));
     manager.querySelectorAll('[data-sw-remove]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();confirm('Quitar archivo','Este archivo dejará de formar parte del espacio de trabajo actual.',button.dataset.fileName,true,async()=>{try{await request('remove',null,{file_id:button.dataset.fileId});closeModal();setFlashToast('Archivo quitado.','success');reloadDocuments();}catch(error){toast(error.message||'No fue posible completar la operación.',true);}});}));
 
     const objectUrls=new Set();
@@ -1411,12 +1988,72 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     manager.querySelectorAll('[data-sw-file]').forEach((button)=>button.addEventListener('click',(event)=>{event.preventDefault();selectFile(event.currentTarget);}));
     let studentActiveNotePopover = null;
+    let activeStudentObservationId = null;
+    let activeStudentObservationTimer = null;
+
+    const clearActiveStudentObservation = () => {
+        if (activeStudentObservationTimer) {
+            clearTimeout(activeStudentObservationTimer);
+            activeStudentObservationTimer = null;
+        }
+        activeStudentObservationId = null;
+
+        const cards = observationPanel?.querySelectorAll('.sw-obs-card') || [];
+        cards.forEach((card) => card.classList.remove('is-active'));
+
+        if (!previewStage) return;
+        previewStage.querySelectorAll('.sw-review-highlight-overlay.is-active, .sw-review-highlight-badge.is-active').forEach((el) => {
+            el.classList.remove('is-active');
+        });
+    };
+
+    const setActiveStudentObservation = (observationId, autoClearMs = 2500) => {
+        if (activeStudentObservationTimer) {
+            clearTimeout(activeStudentObservationTimer);
+            activeStudentObservationTimer = null;
+        }
+
+        activeStudentObservationId = observationId ? Number(observationId) : null;
+
+        // 1. Marcar tarjeta activa en el panel
+        const cards = observationPanel?.querySelectorAll('.sw-obs-card') || [];
+        cards.forEach((card) => {
+            const cardId = Number(card.dataset.observationId || 0);
+            const isActive = activeStudentObservationId !== null && cardId === activeStudentObservationId;
+            card.classList.toggle('is-active', isActive);
+        });
+
+        // 2. Marcar highlights y badges en el visor
+        if (previewStage) {
+            const overlays = previewStage.querySelectorAll('.sw-review-highlight-overlay');
+            const badges = previewStage.querySelectorAll('.sw-review-highlight-badge');
+
+            overlays.forEach((el) => {
+                const elId = Number(el.dataset.observationId || el.dataset.swObservationHighlight || 0);
+                const isActive = activeStudentObservationId !== null && elId === activeStudentObservationId;
+                el.classList.toggle('is-active', isActive);
+            });
+
+            badges.forEach((el) => {
+                const elId = Number(el.dataset.observationId || el.dataset.swObservationBadge || 0);
+                const isActive = activeStudentObservationId !== null && elId === activeStudentObservationId;
+                el.classList.toggle('is-active', isActive);
+            });
+        }
+
+        // 3. Auto-retirar estado activo tras autoClearMs
+        if (activeStudentObservationId !== null && autoClearMs > 0) {
+            activeStudentObservationTimer = setTimeout(() => {
+                clearActiveStudentObservation();
+            }, autoClearMs);
+        }
+    };
+
     const removeStudentActiveNotePopover = () => {
         if (studentActiveNotePopover) {
             studentActiveNotePopover.remove();
             studentActiveNotePopover = null;
         }
-        previewStage?.querySelectorAll('.sw-review-highlight-overlay.is-active').forEach((node) => node.classList.remove('is-active'));
     };
 
     const viewerPanel = workspace?.querySelector('.sw-viewer-panel');
@@ -1459,6 +2096,7 @@ document.addEventListener('DOMContentLoaded', () => {
         removeStudentActiveNotePopover();
         if (!floatingLayer) return;
 
+        if (item && item.id) setActiveStudentObservation(item.id);
         highlightEl.classList.add('is-active');
 
         const note = document.createElement('div');
@@ -1553,6 +2191,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const mark=document.createElement('button');
                 mark.type='button';
                 mark.dataset.swObservationHighlight=String(item.id||'');
+                mark.dataset.observationId=String(item.id||'');
                 mark.className=`sw-review-highlight-overlay ${colorClass}`;
                 mark.setAttribute('aria-label',`Ver observación docente ${obsNumber}`);
                 Object.assign(mark.style,{left:`${Number(rect.left)*100}%`,top:`${Number(rect.top)*100}%`,width:`${Number(rect.width)*100}%`,height:`${Number(rect.height)*100}%`});
@@ -1569,6 +2208,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (firstRect) {
                 const badge = document.createElement('span');
                 badge.className = `sw-review-highlight-badge ${colorClass}`;
+                badge.dataset.swObservationBadge=String(item.id||'');
+                badge.dataset.observationId=String(item.id||'');
                 badge.textContent = String(obsNumber);
                 badge.setAttribute('aria-label', `Ver observación docente ${obsNumber}`);
 
@@ -1596,6 +2237,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 page.append(badge);
             }
         });
+        if (activeStudentObservationId !== null) {
+            setActiveStudentObservation(activeStudentObservationId);
+        }
     };
     const drawPocAnnotations=()=>{previewStage?.querySelectorAll('[data-poc-overlay]').forEach((node)=>node.remove());if(!annotationsVisible)return;pocAnnotations.forEach((annotation,index)=>{const page=previewStage?.querySelector(`[data-poc-page="${annotation.page}"]`);if(!page)return;annotation.rects.forEach((rect)=>{const overlay=document.createElement('span');overlay.dataset.pocOverlay='';overlay.className=`sw-poc-annotation is-${annotation.style}`;Object.assign(overlay.style,{left:`${rect.x*100}%`,top:`${rect.y*100}%`,width:`${rect.width*100}%`,height:`${rect.height*100}%`});page.append(overlay);});const marker=document.createElement('button');marker.type='button';marker.dataset.pocOverlay='';marker.className='sw-poc-marker';marker.textContent=String(index+1);marker.setAttribute('aria-label',`Abrir observación ${index+1}`);Object.assign(marker.style,{left:`${annotation.rects[0].x*100}%`,top:`${annotation.rects[0].y*100}%`});marker.addEventListener('click',()=>page.scrollIntoView({behavior:'smooth',block:'center'}));page.append(marker);});};
     const renderPocPanel=()=>{};
@@ -1850,17 +2494,34 @@ document.addEventListener('DOMContentLoaded', () => {
             main.append(title, description);
             event.append(main); list.prepend(event);
         };
-        trigger.addEventListener('click', () => {
+        const openSubmitModal = (e) => {
+            if (e && typeof e.preventDefault === 'function') e.preventDefault();
+            const res = canResubmitCorrections();
+            if (res.hasDeliveries && !res.eligible) {
+                const message = `Debes corregir todos los documentos observados antes de reenviar el proyecto. (Correcciones realizadas: ${res.completed} de ${res.totalNeeded})`;
+                showVisualToast(message, 'warning', 'Correcciones pendientes');
+                return false;
+            }
             lastFocus = trigger;
             clearError(); setSubmitting(false);
             submitModal.hidden = false;
             submitModal.querySelector('[data-sw-submit-cancel]')?.focus();
-        });
+            return true;
+        };
+
+        trigger.addEventListener('click', openSubmitModal);
         cancelButtons?.forEach((button) => button.addEventListener('click', close));
         submitModal.addEventListener('click', (event) => { if (event.target === submitModal) close(); });
         document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !submitModal.hidden && !submitting) { event.preventDefault(); close(); } });
         confirmButton.addEventListener('click', async () => {
             if (submitting) return;
+            const res = canResubmitCorrections();
+            if (res.hasDeliveries && !res.eligible) {
+                submitModal.hidden = true;
+                const message = `Debes corregir todos los documentos observados antes de reenviar el proyecto. (Correcciones realizadas: ${res.completed} de ${res.totalNeeded})`;
+                showVisualToast(message, 'warning', 'Correcciones pendientes');
+                return;
+            }
             clearError(); setSubmitting(true);
             const body = new FormData(); body.set('project_id', String(projectId)); body.set('_csrf', submitCsrf);
             try {

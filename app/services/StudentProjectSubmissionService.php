@@ -130,7 +130,22 @@ final class StudentProjectSubmissionService
             WHERE f.project_id=:project AND f.deleted_at IS NULL AND f.purged_at IS NULL
               AND COALESCE(s.status,'development') IN ('development','corrections_requested') ORDER BY f.sort_order,f.id FOR UPDATE");
         $query->execute(['project'=>$projectId]);
-        return $query->fetchAll();
+        $rows = $query->fetchAll();
+        if ($rows === []) return [];
+
+        $hasDeliveries = (int)$db->query("SELECT COUNT(*) FROM project_deliveries WHERE project_id={$projectId}")->fetchColumn() > 0;
+        if ($hasDeliveries) {
+            $unreplacedCount = 0;
+            foreach ($rows as $row) {
+                if ((string)$row['review_status'] === 'corrections_requested') {
+                    $unreplacedCount++;
+                }
+            }
+            if ($unreplacedCount > 0) {
+                throw new StudentProjectSubmissionException('Debes corregir todos los documentos observados antes de reenviar el proyecto.', 422);
+            }
+        }
+        return $rows;
     }
 
     private function nextDeliveryNumber(PDO $db, int $projectId): int

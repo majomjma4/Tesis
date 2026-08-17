@@ -26,7 +26,7 @@ final class ProjectStudentDocumentController
             if (($stored['extension'] ?? '') === 'zip' && empty((new ArchiveService())->inspectPackage((string) $stored['absolute_path'])['success'])) throw new InvalidArgumentException('No fue posible validar el contenido del archivo ZIP.');
             $result = $action === 'add'
                 ? Database::transaction(fn(PDO $db): array => $this->add($db, $projectId, $stored, $actor))
-                : Database::transaction(fn(PDO $db): array => $this->replace($db, $projectId, (int) ($_POST['file_id'] ?? 0), (string) ($_POST['expected_checksum'] ?? ''), $stored, $actor));
+                : Database::transaction(fn(PDO $db): array => $this->replace($db, $projectId, (int) ($_POST['file_id'] ?? 0), (string) ($_POST['expected_checksum'] ?? ''), $stored, $actor, $_POST));
             $stored = [];
             $this->json(true, $action === 'add' ? 'Archivo agregado correctamente.' : 'Archivo reemplazado correctamente.', $result);
         } catch (ProjectDocumentVersionException $error) {
@@ -56,10 +56,55 @@ final class ProjectStudentDocumentController
         return ['file_id'=>(int)$file['id']];
     }
 
-    private function replace(PDO $db, int $projectId, int $fileId, string $checksum, array $stored, int $actor): array
+    private function replace(PDO $db, int $projectId, int $fileId, string $checksum, array $stored, int $actor, array $input = []): array
     {
         $this->lockWorkspace($db, $projectId, $actor);
-        return (new ProjectFileVersionChangeService())->replaceWorkspaceInTransaction($db, $projectId, $fileId, $checksum, $stored, $actor);
+        $model = new ProjectDocumentModel($db);
+        $current = $model->findActiveFile($projectId, $fileId, true);
+
+        $newChecksum = (string) ($stored['checksum_sha256'] ?? '');
+        $expectedChecksum = (string) ($current['checksum_sha256'] ?? '');
+
+        if (hash_equals($expectedChecksum, $newChecksum)) {
+            throw new InvalidArgumentException('El archivo seleccionado tiene el mismo contenido que la versión actual. Realiza las correcciones necesarias antes de reemplazarlo.', 422);
+        }
+
+        $currentName = (string) ($current['original_name'] ?? '');
+        $newName = (string) ($stored['original_name'] ?? '');
+        $currentExt = strtolower((string) ($current['extension'] ?? ''));
+        $newExt = strtolower((string) ($stored['extension'] ?? ''));
+
+        $isNameOrExtChanged = ($currentName !== $newName) || ($currentExt !== $newExt);
+        $reasonType = trim((string) ($input['reason_type'] ?? ''));
+        $reasonDetail = trim((string) ($input['reason_detail'] ?? $input['reason_other_detail'] ?? ''));
+
+        $allowedReasonTypes = [
+            'name_change' => 'Cambio de nombre del documento',
+            'format_change' => 'Cambio de formato',
+            'restructuring' => 'Reestructuración del documento',
+            'substitution' => 'Sustitución por versión actualizada',
+            'wrong_file' => 'Corrección del archivo equivocado',
+            'other' => 'Otro',
+        ];
+
+        $finalReason = 'Reemplazo de archivo observada';
+
+        if ($isNameOrExtChanged) {
+            if ($reasonType === '' || !isset($allowedReasonTypes[$reasonType])) {
+                throw new InvalidArgumentException('El motivo del cambio es obligatorio cuando cambia el nombre o formato del archivo.', 422);
+            }
+
+            if ($reasonType === 'other') {
+                if (mb_strlen($reasonDetail) < 5) {
+                    throw new InvalidArgumentException('Describe el motivo del cambio (mínimo 5 caracteres).', 422);
+                }
+                $finalReason = 'Otro: ' . $reasonDetail;
+            } else {
+                $finalReason = $allowedReasonTypes[$reasonType];
+            }
+        }
+
+        return (new ProjectFileVersionChangeService())->replaceWorkspaceInTransaction($db, $projectId, $fileId, $checksum, $stored, $actor, $finalReason);
     }
 
     private function remove(PDO $db, int $projectId, int $fileId, int $actor): array

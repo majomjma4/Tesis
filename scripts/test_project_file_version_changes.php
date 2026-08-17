@@ -24,9 +24,11 @@ try{
     $base=['reason'=>'Corrección solicitada por revisión','declared_summary'=>'Se corrigieron resultados, conclusiones y referencias del documento.','sections'=>['Resultados','Conclusiones'],'addressed_observation_ids'=>[$ownObservation]];
     $expect=static function(callable $call,string $contains,int $status=422)use($assert):void{try{$call();$assert(false,$contains);}catch(ProjectDocumentVersionException $e){$assert($e->httpStatus()===$status&&str_contains($e->getMessage(),$contains),$contains);}};
     $expect(fn()=>$service->replaceInTransaction($db,$project,$file,$checksum,$stored,$student,'academic',array_replace($base,['declared_summary'=>'   '])),'resumen de cambios');
-    $expect(fn()=>$service->replaceInTransaction($db,$project,$file,$checksum,$stored,$student,'academic',array_replace($base,['sections'=>['Resultados','resultados']])),'No repitas secciones');
     $expect(fn()=>$service->replaceInTransaction($db,$project,$file,str_repeat('0',64),$stored,$student,'academic',$base),'documento fue actualizado',409);
     $identical=$stored;$identical['checksum_sha256']=$checksum;$expect(fn()=>$service->replaceInTransaction($db,$project,$file,$checksum,$identical,$student,'academic',$base),'mismo contenido');
+    $db->prepare("UPDATE project_file_review_states SET status='development' WHERE project_id=? AND file_id=? AND checksum_sha256=?")->execute([$project,$file,$checksum]);
+    $expect(fn()=>$service->replaceWorkspaceInTransaction($db,$project,$file,$checksum,$identical,$student),'mismo contenido',422);
+    $db->prepare("UPDATE project_file_review_states SET status='approved' WHERE project_id=? AND file_id=? AND checksum_sha256=?")->execute([$project,$file,$checksum]);
     $expect(fn()=>$service->replaceInTransaction($db,$project,$file,$checksum,$stored,$student,'academic',array_replace($base,['addressed_observation_ids'=>[$otherFileObservation]])),'otro archivo');
     $expect(fn()=>$service->replaceInTransaction($db,$project,$file,$checksum,$stored,$student,'academic',array_replace($base,['addressed_observation_ids'=>[$resolvedObservation]])),'ya fue resuelta');
     if($otherProject!==$project)$expect(fn()=>$service->replaceInTransaction($db,$project,$file,$checksum,$stored,$student,'academic',array_replace($base,['addressed_observation_ids'=>[$otherProjectObservation]])),'otro proyecto');

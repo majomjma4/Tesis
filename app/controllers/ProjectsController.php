@@ -197,10 +197,14 @@ final class ProjectsController
     /** Presenta el espacio de seguimiento de un expediente concreto. */
     public function detail(): void
     {
+        $session = new AuthSessionService();
+        if (!$session->isAuthenticated()) {
+            header('Location: ' . route('login'));
+            exit;
+        }
         $id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $requestedTab = strtolower(trim((string) ($_GET['tab'] ?? 'summary')));
         $access = new ProjectAccessService();
-        $session = new AuthSessionService();
         $isAdministrator = $session->hasAdminAccess();
         $isTeacher = !$isAdministrator && in_array('teacher', $access->currentRoles(), true);
         // El Docente accede a cualquier proyecto activo desde Proyectos activos (no solo a los suyos).
@@ -579,6 +583,58 @@ final class ProjectsController
             http_response_code(500);
             $this->json(['success'=>false,'message'=>'No fue posible enviar los documentos a revisión.','data'=>[]]);
         }
+    }
+
+    /** Permite al estudiante participante alternar el estado de una observación entre pendiente y atendida. */
+    public function toggleStudentObservationStatus(): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]);
+        }
+        $session = new AuthSessionService();
+        $actorId = (int) ($session->userId() ?? 0);
+        if ($actorId < 1) {
+            http_response_code(401);
+            $this->json(['success'=>false,'message'=>'Tu sesión expiró. Inicia sesión nuevamente para continuar.','data'=>[]]);
+        }
+        if (!$session->validateCsrf('student_project_documents', (string) ($_POST['_csrf'] ?? ''))) {
+            http_response_code(419);
+            $this->json(['success'=>false,'message'=>'No fue posible validar la solicitud. Recarga la página e inténtalo nuevamente.','data'=>[]]);
+        }
+        $projectId = filter_var($_POST['project_id'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+        $observationId = filter_var($_POST['observation_id'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+        $targetStatus = strtolower(trim((string)($_POST['status'] ?? '')));
+
+        if ($projectId === false || $projectId === null || $observationId === false || $observationId === null) {
+            http_response_code(422);
+            $this->json(['success'=>false,'message'=>'La solicitud no es válida.','data'=>[]]);
+        }
+        if (!in_array($targetStatus, ['pending', 'addressed'], true)) {
+            http_response_code(422);
+            $this->json(['success'=>false,'message'=>'El estado de la observación no es válido.','data'=>[]]);
+        }
+
+        $db = Database::connection();
+        $queryParticipant = $db->prepare("SELECT 1 FROM project_participants WHERE project_id=:project AND user_id=:user AND role_code='student' AND status='active' AND removed_at IS NULL LIMIT 1");
+        $queryParticipant->execute(['project'=>$projectId, 'user'=>$actorId]);
+        if (!$queryParticipant->fetchColumn()) {
+            http_response_code(403);
+            $this->json(['success'=>false,'message'=>'No tienes autorización para modificar observaciones en este proyecto.','data'=>[]]);
+        }
+
+        $queryObs = $db->prepare("SELECT id, status FROM project_observations WHERE id=:id AND project_id=:project LIMIT 1");
+        $queryObs->execute(['id'=>$observationId, 'project'=>$projectId]);
+        $obs = $queryObs->fetch();
+        if (!$obs) {
+            http_response_code(404);
+            $this->json(['success'=>false,'message'=>'La observación solicitada no existe.','data'=>[]]);
+        }
+
+        $update = $db->prepare("UPDATE project_observations SET status=:status WHERE id=:id AND project_id=:project");
+        $update->execute(['status'=>$targetStatus, 'id'=>$observationId, 'project'=>$projectId]);
+
+        $this->json(['success'=>true, 'message'=>'Estado de la observación actualizado correctamente.', 'data'=>['id'=>$observationId, 'status'=>$targetStatus]]);
     }
 
     public function filePreview(): void
