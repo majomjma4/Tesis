@@ -46,7 +46,7 @@ SELECT CONCAT('delivery:',d.id),'delivery_registered','project_delivery',d.id,d.
 FROM project_deliveries d LEFT JOIN users u ON u.id=d.submitted_by WHERE d.project_id=?
 UNION ALL
 SELECT CONCAT('observation-batch:',MIN(o.id)),'observation_batch_created','project_observation',MIN(o.id),MAX(o.created_at),u.id,u.full_name,NULL,NULL,
-       JSON_OBJECT('observation_count',COUNT(o.id),'affected_file_count',COUNT(DISTINCT NULLIF(o.file_id,0)),'delivery_id',o.delivery_id)
+       JSON_OBJECT('observation_count',COUNT(o.id),'affected_file_count',COUNT(DISTINCT NULLIF(o.file_id,0)),'corrected_files_count',COALESCE((SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(l.new_state,'$.corrections_requested')) AS UNSIGNED) FROM project_audit_log l WHERE l.project_id=o.project_id AND l.action='project_document_review_completed' AND DATE_FORMAT(l.created_at,'%Y-%m-%d %H:%i:%s')=DATE_FORMAT(MAX(o.created_at),'%Y-%m-%d %H:%i:%s') LIMIT 1),COUNT(DISTINCT NULLIF(o.file_id,0))),'delivery_id',o.delivery_id)
 FROM project_observations o LEFT JOIN users u ON u.id=o.author_id WHERE o.project_id=? GROUP BY DATE_FORMAT(o.created_at,'%Y-%m-%d %H:%i:%s'),o.author_id,o.delivery_id
 UNION ALL
 SELECT CONCAT('observation-response:',r.id),'observation_responded','observation_response',r.id,r.created_at,u.id,u.full_name,NULL,NULL,
@@ -183,10 +183,10 @@ SQL;
     private function observationBatchDescription(array $p): string
     {
         $obsCount = (int)($p['observation_count'] ?? 0);
-        $fileCount = (int)($p['affected_file_count'] ?? 0);
+        $correctedFilesCount = (int)($p['corrected_files_count'] ?? $p['corrections_requested'] ?? $p['affected_file_count'] ?? 0);
         $obsText = $obsCount === 1 ? '1 observación' : $obsCount . ' observaciones';
-        if ($fileCount > 0) {
-            $fileText = $fileCount === 1 ? '1 archivo' : $fileCount . ' archivos';
+        if ($correctedFilesCount > 0) {
+            $fileText = $correctedFilesCount === 1 ? '1 archivo con correcciones' : $correctedFilesCount . ' archivos con correcciones';
             return $obsText . ' · ' . $fileText;
         }
         return $obsText;
@@ -195,10 +195,10 @@ SQL;
     private function correctionsRequestedDescription(array $new): string
     {
         $obsCount = (int)($new['observation_count'] ?? 0);
-        $fileCount = (int)($new['corrections_requested'] ?? 0);
+        $correctedFilesCount = (int)($new['corrected_files_count'] ?? $new['corrections_requested'] ?? $new['affected_file_count'] ?? 0);
         $obsText = $obsCount === 1 ? '1 observación' : ($obsCount > 0 ? $obsCount . ' observaciones' : 'Correcciones solicitadas por el tutor.');
-        if ($fileCount > 0 && $obsCount > 0) {
-            $fileText = $fileCount === 1 ? '1 archivo' : $fileCount . ' archivos';
+        if ($correctedFilesCount > 0 && $obsCount > 0) {
+            $fileText = $correctedFilesCount === 1 ? '1 archivo con correcciones' : $correctedFilesCount . ' archivos con correcciones';
             return $obsText . ' · ' . $fileText;
         }
         return $obsText;

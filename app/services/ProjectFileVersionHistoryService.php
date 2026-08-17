@@ -29,7 +29,7 @@ final class ProjectFileVersionHistoryService
     public function accessibleVersion(int $projectId, int $versionId, int $actorId, string $context): array
     {
         $db=$this->db??Database::connection();
-        if (!$this->canView($db,$projectId,$actorId,$context)) throw new InvalidArgumentException('No tienes autorizaciÃ³n para consultar esta versiÃ³n.');
+        if (!$this->canView($db,$projectId,$actorId,$context)) throw new InvalidArgumentException('No tienes autorización para consultar esta versión.');
         $q=$db->prepare('SELECT v.*,p.deleted_at project_deleted_at,f.deleted_at file_deleted_at,f.purged_at file_purged_at FROM project_file_versions v JOIN projects p ON p.id=v.project_id JOIN project_files f ON f.id=v.file_id WHERE v.id=:version AND v.project_id=:project');
         $q->execute(['version'=>$versionId,'project'=>$projectId]); $row=$q->fetch();
         if (!$row || !empty($row['project_deleted_at']) || !empty($row['file_deleted_at']) || !empty($row['file_purged_at']) || (string)$row['physical_status']==='unavailable') throw new InvalidArgumentException('La versión histórica no está disponible.');

@@ -639,58 +639,55 @@ document.addEventListener('DOMContentLoaded', () => {
         }).map((wrapper) => wrapper.item);
     };
 
+    const getActiveChecksumsMap = () => {
+        const map = new Map();
+        if (manager) {
+            manager.querySelectorAll('[data-sw-file]').forEach((btn) => {
+                const fId = Number(btn.dataset.fileId || 0);
+                const fChecksum = String(btn.dataset.fileChecksum || btn.dataset.checksum || '').toLowerCase().trim();
+                if (fId > 0 && fChecksum) {
+                    map.set(fId, fChecksum);
+                }
+            });
+        }
+        return map;
+    };
+
+    const isObservationForActiveVersion = (item, activeChecksumsMap) => {
+        const fileId = Number(item.file_id || 0);
+        if (fileId <= 0) return true; // General del proyecto
+        const activeChecksum = activeChecksumsMap.get(fileId);
+        if (!activeChecksum) return true;
+        const obsChecksum = String(item.file_checksum_sha256 || '').toLowerCase().trim();
+        return obsChecksum === activeChecksum;
+    };
+
     const renderStudentObservations = () => {
         if (!observationPanel) return;
 
         checkStudentResubmissionEligibility();
 
+        const activeChecksumsMap = getActiveChecksumsMap();
         const fileObject = [...manager.querySelectorAll('[data-sw-file]')].find((f) => Number(f.dataset.fileId) === selectedObservationFileId);
         const documentStatus = fileObject?.dataset.documentStatus || '';
         const fileName = fileObject?.dataset.fileName || '';
 
-        // Contadores: Si selectedObservationFileId === 0, muestra total del proyecto. Sino, filtra.
+        // Filtrar observaciones: sólo las pertenecientes a las versiones activas de los archivos
+        const activeObservations = allStudentObservations.filter((item) => isObservationForActiveVersion(item, activeChecksumsMap));
+
         const items = selectedObservationFileId === 0
-            ? allStudentObservations
-            : allStudentObservations.filter((item) => Number(item.file_id || 0) === selectedObservationFileId);
+            ? activeObservations
+            : activeObservations.filter((item) => Number(item.file_id || 0) === selectedObservationFileId);
 
         const pending = items.filter((item) => !observationIsAddressed(item)).length;
         const addressed = items.length - pending;
 
         if (mobileObsBadge) {
-            mobileObsBadge.textContent = String(allStudentObservations.length);
-            mobileObsBadge.hidden = allStudentObservations.length === 0;
+            mobileObsBadge.textContent = String(activeObservations.length);
+            mobileObsBadge.hidden = activeObservations.length === 0;
         }
 
         observationPanel.replaceChildren();
-
-        // BANNERS INFORMATIVOS DE ESTADO ACADÉMICO DEL DOCUMENTO
-        if (selectedObservationFileId > 0 && documentStatus === 'approved') {
-            const banner = document.createElement('div');
-            banner.className = 'sw-obs-approved-banner';
-            banner.style.background = '#f0fdf4';
-            banner.style.border = '1px solid #bbf7d0';
-            banner.style.borderRadius = '8px';
-            banner.style.padding = '10px 12px';
-            banner.style.marginBottom = '12px';
-            banner.style.display = 'flex';
-            banner.style.alignItems = 'center';
-            banner.style.gap = '10px';
-            banner.innerHTML = `<i class="fa-solid fa-circle-check" style="color:#16a34a;font-size:1.25rem;"></i><div><strong style="display:block;color:#15803d;font-size:0.88rem;">Documento aprobado</strong><span style="display:block;color:#166534;font-size:0.78rem;line-height:1.3;">Este documento fue aprobado en la última revisión y no requiere cambios.</span></div>`;
-            observationPanel.append(banner);
-        } else if (selectedObservationFileId > 0 && documentStatus === 'corrections_requested') {
-            const banner = document.createElement('div');
-            banner.className = 'sw-obs-corrections-banner';
-            banner.style.background = '#fffbeb';
-            banner.style.border = '1px solid #fde68a';
-            banner.style.borderRadius = '8px';
-            banner.style.padding = '10px 12px';
-            banner.style.marginBottom = '12px';
-            banner.style.display = 'flex';
-            banner.style.alignItems = 'center';
-            banner.style.gap = '10px';
-            banner.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:#d97706;font-size:1.25rem;"></i><div><strong style="display:block;color:#92400e;font-size:0.88rem;">Requiere correcciones</strong><span style="display:block;color:#b45309;font-size:0.78rem;line-height:1.3;">Revisa las observaciones enviadas por el docente y reemplaza el archivo ajustado.</span></div>`;
-            observationPanel.append(banner);
-        }
 
         const filters = document.createElement('div');
         filters.className = 'sw-obs-filters';
@@ -712,6 +709,37 @@ document.addEventListener('DOMContentLoaded', () => {
             filters.append(button);
         });
         observationPanel.append(filters);
+
+        // BANNERS INFORMATIVOS DE ESTADO ACADÉMICO DEL DOCUMENTO (ABAJO DE LOS FILTROS)
+        if (selectedObservationFileId > 0 && documentStatus === 'approved') {
+            const banner = document.createElement('div');
+            banner.className = 'sw-obs-approved-banner';
+            banner.style.background = '#f0fdf4';
+            banner.style.border = '1px solid #bbf7d0';
+            banner.style.borderRadius = '8px';
+            banner.style.padding = '10px 12px';
+            banner.style.marginTop = '8px';
+            banner.style.marginBottom = '12px';
+            banner.style.display = 'flex';
+            banner.style.alignItems = 'center';
+            banner.style.gap = '10px';
+            banner.innerHTML = `<i class="fa-solid fa-circle-check" style="color:#16a34a;font-size:1.25rem;"></i><div><strong style="display:block;color:#15803d;font-size:0.88rem;">Documento aprobado</strong><span style="display:block;color:#166534;font-size:0.78rem;line-height:1.3;">Este documento fue aprobado en la última revisión y no requiere cambios.</span></div>`;
+            observationPanel.append(banner);
+        } else if (selectedObservationFileId > 0 && documentStatus === 'corrections_requested') {
+            const banner = document.createElement('div');
+            banner.className = 'sw-obs-corrections-banner';
+            banner.style.background = '#fffbeb';
+            banner.style.border = '1px solid #fde68a';
+            banner.style.borderRadius = '8px';
+            banner.style.padding = '10px 12px';
+            banner.style.marginTop = '8px';
+            banner.style.marginBottom = '12px';
+            banner.style.display = 'flex';
+            banner.style.alignItems = 'center';
+            banner.style.gap = '10px';
+            banner.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color:#d97706;font-size:1.25rem;"></i><div><strong style="display:block;color:#92400e;font-size:0.88rem;">Requiere correcciones</strong><span style="display:block;color:#b45309;font-size:0.78rem;line-height:1.3;">Revisa las observaciones enviadas por el docente y reemplaza el archivo ajustado.</span></div>`;
+            observationPanel.append(banner);
+        }
 
         const visibleUnsorted = items.filter((item) => observationFilter === 'all' || (observationFilter === 'addressed' ? observationIsAddressed(item) : !observationIsAddressed(item)));
         const visible = sortStudentObservations(visibleUnsorted);
@@ -2369,14 +2397,24 @@ document.addEventListener('DOMContentLoaded', () => {
         previewStage?.querySelectorAll('[data-sw-observation-highlight], .sw-review-highlight-badge').forEach((node)=>node.remove());
         removeStudentActiveNotePopover();
         const fileId=Number(selectedObservationFileId||0);
-        if(!fileId)return;
         const selected=manager.querySelector('[data-sw-file].is-selected');
+        const activeChecksum = String(selected?.dataset?.fileChecksum || selected?.dataset?.checksum || '').toLowerCase().trim();
         const version=new URL(selected?.dataset.filePreview||window.location.href,window.location.href).searchParams.get('v')||'';
         const entry=manager.querySelector('[data-sw-zip-entry].is-selected')?.dataset?.zipEntryName||'';
         let contextualCount = 0;
         const usedTopsByPage = {};
 
-        allStudentObservations.filter((item)=>Number(item.file_id||0)===fileId&&(!version||String(item.file_checksum_sha256||'').startsWith(version))).forEach((item)=>{
+        allStudentObservations.filter((item) => {
+            if (Number(item.file_id || 0) !== fileId) return false;
+            const obsChecksum = String(item.file_checksum_sha256 || '').toLowerCase().trim();
+            if (activeChecksum) {
+                return obsChecksum === activeChecksum;
+            }
+            if (version) {
+                return obsChecksum.startsWith(version.toLowerCase().trim());
+            }
+            return true;
+        }).forEach((item)=>{
             let anchor=item.selection_anchor;
             try{if(typeof anchor==='string')anchor=JSON.parse(anchor);}catch(e){anchor=null;}
             if(!anchor?.page_number||!Array.isArray(anchor.relative_rects)||((anchor.internal_entry||anchor.entry_name)&&String(anchor.internal_entry||anchor.entry_name)!==entry))return;
@@ -2763,6 +2801,57 @@ document.addEventListener('DOMContentLoaded', () => {
         return truncated.length > 0 ? truncated + '…' : str.slice(0, maxLength) + '…';
     };
 
+    const resolveObservationDisplayType = (item, file = null, meta = null) => {
+        let anchor = item?.selection_anchor || meta;
+        if (typeof anchor === 'string') {
+            try { anchor = JSON.parse(anchor); } catch (e) { anchor = null; }
+        }
+
+        const pageNum = Number(anchor?.page_number || meta?.page_number || 0);
+        const selectedText = String(anchor?.selected_text || meta?.selected_text || '').trim();
+        const hasRects = (Array.isArray(anchor?.relative_rects) && anchor.relative_rects.length > 0) ||
+                         (Array.isArray(meta?.relative_rects) && meta.relative_rects.length > 0);
+
+        const isContextual = pageNum >= 1 && (selectedText !== '' || hasRects);
+        if (isContextual) {
+            return {
+                typeKey: 'contextual',
+                typeLabel: 'Sobre el texto',
+                badgeClass: 'is-contextual',
+                iconClass: 'fa-solid fa-highlighter',
+            };
+        }
+
+        const locRef = String(item?.location_reference || meta?.entry_name || meta?.internal_entry || '');
+        const isZipEntry = locRef.includes('→') || (file && (file.extension === 'zip' || (file.name && file.name.endsWith('.zip'))) && locRef !== '');
+
+        if (isZipEntry) {
+            return {
+                typeKey: 'zip',
+                typeLabel: 'General del ZIP',
+                badgeClass: 'is-zip',
+                iconClass: 'fa-solid fa-file-zipper',
+            };
+        }
+
+        const fileId = Number(item?.file_id || file?.file_id || file?.id || 0);
+        if (fileId > 0) {
+            return {
+                typeKey: 'file',
+                typeLabel: 'General del archivo',
+                badgeClass: 'is-general',
+                iconClass: 'fa-solid fa-comment-dots',
+            };
+        }
+
+        return {
+            typeKey: 'project',
+            typeLabel: 'General del proyecto',
+            badgeClass: 'is-project',
+            iconClass: 'fa-solid fa-circle-info',
+        };
+    };
+
     const renderHistoricalObservations = (items, preview) => {
         if (!observationPanel) return;
         observationPanel.replaceChildren();
@@ -2798,8 +2887,9 @@ document.addEventListener('DOMContentLoaded', () => {
             let anchor = item.selection_anchor;
             try { if (typeof anchor === 'string') anchor = JSON.parse(anchor); } catch (e) { anchor = null; }
 
-            const isContextual = Boolean(anchor?.page_number && (anchor.selected_text || (Array.isArray(anchor.relative_rects) && anchor.relative_rects.length > 0)));
-            const isZipEntry = Boolean(item.location_reference && item.location_reference.includes('→'));
+            const displayInfo = resolveObservationDisplayType(item, preview, anchor);
+            const isContextual = displayInfo.typeKey === 'contextual';
+            const isZipEntry = displayInfo.typeKey === 'zip';
             const categoryLabel = String(item.category || 'Observación');
 
             let colorClass = '';
@@ -2814,23 +2904,9 @@ document.addEventListener('DOMContentLoaded', () => {
             card.className = `sw-obs-card sw-historical-obs-card ${colorClass}`;
             card.dataset.observationId = String(item.id || '');
 
-            let typeBadgeClass = 'is-general';
-            let typeBadgeText = 'General del archivo';
-            let iconClass = 'fa-solid fa-comment-dots';
-
-            if (isContextual) {
-                typeBadgeClass = 'is-contextual';
-                typeBadgeText = `#${obsNumber} · Sobre el texto`;
-                iconClass = 'fa-solid fa-highlighter';
-            } else if (isZipEntry) {
-                typeBadgeClass = 'is-zip';
-                typeBadgeText = 'General del ZIP';
-                iconClass = 'fa-solid fa-file-zipper';
-            } else if (categoryLabel.toLowerCase() === 'general' && !item.file_id) {
-                typeBadgeClass = 'is-project';
-                typeBadgeText = 'General del proyecto';
-                iconClass = 'fa-solid fa-circle-info';
-            }
+            let typeBadgeClass = displayInfo.badgeClass;
+            let typeBadgeText = isContextual ? `#${obsNumber} · ${displayInfo.typeLabel}` : displayInfo.typeLabel;
+            let iconClass = displayInfo.iconClass;
 
             const header = document.createElement('header');
             header.className = 'sw-obs-card-header';

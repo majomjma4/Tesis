@@ -372,7 +372,65 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasDraftChanges = () => Object.keys(reviewDraft).length > 0;
     const completedDrafts = () => files.filter((file) => completedFileIds.has(file.file_id));
     const reviewableFiles = () => files.filter((file) => isReviewableFile(file));
-    const observationsForFile = (fileId) => existingObservations.filter((item) => Number(item.file_id || 0) === fileId);
+    const observationsForFile = (fileId) => {
+        const file = filesById.get(fileId);
+        const expectedChecksum = file ? String(file.expected_checksum || '').toLowerCase().trim() : '';
+        return existingObservations.filter((item) => {
+            if (Number(item.file_id || 0) !== fileId) return false;
+            if (!expectedChecksum) return true;
+            const obsChecksum = String(item.file_checksum_sha256 || '').toLowerCase().trim();
+        });
+    };
+    const resolveObservationDisplayType = (item, file = null, meta = null) => {
+        let anchor = item?.selection_anchor || meta;
+        if (typeof anchor === 'string') {
+            try { anchor = JSON.parse(anchor); } catch (e) { anchor = null; }
+        }
+
+        const pageNum = Number(anchor?.page_number || meta?.page_number || 0);
+        const selectedText = String(anchor?.selected_text || meta?.selected_text || '').trim();
+        const hasRects = (Array.isArray(anchor?.relative_rects) && anchor.relative_rects.length > 0) ||
+                         (Array.isArray(meta?.relative_rects) && meta.relative_rects.length > 0);
+
+        const isContextual = pageNum >= 1 && (selectedText !== '' || hasRects);
+        if (isContextual) {
+            return {
+                typeKey: 'contextual',
+                typeLabel: 'Sobre el texto',
+                badgeClass: 'is-contextual',
+                iconClass: 'fa-solid fa-highlighter',
+            };
+        }
+
+        const locRef = String(item?.location_reference || meta?.entry_name || meta?.internal_entry || '');
+        const isZipEntry = locRef.includes('→') || (file && (file.extension === 'zip' || (file.name && file.name.endsWith('.zip'))) && locRef !== '');
+
+        if (isZipEntry) {
+            return {
+                typeKey: 'zip',
+                typeLabel: 'General del ZIP',
+                badgeClass: 'is-zip',
+                iconClass: 'fa-solid fa-file-zipper',
+            };
+        }
+
+        const fileId = Number(item?.file_id || file?.file_id || file?.id || 0);
+        if (fileId > 0) {
+            return {
+                typeKey: 'file',
+                typeLabel: 'General del archivo',
+                badgeClass: 'is-general',
+                iconClass: 'fa-solid fa-comment-dots',
+            };
+        }
+
+        return {
+            typeKey: 'project',
+            typeLabel: 'General del proyecto',
+            badgeClass: 'is-project',
+            iconClass: 'fa-solid fa-circle-info',
+        };
+    };
     const decisionStatusLabel = (status) => status === 'approved' ? 'Aprobado' : (status === 'corrections_requested' ? 'Requiere correcciones' : 'Sin decision');
     const decisionIconClass = (status) => status === 'approved' ? 'fa-circle-check' : (status === 'corrections_requested' ? 'fa-triangle-exclamation' : 'fa-circle');
 
@@ -898,13 +956,18 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const draft = draftFor(file.file_id);
             const complete = completedFileIds.has(file.file_id);
+            const fileStatus = file.status || file.document_status;
             let state = 'pending';
             let label = 'Pendiente de revision';
             let icon = 'fa-regular fa-circle';
-            if (file.status === 'approved') {
+            if (fileStatus === 'approved') {
                 state = 'approved';
                 label = 'Aprobado';
                 icon = 'fa-solid fa-check';
+            } else if (fileStatus === 'corrections_requested') {
+                state = 'corrections';
+                label = 'Requiere correcciones';
+                icon = 'fa-solid fa-triangle-exclamation';
             } else if (complete && draft?.status === 'approved') {
                 state = 'approved';
                 label = 'Revisado en esta sesion: aprobado';
@@ -922,7 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
             indicator.title = label;
             indicator.setAttribute('aria-label', label);
             indicator.innerHTML = `<i class="${icon}" aria-hidden="true"></i>`;
-            button.classList.toggle('is-review-complete', complete || file.status === 'approved');
+            button.classList.toggle('is-review-complete', complete || fileStatus === 'approved' || fileStatus === 'corrections_requested');
             button.disabled = isSubmitting;
         });
     };
@@ -1025,8 +1088,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (internalEntry) {
             locationBox.innerHTML = `<div style="display:flex;align-items:center;gap:6px;font-weight:600;color:#0284c7;margin-bottom:2px;"><i class="fa-solid fa-file-zipper"></i> ${isZip ? 'General del ZIP' : 'Observación en entrada interna'}</div><div style="font-size:0.75rem;color:#334155;"><strong>Archivo interno:</strong> ${escapeHtml(internalEntry)}</div>`;
         } else if (isContextual && pageNum) {
-            const textSnippet = selectedText.length > 90 ? selectedText.slice(0, 90) + '…' : selectedText;
-            locationBox.innerHTML = `<div style="display:flex;align-items:center;gap:6px;font-weight:600;color:#0f172a;margin-bottom:2px;"><i class="fa-solid fa-bookmark" style="color:#2563eb;"></i> Página ${pageNum}</div><div style="font-style:italic;color:#475569;font-size:0.75rem;line-height:1.2;">“${escapeHtml(textSnippet)}”</div>`;
+            const textSnippet = truncateText(selectedText, 140).truncated;
+            locationBox.innerHTML = `<div style="display:flex;align-items:center;gap:6px;font-weight:600;color:#0f172a;margin-bottom:2px;"><i class="fa-solid fa-bookmark" style="color:#2563eb;"></i> Página ${pageNum}</div><div data-sw-review-card-quote style="font-style:italic;color:#475569;font-size:0.75rem;line-height:1.2;">“${escapeHtml(textSnippet)}”</div>`;
             card.dataset.pageNumber = String(pageNum);
             card.style.cursor = 'pointer';
             card.title = 'Haz clic para ubicar esta observación en el documento';
@@ -1038,9 +1101,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const body = document.createElement('p');
         body.className = 'sw-review-card-body';
-        body.textContent = String(item.body || '');
+        const bodySummary = truncateText(item.body, 140);
+        body.textContent = bodySummary.truncated;
 
         card.append(meta, locationBox, body);
+
+        if (bodySummary.isTruncated || (isContextual && selectedText && selectedText.length > 140)) {
+            const toggleBtn = document.createElement('button');
+            toggleBtn.type = 'button';
+            toggleBtn.className = 'sw-review-toggle-more-btn';
+            toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Ver más';
+            toggleBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const expanded = card.dataset.expanded === 'true';
+                card.dataset.expanded = expanded ? 'false' : 'true';
+                body.textContent = expanded ? bodySummary.truncated : String(item.body || '');
+                if (isContextual && selectedText) {
+                    const quote = locationBox.querySelector('[data-sw-review-card-quote]');
+                    if (quote) {
+                        const quoteSummary = truncateText(selectedText, 140);
+                        quote.textContent = `“${expanded ? quoteSummary.truncated : selectedText}”`;
+                    }
+                }
+                toggleBtn.innerHTML = expanded
+                    ? '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Ver más'
+                    : '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i> Ver menos';
+            });
+            card.append(toggleBtn);
+        }
 
         if (isContextual && pageNum) {
             card.addEventListener('click', () => {
@@ -1057,13 +1146,10 @@ document.addEventListener('DOMContentLoaded', () => {
         section.className = 'sw-review-observation-group is-existing';
 
         if (!items.length) {
-            const heading = document.createElement('div');
-            heading.className = 'sw-review-group-heading';
-            heading.innerHTML = `<strong>Observaciones registradas</strong><span>0</span>`;
             const empty = document.createElement('p');
             empty.className = 'sw-review-empty-inline';
-            empty.textContent = 'Este archivo no tiene observaciones registradas.';
-            section.append(heading, empty);
+            empty.textContent = 'Este documento no tiene observaciones registradas.';
+            section.append(empty);
             return section;
         }
 
@@ -1090,24 +1176,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const isZip = /\.zip$/i.test(String(file.name || ''));
 
-        // SECTION A: Observaciones generales
-        const generalGroup = document.createElement('div');
-        generalGroup.className = 'sw-review-subgroup';
-        generalGroup.style.marginBottom = '1rem';
+        if (generalItems.length > 0) {
+            const generalGroup = document.createElement('div');
+            generalGroup.className = 'sw-review-subgroup';
+            generalGroup.style.marginBottom = '1rem';
 
-        const generalHeading = document.createElement('div');
-        generalHeading.className = 'sw-review-group-heading';
-        generalHeading.innerHTML = `<strong>Observaciones generales</strong><span>${generalItems.length}</span>`;
-        generalGroup.append(generalHeading);
+            const generalHeading = document.createElement('div');
+            generalHeading.className = 'sw-review-group-heading';
+            generalHeading.innerHTML = `<strong>Observaciones generales</strong><span>${generalItems.length}</span>`;
+            generalGroup.append(generalHeading);
 
-        if (!generalItems.length) {
-            const emptyGen = document.createElement('p');
-            emptyGen.className = 'sw-review-empty-inline';
-            emptyGen.style.fontSize = '0.8rem';
-            emptyGen.style.color = '#64748b';
-            emptyGen.textContent = 'Sin observaciones generales.';
-            generalGroup.append(emptyGen);
-        } else {
             const genList = document.createElement('div');
             genList.className = 'sw-review-card-list';
             generalItems.forEach(({ item, originalIndex, anchorObj }) => {
@@ -1115,25 +1193,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 genList.append(card);
             });
             generalGroup.append(genList);
+            section.append(generalGroup);
         }
 
-        // SECTION B: Observaciones sobre el texto
-        const contextualGroup = document.createElement('div');
-        contextualGroup.className = 'sw-review-subgroup';
+        if (contextualItems.length > 0) {
+            const contextualGroup = document.createElement('div');
+            contextualGroup.className = 'sw-review-subgroup';
 
-        const contextualHeading = document.createElement('div');
-        contextualHeading.className = 'sw-review-group-heading';
-        contextualHeading.innerHTML = `<strong>Observaciones sobre el texto</strong><span>${contextualItems.length}</span>`;
-        contextualGroup.append(contextualHeading);
+            const contextualHeading = document.createElement('div');
+            contextualHeading.className = 'sw-review-group-heading';
+            contextualHeading.innerHTML = `<strong>Observaciones sobre el texto</strong><span>${contextualItems.length}</span>`;
+            contextualGroup.append(contextualHeading);
 
-        if (!contextualItems.length) {
-            const emptyCtx = document.createElement('p');
-            emptyCtx.className = 'sw-review-empty-inline';
-            emptyCtx.style.fontSize = '0.8rem';
-            emptyCtx.style.color = '#64748b';
-            emptyCtx.textContent = 'Sin observaciones sobre el texto.';
-            contextualGroup.append(emptyCtx);
-        } else {
             const ctxList = document.createElement('div');
             ctxList.className = 'sw-review-card-list';
             contextualItems.forEach(({ item, originalIndex, anchorObj, pageNum, selectedText }) => {
@@ -1141,9 +1212,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctxList.append(card);
             });
             contextualGroup.append(ctxList);
+            section.append(contextualGroup);
         }
 
-        section.append(generalGroup, contextualGroup);
         return section;
     };
 
@@ -1709,17 +1780,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     const meta = document.createElement('div');
                     meta.className = 'sw-review-card-meta';
 
-                    if (item.category && item.category !== 'General') {
+                    const displayInfo = resolveObservationDisplayType(item, file, metas[index]);
+                    if (item.category && item.category !== 'General' && item.category !== 'Texto seleccionado') {
                         const category = document.createElement('strong');
                         category.className = 'sw-review-category-badge';
                         category.textContent = item.category;
                         meta.append(category);
-                    } else {
-                        const typeLabel = document.createElement('span');
-                        typeLabel.className = 'sw-review-type-label';
-                        typeLabel.textContent = 'Observación general';
-                        meta.append(typeLabel);
                     }
+                    const typeLabel = document.createElement('span');
+                    typeLabel.className = `sw-review-type-label ${displayInfo.badgeClass}`;
+                    typeLabel.textContent = displayInfo.typeLabel;
+                    meta.append(typeLabel);
 
                     const pending = document.createElement('span');
                     pending.textContent = 'Borrador';
@@ -1839,17 +1910,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         meta.append(numberBadge);
                     }
 
-                    if (item.category && item.category !== 'General') {
+                    const displayInfo = resolveObservationDisplayType(item, file, metas[index]);
+                    if (item.category && item.category !== 'General' && item.category !== 'Texto seleccionado') {
                         const category = document.createElement('strong');
                         category.className = 'sw-review-category-badge';
                         category.textContent = item.category;
                         meta.append(category);
-                    } else {
-                        const typeLabel = document.createElement('span');
-                        typeLabel.className = 'sw-review-type-label';
-                        typeLabel.textContent = 'Texto seleccionado';
-                        meta.append(typeLabel);
                     }
+                    const typeLabel = document.createElement('span');
+                    typeLabel.className = `sw-review-type-label ${displayInfo.badgeClass}`;
+                    typeLabel.textContent = displayInfo.typeLabel;
+                    meta.append(typeLabel);
 
                     const pending = document.createElement('span');
                     pending.textContent = 'Borrador';
@@ -2164,7 +2235,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const draft = draftFor(file.file_id);
         const section = document.createElement('section');
         section.className = 'sw-review-actions';
-        const showDecisions = Boolean(draft?.observations.length || draft?.decisionSource === 'manual');
+        const showDecisions = reviewIsAvailable && isReviewableFile(file);
         if (showDecisions) {
             const selectedStatus = draft?.status || '';
             const decisions = document.createElement('div');
