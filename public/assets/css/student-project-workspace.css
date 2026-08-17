@@ -5253,3 +5253,201 @@ canvas.hiddenCanvasElement {
     overflow: hidden !important;
     pointer-events: none !important;
 }
+
+/* ==========================================================================
+   MEJORAS DE MODO HISTÓRICO: SCROLL, WRAPPING Y HIGHLIGHTS
+   ========================================================================== */
+.student-workspace .sw-doc-workspace .sw-observations-panel [data-sw-file-observations],
+.student-workspace .sw-doc-workspace.is-historical .sw-observations-panel [data-sw-file-observations] {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+    scrollbar-gutter: stable;
+    padding: 0.75rem 0.85rem !important;
+}
+
+.student-workspace .sw-historical-obs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.student-workspace .sw-historical-obs-card {
+    background: #ffffff;
+    border: 1px solid var(--sw-border, #e2e8f0);
+    border-radius: 8px;
+    padding: 0.75rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.student-workspace .sw-historical-obs-card:hover {
+    border-color: var(--sw-primary, #2563eb);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.1);
+}
+
+.student-workspace .sw-obs-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.student-workspace .sw-obs-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.73rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+.student-workspace .sw-obs-type-badge.is-contextual { background: #fef3c7; color: #92400e; }
+.student-workspace .sw-obs-type-badge.is-zip { background: #e0e7ff; color: #3730a3; }
+.student-workspace .sw-obs-type-badge.is-general { background: #f1f5f9; color: #475569; }
+.student-workspace .sw-obs-type-badge.is-project { background: #dcfce7; color: #166534; }
+
+.student-workspace .sw-obs-cat-tag {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.student-workspace .sw-obs-zip-ref,
+.student-workspace .sw-obs-loc-ref,
+.student-workspace .sw-obs-context-ref {
+    font-size: 0.76rem;
+    color: #334155;
+    background: #f8fafc;
+    padding: 0.3rem 0.5rem;
+    border-radius: 5px;
+    border: 1px solid #f1f5f9;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.student-workspace .sw-obs-card-body {
+    font-size: 0.83rem;
+    color: #1e293b;
+    line-height: 1.5;
+    white-space: pre-line;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.student-workspace .sw-obs-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    border-top: 1px dashed #f1f5f9;
+    padding-top: 0.35rem;
+    margin-top: 0.2rem;
+}
+
+@keyframes swHighlightPulse {
+    0% { background-color: rgba(234, 179, 8, 0.7); box-shadow: 0 0 12px rgba(234, 179, 8, 0.9); }
+    50% { background-color: rgba(234, 179, 8, 0.9); box-shadow: 0 0 18px rgba(234, 179, 8, 1); }
+    100% { background-color: rgba(234, 179, 8, 0.4); box-shadow: none; }
+}
+
+.student-workspace .sw-highlight-flash {
+    animation: swHighlightPulse 0.8s ease-in-out 2 !important;
+}
+
+/* 3. Paleta de Colores Coherente (Card ↔ Badge ↔ Highlight) */
+.student-workspace .sw-historical-obs-card.sw-review-color-1 {
+    background: #fffbeb !important;
+    border: 1px solid #fde68a !important;
+    border-left: 4px solid #f59e0b !important;
+}
+.student-workspace .sw-historical-obs-card.sw-review-color-1 .sw-obs-type-badge {
+    background: #fef3c7 !important;
+    color: #92400e !important;
+}
+
+.student-workspace .sw-historical-obs-card.sw-review-color-2 {
+    background: #eff6ff !important;
+    border: 1px solid #bfdbfe !important;
+    border-left: 4px solid #3b82f6 !important;
+}
+.student-workspace .sw-historical-obs-card.sw-review-color-2 .sw-obs-type-badge {
+    background: #dbeafe !important;
+    color: #1e40af !important;
+}
+
+.student-workspace .sw-historical-obs-card.sw-review-color-3 {
+    background: #ecfdf5 !important;
+    border: 1px solid #a7f3d0 !important;
+    border-left: 4px solid #10b981 !important;
+}
+.student-workspace .sw-historical-obs-card.sw-review-color-3 .sw-obs-type-badge {
+    background: #d1fae5 !important;
+    color: #065f46 !important;
+}
+
+.student-workspace .sw-historical-obs-card.sw-review-color-4 {
+    background: #f5f3ff !important;
+    border: 1px solid #ddd6fe !important;
+    border-left: 4px solid #8b5cf6 !important;
+}
+.student-workspace .sw-historical-obs-card.sw-review-color-4 .sw-obs-type-badge {
+    background: #ede9fe !important;
+    color: #5b21b6 !important;
+}
+
+.student-workspace .sw-historical-obs-card.sw-review-color-5 {
+    background: #fff1f2 !important;
+    border: 1px solid #fecdd3 !important;
+    border-left: 4px solid #f43f5e !important;
+}
+.student-workspace .sw-historical-obs-card.sw-review-color-5 .sw-obs-type-badge {
+    background: #ffe4e6 !important;
+    color: #9f1239 !important;
+}
+
+/* Botones de alternancia "Ver más" / "Ver menos" */
+.student-workspace .sw-obs-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--sw-primary, #2563eb);
+    background: transparent;
+    border: none;
+    padding: 0.2rem 0;
+    margin-top: 0.3rem;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+.student-workspace .sw-obs-toggle-btn:hover {
+    color: var(--sw-primary-hover, #1d4ed8);
+    text-decoration: underline;
+}
+
+.student-workspace .sw-obs-quote-toggle {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    background: transparent;
+    border: none;
+    padding: 0.15rem 0;
+    margin-top: 0.2rem;
+    cursor: pointer;
+}
+.student-workspace .sw-obs-quote-toggle:hover {
+    color: #334155;
+    text-decoration: underline;
+}

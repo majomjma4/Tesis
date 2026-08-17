@@ -672,9 +672,11 @@ final class ProjectsController
     {
         try {
             $version=$this->historicalVersion();
+            $ext=strtolower((string)($version['extension']??''));
+            $isZip=$ext==='zip';
             $url=route('project-file-version-preview-pdf').'&project_id='.(int)$version['project_id'].'&version_id='.(int)$version['id'].'&v='.rawurlencode(substr((string)$version['checksum_sha256'],0,16));
             $observations=(new ProjectDocumentReviewService())->observationsForRevision((int)$version['project_id'],(int)$version['file_id'],(string)$version['checksum_sha256']);
-            $this->json(['success'=>true,'message'=>'Vista histórica disponible.','data'=>['preview'=>['preview_type'=>'pdf','review_representation'=>true,'content_url'=>$url,'original_name'=>$version['original_name'],'size_bytes'=>(int)$version['size_bytes'],'historical'=>true,'version_number'=>(int)$version['version_number'],'checksum_sha256'=>$version['checksum_sha256'],'observations'=>$observations]]]);
+            $this->json(['success'=>true,'message'=>'Vista histórica disponible.','data'=>['preview'=>['preview_type'=>$isZip?'zip':'pdf','extension'=>$ext,'file_id'=>(int)$version['file_id'],'version_id'=>(int)$version['id'],'review_representation'=>true,'content_url'=>$url,'original_name'=>$version['original_name'],'size_bytes'=>(int)$version['size_bytes'],'historical'=>true,'version_number'=>(int)$version['version_number'],'checksum_sha256'=>$version['checksum_sha256'],'observations'=>$observations]]]);
         } catch (Throwable $e) { error_log('Historical preview metadata: '.$e->getMessage()); http_response_code(404); $this->json(['success'=>false,'message'=>'La versión histórica no está disponible.','data'=>[]]); }
     }
 

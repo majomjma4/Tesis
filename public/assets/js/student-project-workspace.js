@@ -2756,8 +2756,245 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     initStudentProjectSubmission();
 
+    const truncateText = (text, maxLength = 140) => {
+        const str = String(text || '').trim();
+        if (str.length <= maxLength) return null;
+        const truncated = str.slice(0, maxLength).replace(/\s+\S*$/, '');
+        return truncated.length > 0 ? truncated + '…' : str.slice(0, maxLength) + '…';
+    };
+
+    const renderHistoricalObservations = (items, preview) => {
+        if (!observationPanel) return;
+        observationPanel.replaceChildren();
+
+        if (!items || items.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'sw-empty-state';
+            empty.textContent = 'No hay observaciones registradas para esta versión.';
+            observationPanel.append(empty);
+            return;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'sw-obs-list-container sw-historical-obs-list';
+        let contextualCount = 0;
+
+        const sortedItems = [...items].sort((a, b) => {
+            let anchorA = a.selection_anchor;
+            try { if (typeof anchorA === 'string') anchorA = JSON.parse(anchorA); } catch (e) { anchorA = null; }
+            const isContextualA = Boolean(anchorA?.page_number && (anchorA.selected_text || (Array.isArray(anchorA.relative_rects) && anchorA.relative_rects.length > 0)));
+
+            let anchorB = b.selection_anchor;
+            try { if (typeof anchorB === 'string') anchorB = JSON.parse(anchorB); } catch (e) { anchorB = null; }
+            const isContextualB = Boolean(anchorB?.page_number && (anchorB.selected_text || (Array.isArray(anchorB.relative_rects) && anchorB.relative_rects.length > 0)));
+
+            if (isContextualA !== isContextualB) {
+                return isContextualA ? 1 : -1;
+            }
+            return 0;
+        });
+
+        sortedItems.forEach((item) => {
+            let anchor = item.selection_anchor;
+            try { if (typeof anchor === 'string') anchor = JSON.parse(anchor); } catch (e) { anchor = null; }
+
+            const isContextual = Boolean(anchor?.page_number && (anchor.selected_text || (Array.isArray(anchor.relative_rects) && anchor.relative_rects.length > 0)));
+            const isZipEntry = Boolean(item.location_reference && item.location_reference.includes('→'));
+            const categoryLabel = String(item.category || 'Observación');
+
+            let colorClass = '';
+            let obsNumber = 0;
+            if (isContextual) {
+                contextualCount++;
+                obsNumber = contextualCount;
+                colorClass = `sw-review-color-${((obsNumber - 1) % 5) + 1}`;
+            }
+
+            const card = document.createElement('article');
+            card.className = `sw-obs-card sw-historical-obs-card ${colorClass}`;
+            card.dataset.observationId = String(item.id || '');
+
+            let typeBadgeClass = 'is-general';
+            let typeBadgeText = 'General del archivo';
+            let iconClass = 'fa-solid fa-comment-dots';
+
+            if (isContextual) {
+                typeBadgeClass = 'is-contextual';
+                typeBadgeText = `#${obsNumber} · Sobre el texto`;
+                iconClass = 'fa-solid fa-highlighter';
+            } else if (isZipEntry) {
+                typeBadgeClass = 'is-zip';
+                typeBadgeText = 'General del ZIP';
+                iconClass = 'fa-solid fa-file-zipper';
+            } else if (categoryLabel.toLowerCase() === 'general' && !item.file_id) {
+                typeBadgeClass = 'is-project';
+                typeBadgeText = 'General del proyecto';
+                iconClass = 'fa-solid fa-circle-info';
+            }
+
+            const header = document.createElement('header');
+            header.className = 'sw-obs-card-header';
+            header.innerHTML = `<div class="sw-obs-type-badge ${typeBadgeClass}"><i class="${iconClass}" aria-hidden="true"></i> <span>${typeBadgeText}</span></div><span class="sw-obs-cat-tag">${escapeHtml(categoryLabel)}</span>`;
+            card.append(header);
+
+            if (isZipEntry) {
+                const zipRef = document.createElement('div');
+                zipRef.className = 'sw-obs-zip-ref';
+                zipRef.innerHTML = `<i class="fa-solid fa-file-lines" aria-hidden="true"></i> <strong>Archivo interno:</strong> ${escapeHtml(String(item.location_reference))}`;
+                card.append(zipRef);
+            } else if (item.location_reference && !isContextual) {
+                const locRef = document.createElement('div');
+                locRef.className = 'sw-obs-loc-ref';
+                locRef.textContent = String(item.location_reference);
+                card.append(locRef);
+            }
+
+            if (isContextual && anchor?.page_number) {
+                const selectedQuote = String(anchor.selected_text || '');
+                const truncatedQuote = truncateText(selectedQuote, 90);
+                const contextRef = document.createElement('div');
+                contextRef.className = 'sw-obs-context-ref';
+
+                if (truncatedQuote) {
+                    const quoteText = document.createElement('span');
+                    quoteText.className = 'sw-obs-quote-text';
+                    quoteText.textContent = `Página ${anchor.page_number}: "${truncatedQuote}"`;
+                    contextRef.append(quoteText);
+
+                    const quoteToggle = document.createElement('button');
+                    quoteToggle.type = 'button';
+                    quoteToggle.className = 'sw-obs-quote-toggle';
+                    quoteToggle.innerHTML = '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Ver más';
+                    let quoteExpanded = false;
+
+                    quoteToggle.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        quoteExpanded = !quoteExpanded;
+                        quoteText.textContent = quoteExpanded
+                            ? `Página ${anchor.page_number}: "${selectedQuote}"`
+                            : `Página ${anchor.page_number}: "${truncatedQuote}"`;
+                        quoteToggle.innerHTML = quoteExpanded
+                            ? '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i> Ver menos'
+                            : '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Ver más';
+                    });
+                    contextRef.append(quoteToggle);
+                } else {
+                    contextRef.innerHTML = `<i class="fa-solid fa-bookmark" aria-hidden="true"></i> Página ${anchor.page_number}${selectedQuote ? ': "' + escapeHtml(selectedQuote) + '"' : ''}`;
+                }
+                card.append(contextRef);
+            }
+
+            const fullBodyText = String(item.body || '');
+            const truncatedBodyText = truncateText(fullBodyText, 140);
+            const body = document.createElement('div');
+            body.className = 'sw-obs-card-body';
+
+            if (truncatedBodyText) {
+                const bodyContent = document.createElement('span');
+                bodyContent.className = 'sw-obs-body-text';
+                bodyContent.textContent = truncatedBodyText;
+                body.append(bodyContent);
+
+                const toggleBtn = document.createElement('button');
+                toggleBtn.type = 'button';
+                toggleBtn.className = 'sw-obs-toggle-btn';
+                toggleBtn.innerHTML = '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Ver más';
+
+                let expanded = false;
+                toggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    expanded = !expanded;
+                    bodyContent.textContent = expanded ? fullBodyText : truncatedBodyText;
+                    toggleBtn.innerHTML = expanded
+                        ? '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i> Ver menos'
+                        : '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Ver más';
+                    card.classList.toggle('is-expanded', expanded);
+                });
+                body.append(toggleBtn);
+            } else {
+                body.textContent = fullBodyText;
+            }
+            card.append(body);
+
+            const footer = document.createElement('footer');
+            footer.className = 'sw-obs-card-footer';
+            const author = String(item.author_name || 'Docente Evaluador');
+            const dateStr = item.created_at ? new Date(item.created_at).toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+            footer.innerHTML = `<span><i class="fa-solid fa-user-pen" aria-hidden="true"></i> ${escapeHtml(author)}</span>${dateStr ? `<span><i class="fa-regular fa-clock" aria-hidden="true"></i> ${dateStr}</span>` : ''}`;
+            card.append(footer);
+
+            if (isContextual && anchor?.page_number) {
+                card.style.cursor = 'pointer';
+                card.addEventListener('click', () => {
+                    const pageEl = previewStage?.querySelector(`[data-poc-page="${anchor.page_number}"]`);
+                    if (pageEl) {
+                        pageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        const highlights = pageEl.querySelectorAll(`[data-observation-id="${item.id}"]`);
+                        highlights.forEach((hl) => {
+                            hl.classList.add('sw-highlight-flash');
+                            setTimeout(() => hl.classList.remove('sw-highlight-flash'), 2000);
+                        });
+                    }
+                });
+            }
+
+            container.append(card);
+        });
+
+        observationPanel.append(container);
+    };
+
     if (historicalPreview) {
-        (async()=>{try{const payload=await readJsonResponse(await fetch(historicalPreview,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible cargar la versión.');const preview=payload.data.preview;updateSelectedFileHeader(preview.original_name,`Versión ${preview.version_number}`,'Historial','');await renderPreview({status:'ready',preview_type:'pdf',content_url:preview.content_url,name:preview.original_name});const items=preview.observations||[];observationPanel.innerHTML=items.length?items.map((item)=>`<article class="sw-record"><strong>${String(item.category||'Observación')}</strong><p>${String(item.body||'')}</p></article>`).join(''):'<p class="sw-empty-state">No hay observaciones registradas para esta versión.</p>';}catch(error){console.error(error);previewMessage(error.code==='session_expired'?error.message:'No fue posible cargar la versión histórica.','is-error');}})();
+        (async () => {
+            try {
+                const payload = await readJsonResponse(await fetch(historicalPreview, jsonRequestInit()));
+                if (!payload.success) throw new Error(payload.message || 'No fue posible cargar la versión.');
+
+                const preview = payload.data.preview;
+                const items = preview.observations || [];
+                const ext = String(preview.extension || '').toLowerCase();
+                const isZip = ext === 'zip' || preview.preview_type === 'zip';
+
+                updateSelectedFileHeader(preview.original_name, `Versión ${preview.version_number}`, 'Historial', '');
+
+                allStudentObservations = items;
+                selectedObservationFileId = Number(preview.file_id || 0);
+
+                if (viewerDownload) {
+                    viewerDownload.disabled = false;
+                    viewerDownload.onclick = () => {
+                        window.location.href = preview.content_url || route('project-file-version-download') + `&project_id=${projectId}&version_id=${preview.version_id}`;
+                    };
+                }
+
+                if (isZip) {
+                    releasePdfDocument();
+                    activePdfPreview = null;
+                    if (printButton) printButton.disabled = true;
+
+                    renderPreviewState({
+                        type: 'info',
+                        title: 'Archivo ZIP de versión histórica',
+                        message: 'El contenido interno de paquetes ZIP no se explora en versiones anteriores.',
+                        actionText: 'Descargar paquete ZIP',
+                        actionHref: preview.content_url
+                    });
+                } else {
+                    await renderPreview({
+                        status: 'ready',
+                        preview_type: 'pdf',
+                        content_url: preview.content_url,
+                        name: preview.original_name,
+                        file_id: preview.file_id
+                    });
+                }
+
+                renderHistoricalObservations(items, preview);
+            } catch (error) {
+                console.error(error);
+                previewMessage(error.code === 'session_expired' ? error.message : 'No fue posible cargar la versión histórica.', 'is-error');
+            }
+        })();
     } else {
         renderStudentObservations();
         renderPreviewState({
