@@ -171,25 +171,58 @@ final class ProjectRecordModel
 
         foreach ((array) $project['deliveries'] as $delivery) {
             if ((int) $delivery['version_number'] <= 1) continue;
+            $fileCount = (int) ($delivery['file_count'] ?? 1);
+            if ($fileCount <= 0) $fileCount = 1;
+            $filesLabel = $fileCount === 1 ? '1 archivo corregido' : $fileCount . ' archivos corregidos';
             $events[] = [
-                'key' => 'delivery:' . (int) $delivery['id'], 'type' => 'delivery', 'title' => 'Nueva versión enviada',
-                'detail' => trim((string) ($delivery['comment'] ?: $delivery['title'])),
+                'key' => 'delivery:' . (int) $delivery['id'], 'type' => 'delivery', 'title' => 'Correcciones reenviadas',
+                'detail' => $filesLabel,
                 'actor' => (string) $delivery['author_name'], 'date' => (string) $delivery['submitted_at'],
                 'meta' => ['Entrega ' . (int) $delivery['version_number'], project_delivery_status_label((string) $delivery['status'])],
             ];
         }
+
+        $groupedObservations = [];
         foreach ((array) $project['observations'] as $observation) {
+            $createdKey = date('Y-m-d H:i:s', strtotime((string) $observation['created_at']));
+            $groupKey = $createdKey . '_' . (int) ($observation['author_id'] ?? 0);
+            if (!isset($groupedObservations[$groupKey])) {
+                $groupedObservations[$groupKey] = [
+                    'id' => (int) $observation['id'],
+                    'author_name' => (string) ($observation['author_name'] ?? 'Docente'),
+                    'created_at' => (string) $observation['created_at'],
+                    'version_number' => $observation['version_number'] ?? null,
+                    'count' => 0,
+                    'file_ids' => [],
+                ];
+            }
+            $groupedObservations[$groupKey]['count']++;
+            if (!empty($observation['file_id'])) {
+                $groupedObservations[$groupKey]['file_ids'][(int) $observation['file_id']] = true;
+            }
+        }
+
+        foreach ($groupedObservations as $group) {
+            $obsCount = $group['count'];
+            $fileCount = count($group['file_ids']);
+            $obsText = $obsCount === 1 ? '1 observación' : $obsCount . ' observaciones';
+            $detail = $fileCount > 0
+                ? $obsText . ' · ' . ($fileCount === 1 ? '1 archivo' : $fileCount . ' archivos')
+                : $obsText;
+
             $events[] = [
-                'key' => 'observation:' . (int) $observation['id'], 'type' => 'observation', 'title' => 'Observaciones registradas',
-                'detail' => 'Existen observaciones académicas disponibles para consulta.',
-                'actor' => (string) $observation['author_name'], 'date' => (string) $observation['created_at'],
+                'key' => 'observation-batch:' . $group['id'],
+                'type' => 'observation',
+                'title' => 'Enviado a correcciones',
+                'detail' => $detail,
+                'actor' => $group['author_name'],
+                'date' => $group['created_at'],
                 'meta' => array_values(array_filter([
-                    !empty($observation['version_number']) ? 'Entrega ' . (int) $observation['version_number'] : null,
-                    $this->observationStatusLabel((string) ($observation['status'] ?? '')),
+                    !empty($group['version_number']) ? 'Entrega ' . (int) $group['version_number'] : null,
                 ])),
-                'reference' => ['type' => 'observation', 'id' => (int) $observation['id']],
             ];
         }
+
         foreach ((array) ($project['responses'] ?? []) as $response) {
             $events[] = [
                 'key' => 'response:' . (int) $response['id'], 'type' => 'response', 'title' => 'Respuesta a observación registrada',
@@ -225,16 +258,32 @@ final class ProjectRecordModel
             $action = (string) $audit['action'];
             if (in_array($action, ['project_unpublished', 'project_republished'], true)) continue;
             if ($action === 'project_corrections_requested') {
+                // If observation batch already created event for this timestamp, skip duplicate audit card
+                $auditTime = date('Y-m-d H:i:s', strtotime((string) $audit['created_at']));
+                $hasObsBatch = false;
+                foreach ($groupedObservations as $gKey => $gData) {
+                    if (date('Y-m-d H:i:s', strtotime((string) $gData['created_at'])) === $auditTime) {
+                        $hasObsBatch = true;
+                        break;
+                    }
+                }
+                if ($hasObsBatch) continue;
+
                 $next = json_decode((string) ($audit['new_state'] ?? ''), true);
                 $count = is_array($next) ? (int) ($next['observation_count'] ?? 0) : 0;
+                $fileCount = is_array($next) ? (int) ($next['corrections_requested'] ?? 0) : 0;
+                $obsText = $count === 1 ? '1 observación' : ($count > 0 ? $count . ' observaciones' : 'Correcciones solicitadas por el tutor.');
+                $detail = ($fileCount > 0 && $count > 0)
+                    ? $obsText . ' · ' . ($fileCount === 1 ? '1 archivo' : $fileCount . ' archivos')
+                    : $obsText;
+
                 $events[] = [
                     'key' => 'corrections-requested:' . (int) $audit['id'],
                     'type' => 'observation',
-                    'title' => 'Tutor solicitó correcciones',
-                    'detail' => ($count === 1 ? 'Se registró 1 observación.' : 'Se registraron ' . $count . ' observaciones.') . "\nEl proyecto volvió a En desarrollo.",
+                    'title' => 'Enviado a correcciones',
+                    'detail' => $detail,
                     'actor' => (string) ($audit['actor_name'] ?: 'Sistema académico'),
                     'date' => (string) $audit['created_at'],
-                    'meta' => ['En revisión → En desarrollo'],
                 ];
                 continue;
             }

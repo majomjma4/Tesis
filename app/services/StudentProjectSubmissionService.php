@@ -125,15 +125,34 @@ final class StudentProjectSubmissionService
 
     private function lockPendingFiles(PDO $db, int $projectId): array
     {
+        $hasDeliveries = (int)$db->query("SELECT COUNT(*) FROM project_deliveries WHERE project_id={$projectId}")->fetchColumn() > 0;
+        if ($hasDeliveries) {
+            $missingDelivered = $db->prepare("SELECT DISTINCT s.file_id
+                FROM project_file_review_states s
+                LEFT JOIN project_files pf ON pf.id=s.file_id AND pf.project_id=s.project_id AND pf.deleted_at IS NULL AND pf.purged_at IS NULL
+                WHERE s.project_id=:project AND pf.id IS NULL");
+            $missingDelivered->execute(['project' => $projectId]);
+            if ($missingDelivered->fetchColumn()) {
+                throw new StudentProjectSubmissionException('Falta un archivo requerido de la entrega anterior. Todos los documentos entregados previamente deben conservarse y reemplazarse si requieren cambios.', 422);
+            }
+
+            $missingObserved = $db->prepare("SELECT DISTINCT o.file_id
+                FROM project_observations o
+                LEFT JOIN project_files pf ON pf.id=o.file_id AND pf.project_id=o.project_id AND pf.deleted_at IS NULL AND pf.purged_at IS NULL
+                WHERE o.project_id=:project AND o.file_id IS NOT NULL AND pf.id IS NULL");
+            $missingObserved->execute(['project' => $projectId]);
+            if ($missingObserved->fetchColumn()) {
+                throw new StudentProjectSubmissionException('Falta un archivo requerido con observaciones. Debes conservar el archivo y reemplazarlo antes de reenviar el proyecto.', 422);
+            }
+        }
+
         $query = $db->prepare("SELECT f.id,f.original_name,f.checksum_sha256,COALESCE(s.status,'development') review_status
             FROM project_files f LEFT JOIN project_file_review_states s ON s.project_id=f.project_id AND s.file_id=f.id AND s.checksum_sha256=f.checksum_sha256
             WHERE f.project_id=:project AND f.deleted_at IS NULL AND f.purged_at IS NULL
               AND COALESCE(s.status,'development') IN ('development','corrections_requested') ORDER BY f.sort_order,f.id FOR UPDATE");
         $query->execute(['project'=>$projectId]);
         $rows = $query->fetchAll();
-        if ($rows === []) return [];
 
-        $hasDeliveries = (int)$db->query("SELECT COUNT(*) FROM project_deliveries WHERE project_id={$projectId}")->fetchColumn() > 0;
         if ($hasDeliveries) {
             $unreplacedCount = 0;
             foreach ($rows as $row) {
@@ -145,6 +164,8 @@ final class StudentProjectSubmissionService
                 throw new StudentProjectSubmissionException('Debes corregir todos los documentos observados antes de reenviar el proyecto.', 422);
             }
         }
+
+        if ($rows === []) throw new StudentProjectSubmissionException('No hay documentos pendientes por enviar a revisión.', 422);
         return $rows;
     }
 

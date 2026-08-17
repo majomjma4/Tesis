@@ -977,7 +977,17 @@ document.addEventListener('DOMContentLoaded', () => {
         projectActions=document.createElement('div'); projectActions.className='sw-project-actions'; const packageUrl=manager.dataset.packageUrl||`index.php?page=project-package-download&id=${encodeURIComponent(manager.dataset.projectId||'')}`; projectActions.innerHTML=`<div class="sw-project-actions-group"><a class="sw-viewer-action" href="${packageUrl}"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</a></div><div class="sw-project-actions-file"><a class="sw-viewer-action is-file-download" data-sw-viewer-download hidden><i class="fa-solid fa-download" aria-hidden="true"></i> Descargar</a><button type="button" class="sw-viewer-action" data-sw-print disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Imprimir</button></div>`; manager.querySelector('.sw-viewer-panel')?.prepend(projectActions);
     }
     const modal=manager.querySelector('[data-sw-operation-modal]'), modalTitle=manager.querySelector('[data-sw-modal-title]'), modalMessage=manager.querySelector('[data-sw-modal-message]'), modalSummary=manager.querySelector('[data-sw-modal-summary]'), modalConfirm=manager.querySelector('[data-sw-modal-confirm]'); let modalAction=null;
-    const closeMenus=()=>manager.querySelectorAll('[data-sw-file-menu]').forEach((menu)=>{menu.hidden=true;menu.previousElementSibling?.setAttribute('aria-expanded','false');});
+    const closeMenus=()=>{
+        document.querySelectorAll('[data-sw-file-menu]').forEach((menu)=>{
+            menu.hidden=true;
+            if(menu._origin&&menu.parentElement===document.body){
+                menu._origin.appendChild(menu);
+            }
+            menu._origin=null;
+            Object.assign(menu.style,{position:'',top:'',left:'',right:'',bottom:'',zIndex:'',margin:''});
+        });
+        document.querySelectorAll('[data-sw-menu-trigger]').forEach((trigger)=>trigger.setAttribute('aria-expanded','false'));
+    };
     const closeModal=()=>{ modal.hidden=true; modalAction=null; };
     manager.querySelectorAll('[data-sw-modal-cancel]').forEach((button)=>button.addEventListener('click',closeModal));
     modal?.addEventListener('click',(event)=>{if(event.target===modal)closeModal();});
@@ -1000,12 +1010,144 @@ document.addEventListener('DOMContentLoaded', () => {
     const replaceNotice = replaceModal?.querySelector('[data-sw-replace-notice]');
     const replaceReasonGroup = replaceModal?.querySelector('[data-sw-replace-reason-group]');
     const replaceReasonSelect = replaceModal?.querySelector('[data-sw-replace-reason-select]');
+    const replaceReasonTrigger = replaceModal?.querySelector('[data-sw-reason-trigger]');
+    const replaceReasonTriggerText = replaceReasonTrigger?.querySelector('[data-sw-reason-trigger-text]');
     const replaceOtherGroup = replaceModal?.querySelector('[data-sw-replace-other-group]');
     const replaceOtherDetail = replaceModal?.querySelector('[data-sw-replace-other-detail]');
     const replaceErrorAlert = replaceModal?.querySelector('[data-sw-replace-error]');
     const replaceConfirmBtn = replaceModal?.querySelector('[data-sw-replace-confirm]');
 
+    let activeReasonPortal = null;
+
+    const closeReasonPortal = () => {
+        if (activeReasonPortal) {
+            activeReasonPortal.remove();
+            activeReasonPortal = null;
+        }
+        if (replaceReasonTrigger) {
+            replaceReasonTrigger.setAttribute('aria-expanded', 'false');
+            const icon = replaceReasonTrigger.querySelector('i');
+            if (icon) icon.style.transform = 'rotate(0deg)';
+        }
+    };
+
+    const openReasonPortal = () => {
+        closeReasonPortal();
+        if (!replaceReasonTrigger || !replaceReasonSelect) return;
+
+        const options = [...replaceReasonSelect.options];
+        const rect = replaceReasonTrigger.getBoundingClientRect();
+
+        const portal = document.createElement('div');
+        portal.className = 'sw-reason-portal-listbox';
+        portal.setAttribute('role', 'listbox');
+
+        const itemHeight = 38;
+        const visibleLimit = 5;
+        const totalHeight = (visibleLimit * itemHeight) + 12; // 202px: exactly 5 complete options
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const openUpwards = spaceBelow < totalHeight && rect.top > totalHeight;
+
+        const top = openUpwards ? (rect.top - totalHeight - 4) : (rect.bottom + 4);
+
+        Object.assign(portal.style, {
+            position: 'fixed',
+            top: `${Math.max(8, top)}px`,
+            left: `${rect.left}px`,
+            width: `${rect.width}px`,
+            maxHeight: `${totalHeight}px`,
+            height: `${totalHeight}px`,
+            overflowY: 'auto',
+            background: '#ffffff',
+            border: '1px solid #cbd5e1',
+            borderRadius: '12px',
+            boxShadow: '0 16px 36px rgba(15, 23, 42, 0.26)',
+            zIndex: '100000',
+            padding: '6px 0',
+            boxSizing: 'border-box',
+        });
+
+        portal.addEventListener('wheel', (e) => e.stopPropagation());
+        portal.addEventListener('touchmove', (e) => e.stopPropagation());
+
+        options.forEach((opt) => {
+            const item = document.createElement('div');
+            item.setAttribute('role', 'option');
+            item.textContent = opt.textContent;
+            item.dataset.value = opt.value;
+
+            const isSelected = replaceReasonSelect.value === opt.value;
+            Object.assign(item.style, {
+                padding: '0 14px',
+                height: '38px',
+                minHeight: '38px',
+                display: 'flex',
+                alignItems: 'center',
+                boxSizing: 'border-box',
+                fontSize: '0.83rem',
+                lineHeight: '1.2',
+                color: isSelected ? '#2563eb' : '#0f172a',
+                background: isSelected ? '#eff6ff' : '#ffffff',
+                fontWeight: isSelected ? '600' : '400',
+                cursor: 'pointer',
+                transition: 'background 0.12s ease',
+            });
+
+            item.addEventListener('mouseenter', () => {
+                if (replaceReasonSelect.value !== opt.value) item.style.background = '#f8fafc';
+            });
+            item.addEventListener('mouseleave', () => {
+                if (replaceReasonSelect.value !== opt.value) item.style.background = '#ffffff';
+            });
+
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                replaceReasonSelect.value = opt.value;
+                replaceReasonSelect.dispatchEvent(new Event('change'));
+
+                if (replaceReasonTriggerText) {
+                    replaceReasonTriggerText.textContent = opt.textContent;
+                    replaceReasonTriggerText.style.color = opt.value === '' ? '#64748b' : '#0f172a';
+                }
+                closeReasonPortal();
+            });
+
+            portal.append(item);
+        });
+
+        document.body.appendChild(portal);
+        activeReasonPortal = portal;
+
+        replaceReasonTrigger.setAttribute('aria-expanded', 'true');
+        const icon = replaceReasonTrigger.querySelector('i');
+        if (icon) icon.style.transform = 'rotate(180deg)';
+    };
+
+    replaceReasonTrigger?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (activeReasonPortal) {
+            closeReasonPortal();
+        } else {
+            openReasonPortal();
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('[data-sw-reason-trigger]') && !e.target.closest('.sw-reason-portal-listbox')) {
+            closeReasonPortal();
+        }
+    });
+
+    window.addEventListener('resize', closeReasonPortal);
+    window.addEventListener('scroll', (e) => {
+        if (activeReasonPortal && !e.target.closest?.('.sw-reason-portal-listbox')) {
+            closeReasonPortal();
+        }
+    }, true);
+
     const closeReplaceModal = () => {
+        closeReasonPortal();
+        document.body.classList.remove('sw-modal-open');
         if (replaceModal) replaceModal.hidden = true;
     };
 
@@ -1020,6 +1162,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        document.body.classList.add('sw-modal-open');
+
         const newFileName = file.name;
         const currentExt = currentFileName.split('.').pop().toLowerCase();
         const newExt = newFileName.split('.').pop().toLowerCase();
@@ -1033,7 +1177,15 @@ document.addEventListener('DOMContentLoaded', () => {
             replaceErrorAlert.textContent = '';
         }
 
+        if (replaceReasonGroup) {
+            replaceReasonGroup.querySelectorAll('.custom-select, .custom-select-trigger').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+        }
         if (replaceReasonSelect) replaceReasonSelect.value = '';
+        if (replaceReasonTriggerText) {
+            replaceReasonTriggerText.textContent = '-- Selecciona un motivo --';
+            replaceReasonTriggerText.style.color = '#64748b';
+        }
+        closeReasonPortal();
         if (replaceOtherDetail) replaceOtherDetail.value = '';
 
         if (!isNameOrExtChanged) {
@@ -1166,8 +1318,56 @@ document.addEventListener('DOMContentLoaded', () => {
     const externalFiles=(event)=>{const transfer=event.dataTransfer;if(!transfer||!transfer.files||transfer.files.length===0)return [];return [...transfer.files].filter((file)=>file instanceof File&&file.size>=0);};
     manager.addEventListener('dragover',(event)=>{if(!fileInput||externalFiles(event).length===0)return;event.preventDefault();manager.classList.add('is-dragging');}); manager.addEventListener('dragleave',()=>manager.classList.remove('is-dragging'));
     manager.addEventListener('drop',async(event)=>{const files=externalFiles(event);if(files.length===0)return;event.preventDefault();manager.classList.remove('is-dragging');let changed=false;for(const file of files)changed=(await upload(file))||changed;if(changed)reloadDocuments();});
-    manager.querySelectorAll('[data-sw-menu-trigger]').forEach((trigger)=>trigger.addEventListener('click',(event)=>{event.stopPropagation();const menu=trigger.nextElementSibling,open=!menu.hidden;closeMenus();menu.hidden=open;trigger.setAttribute('aria-expanded',open?'false':'true');}));
+    const positionFileMenu=(trigger,menu)=>{
+        menu._origin=trigger.parentElement;
+        document.body.appendChild(menu);
+        menu.hidden=false;
+
+        const rect=trigger.getBoundingClientRect();
+        const menuWidth=menu.offsetWidth||160;
+        const menuHeight=menu.offsetHeight||135;
+        const spaceBelow=window.innerHeight-rect.bottom;
+        const spaceAbove=rect.top;
+
+        let left=rect.right-menuWidth;
+        if(left<10)left=10;
+        if(left+menuWidth>window.innerWidth-10){
+            left=window.innerWidth-menuWidth-10;
+        }
+
+        let top;
+        if(spaceBelow<menuHeight+10&&spaceAbove>spaceBelow){
+            top=rect.top-menuHeight-6;
+        }else{
+            top=rect.bottom+6;
+        }
+
+        Object.assign(menu.style,{
+            position:'fixed',
+            top:`${Math.max(6,top)}px`,
+            left:`${Math.max(6,left)}px`,
+            right:'auto',
+            bottom:'auto',
+            zIndex:'100000',
+            margin:'0'
+        });
+    };
+
+    manager.querySelectorAll('[data-sw-menu-trigger]').forEach((trigger)=>trigger.addEventListener('click',(event)=>{
+        event.stopPropagation();
+        const menu=trigger.nextElementSibling||(trigger._linkedMenu&&trigger._linkedMenu.parentElement===document.body?trigger._linkedMenu:null);
+        if(!menu)return;
+        const wasOpen=!menu.hidden&&menu.parentElement===document.body;
+        closeMenus();
+        if(!wasOpen){
+            trigger._linkedMenu=menu;
+            positionFileMenu(trigger,menu);
+            trigger.setAttribute('aria-expanded','true');
+        }
+    }));
     document.addEventListener('click',(event)=>{if(!event.target.closest('[data-sw-menu-trigger]')&&!event.target.closest('[data-sw-file-menu]'))closeMenus();});
+    window.addEventListener('scroll',closeMenus,{passive:true,capture:true});
+    window.addEventListener('resize',closeMenus,{passive:true});
     manager.querySelectorAll('[data-sw-replace]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();const chooser=document.createElement('input');chooser.type='file';chooser.hidden=true;document.body.appendChild(chooser);chooser.addEventListener('change',()=>{const file=chooser.files?.[0];chooser.remove();if(!file)return;openReplaceModal(file,button.dataset.fileId,button.dataset.fileChecksum,button.dataset.fileName);});chooser.click();}));
     manager.querySelectorAll('[data-sw-remove]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();confirm('Quitar archivo','Este archivo dejará de formar parte del espacio de trabajo actual.',button.dataset.fileName,true,async()=>{try{await request('remove',null,{file_id:button.dataset.fileId});closeModal();setFlashToast('Archivo quitado.','success');reloadDocuments();}catch(error){toast(error.message||'No fue posible completar la operación.',true);}});}));
 
@@ -1702,7 +1902,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (ext === 'pdf' || mime === 'application/pdf') {
-            return 'fa-solid fa-file-pdf';
+            return 'fa-solid fa-file-lines';
         }
 
         if (['doc', 'docx', 'odt', 'rtf'].includes(ext) || mime.includes('word') || mime.includes('officedocument.wordprocessingml')) {
@@ -2525,10 +2725,11 @@ document.addEventListener('DOMContentLoaded', () => {
             clearError(); setSubmitting(true);
             const body = new FormData(); body.set('project_id', String(projectId)); body.set('_csrf', submitCsrf);
             try {
-                const payload = await readJsonResponse(await fetch(submitEndpoint, jsonRequestInit({ method: 'POST', body })));
+                const response = await fetch(submitEndpoint, jsonRequestInit({ method: 'POST', body }));
+                const payload = await readJsonResponse(response);
                 if (!payload.success) throw new Error(payload.message || 'No fue posible enviar los documentos a revisión.');
                 const result = payload.data || {};
-                setSubmitting(false); submitModal.hidden = true;
+                submitModal.hidden = true;
                 updateStatusUi(result);
                 const submittedFileCount = Number(result.submitted_file_count || 0);
                 const submissionMessage = submittedFileCount === 1
@@ -2536,17 +2737,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     : `${submittedFileCount} documentos fueron enviados al tutor para su revisión.`;
                 showVisualToast(submissionMessage, 'success', 'Proyecto enviado a revisión');
             } catch (error) {
-                setSubmitting(false);
+                const isNetworkError = error instanceof TypeError || error.name === 'TypeError' || (error.message || '').includes('fetch') || (error.message || '').includes('NetworkError');
                 const status = Number(error.status || 0);
                 const data = error.data || {};
-                const message = status === 419
-                    ? 'La sesión del formulario venció. Actualiza la página e inténtalo nuevamente.'
+                const message = isNetworkError
+                    ? 'No fue posible completar el envío. Verifica tu conexión e inténtalo nuevamente.'
+                    : status === 419 ? 'La sesión del formulario venció. Actualiza la página e inténtalo nuevamente.'
                     : status === 409 ? 'El proyecto ya fue enviado a revisión. Actualiza la página para consultar su estado actual.'
                     : status === 401 ? 'Tu sesión expiró. Inicia sesión nuevamente para continuar.'
                     : status === 403 ? 'No tienes autorización para enviar este proyecto a revisión.'
                     : (error.message || 'No fue posible enviar los documentos a revisión.');
                 setError(message, Array.isArray(data.pending_review_representations) ? data.pending_review_representations : []);
                 showVisualToast(message, 'error');
+            } finally {
+                setSubmitting(false);
             }
         });
     };

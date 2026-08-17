@@ -7,7 +7,12 @@ final class ProjectReviewReadinessService
 {
     public function check(int $projectId, bool $attemptConversion = true): array
     {
-        $query = Database::connection()->prepare("SELECT id,project_id,original_name,storage_name,extension,size_bytes,checksum_sha256,deleted_at,purged_at FROM project_files WHERE project_id=:project AND deleted_at IS NULL AND purged_at IS NULL ORDER BY sort_order,id");
+        $query = Database::connection()->prepare("SELECT f.id,f.project_id,f.original_name,f.storage_name,f.extension,f.size_bytes,f.checksum_sha256,f.deleted_at,f.purged_at
+            FROM project_files f
+            LEFT JOIN project_file_review_states s ON s.project_id=f.project_id AND s.file_id=f.id AND s.checksum_sha256=f.checksum_sha256
+            WHERE f.project_id=:project AND f.deleted_at IS NULL AND f.purged_at IS NULL
+              AND COALESCE(s.status,'development') IN ('development','corrections_requested')
+            ORDER BY f.sort_order,f.id");
         $query->execute(['project'=>$projectId]);
         $files = $query->fetchAll();
         $pending = [];

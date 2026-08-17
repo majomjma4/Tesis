@@ -3252,15 +3252,15 @@ function getNeutralFileVisualType(extension) {
     const normalized = String(extension || "").trim().toLowerCase().replace(/^\.+/, "");
     const visual = {
         pdf: ["fa-file-lines", "PDF"],
-        doc: ["fa-file-pen", "DOC"], docx: ["fa-file-pen", "DOCX"],
-        xls: ["fa-table", "XLS"], xlsx: ["fa-table", "XLSX"],
-        ppt: ["fa-display", "PPT"], pptx: ["fa-display", "PPTX"],
-        txt: ["fa-align-left", "TXT"],
-        zip: ["fa-box-archive", "ZIP"], rar: ["fa-box-archive", "RAR"],
-        "7z": ["fa-box-archive", "7Z"], tar: ["fa-box-archive", "TAR"], gz: ["fa-box-archive", "GZ"],
-        jpg: ["fa-image", "JPG"], jpeg: ["fa-image", "JPEG"],
-        png: ["fa-image", "PNG"], webp: ["fa-image", "WEBP"],
-        gif: ["fa-image", "GIF"], svg: ["fa-image", "SVG"]
+        doc: ["fa-file-word", "DOC"], docx: ["fa-file-word", "DOCX"], odt: ["fa-file-word", "ODT"], rtf: ["fa-file-word", "RTF"],
+        xls: ["fa-file-excel", "XLS"], xlsx: ["fa-file-excel", "XLSX"], csv: ["fa-file-excel", "CSV"], ods: ["fa-file-excel", "ODS"],
+        ppt: ["fa-file-powerpoint", "PPT"], pptx: ["fa-file-powerpoint", "PPTX"], odp: ["fa-file-powerpoint", "ODP"],
+        txt: ["fa-file-lines", "TXT"], md: ["fa-file-lines", "MD"],
+        zip: ["fa-file-zipper", "ZIP"], rar: ["fa-file-zipper", "RAR"],
+        "7z": ["fa-file-zipper", "7Z"], tar: ["fa-file-zipper", "TAR"], gz: ["fa-file-zipper", "GZ"],
+        jpg: ["fa-file-image", "JPG"], jpeg: ["fa-file-image", "JPEG"],
+        png: ["fa-file-image", "PNG"], webp: ["fa-file-image", "WEBP"],
+        gif: ["fa-file-image", "GIF"], svg: ["fa-file-image", "SVG"]
     }[normalized];
     return {
         extension: normalized,

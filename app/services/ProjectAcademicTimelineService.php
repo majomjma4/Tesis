@@ -45,9 +45,9 @@ SELECT CONCAT('delivery:',d.id),'delivery_registered','project_delivery',d.id,d.
                    )) payload
 FROM project_deliveries d LEFT JOIN users u ON u.id=d.submitted_by WHERE d.project_id=?
 UNION ALL
-SELECT CONCAT('observation:',o.id),'observation_created','project_observation',o.id,o.created_at,u.id,u.full_name,NULL,JSON_OBJECT('status',o.status),
-       JSON_OBJECT('body',o.body,'category',o.category,'reference',o.location_reference,'status',o.status,'delivery_id',o.delivery_id,'file_id',o.file_id,'file_name',f.original_name,'delivery_version',d.version_number)
-FROM project_observations o LEFT JOIN users u ON u.id=o.author_id LEFT JOIN project_files f ON f.id=o.file_id LEFT JOIN project_deliveries d ON d.id=o.delivery_id WHERE o.project_id=?
+SELECT CONCAT('observation-batch:',MIN(o.id)),'observation_batch_created','project_observation',MIN(o.id),MAX(o.created_at),u.id,u.full_name,NULL,NULL,
+       JSON_OBJECT('observation_count',COUNT(o.id),'affected_file_count',COUNT(DISTINCT NULLIF(o.file_id,0)),'delivery_id',o.delivery_id)
+FROM project_observations o LEFT JOIN users u ON u.id=o.author_id WHERE o.project_id=? GROUP BY DATE_FORMAT(o.created_at,'%Y-%m-%d %H:%i:%s'),o.author_id,o.delivery_id
 UNION ALL
 SELECT CONCAT('observation-response:',r.id),'observation_responded','observation_response',r.id,r.created_at,u.id,u.full_name,NULL,NULL,
        JSON_OBJECT('body',r.body,'observation_id',r.observation_id)
@@ -71,7 +71,7 @@ FROM project_adjustment_requests a LEFT JOIN users u ON u.id=a.closed_by WHERE a
 UNION ALL
 SELECT CONCAT('document-review:',l.id),'document_review_completed','project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason)
-FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=? AND l.action='project_document_review_completed'
+FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=? AND l.action='project_document_review_completed' AND NOT EXISTS(SELECT 1 FROM project_observations obs WHERE obs.project_id=l.project_id AND DATE_FORMAT(obs.created_at,'%Y-%m-%d %H:%i:%s')=DATE_FORMAT(l.created_at,'%Y-%m-%d %H:%i:%s'))
 UNION ALL
 SELECT CONCAT('document-status:',s.id),'document_status_recorded','project_file_review_state',s.id,s.updated_at,u.id,u.full_name,NULL,JSON_OBJECT('status',s.status),
        JSON_OBJECT('file_id',s.file_id,'file_name',f.original_name,'checksum',s.checksum_sha256,'status',s.status)
@@ -101,8 +101,10 @@ UNION ALL
 SELECT CONCAT('academic:',l.id),l.action,'project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason)
 FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=? AND (
-  (l.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished','project_publication_reverted','project_corrections_requested','project_status_changed','project_participants_updated','tribunal_assigned','tribunal_updated','thesis_defense_information_updated','tribunal_result_registered','defense_attempt_started')
+  (l.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished','project_publication_reverted','project_status_changed','project_participants_updated','tribunal_assigned','tribunal_updated','thesis_defense_information_updated','tribunal_result_registered','defense_attempt_started')
    AND NOT (l.action='project_unpublished' AND EXISTS(SELECT 1 FROM project_audit_log semantic WHERE semantic.project_id=l.project_id AND semantic.action='project_publication_reverted' AND semantic.created_at=l.created_at)))
+  OR (l.action='project_corrections_requested'
+   AND NOT EXISTS(SELECT 1 FROM project_observations obs WHERE obs.project_id=l.project_id AND DATE_FORMAT(obs.created_at,'%Y-%m-%d %H:%i:%s')=DATE_FORMAT(l.created_at,'%Y-%m-%d %H:%i:%s')))
   OR (l.action='project_updated'
    AND NOT EXISTS(SELECT 1 FROM project_audit_log semantic WHERE semantic.project_id=l.project_id AND semantic.created_at=l.created_at AND semantic.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_republished','project_publication_reverted','project_corrections_requested'))))
 UNION ALL
@@ -140,7 +142,8 @@ SQL;
     {
         return match($type){
             'project_registered'=>['Proyecto registrado',!empty($p['has_delivery'])?'Se registró el proyecto.':'Se registró el proyecto sin una entrega documental inicial.','registration'],
-            'delivery_registered'=>['Entrega enviada a revisión',$this->deliveryDescription($p),'delivery'],
+            'delivery_registered'=>$this->deliveryCopy($p),
+            'observation_batch_created'=>['Enviado a correcciones',$this->observationBatchDescription($p),'observation'],
             'observation_created'=>['Observación académica registrada',(string)($p['body']??''),'observation'],
             'observation_responded'=>['Respuesta a observación registrada',(string)($p['body']??''),'response'],
             'adjustment_requested'=>['Solicitud de ajuste',(string)($p['message']??''),'adjustment'],
@@ -152,21 +155,53 @@ SQL;
             'file_version_registered'=>['Nueva versión documental registrada',trim((string)($p['reason']??$p['file_name']??'')),'file'],
             'document_version_uploaded'=>['Nueva versión documental registrada',!empty($p['declared_summary'])?(string)$p['declared_summary']:(!empty($p['file_name'])?(string)$p['file_name'].' fue actualizada.':'Se actualizó la versión de un documento.'),'file'],
             'document_version_archived'=>['Versiones documentales archivadas','Se archivaron '.(int)($p['archived_count']??0).' versiones históricas.','file'],
-            'project.file_added','project_file_added'=>['Archivo agregado','Se registró un cambio documental relevante.','file'],
-            'project.file_replaced','project_file_replaced'=>['Archivo reemplazado','Se registró un cambio documental relevante.','file'],
-            'project.file_removed','project_file_removed'=>['Archivo retirado','Se registró un cambio documental relevante.','file'],
-            'project.file_restored','project_file_restored'=>['Archivo restaurado','Se registró un cambio documental relevante.','file'],
             'project_publication_reverted','project_unpublished'=>['Publicación revertida',$this->transitionDescription($previous,$new),'status'],
             'project_published','project_republished'=>['Proyecto publicado','El expediente fue publicado institucionalmente.','publication'],
             'project_tribunal_approved','tribunal_approved'=>['Proyecto aprobado por el Tribunal',$this->transitionDescription($previous,$new),'tribunal-approval'],
             'tribunal_assigned','tribunal_updated','project_participants_updated'=>['Tribunal registrado','Se registró una asignación o modificación de Tribunal.','tribunal'],
             'thesis_defense_information_updated'=>['Información de defensa actualizada','Se actualizó información organizativa de la defensa.','tribunal'],
-            'defense_attempt_started'=>['Nueva defensa iniciada','Se habilitó un nuevo intento de defensa'.(!empty($new['attempt'])?' (Intento '.(int)$new['attempt'].').':'.'),'tribunal'],
+            'defense_attempt_started'=>['Nueva defensa iniciada','Se habilitó un nuevo intento de defensa'.(!empty($new['attempt'])?' (Intento '.(int)$new['attempt'].'):':'.'),'tribunal'],
             'tribunal_result_registered'=>['Resultado del Tribunal registrado',($new['result']??'')==='approved'?'El Tribunal aprobó el proyecto.':'El Tribunal registró el proyecto como no aprobado.','tribunal'],
-            'project_corrections_requested'=>['Tutor solicitó correcciones','El proyecto volvió a En desarrollo.','observation'],
+            'project_corrections_requested'=>['Enviado a correcciones',$this->correctionsRequestedDescription($new),'observation'],
             'project_updated'=>['Información del proyecto actualizada',$this->projectInformationDescription($new),'project'],
             default=>[$this->statusTitle($new),$this->transitionDescription($previous,$new),'status'],
         };
+    }
+
+    private function deliveryCopy(array $p): array
+    {
+        $version = (int)($p['version_number'] ?? 1);
+        if ($version >= 2) {
+            $fileCount = (int)($p['file_count'] ?? 1);
+            if ($fileCount <= 0) $fileCount = 1;
+            $filesLabel = $fileCount === 1 ? '1 archivo corregido' : $fileCount . ' archivos corregidos';
+            return ['Correcciones reenviadas', $filesLabel, 'delivery'];
+        }
+        return ['Entrega enviada a revisión', $this->deliveryDescription($p), 'delivery'];
+    }
+
+    private function observationBatchDescription(array $p): string
+    {
+        $obsCount = (int)($p['observation_count'] ?? 0);
+        $fileCount = (int)($p['affected_file_count'] ?? 0);
+        $obsText = $obsCount === 1 ? '1 observación' : $obsCount . ' observaciones';
+        if ($fileCount > 0) {
+            $fileText = $fileCount === 1 ? '1 archivo' : $fileCount . ' archivos';
+            return $obsText . ' · ' . $fileText;
+        }
+        return $obsText;
+    }
+
+    private function correctionsRequestedDescription(array $new): string
+    {
+        $obsCount = (int)($new['observation_count'] ?? 0);
+        $fileCount = (int)($new['corrections_requested'] ?? 0);
+        $obsText = $obsCount === 1 ? '1 observación' : ($obsCount > 0 ? $obsCount . ' observaciones' : 'Correcciones solicitadas por el tutor.');
+        if ($fileCount > 0 && $obsCount > 0) {
+            $fileText = $fileCount === 1 ? '1 archivo' : $fileCount . ' archivos';
+            return $obsText . ' · ' . $fileText;
+        }
+        return $obsText;
     }
 
     private function deliveryDescription(array $p): string

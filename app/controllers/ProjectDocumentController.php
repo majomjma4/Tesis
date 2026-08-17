@@ -13,6 +13,7 @@ final class ProjectDocumentController
         $projectId=(int)($_POST['project_id']??$_POST['material_id']??0);$action=(string)($_POST['action']??'');$actor=(int)$session->userId();$model=new ProjectDocumentModel();$storage=new ProjectDocumentFileService();$stored=[];
         $capabilities=(new ProjectCapabilityService())->forProjectId($projectId,$this->documentContext);
         if(empty($capabilities['manage_files']))$this->json(false,'No tienes autorización para gestionar documentos del proyecto.',[],403);
+        if (session_status() === PHP_SESSION_ACTIVE) { session_write_close(); }
         try{
             if($projectId<1)throw new InvalidArgumentException('El proyecto no es válido.');
             $access=new ProjectAccessService();$project=$access->can('project.view')?(new ProjectRecordModel())->find($projectId,$actor,true,$this->documentContext==='repository'):null;

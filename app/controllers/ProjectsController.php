@@ -571,6 +571,7 @@ final class ProjectsController
             http_response_code(422);
             $this->json(['success'=>false,'message'=>'El proyecto solicitado no es válido.','data'=>[]]);
         }
+        if (session_status() === PHP_SESSION_ACTIVE) { session_write_close(); }
         try {
             $result = (new StudentProjectSubmissionService())->submitForReview((int) $projectId, $actorId);
             $result['capabilities'] = (new ProjectCapabilityService())->forProjectId((int) $projectId, 'academic');

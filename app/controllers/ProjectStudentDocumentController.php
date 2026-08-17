@@ -14,6 +14,7 @@ final class ProjectStudentDocumentController
         $action = (string) ($_POST['action'] ?? '');
         if (!in_array($action, ['add','replace','remove'], true)) $this->json(false, 'La acción documental no es válida.', [], 422);
         if (empty((new ProjectCapabilityService())->forProjectId($projectId, 'academic')['manage_workspace_files'])) $this->json(false, 'No tienes permiso para modificar los archivos de este proyecto.', [], 403);
+        if (session_status() === PHP_SESSION_ACTIVE) { session_write_close(); }
         $storage = new ProjectDocumentFileService();
         $stored = [];
         try {
@@ -112,9 +113,34 @@ final class ProjectStudentDocumentController
         $this->lockWorkspace($db, $projectId, $actor);
         $model = new ProjectDocumentModel($db); $file = $model->findActiveFile($projectId, $fileId, true);
         $this->assertEditableFile($db, $projectId, $file);
+        $this->assertFileCanBeRemoved($db, $projectId, $file);
         $removed = $model->retire($projectId, [$fileId], $actor);
         (new ProjectAuditService($db))->record($projectId, $actor, 'project_workspace_file_removed', 'project_file', $fileId, ['checksum'=>(string)$file['checksum_sha256']], ['removed'=>true], 'Archivo retirado del espacio de trabajo.');
         return ['file_id'=>$fileId,'removed'=>count($removed) === 1];
+    }
+
+    private function assertFileCanBeRemoved(PDO $db, int $projectId, array $file): void
+    {
+        $fileId = (int) ($file['id'] ?? 0);
+        if (!empty($file['delivery_id'])) {
+            throw new ProjectDocumentVersionException('Los archivos que forman parte de una entrega a revisión no pueden eliminarse. Si requieren cambios, debes usar la opción Reemplazar archivo.', 422);
+        }
+        $hasDeliveries = (int) $db->query("SELECT COUNT(*) FROM project_deliveries WHERE project_id={$projectId}")->fetchColumn() > 0;
+        if ($hasDeliveries) {
+            $isDelivered = $db->prepare("SELECT 1 FROM project_files f
+                WHERE f.id = :file AND f.project_id = :project
+                  AND (
+                    f.delivery_id IS NOT NULL
+                    OR EXISTS (SELECT 1 FROM project_file_review_states s WHERE s.file_id = f.id AND s.project_id = f.project_id)
+                    OR EXISTS (SELECT 1 FROM project_observations o WHERE o.file_id = f.id AND o.project_id = f.project_id)
+                    OR EXISTS (SELECT 1 FROM project_file_version_changes c WHERE c.file_id = f.id AND c.project_id = f.project_id)
+                    OR EXISTS (SELECT 1 FROM project_file_versions v WHERE v.file_id = f.id AND v.project_id = f.project_id)
+                  ) LIMIT 1");
+            $isDelivered->execute(['file' => $fileId, 'project' => $projectId]);
+            if ($isDelivered->fetchColumn()) {
+                throw new ProjectDocumentVersionException('Los archivos que forman parte de una entrega a revisión no pueden eliminarse. Si requieren cambios, debes usar la opción Reemplazar archivo.', 422);
+            }
+        }
     }
 
     private function lockWorkspace(PDO $db, int $projectId, int $actor): void

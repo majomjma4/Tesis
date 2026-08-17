@@ -42,6 +42,15 @@ final class Database
     {
         $connection = self::connection();
         $connection->beginTransaction();
+        register_shutdown_function(static function () use ($connection): void {
+            if ($connection instanceof PDO && $connection->inTransaction()) {
+                try {
+                    $connection->rollBack();
+                } catch (Throwable $exception) {
+                    // No lanzar excepciones durante shutdown.
+                }
+            }
+        });
         try {
             $result = $operation($connection);
             $connection->commit();
