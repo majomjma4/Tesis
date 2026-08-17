@@ -218,10 +218,11 @@ final class ProjectDocumentReviewBatchService
             if ($entry === '') {
                 $entry = null;
             } else {
-                $entry = preg_replace('#^[/\\\\]+#', '', str_replace('\\', '/', $entry));
-                if ($entry === null || $entry === '' || mb_strlen($entry) > 500 || str_contains($entry, '<') || preg_match('#^(?:[A-Za-z]:|/|\\\\)#', $entry)) {
+                $cleanEntry = preg_replace('#^[/\\\\]+#', '', str_replace('\\', '/', $entry));
+                if ($cleanEntry === null || $cleanEntry === '' || mb_strlen($cleanEntry) > 500 || str_contains($cleanEntry, '<') || preg_match('#^(?:[A-Za-z]:|/|\\\\)#', $cleanEntry)) {
                     throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
                 }
+                $entry = $cleanEntry;
             }
         }
         $normalizedRects = [];

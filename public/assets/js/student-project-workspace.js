@@ -441,9 +441,55 @@ document.addEventListener('DOMContentLoaded', () => {
     const manager=workspace.querySelector('[data-sw-document-manager]'); if (!manager) return;
     const endpoint=manager.dataset.endpoint, csrf=manager.dataset.csrf, reviewRepresentationEndpoint=manager.dataset.reviewRepresentationEndpoint||'', reviewRepresentationCsrf=manager.dataset.reviewRepresentationCsrf||'', projectId=manager.dataset.projectId, historicalPreview=manager.dataset.historicalPreview||'';
     let pdfjsPromise=null, pdfDocument=null, pdfDocumentKey='', pdfDocumentLoading=null, pdfDocumentGeneration=0, previewGeneration=0, previewController=null, currentPreviewUrl='', pdfScale=1, pdfFitScale=1, activePdfPreview=null, pocAnnotations=[], annotationsVisible=true;
-    const pdfjs=async()=>{if(!pdfjsPromise)pdfjsPromise=import(manager.dataset.pdfjsUrl).then((module)=>{module.GlobalWorkerOptions.workerSrc=manager.dataset.pdfjsWorker;return module;});return pdfjsPromise;};
     const jsonRequestInit=(options={})=>({...options,credentials:'same-origin',headers:{Accept:'application/json',...(options.headers||{})}});
-    const readJsonResponse=async(response)=>{const redirectedToLogin=response.redirected&&/([?&]page=login)(?:&|$)/i.test(response.url||'');if(response.status===401||redirectedToLogin){const error=new Error('Tu sesión ha expirado. Vuelve a iniciar sesión.');error.status=401;error.code='session_expired';throw error;}const contentType=(response.headers.get('content-type')||'').toLowerCase();if(!contentType.includes('application/json')){const error=new Error('Respuesta inesperada del servidor.');error.status=response.status;error.code='unexpected_response';throw error;}const payload=await response.json();if(!response.ok){const error=new Error(payload.message||'No fue posible completar la operación.');error.status=response.status;error.data=payload.data||{};throw error;}return payload;};
+    const handleExpiredSession = (notice) => {
+        const message = notice || 'Tu sesión ha caducado. Inicia sesión nuevamente.';
+        setTimeout(() => {
+            const loginUrl = 'index.php?page=login&notice=' + encodeURIComponent(message);
+            window.location.href = loginUrl;
+        }, 200);
+    };
+
+    const readJsonResponse = async (response) => {
+        const redirectedToLogin = response.redirected && /([?&]page=login)(?:&|$)/i.test(response.url || '');
+        const is401 = response.status === 401 || response.status === 419;
+
+        let payload = null;
+        const contentType = (response.headers.get('content-type') || '').toLowerCase();
+        if (contentType.includes('application/json')) {
+            try {
+                payload = await response.clone().json();
+            } catch (e) {}
+        }
+
+        const isSessionExpiredPayload = payload && (payload.authenticated === false || payload.code === 'session_expired');
+
+        if (is401 || redirectedToLogin || isSessionExpiredPayload) {
+            const notice = payload?.message || 'Tu sesión ha caducado. Inicia sesión nuevamente.';
+            handleExpiredSession(notice);
+            const error = new Error(notice);
+            error.status = 401;
+            error.code = 'session_expired';
+            throw error;
+        }
+
+        if (!contentType.includes('application/json')) {
+            const error = new Error('Respuesta inesperada del servidor.');
+            error.status = response.status;
+            error.code = 'unexpected_response';
+            throw error;
+        }
+
+        if (!payload) payload = await response.json();
+
+        if (!response.ok) {
+            const error = new Error(payload.message || 'No fue posible completar la operación.');
+            error.status = response.status;
+            error.data = payload.data || {};
+            throw error;
+        }
+        return payload;
+    };
     const fileInput=manager.querySelector('[data-sw-file-input]'), addButton=manager.querySelector('[data-sw-add-files]');
     const viewerName=manager.querySelector('[data-sw-viewer-name]'), viewerMeta=manager.querySelector('[data-sw-viewer-meta]'), viewerDownload=manager.querySelector('[data-sw-viewer-download]'), viewerEmpty=manager.querySelector('[data-sw-viewer-empty]'), previewStage=manager.querySelector('[data-sw-preview-stage]'), observationPanel=manager.querySelector('[data-sw-file-observations]');
     const mobileObsBadge=manager.querySelector('[data-sw-mobile-obs-badge]');

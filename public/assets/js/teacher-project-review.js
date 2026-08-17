@@ -246,6 +246,87 @@ document.addEventListener('DOMContentLoaded', () => {
         return { left, top, width, height };
     };
 
+    const compactRelativeRects = (rects) => {
+        if (!Array.isArray(rects) || !rects.length) return [];
+
+        const valid = rects
+            .map((r) => normalizeRect01(r))
+            .filter((r) => r.width > 0 && r.height > 0);
+
+        if (!valid.length) return [];
+
+        valid.sort((a, b) => (a.top !== b.top ? a.top - b.top : a.left - b.left));
+
+        const lines = [];
+        valid.forEach((rect) => {
+            if (lines.length === 0) {
+                lines.push([rect]);
+                return;
+            }
+
+            const currentLine = lines[lines.length - 1];
+            const lineTop = currentLine[0].top;
+            const lineHeight = currentLine.reduce((max, r) => Math.max(max, r.height), currentLine[0].height);
+
+            const topDiff = Math.abs(rect.top - lineTop);
+            const verticalOverlap = Math.min(rect.top + rect.height, lineTop + lineHeight) - Math.max(rect.top, lineTop);
+            const isSameLine = topDiff < 0.015 || (verticalOverlap > 0.3 * Math.min(rect.height, lineHeight));
+
+            if (isSameLine) {
+                currentLine.push(rect);
+            } else {
+                lines.push([rect]);
+            }
+        });
+
+        let compacted = lines.map((lineRects) => {
+            let minLeft = lineRects[0].left;
+            let minTop = lineRects[0].top;
+            let maxRight = lineRects[0].left + lineRects[0].width;
+            let maxBottom = lineRects[0].top + lineRects[0].height;
+
+            for (let i = 1; i < lineRects.length; i++) {
+                const r = lineRects[i];
+                if (r.left < minLeft) minLeft = r.left;
+                if (r.top < minTop) minTop = r.top;
+                if (r.left + r.width > maxRight) maxRight = r.left + r.width;
+                if (r.top + r.height > maxBottom) maxBottom = r.top + r.height;
+            }
+
+            return normalizeRect01({
+                left: minLeft,
+                top: minTop,
+                width: maxRight - minLeft,
+                height: maxBottom - minTop,
+            });
+        }).filter((r) => r.width > 0 && r.height > 0);
+
+        while (compacted.length > 50) {
+            const nextPass = [];
+            for (let i = 0; i < compacted.length; i += 2) {
+                if (i + 1 < compacted.length) {
+                    const r1 = compacted[i];
+                    const r2 = compacted[i + 1];
+                    const minLeft = Math.min(r1.left, r2.left);
+                    const minTop = Math.min(r1.top, r2.top);
+                    const maxRight = Math.max(r1.left + r1.width, r2.left + r2.width);
+                    const maxBottom = Math.max(r1.top + r1.height, r2.top + r2.height);
+                    nextPass.push(normalizeRect01({
+                        left: minLeft,
+                        top: minTop,
+                        width: maxRight - minLeft,
+                        height: maxBottom - minTop,
+                    }));
+                } else {
+                    nextPass.push(compacted[i]);
+                }
+            }
+            compacted = nextPass;
+        }
+
+        return compacted;
+    };
+
     const normalizeInternalEntry = (value) => {
         if (typeof value !== 'string') return null;
         const clean = value.replace(/^[/\\]+/, '').replace(/\\/g, '/').trim();
@@ -431,7 +512,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 page_number: pageNum,
                                 entry_name: normalizeInternalEntry(m?.entry_name),
                                 internal_entry: normalizeInternalEntry(m?.internal_entry),
-                                relative_rects: Array.isArray(m?.relative_rects) ? m.relative_rects.map((rect) => normalizeRect01(rect)) : [],
+                                relative_rects: Array.isArray(m?.relative_rects) ? compactRelativeRects(m.relative_rects) : [],
                             };
                         }));
                     }
@@ -575,7 +656,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return `Una observación contextual perdió su página de ubicación. Revisa las observaciones del archivo "${fileName}" antes de terminar la revisión.`;
                 }
                 const validRects = Array.isArray(meta?.relative_rects)
-                    ? meta.relative_rects.map(normalizeRect01).filter((r) => r.width > 0 && r.height > 0)
+                    ? compactRelativeRects(meta.relative_rects)
                     : [];
                 if (!validRects.length) {
                     return `Una observación contextual perdió su posición de recuadro. Revisa las observaciones del archivo "${fileName}" antes de terminar la revisión.`;
@@ -626,9 +707,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const text = String(meta?.selected_text || '').trim();
                         const pageNum = resolveLegacyPageNumber(meta, observation);
                         if (!text || !pageNum || !Array.isArray(meta?.relative_rects) || !meta.relative_rects.length) return null;
-                        const validRects = meta.relative_rects
-                            .map((rect) => normalizeRect01(rect))
-                            .filter((rect) => rect.width > 0 && rect.height > 0);
+                        const validRects = compactRelativeRects(meta.relative_rects);
                         if (!validRects.length) return null;
                         const entryValue = normalizeInternalEntry(meta.internal_entry || meta.entry_name);
                         return {
@@ -901,7 +980,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 page_number: editorState.pageNumber || null,
                 entry_name: normalizeInternalEntry(editorState.entryName),
                 internal_entry: normalizeInternalEntry(editorState.internalEntry),
-                relative_rects: Array.isArray(editorState.relativeRects) ? editorState.relativeRects.map(normalizeRect01) : [],
+                relative_rects: Array.isArray(editorState.relativeRects) ? compactRelativeRects(editorState.relativeRects) : [],
             };
             draft.observations.push(observation);
             metas.push(meta);
@@ -914,7 +993,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 entry_name: normalizeInternalEntry(previousMeta.entry_name),
                 internal_entry: normalizeInternalEntry(previousMeta.internal_entry),
                 relative_rects: Array.isArray(previousMeta.relative_rects) && previousMeta.relative_rects.length
-                    ? previousMeta.relative_rects.map(normalizeRect01)
+                    ? compactRelativeRects(previousMeta.relative_rects)
                     : [],
             };
             draft.observations[editorState.index] = observation;
@@ -2312,12 +2391,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const pageRect = page.getBoundingClientRect();
-        const relativeRects = rects.map((r) => normalizeRect01({
+        const relativeRects = compactRelativeRects(rects.map((r) => ({
             left: (r.left - pageRect.left) / pageRect.width,
             top: (r.top - pageRect.top) / pageRect.height,
             width: r.width / pageRect.width,
             height: r.height / pageRect.height,
-        })).filter((rect) => rect.width > 0 && rect.height > 0);
+        })));
+
+        if (relativeRects.length > 50) {
+            reviewError = 'La selección de texto es demasiado extensa. Selecciona un fragmento más corto para agregar esta observación.';
+            renderReviewCenter();
+            return;
+        }
 
         const selectedTextSnippet = text.length > 500 ? `${text.slice(0, 497)}...` : text;
         const locationRef = buildLocationReference(pageNumber);
@@ -2439,22 +2524,50 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof textarea.focus === 'function') textarea.focus({ preventScroll: true });
     };
 
+    const handleExpiredSession = (notice) => {
+        const message = notice || 'Tu sesion ha caducado. Inicia sesion nuevamente.';
+        if (typeof announce === 'function') {
+            announce(message, 'warning');
+        }
+        // DO NOT clear localStorage draft (teacher_review_draft_*). Draft remains intact for re-login.
+        setTimeout(() => {
+            const loginUrl = 'index.php?page=login&notice=' + encodeURIComponent(message);
+            window.location.href = loginUrl;
+        }, 200);
+    };
+
     const readJsonResponse = async (response) => {
         const redirectedToLogin = response.redirected && /([?&]page=login)(?:&|$)/i.test(response.url || '');
-        if (response.status === 401 || redirectedToLogin) {
-            const error = new Error('Tu sesion ha expirado. Vuelve a iniciar sesion.');
+        const is401 = response.status === 401 || response.status === 419;
+
+        let payload = null;
+        const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+        if (contentType.includes('application/json')) {
+            try {
+                payload = await response.clone().json();
+            } catch (e) {}
+        }
+
+        const isSessionExpiredPayload = payload && (payload.authenticated === false || payload.code === 'session_expired');
+
+        if (is401 || redirectedToLogin || isSessionExpiredPayload) {
+            const notice = payload?.message || 'Tu sesion ha caducado. Inicia sesion nuevamente.';
+            handleExpiredSession(notice);
+            const error = new Error(notice);
             error.status = 401;
             error.code = 'session_expired';
             throw error;
         }
-        const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+
         if (!contentType.includes('application/json')) {
             const error = new Error('Respuesta inesperada del servidor.');
             error.status = response.status;
             error.code = 'unexpected_response';
             throw error;
         }
-        const payload = await response.json();
+
+        if (!payload) payload = await response.json();
+
         if (!response.ok) {
             const error = new Error(payload.message || 'No fue posible completar la operacion.');
             error.status = response.status;
