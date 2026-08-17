@@ -29,7 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
     ).map((file) => ({
         file_id: Number(file.file_id),
         expected_checksum: String(file.expected_checksum),
-        status: String(file.status || 'development'),
+        status: String(file.status || file.document_status || 'development'),
+        document_status: String(file.document_status || file.status || 'development'),
         name: String(file.name || 'Documento'),
     }));
     const filesById = new Map(files.map((file) => [file.file_id, file]));
@@ -375,6 +376,119 @@ document.addEventListener('DOMContentLoaded', () => {
     const decisionStatusLabel = (status) => status === 'approved' ? 'Aprobado' : (status === 'corrections_requested' ? 'Requiere correcciones' : 'Sin decision');
     const decisionIconClass = (status) => status === 'approved' ? 'fa-circle-check' : (status === 'corrections_requested' ? 'fa-triangle-exclamation' : 'fa-circle');
 
+    const ensureCardNavStyles = () => {
+        const styleId = 'sw-review-card-nav-styles';
+        if (!document.getElementById(styleId)) {
+            const styleNode = document.createElement('style');
+            styleNode.id = styleId;
+            styleNode.textContent = `
+                @keyframes swHighlightPulse {
+                    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.8); outline: 2px solid #2563eb; }
+                    50% { transform: scale(1.05); box-shadow: 0 0 0 8px rgba(37, 99, 235, 0); outline: 3px solid #1d4ed8; }
+                    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); outline: 2px solid #2563eb; }
+                }
+                .sw-highlight-pulse {
+                    animation: swHighlightPulse 0.8s ease-in-out 2 !important;
+                    z-index: 100 !important;
+                }
+                .sw-review-observation-card.is-active-card {
+                    border-left: 3px solid #2563eb !important;
+                    background-color: #f8fafc !important;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+                }
+                .sw-obs-status-badge {
+                    font-size: 0.72rem;
+                    padding: 2px 7px;
+                    border-radius: 4px;
+                    font-weight: 600;
+                    background: #f1f5f9;
+                    color: #475569;
+                }
+                .sw-obs-status-badge.is-sent {
+                    background: #e0f2fe;
+                    color: #0369a1;
+                }
+                .sw-obs-status-badge.is-previous {
+                    background: #fef3c7;
+                    color: #b45309;
+                }
+                .sw-review-highlight-overlay {
+                    background: var(--sw-color-bg, rgba(250, 204, 21, 0.16));
+                    border: 1px solid var(--sw-color-border, rgba(202, 138, 4, 0.75));
+                    border-radius: 3px;
+                    box-sizing: border-box;
+                    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+                }
+                .sw-review-highlight-overlay.sw-highlight-pulse {
+                    border-width: 2px !important;
+                    box-shadow: 0 0 12px rgba(37, 99, 235, 0.5) !important;
+                }
+            `;
+            document.head.append(styleNode);
+        }
+    };
+    ensureCardNavStyles();
+
+    const navigateToContextualObservation = (fileId, pageNumber, obsIndex, cardElement) => {
+        const allCards = observationPanel?.querySelectorAll('.sw-review-observation-card');
+        allCards?.forEach((c) => c.classList.remove('is-active-card'));
+        if (cardElement) {
+            cardElement.classList.add('is-active-card');
+        }
+
+        const isViewerHidden = () => {
+            if (!previewStage) return true;
+            const rect = previewStage.getBoundingClientRect();
+            return rect.width === 0 || rect.height === 0;
+        };
+
+        const executeScrollAndHighlight = () => {
+            renderHighlights();
+            const targetOverlays = previewStage?.querySelectorAll(`.sw-review-highlight-overlay[data-observation-index="${obsIndex}"]`);
+            const guide = previewStage?.querySelector(`.sw-review-highlight-rail-guide[data-observation-index="${obsIndex}"]`);
+            const targetPage = previewStage?.querySelector(`[data-poc-page="${pageNumber}"]`)
+                || previewStage?.querySelector(`[data-page-number="${pageNumber}"]`);
+
+            if (targetOverlays && targetOverlays.length > 0) {
+                targetOverlays[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetOverlays.forEach((el) => el.classList.add('sw-highlight-pulse'));
+                guide?.classList.add('sw-highlight-pulse');
+                setTimeout(() => {
+                    targetOverlays.forEach((el) => el.classList.remove('sw-highlight-pulse'));
+                    guide?.classList.remove('sw-highlight-pulse');
+                }, 2000);
+            } else if (targetPage) {
+                targetPage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        };
+
+        const needsTabSwitch = isViewerHidden() || (activeFileId !== fileId && fileId > 0);
+
+        if (needsTabSwitch) {
+            const viewerTabBtn = manager?.querySelector('[data-sw-mobile-tab="viewer"]');
+            viewerTabBtn?.click();
+
+            if (fileId > 0 && activeFileId !== fileId) {
+                selectFile(fileId);
+            }
+
+            let attempts = 0;
+            const checkAndScroll = () => {
+                attempts++;
+                const pageEl = previewStage?.querySelector(`[data-poc-page="${pageNumber}"]`)
+                    || previewStage?.querySelector(`[data-page-number="${pageNumber}"]`);
+                if (pageEl || attempts > 25) {
+                    executeScrollAndHighlight();
+                } else {
+                    requestAnimationFrame(checkAndScroll);
+                }
+            };
+            requestAnimationFrame(checkAndScroll);
+        } else {
+            executeScrollAndHighlight();
+        }
+    };
+
     const teacherId = Number(config.teacher_id || 0);
     const draftStorageKey = (projectId > 0 && teacherId > 0)
         ? `teacher_review_draft_${projectId}_${teacherId}`
@@ -535,6 +649,47 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    const populateObservationMetaFromDB = () => {
+        existingObservations.forEach((item) => {
+            const fileId = Number(item.file_id || 0);
+            if (fileId <= 0) return;
+            if (!observationMeta.has(fileId)) {
+                observationMeta.set(fileId, []);
+            }
+            const metas = observationMeta.get(fileId);
+            const obsForFile = observationsForFile(fileId);
+            const index = obsForFile.indexOf(item);
+            if (index < 0) return;
+
+            let anchorObj = null;
+            if (item.selection_anchor) {
+                try {
+                    anchorObj = typeof item.selection_anchor === 'string' ? JSON.parse(item.selection_anchor) : item.selection_anchor;
+                } catch (e) {}
+            }
+
+            const pageNum = anchorObj?.page_number || resolveLegacyPageNumber(anchorObj, item);
+            const selectedText = String(anchorObj?.selected_text || '').trim();
+            let internalEntry = normalizeInternalEntry(anchorObj?.internal_entry || anchorObj?.entry_name);
+            if (!internalEntry && item.location_reference && item.location_reference.includes('→')) {
+                const parts = item.location_reference.split('→');
+                if (parts.length > 1) {
+                    internalEntry = normalizeInternalEntry(parts.slice(1).join('→').trim());
+                }
+            }
+            const validRects = Array.isArray(anchorObj?.relative_rects) ? compactRelativeRects(anchorObj.relative_rects) : [];
+
+            metas[index] = {
+                selected_text: selectedText,
+                page_number: pageNum,
+                entry_name: internalEntry,
+                internal_entry: internalEntry,
+                relative_rects: validRects,
+            };
+        });
+    };
+    populateObservationMetaFromDB();
+
     const draftFor = (fileId, initialStatus = '') => {
         if (!reviewDraft[fileId] && allowedStatuses.has(initialStatus)) {
             const file = filesById.get(fileId);
@@ -568,16 +723,23 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const summary = () => {
-        const persistedApproved = files.filter((file) => file.status === 'approved').length;
+        const filesList = files;
         const completed = completedDrafts();
-        const approved = persistedApproved + completed.filter((file) => reviewDraft[file.file_id]?.status === 'approved').length;
-        const corrections = completed.filter((file) => reviewDraft[file.file_id]?.status === 'corrections_requested').length;
+        const persistedApproved = filesList.filter((file) => !completedFileIds.has(file.file_id) && (file.status === 'approved' || file.document_status === 'approved')).length;
+        const persistedCorrections = filesList.filter((file) => !completedFileIds.has(file.file_id) && (file.status === 'corrections_requested' || file.document_status === 'corrections_requested')).length;
+        const draftApproved = completed.filter((file) => reviewDraft[file.file_id]?.status === 'approved').length;
+        const draftCorrections = completed.filter((file) => reviewDraft[file.file_id]?.status === 'corrections_requested').length;
+
+        const approved = persistedApproved + draftApproved;
+        const corrections = persistedCorrections + draftCorrections;
+        const reviewed = approved + corrections;
+
         return {
-            total: files.length,
-            reviewed: persistedApproved + completed.length,
+            total: filesList.length,
+            reviewed,
             approved,
             corrections,
-            pending: Math.max(0, files.length - persistedApproved - completed.length),
+            pending: Math.max(0, filesList.length - reviewed),
             newObservations: completed.reduce((count, file) => count + (reviewDraft[file.file_id]?.observations.length || 0), 0),
         };
     };
@@ -781,6 +943,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const hasSavedDraft = Boolean(draftStorageKey && localStorage.getItem(draftStorageKey));
 
+        if (!reviewIsAvailable) {
+            section.innerHTML = `
+                <div class="sw-review-progress-heading"><strong>Revisión finalizada</strong><span>${value.reviewed} de ${value.total} documentos</span></div>
+                <div class="sw-review-progress-track" aria-hidden="true"><span style="width:${value.total ? Math.round((value.reviewed / value.total) * 100) : 0}%"></span></div>
+                <div class="sw-review-progress-counts">
+                    <span class="is-approved"><i class="fa-solid fa-check" aria-hidden="true"></i>${value.approved} aprobados</span>
+                    <span class="is-corrections"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>${value.corrections} con correcciones</span>
+                    <span class="is-pending"><i class="fa-regular fa-circle" aria-hidden="true"></i>${value.pending} pendientes</span>
+                </div>
+                <div class="sw-review-read-only-banner" style="margin-top:10px;padding:8px 10px;background:rgba(234,179,8,0.1);border-radius:6px;font-size:0.8rem;color:var(--text-color, #334155);display:flex;align-items:center;gap:6px;">
+                    <i class="fa-solid fa-lock" style="color:#d97706;" aria-hidden="true"></i>
+                    <span>La revisión fue confirmada y se enviaron los resultados al estudiante.</span>
+                </div>`;
+            return section;
+        }
+
         section.innerHTML = `
             <div class="sw-review-progress-heading"><strong>Revisión</strong><span>${value.reviewed} de ${value.total} documentos</span></div>
             <div class="sw-review-progress-track" aria-hidden="true"><span style="width:${value.total ? Math.round((value.reviewed / value.total) * 100) : 0}%"></span></div>
@@ -800,46 +978,172 @@ document.addEventListener('DOMContentLoaded', () => {
         return section;
     };
 
+    const createObservationCard = (file, item, index, anchorObj, isContextual, isZip, pageNum = null, selectedText = '') => {
+        const card = document.createElement('article');
+        card.className = 'sw-review-observation-card is-existing';
+        card.dataset.obsIndex = String(index);
+
+        const meta = document.createElement('div');
+        meta.className = 'sw-review-card-meta';
+        const category = document.createElement('strong');
+        category.textContent = String(item.category || 'General');
+
+        const state = document.createElement('span');
+        const previousVersion = item.file_checksum_sha256 && String(item.file_checksum_sha256) !== file.expected_checksum;
+        if (previousVersion) {
+            state.textContent = 'Versión anterior';
+            state.className = 'sw-obs-status-badge is-previous';
+        } else if (item.status === 'addressed') {
+            state.textContent = 'Atendida';
+            state.className = 'sw-obs-status-badge';
+        } else if (item.status === 'resolved') {
+            state.textContent = 'Resuelta';
+            state.className = 'sw-obs-status-badge';
+        } else {
+            state.textContent = 'Enviada';
+            state.className = 'sw-obs-status-badge is-sent';
+        }
+        meta.append(category, state);
+
+        let internalEntry = normalizeInternalEntry(anchorObj?.internal_entry || anchorObj?.entry_name);
+        if (!internalEntry && item.location_reference && item.location_reference.includes('→')) {
+            const parts = item.location_reference.split('→');
+            if (parts.length > 1) {
+                internalEntry = normalizeInternalEntry(parts.slice(1).join('→').trim());
+            }
+        }
+
+        const locationBox = document.createElement('div');
+        locationBox.className = 'sw-review-card-location';
+        locationBox.style.fontSize = '0.78rem';
+        locationBox.style.margin = '4px 0 8px 0';
+        locationBox.style.padding = '4px 8px';
+        locationBox.style.borderRadius = '4px';
+        locationBox.style.background = 'rgba(241,245,249,0.85)';
+        locationBox.style.border = '1px solid #e2e8f0';
+
+        if (internalEntry) {
+            locationBox.innerHTML = `<div style="display:flex;align-items:center;gap:6px;font-weight:600;color:#0284c7;margin-bottom:2px;"><i class="fa-solid fa-file-zipper"></i> ${isZip ? 'General del ZIP' : 'Observación en entrada interna'}</div><div style="font-size:0.75rem;color:#334155;"><strong>Archivo interno:</strong> ${escapeHtml(internalEntry)}</div>`;
+        } else if (isContextual && pageNum) {
+            const textSnippet = selectedText.length > 90 ? selectedText.slice(0, 90) + '…' : selectedText;
+            locationBox.innerHTML = `<div style="display:flex;align-items:center;gap:6px;font-weight:600;color:#0f172a;margin-bottom:2px;"><i class="fa-solid fa-bookmark" style="color:#2563eb;"></i> Página ${pageNum}</div><div style="font-style:italic;color:#475569;font-size:0.75rem;line-height:1.2;">“${escapeHtml(textSnippet)}”</div>`;
+            card.dataset.pageNumber = String(pageNum);
+            card.style.cursor = 'pointer';
+            card.title = 'Haz clic para ubicar esta observación en el documento';
+        } else if (isZip) {
+            locationBox.innerHTML = `<i class="fa-solid fa-file-zipper" style="color:#0284c7;margin-right:4px;"></i> <span style="font-weight:600;color:#0369a1;">General del ZIP completo</span>`;
+        } else {
+            locationBox.innerHTML = `<i class="fa-solid fa-file-lines" style="color:#64748b;margin-right:4px;"></i> <span style="font-weight:500;color:#64748b;">General del archivo</span>`;
+        }
+
+        const body = document.createElement('p');
+        body.className = 'sw-review-card-body';
+        body.textContent = String(item.body || '');
+
+        card.append(meta, locationBox, body);
+
+        if (isContextual && pageNum) {
+            card.addEventListener('click', () => {
+                navigateToContextualObservation(file.file_id, pageNum, index, card);
+            });
+        }
+
+        return card;
+    };
+
     const createExistingSection = (file) => {
         const items = observationsForFile(file.file_id);
         const section = document.createElement('section');
         section.className = 'sw-review-observation-group is-existing';
-        const heading = document.createElement('div');
-        heading.className = 'sw-review-group-heading';
-        heading.innerHTML = `<strong>Observaciones existentes</strong><span>${items.length}</span>`;
-        section.append(heading);
+
         if (!items.length) {
+            const heading = document.createElement('div');
+            heading.className = 'sw-review-group-heading';
+            heading.innerHTML = `<strong>Observaciones registradas</strong><span>0</span>`;
             const empty = document.createElement('p');
             empty.className = 'sw-review-empty-inline';
             empty.textContent = 'Este archivo no tiene observaciones registradas.';
-            section.append(empty);
+            section.append(heading, empty);
             return section;
         }
-        const list = document.createElement('div');
-        list.className = 'sw-review-card-list';
-        items.forEach((item) => {
-            const card = document.createElement('article');
-            card.className = 'sw-review-observation-card is-existing';
-            const meta = document.createElement('div');
-            meta.className = 'sw-review-card-meta';
-            const category = document.createElement('strong');
-            category.textContent = String(item.category || 'General');
-            const state = document.createElement('span');
-            const previousVersion = item.file_checksum_sha256 && String(item.file_checksum_sha256) !== file.expected_checksum;
-            state.textContent = previousVersion ? 'Version anterior' : String(item.status || 'Registrada');
-            meta.append(category, state);
-            const body = document.createElement('p');
-            body.textContent = String(item.body || '');
-            card.append(meta, body);
-            if (item.location_reference) {
-                const location = document.createElement('small');
-                location.innerHTML = '<i class="fa-solid fa-location-dot" aria-hidden="true"></i>';
-                location.append(document.createTextNode(` ${item.location_reference}`));
-                card.append(location);
+
+        const generalItems = [];
+        const contextualItems = [];
+
+        items.forEach((item, originalIndex) => {
+            let anchorObj = null;
+            if (item.selection_anchor) {
+                try {
+                    anchorObj = typeof item.selection_anchor === 'string' ? JSON.parse(item.selection_anchor) : item.selection_anchor;
+                } catch (e) {}
             }
-            list.append(card);
+            const pageNum = anchorObj?.page_number || resolveLegacyPageNumber(anchorObj, item);
+            const selectedText = String(anchorObj?.selected_text || '').trim();
+            const hasContextualAnchor = pageNum && (selectedText !== '' || (Array.isArray(anchorObj?.relative_rects) && anchorObj.relative_rects.length > 0));
+
+            if (hasContextualAnchor) {
+                contextualItems.push({ item, originalIndex, anchorObj, pageNum, selectedText });
+            } else {
+                generalItems.push({ item, originalIndex, anchorObj });
+            }
         });
-        section.append(list);
+
+        const isZip = /\.zip$/i.test(String(file.name || ''));
+
+        // SECTION A: Observaciones generales
+        const generalGroup = document.createElement('div');
+        generalGroup.className = 'sw-review-subgroup';
+        generalGroup.style.marginBottom = '1rem';
+
+        const generalHeading = document.createElement('div');
+        generalHeading.className = 'sw-review-group-heading';
+        generalHeading.innerHTML = `<strong>Observaciones generales</strong><span>${generalItems.length}</span>`;
+        generalGroup.append(generalHeading);
+
+        if (!generalItems.length) {
+            const emptyGen = document.createElement('p');
+            emptyGen.className = 'sw-review-empty-inline';
+            emptyGen.style.fontSize = '0.8rem';
+            emptyGen.style.color = '#64748b';
+            emptyGen.textContent = 'Sin observaciones generales.';
+            generalGroup.append(emptyGen);
+        } else {
+            const genList = document.createElement('div');
+            genList.className = 'sw-review-card-list';
+            generalItems.forEach(({ item, originalIndex, anchorObj }) => {
+                const card = createObservationCard(file, item, originalIndex, anchorObj, false, isZip);
+                genList.append(card);
+            });
+            generalGroup.append(genList);
+        }
+
+        // SECTION B: Observaciones sobre el texto
+        const contextualGroup = document.createElement('div');
+        contextualGroup.className = 'sw-review-subgroup';
+
+        const contextualHeading = document.createElement('div');
+        contextualHeading.className = 'sw-review-group-heading';
+        contextualHeading.innerHTML = `<strong>Observaciones sobre el texto</strong><span>${contextualItems.length}</span>`;
+        contextualGroup.append(contextualHeading);
+
+        if (!contextualItems.length) {
+            const emptyCtx = document.createElement('p');
+            emptyCtx.className = 'sw-review-empty-inline';
+            emptyCtx.style.fontSize = '0.8rem';
+            emptyCtx.style.color = '#64748b';
+            emptyCtx.textContent = 'Sin observaciones sobre el texto.';
+            contextualGroup.append(emptyCtx);
+        } else {
+            const ctxList = document.createElement('div');
+            ctxList.className = 'sw-review-card-list';
+            contextualItems.forEach(({ item, originalIndex, anchorObj, pageNum, selectedText }) => {
+                const card = createObservationCard(file, item, originalIndex, anchorObj, true, isZip, pageNum, selectedText);
+                ctxList.append(card);
+            });
+            contextualGroup.append(ctxList);
+        }
+
+        section.append(generalGroup, contextualGroup);
         return section;
     };
 
@@ -1290,19 +1594,28 @@ document.addEventListener('DOMContentLoaded', () => {
         heading.innerHTML = `<strong>Observaciones generales del proyecto</strong><span>${generalObservations.length}</span>`;
         section.append(heading);
 
-        const info = document.createElement('p');
-        info.className = 'sw-review-empty-inline';
-        info.style.marginBottom = '0.55rem';
-        info.textContent = 'Registra comentarios que correspondan al proyecto en general y no a un documento específico.';
-        section.append(info);
+        if (reviewIsAvailable) {
+            const info = document.createElement('p');
+            info.className = 'sw-review-empty-inline';
+            info.style.marginBottom = '0.55rem';
+            info.textContent = 'Registra comentarios que correspondan al proyecto en general y no a un documento específico.';
+            section.append(info);
 
-        const addBtn = document.createElement('button');
-        addBtn.type = 'button';
-        addBtn.className = 'sw-review-add-general';
-        addBtn.disabled = isSubmitting;
-        addBtn.innerHTML = '<i class="fa-solid fa-plus" aria-hidden="true"></i> Agregar observación general';
-        addBtn.addEventListener('click', () => openEditor('general_project', 0));
-        section.append(addBtn);
+            const addBtn = document.createElement('button');
+            addBtn.type = 'button';
+            addBtn.className = 'sw-review-add-general';
+            addBtn.disabled = isSubmitting;
+            addBtn.innerHTML = '<i class="fa-solid fa-plus" aria-hidden="true"></i> Agregar observación general';
+            addBtn.addEventListener('click', () => openEditor('general_project', 0));
+            section.append(addBtn);
+        } else if (!generalObservations.length) {
+            const emptyGen = document.createElement('p');
+            emptyGen.className = 'sw-review-empty-inline';
+            emptyGen.style.fontSize = '0.8rem';
+            emptyGen.style.color = '#64748b';
+            emptyGen.textContent = 'Sin observaciones generales.';
+            section.append(emptyGen);
+        }
 
         if (generalObservations.length > 0) {
             const list = document.createElement('div');
@@ -1950,10 +2263,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (!reviewIsAvailable) {
-            const unavailable = document.createElement('div');
-            unavailable.className = 'sw-review-unavailable';
-            unavailable.innerHTML = '<i class="fa-solid fa-lock" aria-hidden="true"></i><strong>Revision no disponible</strong><span>El proyecto debe encontrarse en revision para confirmar decisiones documentales.</span>';
-            scrollBody.append(unavailable);
+            const hasPersistedReview = value.reviewed > 0 || existingObservations.length > 0;
+            if (!hasPersistedReview) {
+                const unavailable = document.createElement('div');
+                unavailable.className = 'sw-review-unavailable';
+                unavailable.innerHTML = '<i class="fa-solid fa-lock" aria-hidden="true"></i><strong>Revisión no disponible</strong><span>El proyecto debe encontrarse en revisión para confirmar decisiones documentales.</span>';
+                scrollBody.append(unavailable);
+                return;
+            }
+            const file = filesById.get(activeFileId);
+            if (!file) {
+                scrollBody.append(createProjectGeneralSection());
+                return;
+            }
+            if (activeInternalZipEntry) {
+                const banner = document.createElement('div');
+                banner.className = 'sw-viewer-help-banner sw-zip-internal-banner';
+                banner.style.background = '#f8fafc';
+                banner.style.borderLeft = '3px solid #64748b';
+                banner.style.padding = '0.5rem 0.75rem';
+                banner.style.marginBottom = '0.5rem';
+                banner.style.fontSize = '0.78rem';
+                banner.style.color = '#334155';
+                banner.innerHTML = '<i class="fa-solid fa-circle-info" style="color:#64748b;margin-right:0.35rem;"></i> Los archivos dentro de un ZIP se consultan únicamente como referencia.';
+                scrollBody.append(banner);
+            }
+            const fileStatus = file.status || file.document_status;
+            if (fileStatus === 'approved') {
+                const approved = document.createElement('div');
+                approved.className = 'sw-review-persisted-approved';
+                approved.innerHTML = '<i class="fa-solid fa-circle-check" aria-hidden="true"></i><div><strong style="display:block;margin-bottom:4px;color:#15803d;font-size:0.9rem;">Documento aprobado</strong><span style="display:block;color:#166534;">Este documento fue aprobado en la revisión enviada.</span></div>';
+                scrollBody.append(approved, createExistingSection(file));
+            } else if (fileStatus === 'corrections_requested') {
+                const corrections = document.createElement('div');
+                corrections.className = 'sw-review-persisted-approved';
+                corrections.style.borderColor = '#f59e0b';
+                corrections.style.background = '#fffbeb';
+                corrections.style.borderRadius = '8px';
+                corrections.style.border = '1px solid #fde68a';
+                corrections.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#d97706;font-size:1.5rem;" aria-hidden="true"></i><div><strong style="display:block;margin-bottom:6px;color:#92400e;font-size:0.92rem;font-weight:700;">Requiere correcciones</strong><span style="display:block;color:#b45309;font-size:0.78rem;line-height:1.4;">Este documento fue devuelto con observaciones para ajuste del estudiante.</span></div>';
+                scrollBody.append(corrections, createExistingSection(file));
+            } else {
+                scrollBody.append(createExistingSection(file));
+            }
             return;
         }
 
@@ -2212,7 +2564,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const getContextualObservationMap = (fileId) => {
         const draft = draftFor(fileId);
         const metas = metadataFor(fileId);
-        const observations = draft?.observations || [];
+        const observations = (reviewIsAvailable && draft?.observations?.length) ? draft.observations : observationsForFile(fileId);
         const map = new Map();
         let count = 0;
 
@@ -2241,12 +2593,12 @@ document.addEventListener('DOMContentLoaded', () => {
         isRenderingHighlights = true;
         try {
             withScrollPreserved(() => {
-                previewStage.querySelectorAll('.sw-review-highlight-overlay, .sw-review-highlight-badge').forEach((el) => el.remove());
+                previewStage.querySelectorAll('.sw-review-highlight-overlay, .sw-review-highlight-badge, .sw-review-highlight-rail-guide').forEach((el) => el.remove());
 
                 if (!activeFileId) return;
                 const metas = metadataFor(activeFileId);
                 const draft = draftFor(activeFileId);
-                const observations = draft?.observations || [];
+                const observations = (reviewIsAvailable && draft?.observations?.length) ? draft.observations : observationsForFile(activeFileId);
                 const contextualMap = getContextualObservationMap(activeFileId);
                 const usedTopsByPage = {};
 
@@ -2266,7 +2618,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const pageEl = previewStage.querySelector(`[data-poc-page="${meta.page_number}"]`);
                     if (!pageEl) return;
 
-                    // Overlays sobre todas las rects seleccionadas
+                    // Overlays sobre todas las rects seleccionadas (por línea compactada)
                     validRects.forEach((rect) => {
                         const highlight = document.createElement('span');
                         highlight.className = `sw-review-highlight-overlay ${colorClass}`;
@@ -2292,19 +2644,30 @@ document.addEventListener('DOMContentLoaded', () => {
                         pageEl.append(highlight);
                     });
 
-                    // UN ÚNICO BADGE AL MARGEN REAL DE LA PÁGINA (ALINEADO VERTICALMENTE CON LA PRIMERA LÍNEA)
-                    const firstRect = validRects[0];
-                    if (firstRect) {
+                    // INDICADOR LATERAL CON GUÍA VERTICAL QUE ABARCA TODO EL RANGO DE SELECCIÓN (minTop -> maxBottom)
+                    if (validRects.length > 0) {
+                        const tops = validRects.map((r) => r.top);
+                        const bottoms = validRects.map((r) => r.top + r.height);
+                        const minTop = Math.min(...tops);
+                        const maxBottom = Math.max(...bottoms);
+                        const rangeHeight = Math.max(0.005, maxBottom - minTop);
+
+                        const guideContainer = document.createElement('div');
+                        guideContainer.className = `sw-review-highlight-rail-guide ${colorClass}`;
+                        guideContainer.dataset.observationIndex = String(index);
+                        guideContainer.title = `Observación [${obsNumber}]: ${obs.body}`;
+
                         const badge = document.createElement('span');
                         badge.className = `sw-review-highlight-badge ${colorClass}`;
                         badge.textContent = String(obsNumber);
-                        badge.title = `Observación [${obsNumber}]: ${obs.body}`;
 
-                        // El badge se fija al margen izquierdo de la página para no tapar texto ni celdas de tablas
-                        const finalLeftCss = `calc(0% - 24px)`;
+                        const railBar = document.createElement('span');
+                        railBar.className = `sw-review-highlight-rail-bar ${colorClass}`;
 
-                        // Evitar solapamiento vertical entre badges en la misma página
-                        let badgeTop = firstRect.top * 100;
+                        guideContainer.append(badge, railBar);
+
+                        const finalLeftCss = `calc(0% - 26px)`;
+                        let badgeTop = minTop * 100;
                         const pageKey = String(meta.page_number);
                         usedTopsByPage[pageKey] = usedTopsByPage[pageKey] || [];
                         while (usedTopsByPage[pageKey].some((t) => Math.abs(t - badgeTop) < 2.5)) {
@@ -2312,18 +2675,36 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         usedTopsByPage[pageKey].push(badgeTop);
 
-                        Object.assign(badge.style, {
+                        Object.assign(guideContainer.style, {
+                            position: 'absolute',
                             left: finalLeftCss,
                             top: `calc(${badgeTop.toFixed(3)}% - 2px)`,
+                            height: `${(rangeHeight * 100).toFixed(3)}%`,
+                            minHeight: '20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            pointerEvents: 'auto',
+                            cursor: 'pointer',
+                            zIndex: '15',
                         });
 
-                        badge.addEventListener('click', (e) => {
+                        Object.assign(railBar.style, {
+                            width: '3px',
+                            flex: '1 1 auto',
+                            borderRadius: '2px',
+                            background: 'var(--sw-color-badge-border, #ca8a04)',
+                            opacity: '0.85',
+                            marginTop: '2px',
+                        });
+
+                        guideContainer.addEventListener('click', (e) => {
                             e.stopPropagation();
                             const firstOverlay = pageEl.querySelector(`[data-observation-index="${index}"]`);
-                            showHighlightNote(firstOverlay || badge, obs, index, activeFileId, obsNumber, colorClass);
+                            showHighlightNote(firstOverlay || guideContainer, obs, index, activeFileId, obsNumber, colorClass);
                         });
 
-                        pageEl.append(badge);
+                        pageEl.append(guideContainer);
                     }
                 });
             });
