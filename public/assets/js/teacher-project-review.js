@@ -231,6 +231,50 @@ document.addEventListener('DOMContentLoaded', () => {
         return pageNumber ? `Pagina ${pageNumber}` : '';
     };
 
+    const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+
+    const normalizeRect01 = (rect) => {
+        const rawLeft = Number(rect?.left) || 0;
+        const rawTop = Number(rect?.top) || 0;
+        const rawWidth = Number(rect?.width) || 0;
+        const rawHeight = Number(rect?.height) || 0;
+
+        const left = clamp01(rawLeft);
+        const top = clamp01(rawTop);
+        const width = Math.max(0.0001, Math.min(clamp01(rawWidth), 1 - left));
+        const height = Math.max(0.0001, Math.min(clamp01(rawHeight), 1 - top));
+        return { left, top, width, height };
+    };
+
+    const normalizeInternalEntry = (value) => {
+        if (typeof value !== 'string') return null;
+        const clean = value.replace(/^[/\\]+/, '').replace(/\\/g, '/').trim();
+        return clean !== '' ? clean : null;
+    };
+
+    const resolveLegacyPageNumber = (meta, observation) => {
+        const current = Number(meta?.page_number || 0);
+        if (Number.isInteger(current) && current >= 1) {
+            return current;
+        }
+
+        const selectedText = String(meta?.selected_text || '').trim();
+        const hasRects = Array.isArray(meta?.relative_rects) && meta.relative_rects.length > 0;
+        const isContextual = selectedText !== '' || hasRects;
+        if (!isContextual) {
+            return null;
+        }
+
+        const reference = String(observation?.location_reference || '');
+        const match = reference.match(/pagina\s*(\d+)/i);
+        if (!match) {
+            return null;
+        }
+
+        const derived = Number.parseInt(match[1], 10);
+        return Number.isInteger(derived) && derived >= 1 ? derived : null;
+    };
+
     const announce = (message, kind = 'info') => {
         if (typeof window.showToast === 'function') window.showToast(message, kind);
     };
@@ -378,15 +422,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 Object.entries(payload.observationMeta).forEach(([fileIdStr, metas]) => {
                     const fileId = Number(fileIdStr);
                     if (reviewDraft[fileId] && Array.isArray(metas)) {
-                        observationMeta.set(fileId, metas.map((m) => ({
-                            selected_text: String(m?.selected_text || ''),
-                            page_number: Number(m?.page_number || 0) || null,
-                            entry_name: m?.entry_name ? String(m.entry_name) : null,
-                            internal_entry: m?.internal_entry ? String(m.internal_entry) : null,
-                            relative_rects: Array.isArray(m?.relative_rects) ? m.relative_rects.map((rect) => ({
-                                left: Number(rect?.left), top: Number(rect?.top), width: Number(rect?.width), height: Number(rect?.height),
-                            })) : [],
-                        })));
+                        const obsList = reviewDraft[fileId].observations || [];
+                        observationMeta.set(fileId, metas.map((m, idx) => {
+                            const obs = obsList[idx];
+                            const pageNum = resolveLegacyPageNumber(m, obs);
+                            return {
+                                selected_text: String(m?.selected_text || ''),
+                                page_number: pageNum,
+                                entry_name: normalizeInternalEntry(m?.entry_name),
+                                internal_entry: normalizeInternalEntry(m?.internal_entry),
+                                relative_rects: Array.isArray(m?.relative_rects) ? m.relative_rects.map((rect) => normalizeRect01(rect)) : [],
+                            };
+                        }));
                     }
                 });
             }
@@ -508,9 +555,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const draft = draftFor(fileId);
         if (!draft || !allowedStatuses.has(draft.status)) return 'Selecciona una decision para este archivo.';
         if (draft.status === 'corrections_requested' && !draft.observations.length) return 'Agrega al menos una observacion para solicitar correcciones.';
-        for (const item of draft.observations) {
+        const file = filesById.get(fileId);
+        const fileName = file ? file.name : `Archivo #${fileId}`;
+        const metas = metadataFor(fileId);
+
+        for (let i = 0; i < draft.observations.length; i++) {
+            const item = draft.observations[i];
             const error = validateObservation(item);
             if (error) return error;
+
+            const meta = metas[i];
+            const selectedText = String(meta?.selected_text || '').trim();
+            const hasRects = Array.isArray(meta?.relative_rects) && meta.relative_rects.length > 0;
+            const hasContextualMeta = selectedText !== '' || hasRects;
+
+            if (hasContextualMeta) {
+                const pageNum = resolveLegacyPageNumber(meta, item);
+                if (!pageNum || pageNum < 1) {
+                    return `Una observación contextual perdió su página de ubicación. Revisa las observaciones del archivo "${fileName}" antes de terminar la revisión.`;
+                }
+                const validRects = Array.isArray(meta?.relative_rects)
+                    ? meta.relative_rects.map(normalizeRect01).filter((r) => r.width > 0 && r.height > 0)
+                    : [];
+                if (!validRects.length) {
+                    return `Una observación contextual perdió su posición de recuadro. Revisa las observaciones del archivo "${fileName}" antes de terminar la revisión.`;
+                }
+            }
         }
         return '';
     };
@@ -553,12 +623,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     location_reference: observation.location_reference,
                     anchor: (() => {
                         const meta = metadataFor(file.file_id)[index];
-                        if (!meta?.page_number || !Array.isArray(meta.relative_rects) || !meta.relative_rects.length) return null;
+                        const text = String(meta?.selected_text || '').trim();
+                        const pageNum = resolveLegacyPageNumber(meta, observation);
+                        if (!text || !pageNum || !Array.isArray(meta?.relative_rects) || !meta.relative_rects.length) return null;
+                        const validRects = meta.relative_rects
+                            .map((rect) => normalizeRect01(rect))
+                            .filter((rect) => rect.width > 0 && rect.height > 0);
+                        if (!validRects.length) return null;
+                        const entryValue = normalizeInternalEntry(meta.internal_entry || meta.entry_name);
                         return {
-                            selected_text: String(meta.selected_text || '').slice(0, 500),
-                            page_number: Number(meta.page_number),
-                            relative_rects: meta.relative_rects.map(({ left, top, width, height }) => ({ left, top, width, height })),
-                            internal_entry: meta.internal_entry || meta.entry_name || null,
+                            selected_text: text.slice(0, 500),
+                            page_number: pageNum,
+                            relative_rects: validRects,
+                            internal_entry: entryValue,
                         };
                     })(),
                 })),
@@ -705,6 +782,11 @@ document.addEventListener('DOMContentLoaded', () => {
         removeSelectionPopover(true);
 
         manager.querySelectorAll('[data-sw-file], [data-sw-zip-entry]').forEach((btn) => btn.classList.remove('is-selected'));
+        manager.querySelectorAll('[data-sw-zip-tree]').forEach((tree) => {
+            tree.hidden = true;
+            tree.querySelectorAll('.sw-zip-subtree').forEach((sub) => { sub.hidden = true; });
+            tree.querySelectorAll('.sw-zip-folder-btn i').forEach((icon) => { icon.className = 'fa-solid fa-folder-closed'; });
+        });
 
         const viewerName = manager.querySelector('[data-sw-viewer-name]');
         const viewerMeta = manager.querySelector('[data-sw-viewer-meta]');
@@ -811,12 +893,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const draft = draftFor(editorState.fileId, 'corrections_requested');
         if (!draft) return;
         const observation = { body, category, location_reference: locationReference || null };
-        const meta = { selected_text: editorState.selectedText || '' };
         const metas = metadataFor(editorState.fileId);
+
         if (editorState.index === null) {
+            const meta = {
+                selected_text: editorState.selectedText || '',
+                page_number: editorState.pageNumber || null,
+                entry_name: normalizeInternalEntry(editorState.entryName),
+                internal_entry: normalizeInternalEntry(editorState.internalEntry),
+                relative_rects: Array.isArray(editorState.relativeRects) ? editorState.relativeRects.map(normalizeRect01) : [],
+            };
             draft.observations.push(observation);
             metas.push(meta);
         } else {
+            const previousMeta = metas[editorState.index] || {};
+            const meta = {
+                ...previousMeta,
+                selected_text: editorState.selectedText || previousMeta.selected_text || '',
+                page_number: previousMeta.page_number || null,
+                entry_name: normalizeInternalEntry(previousMeta.entry_name),
+                internal_entry: normalizeInternalEntry(previousMeta.internal_entry),
+                relative_rects: Array.isArray(previousMeta.relative_rects) && previousMeta.relative_rects.length
+                    ? previousMeta.relative_rects.map(normalizeRect01)
+                    : [],
+            };
             draft.observations[editorState.index] = observation;
             metas[editorState.index] = meta;
         }
@@ -996,6 +1096,61 @@ document.addEventListener('DOMContentLoaded', () => {
         categoryLabel.textContent = 'Categoría';
         const categoryCustomSelect = createCategorySelect(state.category);
         categoryLabel.append(categoryCustomSelect);
+        form.append(categoryLabel);
+
+        const targetFile = filesById.get(state.fileId);
+        const isZipFile = targetFile && (targetFile.extension === 'zip' || (targetFile.name && targetFile.name.endsWith('.zip')));
+
+        if (isZipFile) {
+            const zipEntriesList = [];
+            manager.querySelectorAll('.sw-zip-entry-name').forEach((span) => {
+                const name = span.textContent.trim();
+                if (name && !zipEntriesList.includes(name)) zipEntriesList.push(name);
+            });
+
+            if (zipEntriesList.length > 0) {
+                const internalLabel = document.createElement('label');
+                internalLabel.className = 'sw-review-internal-entry-label';
+                internalLabel.textContent = 'Archivo interno relacionado (opcional)';
+
+                const select = document.createElement('select');
+                select.className = 'sw-review-internal-entry-select';
+                select.dataset.swReviewInternalEntry = '';
+                select.disabled = isSubmitting;
+
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = '';
+                defaultOpt.textContent = '[ Todo el paquete ZIP ]';
+                select.append(defaultOpt);
+
+                zipEntriesList.forEach((entryName) => {
+                    const opt = document.createElement('option');
+                    opt.value = entryName;
+                    opt.textContent = entryName;
+                    if (state.internalEntry === entryName || (state.locationReference && state.locationReference.includes(entryName))) {
+                        opt.selected = true;
+                    }
+                    select.append(opt);
+                });
+
+                select.addEventListener('change', () => {
+                    const val = select.value.trim();
+                    if (val) {
+                        state.internalEntry = val;
+                        state.entryName = val;
+                        state.locationReference = `${targetFile.name} \u2192 ${val}`;
+                    } else {
+                        state.internalEntry = null;
+                        state.entryName = null;
+                        state.locationReference = null;
+                    }
+                });
+
+                internalLabel.append(select);
+                form.append(internalLabel);
+            }
+        }
+
         const bodyLabel = document.createElement('label');
         bodyLabel.textContent = 'Comentario';
         const textarea = document.createElement('textarea');
@@ -1352,10 +1507,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const actions = document.createElement('div');
                     actions.className = 'sw-review-card-actions';
-                    actions.innerHTML = '<button type="button" data-action="edit"><i class="fa-solid fa-pen" aria-hidden="true"></i> Editar</button><button type="button" data-action="delete"><i class="fa-regular fa-trash-can" aria-hidden="true"></i> Eliminar</button>';
+
+                    const isZipDoc = file.extension === 'zip' || (file.name && file.name.endsWith('.zip'));
+                    if (isZipDoc) {
+                        const convertBtn = document.createElement('button');
+                        convertBtn.type = 'button';
+                        convertBtn.className = 'sw-review-convert-zip-btn';
+                        convertBtn.innerHTML = '<i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i> Conservar como observación del archivo interno';
+                        convertBtn.title = 'Convertir a observación general del paquete ZIP referenciando la entrada interna';
+                        convertBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (isSubmitting) return;
+                            const metaObj = metas[index] || {};
+                            let entryName = metaObj.internal_entry || metaObj.entry_name;
+                            if (!entryName && item.location_reference && item.location_reference.includes('→')) {
+                                entryName = item.location_reference.replace(/^.*?→\s*/, '').replace(/\s*·.*$/, '').trim();
+                            }
+                            const cleanEntry = normalizeInternalEntry(entryName);
+                            item.category = item.category && item.category !== 'Texto seleccionado' ? item.category : 'General';
+                            item.location_reference = cleanEntry ? `${file.name} \u2192 ${cleanEntry}` : `${file.name}`;
+                            metas[index] = {
+                                selected_text: '',
+                                page_number: null,
+                                entry_name: cleanEntry,
+                                internal_entry: cleanEntry,
+                                relative_rects: [],
+                            };
+                            saveReviewDraft();
+                            renderReviewCenter();
+                            announce('Observación convertida a observación general del paquete ZIP.', 'info');
+                        });
+                        actions.append(convertBtn);
+                    }
+
+                    const editBtn = document.createElement('button');
+                    editBtn.type = 'button';
+                    editBtn.dataset.action = 'edit';
+                    editBtn.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i> Editar';
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.dataset.action = 'delete';
+                    deleteBtn.innerHTML = '<i class="fa-regular fa-trash-can" aria-hidden="true"></i> Eliminar';
+                    actions.append(editBtn, deleteBtn);
+
                     actions.querySelectorAll('button').forEach((b) => b.disabled = isSubmitting);
 
-                    actions.querySelector('[data-action="edit"]').addEventListener('click', (e) => {
+                    editBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
                         openEditor('edit', file.file_id, {
                             index,
@@ -1365,7 +1562,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             selectedText: selectedText,
                         });
                     });
-                    actions.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+                    deleteBtn.addEventListener('click', (e) => {
                         e.stopPropagation();
                         if (isSubmitting) return;
                         draft.observations.splice(index, 1);
@@ -1629,7 +1826,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirmState.enabled && !isSubmitting) {
             const helper = document.createElement('small');
             helper.className = 'sw-review-finish-helper';
-            helper.textContent = 'Completa los documentos pendientes antes de confirmar.';
+            helper.textContent = confirmState.reason || 'Completa la revisión de todos los documentos antes de confirmar.';
             section.append(helper);
         }
 
@@ -1649,6 +1846,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         observationPanel.replaceChildren(progressNode, scrollBody);
 
+        const mobileFooter = manager.querySelector('[data-sw-mobile-review-footer]');
+
         if (obsFooter) {
             if (reviewIsAvailable && value.total > 0) {
                 obsFooter.replaceChildren(createReadySummary());
@@ -1658,6 +1857,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 obsFooter.replaceChildren();
                 obsFooter.hidden = true;
                 obsFooter.style.display = 'none';
+            }
+        }
+
+        if (mobileFooter) {
+            if (reviewIsAvailable && value.total > 0) {
+                mobileFooter.replaceChildren(createReadySummary());
+                mobileFooter.hidden = false;
+            } else {
+                mobileFooter.replaceChildren();
+                mobileFooter.hidden = true;
             }
         }
 
@@ -1674,6 +1883,19 @@ document.addEventListener('DOMContentLoaded', () => {
             scrollBody.append(createProjectGeneralSection());
             if (editorState?.fileId === 0) scrollBody.append(createEditor());
             return;
+        }
+
+        if (activeInternalZipEntry) {
+            const banner = document.createElement('div');
+            banner.className = 'sw-viewer-help-banner sw-zip-internal-banner';
+            banner.style.background = '#f8fafc';
+            banner.style.borderLeft = '3px solid #64748b';
+            banner.style.padding = '0.5rem 0.75rem';
+            banner.style.marginBottom = '0.5rem';
+            banner.style.fontSize = '0.78rem';
+            banner.style.color = '#334155';
+            banner.innerHTML = '<i class="fa-solid fa-circle-info" style="color:#64748b;margin-right:0.35rem;"></i> Los archivos dentro de un ZIP se consultan únicamente como referencia. Las observaciones se registran sobre el paquete ZIP.';
+            scrollBody.append(banner);
         }
 
         if (file.status === 'approved') {
@@ -2042,7 +2264,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const inspectTextSelection = () => {
-        if (isSubmitting || !reviewIsAvailable || filesById.get(activeFileId)?.status === 'approved') {
+        if (isSubmitting || !reviewIsAvailable || filesById.get(activeFileId)?.status === 'approved' || activeInternalZipEntry) {
             removeSelectionPopover(false);
             return;
         }
@@ -2090,12 +2312,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const pageRect = page.getBoundingClientRect();
-        const relativeRects = rects.map((r) => ({
+        const relativeRects = rects.map((r) => normalizeRect01({
             left: (r.left - pageRect.left) / pageRect.width,
             top: (r.top - pageRect.top) / pageRect.height,
             width: r.width / pageRect.width,
             height: r.height / pageRect.height,
-        }));
+        })).filter((rect) => rect.width > 0 && rect.height > 0);
 
         const selectedTextSnippet = text.length > 500 ? `${text.slice(0, 497)}...` : text;
         const locationRef = buildLocationReference(pageNumber);
@@ -2106,6 +2328,8 @@ document.addEventListener('DOMContentLoaded', () => {
             fileId: activeFileId,
             selectedText: selectedTextSnippet,
             pageNumber,
+            entryName: activeInternalZipEntry ? normalizeInternalEntry(activeInternalZipEntry.entryName) : null,
+            internalEntry: activeInternalZipEntry ? normalizeInternalEntry(activeInternalZipEntry.entryName) : null,
             locationReference: locationRef,
             rangeRect: anchorRect,
             relativeRects,
@@ -2255,19 +2479,41 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirmModal) return;
         const confirmState = getConfirmState();
         const currentSummary = decisionSummary();
-        const hasCorrections = currentSummary.corrections > 0;
+        const val = summary();
+        const total = currentSummary.total;
+        const approved = currentSummary.approved;
+        const corrections = currentSummary.corrections;
+        const hasCorrections = corrections > 0;
+
         if (confirmHeading) {
-            confirmHeading.textContent = currentSummary.total > 0
-                ? 'Has terminado la revision de los documentos.'
-                : 'Todavia no hay una revision lista para terminar.';
+            confirmHeading.textContent = 'Estás a punto de enviar esta revisión al estudiante.';
         }
+
         if (confirmMessage) {
-            confirmMessage.textContent = hasCorrections
-                ? 'Al enviar esta revision, el estudiante vera las observaciones, comentarios y marcas de los documentos que requieren correcciones. Solo esos documentos deberan modificarse y reenviarse.'
-                : 'Todos los documentos fueron aprobados y el proyecto pasara a estado Aprobado.';
+            const docWord = total === 1 ? 'documento' : 'documentos';
+            const revWord = total === 1 ? 'Se revisó' : 'Se revisaron';
+
+            if (hasCorrections) {
+                const approvedText = approved === 1 ? '1 fue aprobado' : `${approved} fueron aprobados`;
+                const correctionsText = corrections === 1 ? '1 requiere correcciones' : `${corrections} requieren correcciones`;
+                confirmMessage.innerHTML = `${revWord} <strong>${total}</strong> ${docWord}: <strong>${approvedText}</strong> y <strong>${correctionsText}</strong>.<br><br>Las observaciones, comentarios y subrayados realizados durante la revisión serán visibles para el estudiante.<br><br>Una vez confirmada, la revisión quedará bloqueada y el proyecto volverá a estado <strong>En desarrollo</strong> para que el estudiante pueda realizar las correcciones y reenviar los documentos pendientes.`;
+            } else {
+                const allApprovedText = total === 1 ? 'fue aprobado' : 'todos fueron aprobados';
+                confirmMessage.innerHTML = `${revWord} <strong>${total}</strong> ${docWord} y ${allApprovedText}.<br><br>Las observaciones y comentarios realizados durante la revisión serán enviados al estudiante.<br><br>Una vez confirmada, la revisión quedará bloqueada y el proyecto pasará a estado <strong>Aprobado</strong>.`;
+            }
         }
-        if (confirmApprovedCount) confirmApprovedCount.textContent = `${currentSummary.approved} aprobados`;
-        if (confirmCorrectionsCount) confirmCorrectionsCount.textContent = `${currentSummary.corrections} con correcciones`;
+
+        if (confirmApprovedCount) {
+            confirmApprovedCount.textContent = `${approved} ${approved === 1 ? 'aprobado' : 'aprobados'}`;
+        }
+        if (confirmCorrectionsCount) {
+            confirmCorrectionsCount.textContent = `${corrections} ${corrections === 1 ? 'requiere correcciones' : 'con correcciones'}`;
+        }
+        const confirmObsCount = confirmModal.querySelector('[data-sw-review-observations-count]');
+        if (confirmObsCount) {
+            confirmObsCount.textContent = `${val.newObservations} ${val.newObservations === 1 ? 'observación nueva' : 'observaciones nuevas'}`;
+        }
+
         if (confirmStatus) {
             confirmStatus.hidden = confirmModalStatus === '';
             confirmStatus.textContent = confirmModalStatus;
@@ -2276,10 +2522,15 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmError.hidden = confirmModalError === '';
             confirmError.textContent = confirmModalError;
         }
-        if (confirmLock) confirmLock.textContent = 'Una vez enviada, esta revisión quedará bloqueada.';
+        if (confirmLock) {
+            confirmLock.textContent = 'Después de confirmar no podrás modificar esta revisión.';
+        }
         if (confirmSubmitButton) {
             confirmSubmitButton.disabled = !confirmState.enabled || isSubmitting;
-            confirmSubmitButton.querySelector('span').textContent = isSubmitting ? 'Finalizando revision...' : 'Terminar revision';
+            const btnSpan = confirmSubmitButton.querySelector('span');
+            if (btnSpan) {
+                btnSpan.textContent = isSubmitting ? 'Finalizando revisión...' : 'Terminar revisión';
+            }
         }
     };
 

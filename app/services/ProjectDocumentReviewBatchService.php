@@ -215,20 +215,43 @@ final class ProjectDocumentReviewBatchService
         $entry = $raw['internal_entry'] ?? $raw['entry_name'] ?? null;
         if ($entry !== null) {
             $entry = trim((string)$entry);
-            if ($entry === '' || mb_strlen($entry) > 500 || str_contains($entry, '<') || preg_match('#^(?:[A-Za-z]:|/|\\\\)#', $entry)) {
-                throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+            if ($entry === '') {
+                $entry = null;
+            } else {
+                $entry = preg_replace('#^[/\\\\]+#', '', str_replace('\\', '/', $entry));
+                if ($entry === null || $entry === '' || mb_strlen($entry) > 500 || str_contains($entry, '<') || preg_match('#^(?:[A-Za-z]:|/|\\\\)#', $entry)) {
+                    throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+                }
             }
         }
         $normalizedRects = [];
+        $epsilon = 0.002;
         foreach ($rects as $rect) {
             if (!is_array($rect)) throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
-            $values = [];
+            $rawValues = [];
             foreach (['left','top','width','height'] as $key) {
                 if (!isset($rect[$key]) || !is_numeric($rect[$key])) throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
-                $values[$key] = (float)$rect[$key];
+                $rawValues[$key] = (float)$rect[$key];
             }
-            if ($values['left'] < 0 || $values['top'] < 0 || $values['width'] <= 0 || $values['height'] <= 0 || $values['left'] + $values['width'] > 1 || $values['top'] + $values['height'] > 1) throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
-            $normalizedRects[] = $values;
+            $rawLeft = $rawValues['left'];
+            $rawTop = $rawValues['top'];
+            $rawWidth = $rawValues['width'];
+            $rawHeight = $rawValues['height'];
+
+            if ($rawLeft < -$epsilon || $rawTop < -$epsilon || $rawWidth <= 0 || $rawHeight <= 0 || ($rawLeft + $rawWidth) > (1.0 + $epsilon) || ($rawTop + $rawHeight) > (1.0 + $epsilon)) {
+                throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+            }
+
+            $left = max(0.0, min(1.0, $rawLeft));
+            $top = max(0.0, min(1.0, $rawTop));
+            $width = min($rawWidth, 1.0 - $left);
+            $height = min($rawHeight, 1.0 - $top);
+
+            if ($width <= 0 || $height <= 0) {
+                throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+            }
+
+            $normalizedRects[] = ['left' => $left, 'top' => $top, 'width' => $width, 'height' => $height];
         }
         return ['selected_text'=>$text, 'page_number'=>$page, 'relative_rects'=>$normalizedRects, 'internal_entry'=>$entry];
     }

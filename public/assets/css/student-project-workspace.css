@@ -3310,6 +3310,48 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     transition: color 0.15s ease;
 }
 
+.sw-review-confirm-modal .sw-submit-modal-card {
+    height: auto !important;
+    max-height: min(720px, calc(100vh - 2rem)) !important;
+}
+
+.sw-review-confirm-modal .sw-submit-modal-body {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    max-height: calc(100vh - 140px) !important;
+}
+
+.sw-review-confirm-modal .sw-submit-confirm-btn,
+.sw-review-confirm-modal .sw-review-confirm-submit {
+    background: var(--sw-primary, #2563eb) !important;
+    border-color: var(--sw-primary, #2563eb) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 5px rgba(37, 99, 235, 0.25) !important;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.sw-review-confirm-modal .sw-submit-confirm-btn i,
+.sw-review-confirm-modal .sw-submit-confirm-btn span,
+.sw-review-confirm-modal .sw-review-confirm-submit i,
+.sw-review-confirm-modal .sw-review-confirm-submit span {
+    color: #ffffff !important;
+}
+
+.sw-review-confirm-modal .sw-submit-confirm-btn:hover:not(:disabled),
+.sw-review-confirm-modal .sw-review-confirm-submit:hover:not(:disabled) {
+    background: #1d4ed8 !important;
+    border-color: #1d4ed8 !important;
+    color: #ffffff !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 5px 14px rgba(37, 99, 235, 0.38) !important;
+}
+
+.sw-review-confirm-modal .sw-submit-confirm-btn:active:not(:disabled),
+.sw-review-confirm-modal .sw-review-confirm-submit:active:not(:disabled) {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2) !important;
+}
+
 .sw-submit-confirm-btn span {
     color: #0f172a !important;
     transition: color 0.15s ease;
@@ -3360,6 +3402,7 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     display: flex !important;
     flex-direction: column !important;
     height: 100% !important;
+    overflow: hidden !important;
 }
 
 .student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel [data-sw-file-observations] {
@@ -3367,7 +3410,8 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     flex-direction: column !important;
     flex: 1 1 0% !important;
     min-height: 0 !important;
-    overflow: hidden !important;
+    overflow-y: auto !important;
+    scrollbar-gutter: stable;
 }
 
 .student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel .sw-obs-footer {
@@ -3378,6 +3422,96 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     background: var(--sw-surface, #ffffff) !important;
     margin-top: auto !important;
     z-index: 6 !important;
+}
+
+.student-workspace .sw-mobile-review-footer {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    .student-workspace .sw-doc-workspace.is-teacher-review {
+        display: flex !important;
+        flex-direction: column !important;
+        height: calc(100vh - 120px) !important;
+        min-height: 480px !important;
+        overflow: hidden !important;
+    }
+
+    .student-workspace .sw-doc-workspace.is-teacher-review .sw-mobile-switcher {
+        flex: 0 0 auto !important;
+    }
+
+    .student-workspace .sw-doc-workspace.is-teacher-review .sw-explorer-panel,
+    .student-workspace .sw-doc-workspace.is-teacher-review .sw-viewer-panel,
+    .student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+    }
+
+    .student-workspace .sw-doc-workspace.is-teacher-review .sw-obs-footer {
+        display: none !important;
+    }
+
+    .student-workspace .sw-doc-workspace.is-teacher-review .sw-mobile-review-footer {
+        display: block !important;
+        flex: 0 0 auto !important;
+        padding: 0.65rem 0.85rem !important;
+        border-top: 1px solid var(--sw-border, #e2e8f0) !important;
+        background: #ffffff !important;
+        box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.05) !important;
+        z-index: 10 !important;
+    }
+
+    .student-workspace .sw-doc-workspace.is-teacher-review .sw-mobile-review-footer[hidden] {
+        display: none !important;
+    }
+
+    .student-workspace .sw-viewer-panel {
+        overflow-y: auto !important;
+    }
+
+    .student-workspace .sw-viewer-help-banner {
+        padding: 0.45rem 0.65rem !important;
+        margin-bottom: 0.45rem !important;
+        font-size: 0.78rem !important;
+    }
+
+    .student-workspace .sw-viewer-help-banner strong {
+        font-size: 0.8rem !important;
+    }
+
+    .student-workspace .sw-preview-state-card {
+        padding: 1rem 0.75rem !important;
+        margin: 0.5rem auto !important;
+    }
+
+    .student-workspace .sw-preview-state-card .sw-state-icon-badge {
+        width: 56px !important;
+        height: 56px !important;
+        font-size: 1.5rem !important;
+        margin-bottom: 0.65rem !important;
+        border-radius: 14px !important;
+    }
+
+    .student-workspace .sw-preview-state-card .sw-state-icon-badge .sub-icon {
+        width: 20px !important;
+        height: 20px !important;
+        font-size: 0.65rem !important;
+        bottom: -2px !important;
+        right: -2px !important;
+    }
+
+    .student-workspace .sw-state-title {
+        font-size: 0.98rem !important;
+        margin-bottom: 0.35rem !important;
+    }
+
+    .student-workspace .sw-state-message {
+        font-size: 0.82rem !important;
+        line-height: 1.4 !important;
+        margin-bottom: 0.5rem !important;
+    }
 }
 
 .student-workspace .sw-observations-panel.is-collapsed > *:not(.sw-panel-reopen-btn),
@@ -3443,11 +3577,13 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
 
 .student-workspace .sw-review-progress-heading span {
     color: #64748b;
-    font-size: 0.68rem;
+    font-size: 0.72rem;
     letter-spacing: -0.01em;
-    flex: 0 1 auto;
-    white-space: nowrap;
+    flex: 1 1 auto;
+    white-space: normal;
+    word-break: break-word;
     min-width: 0;
+    text-align: right;
 }
 
 .student-workspace .sw-review-file-heading span,
@@ -3932,10 +4068,8 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
 
 .student-workspace .sw-review-scroll-body {
     flex: 1 1 auto;
-    min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-    scrollbar-gutter: stable;
+    min-height: auto;
+    overflow: visible !important;
     display: flex;
     flex-direction: column;
 }
@@ -3975,12 +4109,20 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     border: 1px solid var(--sw-primary, #2563eb);
     background: var(--sw-primary, #2563eb);
     color: #ffffff;
-    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+    box-shadow: 0 2px 5px rgba(37, 99, 235, 0.25);
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .student-workspace .sw-review-finish-btn:not(:disabled):hover {
     background: #1d4ed8;
     border-color: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px rgba(37, 99, 235, 0.38);
+}
+
+.student-workspace .sw-review-finish-btn:not(:disabled):active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
 }
 
 .student-workspace .sw-review-finish-btn:disabled {
@@ -4730,15 +4872,16 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
         min-height: 0;
         display: flex;
         flex-direction: column;
-        overflow-y: auto;
-        scrollbar-gutter: stable;
+        overflow: hidden !important;
         box-sizing: border-box;
     }
 
     .student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel [data-sw-file-observations] {
-        display: block !important;
+        display: flex !important;
+        flex-direction: column !important;
+        flex: 1 1 0% !important;
+        min-height: 0 !important;
         overflow-y: auto !important;
-        max-height: none !important;
         scrollbar-gutter: stable;
     }
 }
@@ -4750,13 +4893,17 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
 }
 
 @media (min-width: 769px) and (max-width: 1080px) {
-    .student-workspace .sw-doc-workspace {
+    .student-workspace .sw-doc-workspace,
+    .student-workspace .sw-doc-workspace.is-teacher-review {
         display: flex !important;
         flex-direction: row !important;
         align-items: stretch !important;
         gap: 0.5rem !important;
         width: 100% !important;
         max-width: 100% !important;
+        height: var(--sw-workspace-height, calc(100vh - 120px)) !important;
+        max-height: var(--sw-workspace-height, calc(100vh - 120px)) !important;
+        min-height: 480px !important;
         box-sizing: border-box !important;
         overflow: hidden !important;
     }
@@ -4765,12 +4912,20 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
         flex: 0 0 175px !important;
         min-width: 150px !important;
         max-width: 195px !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
         box-sizing: border-box !important;
     }
 
     .student-workspace .sw-viewer-panel {
         flex: 1 1 0% !important;
         min-width: 280px !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
         box-sizing: border-box !important;
     }
 
@@ -4778,6 +4933,10 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
         flex: 0 0 250px !important;
         min-width: 220px !important;
         max-width: 270px !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
         box-sizing: border-box !important;
     }
 

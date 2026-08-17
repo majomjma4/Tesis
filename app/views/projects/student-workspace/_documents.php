@@ -152,6 +152,9 @@ $getFileIconClass = static function (?string $extension, ?string $mimeType = nul
             <?php if ($canSendForReview): ?><button type="button" class="sw-obs-action-btn" data-sw-submit-review><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Enviar a revisión</button><?php endif; ?>
         </footer>
     </aside>
+    <?php if ($canReviewDocuments): ?>
+    <footer class="sw-mobile-review-footer" data-sw-mobile-review-footer hidden></footer>
+    <?php endif; ?>
     <div class="sw-operation-modal" data-sw-operation-modal hidden><section role="dialog" aria-modal="true" aria-labelledby="swOperationTitle"><header><h2 data-sw-modal-title id="swOperationTitle">Confirmar acción</h2><button type="button" data-sw-modal-cancel aria-label="Cerrar"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header><div><p data-sw-modal-message></p><p class="sw-modal-file-summary" data-sw-modal-summary hidden></p></div><footer><button type="button" data-sw-modal-cancel>Cancelar</button><button type="button" class="is-danger" data-sw-modal-confirm>Confirmar</button></footer></section></div>
     <?php
     $hasPreviousReview = !empty(array_filter($files, static fn(array $f): bool =>
@@ -203,30 +206,37 @@ $getFileIconClass = static function (?string $extension, ?string $mimeType = nul
     </div>
     <?php if ($canReviewDocuments): ?>
     <div class="sw-operation-modal sw-review-confirm-modal" data-sw-review-confirm-modal hidden>
-        <section role="dialog" aria-modal="true" aria-labelledby="swReviewConfirmTitle" class="sw-review-confirm-card">
-            <header class="sw-review-confirm-header">
+        <section role="dialog" aria-modal="true" aria-labelledby="swReviewConfirmTitle" class="sw-review-confirm-card sw-submit-modal-card">
+            <header class="sw-review-confirm-header sw-submit-modal-header">
                 <h2 id="swReviewConfirmTitle">¿Terminar revisión?</h2>
-                <button type="button" data-sw-review-confirm-close aria-label="Cerrar ventana">
+                <button type="button" class="sw-submit-modal-close-btn" data-sw-review-confirm-close aria-label="Cerrar ventana">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
             </header>
-            <div class="sw-review-confirm-body">
-                <div class="sw-review-confirm-copy">
-                    <strong data-sw-review-confirm-heading>Has terminado la revisión de los documentos.</strong>
-                    <p data-sw-review-confirm-message>Al enviar esta revisión al estudiante ya no podrás modificar las decisiones ni observaciones de esta revisión.</p>
-                    <p data-sw-review-confirm-lock>Una vez enviada, esta revisión quedará bloqueada.</p>
+            <div class="sw-review-confirm-body sw-submit-modal-body" style="text-align: left; align-items: stretch; padding: 1.1rem 1.25rem;">
+                <div class="sw-submit-hero" style="margin-bottom: 0.6rem;">
+                    <div class="sw-submit-icon-badge" style="width: 52px; height: 52px; font-size: 1.35rem; margin-bottom: 0.5rem;">
+                        <i class="fa-solid fa-clipboard-check" aria-hidden="true"></i>
+                    </div>
+                    <h3 class="sw-submit-question" data-sw-review-confirm-heading style="font-size: 1rem; margin-bottom: 0.2rem;">Estás a punto de enviar esta revisión al estudiante.</h3>
                 </div>
-                <div class="sw-review-confirm-stats" data-sw-review-confirm-stats>
-                    <span data-sw-review-approved-count>0 aprobados</span>
-                    <span data-sw-review-corrections-count>0 con correcciones</span>
+                <div class="sw-review-confirm-stats" data-sw-review-confirm-stats style="display: flex; flex-wrap: wrap; gap: 0.35rem; justify-content: center; width: 100%; margin-bottom: 0.65rem; font-size: 0.76rem; font-weight: 600;">
+                    <span data-sw-review-approved-count style="color: #166534; background: #f0fdf4; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid #bbf7d0;">0 aprobados</span>
+                    <span data-sw-review-corrections-count style="color: #991b1b; background: #fef2f2; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid #fecaca;">0 con correcciones</span>
+                    <span data-sw-review-observations-count style="color: #1e40af; background: #eff6ff; padding: 0.25rem 0.55rem; border-radius: 6px; border: 1px solid #bfdbfe;">0 observaciones nuevas</span>
                 </div>
-                <p class="sw-review-confirm-status" data-sw-review-confirm-status hidden></p>
-                <p class="sw-review-confirm-error" data-sw-review-confirm-error hidden role="alert"></p>
+                <div class="sw-submit-subtitle" data-sw-review-confirm-message style="font-size: 0.83rem; color: #334155; line-height: 1.45; margin-bottom: 0.65rem; max-width: 100%; text-align: left;"></div>
+                <div class="sw-submit-restriction-box" style="padding: 0.55rem 0.8rem;">
+                    <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                    <span data-sw-review-confirm-lock>Después de confirmar no podrás modificar esta revisión.</span>
+                </div>
+                <p class="sw-review-confirm-status" data-sw-review-confirm-status hidden style="margin-top: 0.5rem; font-size: 0.82rem; color: #2563eb; font-weight: 600; text-align: center;"></p>
+                <p class="sw-review-confirm-error" data-sw-review-confirm-error hidden role="alert" style="margin-top: 0.5rem; font-size: 0.82rem; color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; padding: 0.5rem 0.75rem; border-radius: 8px; text-align: left;"></p>
             </div>
-            <footer class="sw-review-confirm-footer">
-                <button type="button" class="sw-review-confirm-cancel" data-sw-review-confirm-cancel>Cancelar</button>
-                <button type="button" class="sw-review-confirm-submit" data-sw-review-confirm-submit>
-                    <i class="fa-solid fa-check" aria-hidden="true"></i> <span>Terminar revisión</span>
+            <footer class="sw-review-confirm-footer sw-submit-modal-footer" style="padding: 0.75rem 1.15rem;">
+                <button type="button" class="sw-submit-cancel-btn" data-sw-review-confirm-cancel>Cancelar</button>
+                <button type="button" class="sw-submit-confirm-btn sw-review-confirm-submit" data-sw-review-confirm-submit style="background: var(--sw-primary, #2563eb) !important; color: #ffffff !important; border-color: var(--sw-primary, #2563eb) !important;">
+                    <i class="fa-solid fa-check" aria-hidden="true" style="color: #ffffff !important;"></i> <span style="color: #ffffff !important;">Terminar revisión</span>
                 </button>
             </footer>
         </section>

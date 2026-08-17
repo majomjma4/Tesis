@@ -1320,15 +1320,27 @@ document.addEventListener('DOMContentLoaded', () => {
             title: 'Visualiza tus archivos',
             message: 'Selecciona un documento del explorador para consultar su contenido y observaciones.'
         });
+        workspace.querySelectorAll('[data-sw-zip-tree]').forEach((tree) => {
+            tree.hidden = true;
+            tree.querySelectorAll('.sw-zip-subtree').forEach((sub) => { sub.hidden = true; });
+            tree.querySelectorAll('.sw-zip-folder-btn i').forEach((icon) => { icon.className = 'fa-solid fa-folder-closed'; });
+        });
     };
 
-    const loadZipDirectory=async(rootButton,path,tree)=>{if(!tree)return;if(tree.dataset.loaded==='true'){tree.hidden=!tree.hidden;return;}tree.hidden=false;tree.textContent='Cargando…';try{const target=new URL(rootButton.dataset.fileZipUrl,window.location.origin);if(path)target.searchParams.set('path',path);const payload=await readJsonResponse(await fetch(target,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible abrir el ZIP.');renderZipTree(tree,payload.data?.archive?.items||payload.data?.archive||[],rootButton);tree.dataset.loaded='true';}catch(error){console.error('No fue posible cargar la estructura del ZIP.',error);tree.textContent=error.code==='session_expired'?error.message:'No fue posible abrir esta carpeta.';}};
+    const loadZipDirectory=async(rootButton,path,tree)=>{if(!tree)return;if(tree.dataset.loaded==='true'){tree.hidden=false;return;}tree.hidden=false;tree.textContent='Cargando…';try{const target=new URL(rootButton.dataset.fileZipUrl,window.location.origin);if(path)target.searchParams.set('path',path);const payload=await readJsonResponse(await fetch(target,jsonRequestInit()));if(!payload.success)throw new Error(payload.message||'No fue posible abrir el ZIP.');renderZipTree(tree,payload.data?.archive?.items||payload.data?.archive||[],rootButton);tree.dataset.loaded='true';}catch(error){console.error('No fue posible cargar la estructura del ZIP.',error);tree.textContent=error.code==='session_expired'?error.message:'No fue posible abrir esta carpeta.';}};
     const selectFile=(button)=>{
         const fileId = Number(button.dataset.fileId || 0);
+        const archiveNode = button.closest('.sw-archive-node');
+        const zipTree = archiveNode?.querySelector('[data-sw-zip-tree]');
 
-        // TOGGLE: Si el archivo ya tiene la clase visual .is-selected en el DOM, deseleccionar y cerrar visor
-        if (button.classList.contains('is-selected')) {
+        // TOGGLE UNIFICADO: Si el ZIP/archivo ya está seleccionado o expandido, deseleccionar y colapsar todo en un solo clic
+        if (button.classList.contains('is-selected') || (button.dataset.fileZipUrl && zipTree && !zipTree.hidden)) {
             deselectCurrentWorkspaceFile();
+            if (zipTree) {
+                zipTree.hidden = true;
+                zipTree.querySelectorAll('.sw-zip-subtree').forEach((sub) => { sub.hidden = true; });
+                zipTree.querySelectorAll('.sw-zip-folder-btn i').forEach((icon) => { icon.className = 'fa-solid fa-folder-closed'; });
+            }
             return;
         }
 
@@ -1342,7 +1354,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if(button.dataset.fileZipUrl){
             currentPreviewUrl='';
             renderPreviewState({type:'empty',title:'Archivo ZIP seleccionado',message:'Usa el explorador de archivos para desplegar y consultar el contenido del ZIP.'});
-            void loadZipDirectory(button,'',button.closest('.sw-archive-node')?.querySelector('[data-sw-zip-tree]'));
+            if (zipTree) zipTree.hidden = false;
+            void loadZipDirectory(button,'',zipTree);
             return;
         }
         if(window.innerWidth<=768){ switchMobileTab('viewer'); }
