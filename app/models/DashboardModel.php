@@ -384,32 +384,76 @@ final class DashboardModel
 
     private function adminStatusDistribution(PDO $connection, int $totalProjects): array
     {
-        $statusLabels = [
-            'development' => 'En desarrollo',
-            'under_review' => 'En revisión',
-            'approved' => 'Aprobados',
-            'defense' => 'En tribunal',
-            'published' => 'Publicados',
-            'completed' => 'Finalizados',
+        /*
+         * PANORAMA ACADÉMICO — 5 categorías visuales consolidadas.
+         *
+         * Categorías y reglas de agrupación:
+         *   En desarrollo → status = 'development'
+         *   En revisión   → status = 'under_review'
+         *                   + tesis (pt.code='thesis') con status = 'approved'
+         *                     NOTA: Esta agrupación es EXCLUSIVAMENTE visual/panorámica.
+         *                     La tesis sigue en flujo académico; su aprobación final
+         *                     ocurre sólo en tribunal_approved. No cambia el status real en BD.
+         *   Aprobados     → non-thesis con status = 'approved'
+         *                   + tesis con status = 'tribunal_approved'
+         *                   + status = 'completed' (legacy, compatibilidad histórica)
+         *   En tribunal   → tesis con status = 'defense'
+         *   Publicados    → status = 'published'
+         *
+         * "Finalizados" eliminado del panorama: `completed` se consolida en Aprobados.
+         * El denominador es el total real de proyectos vigentes (deleted_at IS NULL).
+         */
+        $totalDenominator = max(1, $totalProjects);
+
+        $statement = $connection->query(
+            "SELECT
+                SUM(CASE
+                    WHEN p.status = 'development' THEN 1
+                    ELSE 0
+                END) AS development,
+                SUM(CASE
+                    WHEN p.status = 'under_review' THEN 1
+                    WHEN p.status = 'approved' AND pt.code = 'thesis' THEN 1
+                    ELSE 0
+                END) AS under_review,
+                SUM(CASE
+                    WHEN p.status = 'completed' THEN 1
+                    WHEN p.status = 'tribunal_approved' AND pt.code = 'thesis' THEN 1
+                    WHEN p.status = 'approved' AND pt.code != 'thesis' THEN 1
+                    ELSE 0
+                END) AS approved,
+                SUM(CASE
+                    WHEN p.status = 'defense' AND pt.code = 'thesis' THEN 1
+                    ELSE 0
+                END) AS defense,
+                SUM(CASE
+                    WHEN p.status = 'published' THEN 1
+                    ELSE 0
+                END) AS published
+             FROM projects p
+             INNER JOIN project_types pt ON pt.id = p.project_type_id
+             WHERE p.deleted_at IS NULL"
+        );
+        $row = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $categories = [
+            'development' => ['label' => 'En desarrollo', 'route' => route('projects') . '&status=development'],
+            'under_review' => ['label' => 'En revisión',   'route' => route('projects') . '&status=under_review'],
+            'approved'     => ['label' => 'Aprobados',     'route' => route('projects') . '&status=approved'],
+            'defense'      => ['label' => 'En tribunal',   'route' => route('projects') . '&status=defense'],
+            'published'    => ['label' => 'Publicados',    'route' => route('admin-repository')],
         ];
 
-        $statement = $connection->query("SELECT status, COUNT(*) count FROM projects WHERE deleted_at IS NULL GROUP BY status");
-        $rows = $statement->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
-
-        $totalDenominator = max(1, array_sum(array_map(intval(...), $rows)));
-
         $result = [];
-        foreach ($statusLabels as $status => $label) {
-            $count = (int) ($rows[$status] ?? 0);
+        foreach ($categories as $key => $meta) {
+            $count = (int) ($row[$key] ?? 0);
             $percentage = round(($count / $totalDenominator) * 100, 1);
-            $route = $status === 'published' ? route('admin-repository') : route('projects') . '&status=' . $status;
-
             $result[] = [
-                'status' => $status,
-                'label' => $label,
-                'count' => $count,
+                'status'     => $key,
+                'label'      => $meta['label'],
+                'count'      => $count,
                 'percentage' => $percentage,
-                'route' => $route,
+                'route'      => $meta['route'],
             ];
         }
 

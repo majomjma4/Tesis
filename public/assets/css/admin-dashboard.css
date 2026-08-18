@@ -462,11 +462,27 @@ a.attention-v4-row:hover .v4-row-cta i {
     transform: translateX(2px);
 }
 
-/* D. Panorama Académico (Grid 3 x 2 Compacto) */
+/* D. Panorama Académico (Layout 3 + 2 simétrico al resumen operativo) */
 .status-v4-compact-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 12px;
+}
+
+.status-row {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+}
+
+.status-row.row-top {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.status-row.row-bottom {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 66.66%;
+    margin: 0 auto;
 }
 
 .status-v4-node {
@@ -630,8 +646,10 @@ a.timeline-v4-item:hover .v4-act-title {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         max-width: 100%;
     }
-    .status-v4-compact-grid {
+    .status-row.row-top,
+    .status-row.row-bottom {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-width: 100%;
     }
 }
 
@@ -659,8 +677,10 @@ a.timeline-v4-item:hover .v4-act-title {
         min-width: auto;
     }
 
-    .status-v4-compact-grid {
+    .status-row.row-top,
+    .status-row.row-bottom {
         grid-template-columns: 1fr;
+        max-width: 100%;
     }
 
     .attention-v4-row {

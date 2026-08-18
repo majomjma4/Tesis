@@ -321,24 +321,55 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
             <a href="<?= e(route('projects')) ?>" class="v4-header-link">Ver expedientes completos</a>
         </div>
 
+        <?php
+        // Total vigente: denominador dinámico para el texto "X de N · Y% del total"
+        $panoramaTotal = (int) ($totalProjects['count'] ?? 0);
+        // Dividir las 5 categorías en fila superior (3) e inferior (2)
+        $panoramaTop    = array_slice($statusDistribution, 0, 3);
+        $panoramaBottom = array_slice($statusDistribution, 3);
+        ?>
         <div class="status-v4-compact-grid">
-            <?php foreach ($statusDistribution as $statusItem):
-                $itemRoute = !empty($statusItem['route']) ? (string) $statusItem['route'] : null;
-                $percentage = (float) ($statusItem['percentage'] ?? 0.0);
-                $count = (int) ($statusItem['count'] ?? 0);
-                $tagElement = $itemRoute !== null ? 'a' : 'div';
-            ?>
-                <<?= $tagElement ?> class="status-v4-node" <?= $itemRoute !== null ? 'href="' . e($itemRoute) . '"' : '' ?>>
-                    <div class="node-head">
-                        <span class="node-label"><?= e((string) ($statusItem['label'] ?? '')) ?></span>
-                        <strong class="node-count"><?= $count ?></strong>
-                    </div>
-                    <div class="node-track">
-                        <div class="node-fill" style="width: <?= min(100, max(0, $percentage)) ?>%;"></div>
-                    </div>
-                    <span class="node-pct"><?= $percentage ?>%</span>
-                </<?= $tagElement ?>>
-            <?php endforeach; ?>
+            <div class="status-row row-top">
+                <?php foreach ($panoramaTop as $statusItem):
+                    $itemRoute  = !empty($statusItem['route']) ? (string) $statusItem['route'] : null;
+                    $percentage = (float) ($statusItem['percentage'] ?? 0.0);
+                    $count      = (int) ($statusItem['count'] ?? 0);
+                    $tagElement = $itemRoute !== null ? 'a' : 'div';
+                ?>
+                    <<?= $tagElement ?> class="status-v4-node" <?= $itemRoute !== null ? 'href="' . e($itemRoute) . '"' : '' ?>>
+                        <div class="node-head">
+                            <span class="node-label"><?= e((string) ($statusItem['label'] ?? '')) ?></span>
+                            <strong class="node-count"><?= $count ?></strong>
+                        </div>
+                        <div class="node-track">
+                            <div class="node-fill" style="width: <?= min(100, max(0, $percentage)) ?>%;"></div>
+                        </div>
+                        <span class="node-pct"><?= $count ?> de <?= $panoramaTotal ?> proyectos &middot; <?= $percentage ?>%</span>
+                    </<?= $tagElement ?>>
+                <?php endforeach; ?>
+            </div>
+
+            <?php if ($panoramaBottom !== []): ?>
+            <div class="status-row row-bottom">
+                <?php foreach ($panoramaBottom as $statusItem):
+                    $itemRoute  = !empty($statusItem['route']) ? (string) $statusItem['route'] : null;
+                    $percentage = (float) ($statusItem['percentage'] ?? 0.0);
+                    $count      = (int) ($statusItem['count'] ?? 0);
+                    $tagElement = $itemRoute !== null ? 'a' : 'div';
+                ?>
+                    <<?= $tagElement ?> class="status-v4-node" <?= $itemRoute !== null ? 'href="' . e($itemRoute) . '"' : '' ?>>
+                        <div class="node-head">
+                            <span class="node-label"><?= e((string) ($statusItem['label'] ?? '')) ?></span>
+                            <strong class="node-count"><?= $count ?></strong>
+                        </div>
+                        <div class="node-track">
+                            <div class="node-fill" style="width: <?= min(100, max(0, $percentage)) ?>%;"></div>
+                        </div>
+                        <span class="node-pct"><?= $count ?> de <?= $panoramaTotal ?> proyectos &middot; <?= $percentage ?>%</span>
+                    </<?= $tagElement ?>>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
         </div>
     </section>
 
