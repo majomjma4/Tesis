@@ -99,7 +99,10 @@ final class RepositoryController
         if ($project !== null && !empty($projectCapabilities['view_adjustment_requests'])) {
             try {
                 $adjustmentData = (new ProjectAdjustmentRequestService())->listForProject(
-                    Database::connection(), $project, (int) ($session->userId() ?? 0), 'repository'
+                    (int) $project['id'],
+                    (string) $project['status'],
+                    (int) ($session->userId() ?? 0),
+                    'repository'
                 );
             } catch (Throwable $e) {
                 error_log('Repository detail adjustment list: ' . $e->getMessage());
