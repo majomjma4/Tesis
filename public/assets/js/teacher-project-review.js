@@ -1142,16 +1142,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const createExistingSection = (file) => {
         const items = observationsForFile(file.file_id);
-        const section = document.createElement('section');
-        section.className = 'sw-review-observation-group is-existing';
 
         if (!items.length) {
+            if (!reviewIsAvailable) return null;
+            const section = document.createElement('section');
+            section.className = 'sw-review-observation-group is-existing';
             const empty = document.createElement('p');
             empty.className = 'sw-review-empty-inline';
             empty.textContent = 'Este documento no tiene observaciones registradas.';
             section.append(empty);
             return section;
         }
+
+        const section = document.createElement('section');
+        section.className = 'sw-review-observation-group is-existing';
 
         const generalItems = [];
         const contextualItems = [];
@@ -1658,6 +1662,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const createProjectGeneralSection = () => {
+        if (!reviewIsAvailable && !generalObservations.length) {
+            return null;
+        }
         const section = document.createElement('section');
         section.className = 'sw-review-observation-group is-general-project';
         const heading = document.createElement('div');
@@ -2344,7 +2351,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const file = filesById.get(activeFileId);
             if (!file) {
-                scrollBody.append(createProjectGeneralSection());
+                const genSec = createProjectGeneralSection();
+                if (genSec) scrollBody.append(genSec);
                 return;
             }
             if (activeInternalZipEntry) {
@@ -2360,11 +2368,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 scrollBody.append(banner);
             }
             const fileStatus = file.status || file.document_status;
+            const existingSection = createExistingSection(file);
             if (fileStatus === 'approved') {
                 const approved = document.createElement('div');
                 approved.className = 'sw-review-persisted-approved';
                 approved.innerHTML = '<i class="fa-solid fa-circle-check" aria-hidden="true"></i><div><strong style="display:block;margin-bottom:4px;color:#15803d;font-size:0.9rem;">Documento aprobado</strong><span style="display:block;color:#166534;">Este documento fue aprobado en la revisión enviada.</span></div>';
-                scrollBody.append(approved, createExistingSection(file));
+                scrollBody.append(approved);
+                if (existingSection) scrollBody.append(existingSection);
             } else if (fileStatus === 'corrections_requested') {
                 const corrections = document.createElement('div');
                 corrections.className = 'sw-review-persisted-approved';
@@ -2373,16 +2383,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 corrections.style.borderRadius = '8px';
                 corrections.style.border = '1px solid #fde68a';
                 corrections.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#d97706;font-size:1.5rem;" aria-hidden="true"></i><div><strong style="display:block;margin-bottom:6px;color:#92400e;font-size:0.92rem;font-weight:700;">Requiere correcciones</strong><span style="display:block;color:#b45309;font-size:0.78rem;line-height:1.4;">Este documento fue devuelto con observaciones para ajuste del estudiante.</span></div>';
-                scrollBody.append(corrections, createExistingSection(file));
+                scrollBody.append(corrections);
+                if (existingSection) scrollBody.append(existingSection);
             } else {
-                scrollBody.append(createExistingSection(file));
+                if (existingSection) scrollBody.append(existingSection);
             }
             return;
         }
 
         const file = filesById.get(activeFileId);
         if (!file) {
-            scrollBody.append(createProjectGeneralSection());
+            const genSec = createProjectGeneralSection();
+            if (genSec) scrollBody.append(genSec);
             if (editorState?.fileId === 0) scrollBody.append(createEditor());
             return;
         }
@@ -2404,7 +2416,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const approved = document.createElement('div');
             approved.className = 'sw-review-persisted-approved';
             approved.innerHTML = '<i class="fa-solid fa-circle-check" aria-hidden="true"></i><div><strong>Documento aprobado</strong><span>Este checksum ya fue aprobado y no requiere una nueva decision.</span></div>';
-            scrollBody.append(approved, createExistingSection(file));
+            const existingSection = createExistingSection(file);
+            scrollBody.append(approved);
+            if (existingSection) scrollBody.append(existingSection);
             return;
         }
 

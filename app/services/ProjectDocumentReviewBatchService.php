@@ -44,12 +44,7 @@ final class ProjectDocumentReviewBatchService
         }
 
         $normalized = $this->normalizeDecisions($decisions);
-        $filesQuery = $db->prepare(
-            'SELECT id,project_id,original_name,checksum_sha256,created_at,deleted_at,purged_at
-             FROM project_files WHERE project_id=:project AND deleted_at IS NULL AND purged_at IS NULL ORDER BY id FOR UPDATE'
-        );
-        $filesQuery->execute(['project'=>$projectId]);
-        $files = $filesQuery->fetchAll();
+        $files = (new ProjectDocumentReviewService($db))->loadFilesInReviewScope($db, $projectId, true);
         if ($files === []) throw new ProjectStatusTransitionException('El proyecto no puede revisarse porque no contiene documentos activos.');
         $byId = [];
         foreach ($files as $file) $byId[(int)$file['id']] = $file;
@@ -63,7 +58,7 @@ final class ProjectDocumentReviewBatchService
         }
 
         $reviewService = new ProjectDocumentReviewService($db);
-        $before = $reviewService->describeCurrentFiles($projectId, $files);
+        $before = $reviewService->describeCurrentFiles($projectId, $files, true);
         $previousById = [];
         foreach ($before['files'] as $file) $previousById[(int)$file['id']] = (string)$file['document_status'];
         foreach ($files as $file) {
@@ -102,7 +97,7 @@ final class ProjectDocumentReviewBatchService
             ];
         }
 
-        $after = $reviewService->describeCurrentFiles($projectId, $files);
+        $after = $reviewService->describeCurrentFiles($projectId, $files, true);
         $summary = $after['summary'];
         $finalProjectStatus = $summary['corrections_requested'] > 0
             ? 'development'

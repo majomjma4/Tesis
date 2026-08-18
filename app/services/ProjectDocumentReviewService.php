@@ -16,11 +16,12 @@ final class ProjectDocumentReviewService
     public function __construct(private readonly ?PDO $db = null) {}
 
     /** @return array{files:array<int,array<string,mixed>>,summary:array<string,mixed>} */
-    public function describeCurrentFiles(int $projectId, array $files): array
+    public function describeCurrentFiles(int $projectId, array $files, bool $reviewScope = false): array
     {
         $active = array_values(array_filter($files, static fn(array $file): bool =>
             (int)($file['project_id'] ?? 0) === $projectId && empty($file['deleted_at']) && empty($file['purged_at'])
         ));
+        $active = $this->filesInReviewScope($projectId, $active, $reviewScope);
         if ($active === []) return ['files'=>[], 'summary'=>$this->summary([])];
 
         $ids = array_map(static fn(array $file): int => (int)$file['id'], $active);
@@ -77,11 +78,42 @@ final class ProjectDocumentReviewService
     {
         $db = $this->db ?? Database::connection();
         $query = $db->prepare(
-            'SELECT id,project_id,original_name,checksum_sha256,created_at,deleted_at,purged_at
+            'SELECT id,project_id,original_name,checksum_sha256,created_at,deleted_at,purged_at,delivery_id
              FROM project_files WHERE project_id=:project AND deleted_at IS NULL AND purged_at IS NULL ORDER BY id'
         );
         $query->execute(['project'=>$projectId]);
-        return $this->describeCurrentFiles($projectId, $query->fetchAll())['summary'];
+        return $this->describeCurrentFiles($projectId, $query->fetchAll(), true)['summary'];
+    }
+
+    /**
+     * Returns the active files that belong to the academic review scope.
+     * Modern projects exclude workspace files until they are assigned to a delivery;
+     * legacy projects without deliveries retain the historical behavior.
+     */
+    public function filesInReviewScope(int $projectId, array $files, bool $reviewScope = true): array
+    {
+        if (!$reviewScope || !$this->usesModernDeliveries($projectId)) return $files;
+        return array_values(array_filter($files, static fn(array $file): bool => !empty($file['delivery_id'])));
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function loadFilesInReviewScope(PDO $db, int $projectId, bool $forUpdate = false): array
+    {
+        $query = $db->prepare(
+            'SELECT id,project_id,original_name,checksum_sha256,created_at,deleted_at,purged_at,delivery_id
+             FROM project_files WHERE project_id=:project AND deleted_at IS NULL AND purged_at IS NULL ORDER BY id'
+            . ($forUpdate ? ' FOR UPDATE' : '')
+        );
+        $query->execute(['project'=>$projectId]);
+        return $this->filesInReviewScope($projectId, $query->fetchAll(), true);
+    }
+
+    private function usesModernDeliveries(int $projectId): bool
+    {
+        $db = $this->db ?? Database::connection();
+        $query = $db->prepare('SELECT 1 FROM project_deliveries WHERE project_id=:project LIMIT 1');
+        $query->execute(['project'=>$projectId]);
+        return (bool)$query->fetchColumn();
     }
 
     public function label(string $status): string

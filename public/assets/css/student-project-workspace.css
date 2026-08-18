@@ -3707,12 +3707,45 @@ body.sw-modal-open {
     }
 }
 
-.student-workspace .sw-observations-panel.is-collapsed > *:not(.sw-panel-reopen-btn),
-.student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel.is-collapsed > *:not(.sw-panel-reopen-btn),
-.student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel.is-collapsed [data-sw-file-observations],
+/* Reglas estrictas de ocultamiento para panel de observaciones colapsado (Rol Estudiante y Docente) */
+.sw-observations-panel.is-collapsed > *:not(.sw-panel-reopen-btn),
+.sw-observations-panel.is-collapsed [data-sw-file-observations],
+.sw-observations-panel.is-collapsed .sw-obs-header,
+.sw-observations-panel.is-collapsed .sw-obs-footer,
 .student-workspace.sw-observations-collapsed .sw-observations-panel > *:not(.sw-panel-reopen-btn),
-.student-workspace.sw-observations-collapsed .sw-observations-panel [data-sw-file-observations] {
+.student-workspace.sw-observations-collapsed .sw-observations-panel [data-sw-file-observations],
+.student-workspace.sw-observations-collapsed .sw-observations-panel .sw-obs-header,
+.student-workspace.sw-observations-collapsed .sw-observations-panel .sw-obs-footer,
+.student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed > *:not(.sw-panel-reopen-btn),
+.student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed [data-sw-file-observations],
+.student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed .sw-obs-header,
+.student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed .sw-obs-footer,
+.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel > *:not(.sw-panel-reopen-btn),
+.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel [data-sw-file-observations],
+.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel .sw-obs-header,
+.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel .sw-obs-footer {
     display: none !important;
+}
+
+.sw-observations-panel.is-collapsed .sw-panel-reopen-btn,
+.student-workspace.sw-observations-collapsed .sw-observations-panel .sw-panel-reopen-btn,
+.student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed .sw-panel-reopen-btn,
+.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel .sw-panel-reopen-btn {
+    display: flex !important;
+    margin: 0 auto !important;
+}
+
+.sw-observations-panel.is-collapsed,
+.student-workspace .sw-observations-panel.is-collapsed,
+.student-workspace.sw-observations-collapsed .sw-observations-panel,
+.student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed,
+.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    padding: 0.5rem 0.2rem !important;
+    overflow: hidden !important;
 }
 
 .student-workspace .sw-review-progress,

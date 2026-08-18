@@ -300,7 +300,7 @@ final class ProjectsController
         ]);
         $documentReview = null;
         if ($projectContext === 'academic_management' && (string)$project['status'] === 'development') {
-            $documentReview = (new ProjectDocumentReviewService())->describeCurrentFiles((int)$project['id'], (array)$project['files']);
+            $documentReview = (new ProjectDocumentReviewService())->describeCurrentFiles((int)$project['id'], (array)$project['files'], true);
             $project['files'] = $documentReview['files'];
         }
         $studentDocumentReview = null;
@@ -308,7 +308,9 @@ final class ProjectsController
         $historicalVersion = null;
         $studentDefense = null;
         if (!$isAdministrator) {
-            $studentDocumentReview = (new ProjectDocumentReviewService())->describeCurrentFiles((int) $project['id'], (array) $project['files']);
+            $studentDocumentReview = (new ProjectDocumentReviewService())->describeCurrentFiles(
+                (int) $project['id'], (array) $project['files'], $isTeacher
+            );
             $project['files'] = $studentDocumentReview['files'];
             $studentVersions = (new ProjectDocumentModel())->versions((int) $project['id']);
             $historicalId = (int)($_GET['version_id'] ?? 0);
