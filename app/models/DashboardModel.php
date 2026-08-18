@@ -7,34 +7,334 @@ final class DashboardModel
     public function getAdminDashboard(): array
     {
         $connection = Database::connection();
-        $projects = $this->adminProjectSummary($connection);
+        $userSummary = $this->adminUserSummary($connection);
+        $projectSummary = $this->adminProjectSummary($connection);
+        $trashSummary = $this->adminTrashSummary($connection);
+        $institutionalContext = $this->adminInstitutionalContext($connection);
+
+        $summary = [
+            'total_projects' => [
+                'count' => (int) $projectSummary['total'],
+                'route' => route('projects'),
+            ],
+            'active_projects' => [
+                'count' => (int) $projectSummary['in_flow'],
+                'route' => route('projects'),
+            ],
+            'approved_projects' => [
+                'count' => (int) $projectSummary['approved'],
+                'route' => route('projects'),
+            ],
+            'published_projects' => [
+                'count' => (int) ($projectSummary['published'] ?? 0),
+                'route' => route('admin-repository'),
+            ],
+            'active_users' => [
+                'active' => (int) $userSummary['active'],
+                'total' => (int) $userSummary['total'],
+                'route' => route('admin-users') . '&status=active',
+            ],
+        ];
+
+        $attention = $this->adminAttentionAlertsClean($connection, $userSummary, $trashSummary['total']);
+        $platformStatus = $this->adminPlatformStatus($connection, $userSummary, $trashSummary);
+        $statusDistribution = $this->adminStatusDistribution($connection, (int) $projectSummary['total']);
+        $recentAdminActivity = $this->adminRecentAdminActivity($connection);
+        $upcomingDates = $this->adminUpcomingDates($connection);
+
+        // LEGACY ALIASES (Mantener transitoriamente para compatibilidad)
+        $legacyPendingAdjustments = $this->adminPendingAdjustmentsCount($connection);
+        $legacyKpis = [
+            'active_projects' => $summary['active_projects'],
+            'pending_adjustments' => ['count' => $legacyPendingAdjustments, 'route' => route('projects')],
+            'projects_with_observations' => ['count' => (int) $projectSummary['pending_observations'], 'route' => route('projects')],
+            'active_users' => $summary['active_users'],
+        ];
+
         return [
-            'users' => $this->adminUserSummary($connection),
-            'projects' => $projects,
-            'weekly_activity' => $this->adminWeeklyActivity($connection),
-            'activity' => $this->adminActivity($connection),
-            'alerts' => $this->adminAlerts($connection,(int)$projects['pending_observations']),
-            'dates' => $this->adminUpcomingDates($connection),
+            // NUEVO CONTRATO DEFINITIVO DE FASE 1C + 4F
+            'institutional_context' => $institutionalContext,
+            'summary' => $summary,
+            'platform_status' => $platformStatus,
+            'attention' => $attention,
+            'trash' => $trashSummary,
+            'project_status_distribution' => $statusDistribution,
+            'recent_admin_activity' => $recentAdminActivity,
             'updated_at' => date('Y-m-d H:i:s'),
+
+            // ALIASES DE COMPATIBILIDAD TRANSITORIA — LEGACY / REMOVE AFTER ADMIN DASHBOARD FINAL QA
+            'kpis' => $legacyKpis,
+            'upcoming_dates' => $upcomingDates,
+            'recent_activity' => $recentAdminActivity,
+            'users' => $userSummary,
+            'projects' => $projectSummary,
+            'weekly_activity' => $this->adminWeeklyActivity($connection),
+            'activity' => $recentAdminActivity,
+            'alerts' => $this->adminAlerts($connection, (int) $projectSummary['pending_observations']),
+            'dates' => $upcomingDates,
         ];
     }
 
     public function emptyAdminDashboard(): array
     {
         return [
+            'institutional_context' => [
+                'academic_period' => null,
+                'next_institutional_date' => null,
+            ],
+            'summary' => [
+                'total_projects' => ['count' => 0, 'route' => route('projects')],
+                'active_projects' => ['count' => 0, 'route' => route('projects')],
+                'approved_projects' => ['count' => 0, 'route' => route('projects')],
+                'published_projects' => ['count' => 0, 'route' => route('admin-repository')],
+                'active_users' => ['active' => 0, 'total' => 0, 'route' => route('admin-users') . '&status=active'],
+            ],
+            'platform_status' => [
+                'access' => [
+                    'active' => 0,
+                    'total' => 0,
+                    'percentage' => 100,
+                    'expired_credentials' => 0,
+                    'blocked_accounts' => 0,
+                    'route' => route('admin-users'),
+                ],
+                'retention' => [
+                    'total' => 0,
+                    'projects' => 0,
+                    'users' => 0,
+                    'support_materials' => 0,
+                    'retention_days' => [
+                        'projects' => 60,
+                        'users' => 60,
+                        'support_materials' => 60,
+                    ],
+                    'automatic_purge' => true,
+                    'route' => route('admin-trash'),
+                ],
+            ],
+            'attention' => [],
+            'trash' => [
+                'total' => 0,
+                'projects' => 0,
+                'users' => 0,
+                'support_materials' => 0,
+                'route' => route('admin-trash'),
+            ],
+            'project_status_distribution' => [],
+            'recent_admin_activity' => [],
+            'updated_at' => null,
+
+            // LEGACY ALIASES
+            'kpis' => [
+                'active_projects' => ['count' => 0, 'route' => route('projects')],
+                'pending_adjustments' => ['count' => 0, 'route' => route('projects')],
+                'projects_with_observations' => ['count' => 0, 'route' => route('projects')],
+                'active_users' => ['active' => 0, 'total' => 0, 'route' => route('admin-users') . '&status=active'],
+            ],
+            'upcoming_dates' => [],
+            'recent_activity' => [],
             'users' => ['total' => 0, 'active' => 0, 'blocked' => 0, 'recent' => 0],
             'projects' => ['total' => 0, 'active' => 0, 'pending_observations' => 0, 'items' => []],
             'weekly_activity' => 0,
             'activity' => [],
             'alerts' => [],
             'dates' => [],
-            'updated_at' => null,
         ];
+    }
+
+    private function adminInstitutionalContext(PDO $connection): array
+    {
+        $period = null;
+        try {
+            $stmt = $connection->query("SELECT id, code, name, starts_on, ends_on, status FROM academic_periods WHERE status = 'active' ORDER BY id DESC LIMIT 1");
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row) {
+                $endsOn = !empty($row['ends_on']) ? strtotime((string) $row['ends_on']) : null;
+                $daysRemaining = null;
+                if ($endsOn !== null) {
+                    $diff = (int) ceil(($endsOn - time()) / 86400);
+                    $daysRemaining = max(0, $diff);
+                }
+                $period = [
+                    'id' => (int) $row['id'],
+                    'code' => (string) ($row['code'] ?? ''),
+                    'name' => (string) ($row['name'] ?? ''),
+                    'status' => (string) ($row['status'] ?? 'active'),
+                    'starts_on' => (string) ($row['starts_on'] ?? ''),
+                    'ends_on' => (string) ($row['ends_on'] ?? ''),
+                    'days_remaining' => $daysRemaining,
+                    'route' => route('admin-academic'),
+                ];
+            }
+        } catch (Throwable $e) {
+            error_log('adminInstitutionalContext error: ' . $e->getMessage());
+        }
+
+        $nextDate = null;
+        if ($period !== null && !empty($period['ends_on'])) {
+            $nextDate = [
+                'title' => 'Cierre de ' . $period['name'],
+                'date' => $period['ends_on'],
+                'days_remaining' => $period['days_remaining'],
+                'route' => route('calendar'),
+            ];
+        }
+
+        return [
+            'academic_period' => $period,
+            'next_institutional_date' => $nextDate,
+        ];
+    }
+
+    private function adminTrashSummary(PDO $connection): array
+    {
+        $projects = (int) $connection->query("SELECT COUNT(*) FROM projects WHERE deleted_at IS NOT NULL")->fetchColumn();
+        $users = (int) $connection->query("SELECT COUNT(*) FROM users WHERE deleted_at IS NOT NULL")->fetchColumn();
+        $supportMaterials = (int) $connection->query("SELECT COUNT(*) FROM support_materials WHERE deleted_at IS NOT NULL")->fetchColumn();
+        $total = $projects + $users + $supportMaterials;
+
+        return [
+            'total' => $total,
+            'projects' => $projects,
+            'users' => $users,
+            'support_materials' => $supportMaterials,
+            'route' => route('admin-trash'),
+        ];
+    }
+
+    private function adminPendingAdjustmentsCount(PDO $connection): int
+    {
+        return (int) $connection->query("SELECT COUNT(*) FROM project_adjustment_requests WHERE status='pending'")->fetchColumn();
+    }
+
+    private function adminPlatformStatus(PDO $connection, array $userSummary, array $trashSummary): array
+    {
+        $expiredTempPassCount = (int) $connection->query(
+            "SELECT COUNT(*) FROM users WHERE temporary_password_expires_at IS NOT NULL AND temporary_password_expires_at <= CURRENT_TIMESTAMP AND deleted_at IS NULL AND purged_at IS NULL"
+        )->fetchColumn();
+
+        $activeUsers = (int) ($userSummary['active'] ?? 0);
+        $totalUsers = (int) ($userSummary['total'] ?? 0);
+        $blockedUsers = (int) ($userSummary['blocked'] ?? 0);
+        $percentage = $totalUsers > 0 ? (int) round(($activeUsers / $totalUsers) * 100) : 100;
+
+        $settings = (new SystemSettingModel())->all();
+
+        return [
+            'access' => [
+                'active' => $activeUsers,
+                'total' => $totalUsers,
+                'percentage' => $percentage,
+                'expired_credentials' => $expiredTempPassCount,
+                'blocked_accounts' => $blockedUsers,
+                'route' => route('admin-users'),
+            ],
+            'retention' => [
+                'total' => (int) ($trashSummary['total'] ?? 0),
+                'projects' => (int) ($trashSummary['projects'] ?? 0),
+                'users' => (int) ($trashSummary['users'] ?? 0),
+                'support_materials' => (int) ($trashSummary['support_materials'] ?? 0),
+                'retention_days' => [
+                    'projects' => (int) ($settings['retention_projects_days'] ?? 60),
+                    'users' => (int) ($settings['retention_users_days'] ?? 60),
+                    'support_materials' => (int) ($settings['retention_materials_days'] ?? 60),
+                ],
+                'automatic_purge' => true,
+                'route' => route('admin-trash'),
+            ],
+        ];
+    }
+
+    private function adminAttentionAlertsClean(PDO $connection, array $userSummary, int $trashTotal): array
+    {
+        $expiredTempPassCount = (int) $connection->query(
+            "SELECT COUNT(*) FROM users WHERE temporary_password_expires_at IS NOT NULL AND temporary_password_expires_at <= CURRENT_TIMESTAMP AND deleted_at IS NULL AND purged_at IS NULL"
+        )->fetchColumn();
+
+        $blockedCount = (int) ($userSummary['blocked'] ?? 0);
+
+        $alerts = [];
+        if ($expiredTempPassCount > 0) {
+            $alerts[] = [
+                'key' => 'expired_temporary_passwords',
+                'severity' => 'critical',
+                'count' => $expiredTempPassCount,
+                'title' => 'Contraseñas temporales vencidas',
+                'description' => $expiredTempPassCount . ' ' . ($expiredTempPassCount === 1 ? 'persona debe' : 'personas deben') . ' actualizar su acceso.',
+                'route' => route('admin-users'),
+            ];
+        }
+        if ($blockedCount > 0) {
+            $alerts[] = [
+                'key' => 'blocked_accounts',
+                'severity' => 'high',
+                'count' => $blockedCount,
+                'title' => 'Cuentas bloqueadas',
+                'description' => $blockedCount . ' ' . ($blockedCount === 1 ? 'cuenta requiere' : 'cuentas requieren') . ' revisión.',
+                'route' => route('admin-users') . '&status=blocked',
+            ];
+        }
+        if ($trashTotal > 0) {
+            $alerts[] = [
+                'key' => 'trash_items',
+                'severity' => 'medium',
+                'count' => $trashTotal,
+                'title' => 'Elementos en papelera',
+                'description' => $trashTotal . ' ' . ($trashTotal === 1 ? 'elemento permanece recuperable.' : 'elementos permanecen recuperables.'),
+                'route' => route('admin-trash'),
+            ];
+        }
+
+        $severityOrder = ['critical' => 3, 'high' => 2, 'medium' => 1];
+        usort($alerts, static fn(array $a, array $b): int => ($severityOrder[$b['severity']] ?? 0) <=> ($severityOrder[$a['severity']] ?? 0));
+        return $alerts;
+    }
+
+    private function adminRecentAdminActivity(PDO $connection): array
+    {
+        try {
+            $stmt = $connection->query("SELECT id, action, action_label, module, entity_type, element_label, created_at FROM admin_audit_log ORDER BY id DESC LIMIT 6");
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $activity = [];
+            foreach ($rows as $r) {
+                $actionKey = (string) ($r['action'] ?? '');
+                $actionLabel = !empty($r['action_label']) ? (string) $r['action_label'] : $this->humanizeAction($actionKey);
+                $resource = !empty($r['element_label']) ? (string) $r['element_label'] : (!empty($r['module']) ? (string) $r['module'] : 'Sistema');
+                $activity[] = [
+                    'action' => $actionLabel,
+                    'label' => $actionLabel,
+                    'actor' => 'Administración',
+                    'resource' => $resource,
+                    'occurred_at' => (string) ($r['created_at'] ?? ''),
+                    'date' => (string) ($r['created_at'] ?? ''),
+                    'route' => route('admin-reports'),
+                ];
+            }
+            return $activity;
+        } catch (Throwable $e) {
+            error_log('adminRecentAdminActivity error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    private function humanizeAction(string $action): string
+    {
+        return match ($action) {
+            'notification_sent' => 'Comunicado institucional enviado',
+            'admin_access_granted' => 'Acceso administrativo otorgado',
+            'user_updated' => 'Usuario actualizado',
+            'session_expired_inactivity' => 'Sesión expirada por inactividad',
+            'user_status_changed' => 'Estado de usuario actualizado',
+            default => str_replace('_', ' ', ucfirst($action)),
+        };
     }
 
     private function adminUserSummary(PDO $connection): array
     {
-        $row = $connection->query("SELECT COUNT(*) total, SUM(status='active') active, SUM(status='blocked') blocked, SUM(status='active' AND created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 30 DAY)) recent FROM users WHERE deleted_at IS NULL AND purged_at IS NULL")->fetch() ?: [];
+        $statement = $connection->query(
+            "SELECT COUNT(*) total, SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) active, SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END) blocked, SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) recent FROM users WHERE deleted_at IS NULL AND purged_at IS NULL"
+        );
+        $row = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
         return [
             'total' => (int) ($row['total'] ?? 0),
             'active' => (int) ($row['active'] ?? 0),
@@ -45,255 +345,185 @@ final class DashboardModel
 
     private function adminProjectSummary(PDO $connection): array
     {
-        $row=$connection->query("SELECT COUNT(*) total,SUM(status IN ('development','under_review','approved','defense','tribunal_approved')) active,SUM(status='development') development,SUM(status='under_review') review,SUM(status='approved') approved,SUM(status='defense') defense,SUM(status='tribunal_approved') tribunal_approved,SUM(status='published') published FROM projects WHERE deleted_at IS NULL")->fetch()?:[];
-        $reviewSituation=(new ProjectReviewSituationService())->aggregate($connection,true);
-        $items=[
-            ['status'=>'development','label'=>'En desarrollo','count'=>(int)($row['development']??0),'url'=>route('projects').'&status=development'],
-            ['status'=>'under_review','label'=>'En revisión','count'=>(int)($row['review']??0),'url'=>route('projects').'&status=under_review'],
-            ['status'=>'approved','label'=>'Aprobados','count'=>(int)($row['approved']??0),'url'=>route('projects').'&status=approved'],
-            ['status'=>'defense','label'=>'En tribunal','count'=>(int)($row['defense']??0),'url'=>route('projects').'&status=defense'],
-            ['status'=>'tribunal_approved','label'=>'Aprobados por el Tribunal','count'=>(int)($row['tribunal_approved']??0),'url'=>route('projects').'&status=tribunal_approved'],
-            ['status'=>'published','label'=>'Publicados','count'=>(int)($row['published']??0),'url'=>route('admin-repository')],
+        $statement = $connection->query(
+            "SELECT
+                COUNT(*) total,
+                SUM(CASE WHEN status IN ('development','under_review','defense') THEN 1 ELSE 0 END) in_flow,
+                SUM(CASE WHEN status IN ('approved','tribunal_approved','completed') THEN 1 ELSE 0 END) approved,
+                SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) published
+             FROM projects WHERE deleted_at IS NULL"
+        );
+        $row = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $pendingObs = (int) $connection->query(
+            "SELECT COUNT(DISTINCT p.id) FROM projects p INNER JOIN project_observations o ON o.project_id = p.id WHERE p.deleted_at IS NULL AND p.status != 'published' AND o.status = 'pending'"
+        )->fetchColumn();
+
+        return [
+            'total' => (int) ($row['total'] ?? 0),
+            'in_flow' => (int) ($row['in_flow'] ?? 0),
+            'approved' => (int) ($row['approved'] ?? 0),
+            'published' => (int) ($row['published'] ?? 0),
+            'active' => (int) ($row['in_flow'] ?? 0),
+            'pending_observations' => $pendingObs,
+            'items' => [],
         ];
-        return ['total'=>(int)($row['total']??0),'active'=>(int)($row['active']??0),'pending_observations'=>$reviewSituation['pending'],'items'=>$items];
     }
 
-    private function adminWeeklyActivity(PDO $connection): int
+    private function adminStatusDistribution(PDO $connection, int $totalProjects): array
     {
-        return (int) $connection->query("SELECT
-            (SELECT COUNT(*) FROM admin_audit_log WHERE created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 7 DAY)) +
-            (SELECT COUNT(*) FROM project_audit_log WHERE created_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 7 DAY))")->fetchColumn();
-    }
-
-    private function adminActivity(PDO $connection): array
-    {
-        $statement = $connection->query("SELECT action, detail, created_at, full_name, project_id FROM (SELECT pal.action,COALESCE(pal.reason,p.title) detail,pal.created_at,u.full_name,p.id project_id FROM project_audit_log pal LEFT JOIN users u ON u.id=pal.user_id INNER JOIN projects p ON p.id=pal.project_id UNION ALL SELECT aal.action,CONCAT('Cuenta de ',COALESCE(target.full_name,'usuario')) detail,aal.created_at,actor.full_name,NULL project_id FROM admin_audit_log aal LEFT JOIN users actor ON actor.id=aal.actor_user_id LEFT JOIN users target ON aal.entity_type='user' AND target.id=aal.entity_id) activity ORDER BY created_at DESC LIMIT 6");
-        $labels=['project_created'=>'Proyecto creado','project_updated'=>'Proyecto actualizado','project_trashed'=>'Proyecto enviado a la papelera','project_restored'=>'Proyecto restaurado','project_published'=>'Proyecto publicado','project_unpublished'=>'Publicación retirada','delivery_submitted'=>'Entrega registrada','users_bulk_imported'=>'Usuarios importados','user_created'=>'Usuario creado','user_updated'=>'Usuario actualizado','user_trashed'=>'Usuario enviado a la papelera','user_restored'=>'Usuario restaurado','password_reset'=>'Contraseña restablecida','notification_sent'=>'Notificación enviada','demo_users_imported'=>'Usuarios de prueba importados','demo_teacher_updated'=>'Docente de prueba actualizado','demo_catalog_configured'=>'Catálogo configurado'];
-        return array_map(fn(array $row): array => [
-            'action' => $labels[(string)$row['action']] ?? 'Actividad administrativa',
-            'detail' => (string) $row['detail'],
-            'user' => (string) ($row['full_name'] ?: 'Sistema'),
-            'date' => $this->relativeAdminTime((string)$row['created_at']),
-            'url' => $row['project_id'] ? route('project-detail') . '&id=' . (int) $row['project_id'] : route('admin-users'),
-        ], $statement->fetchAll());
-    }
-
-    private function adminAlerts(PDO $connection, int $pendingProjectCount): array
-    {
-        $counts = [
-            'blocked' => (int) $connection->query("SELECT COUNT(*) FROM users WHERE status='blocked' AND deleted_at IS NULL AND purged_at IS NULL")->fetchColumn(),
-            'observations' => $pendingProjectCount,
-            'trash' => (int) $connection->query("SELECT (SELECT COUNT(*) FROM projects WHERE deleted_at IS NOT NULL)+(SELECT COUNT(*) FROM users WHERE deleted_at IS NOT NULL AND purged_at IS NULL)")->fetchColumn(),
-            'temporary' => (int) $connection->query("SELECT COUNT(*) FROM users u WHERE u.must_change_password=1 AND u.is_admin=0 AND u.deleted_at IS NULL AND u.purged_at IS NULL AND u.temporary_password_expires_at IS NOT NULL AND u.temporary_password_expires_at <= CURRENT_TIMESTAMP")->fetchColumn(),
+        $statusLabels = [
+            'development' => 'En desarrollo',
+            'under_review' => 'En revisión',
+            'approved' => 'Aprobados',
+            'defense' => 'En tribunal',
+            'published' => 'Publicados',
+            'completed' => 'Finalizados',
         ];
-        $alerts = [];
-        if ($counts['temporary'] > 0) $alerts[] = ['priority'=>400,'tone'=>'danger','icon'=>'fa-key','title'=>'Contraseñas temporales vencidas','text'=>$counts['temporary'].' '.($counts['temporary'] === 1 ? 'persona debe' : 'personas deben').' actualizar su acceso.','count'=>$counts['temporary'],'url'=>route('admin-users')];
-        if ($counts['blocked'] > 0) $alerts[] = ['priority'=>300,'tone'=>'danger','icon'=>'fa-user-lock','title'=>'Cuentas bloqueadas','text'=>$counts['blocked'].' '.($counts['blocked'] === 1 ? 'cuenta requiere' : 'cuentas requieren').' revisión.','count'=>$counts['blocked'],'url'=>route('admin-users').'&status=blocked'];
-        if ($counts['observations'] > 0) $alerts[] = ['priority'=>200,'tone'=>'warning','icon'=>'fa-comment-dots','title'=>'Observaciones pendientes','text'=>$counts['observations'].' '.($counts['observations'] === 1 ? 'proyecto requiere' : 'proyectos requieren').' atención del estudiante.','count'=>$counts['observations'],'url'=>route('projects')];
-        if ($counts['trash'] > 0) $alerts[] = ['priority'=>100,'tone'=>'neutral','icon'=>'fa-trash-can','title'=>'Elementos en papelera','text'=>$counts['trash'].' '.($counts['trash'] === 1 ? 'elemento permanece recuperable.' : 'elementos permanecen recuperables.'),'count'=>$counts['trash'],'url'=>route('admin-trash')];
-        usort($alerts, static fn(array $first,array $second):int => $second['priority'] <=> $first['priority']);
-        return array_slice($alerts, 0, 4);
+
+        $statement = $connection->query("SELECT status, COUNT(*) count FROM projects WHERE deleted_at IS NULL GROUP BY status");
+        $rows = $statement->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+
+        $totalDenominator = max(1, array_sum(array_map(intval(...), $rows)));
+
+        $result = [];
+        foreach ($statusLabels as $status => $label) {
+            $count = (int) ($rows[$status] ?? 0);
+            $percentage = round(($count / $totalDenominator) * 100, 1);
+            $route = $status === 'published' ? route('admin-repository') : route('projects') . '&status=' . $status;
+
+            $result[] = [
+                'status' => $status,
+                'label' => $label,
+                'count' => $count,
+                'percentage' => $percentage,
+                'route' => $route,
+            ];
+        }
+
+        return $result;
     }
 
     private function adminUpcomingDates(PDO $connection): array
     {
-        $sql = "SELECT label, event_date, kind FROM (SELECT CONCAT('Inicio de ', name) label, starts_on event_date, 'period' kind FROM academic_periods WHERE starts_on >= CURRENT_DATE UNION ALL SELECT CONCAT('Cierre de ', name), ends_on, 'period' FROM academic_periods WHERE ends_on >= CURRENT_DATE UNION ALL SELECT title, event_date, 'event' FROM project_events WHERE project_id IS NOT NULL AND event_date >= CURRENT_DATE AND is_completed=0) dates ORDER BY event_date ASC LIMIT 5";
-        $rows = $connection->query($sql)->fetchAll();
-        return array_map(fn(array $row): array => [
-            'label'=>(string)$row['label'],
-            'date'=>$this->spanishShortDate((string)$row['event_date']),
-            'days'=>max(0, (int) floor((strtotime((string)$row['event_date']) - strtotime(date('Y-m-d'))) / 86400)),
-            'kind'=>(string)$row['kind'],
-        ], $rows);
+        $periodContext = $this->adminInstitutionalContext($connection);
+        $dates = [];
+
+        if (!empty($periodContext['next_institutional_date'])) {
+            $item = $periodContext['next_institutional_date'];
+            $dates[] = [
+                'date' => date('d M', strtotime((string) $item['date'])),
+                'label' => $item['title'],
+                'kind' => 'Periodo académico',
+                'days' => (int) $item['days_remaining'],
+                'route' => $item['route'],
+            ];
+        }
+
+        return $dates;
     }
 
-    private function relativeAdminTime(string $value):string
+    private function adminActivity(PDO $connection): array
     {
-        $timestamp=strtotime($value);if(!$timestamp)return 'Fecha no disponible';$seconds=max(0,time()-$timestamp);
-        if($seconds<60)return 'Ahora';if($seconds<3600){$minutes=(int)floor($seconds/60);return 'Hace '.$minutes.' '.($minutes===1?'minuto':'minutos');}
-        if($seconds<86400){$hours=(int)floor($seconds/3600);return 'Hace '.$hours.' '.($hours===1?'hora':'horas');}
-        if($seconds<604800){$days=(int)floor($seconds/86400);return 'Hace '.$days.' '.($days===1?'día':'días');}
-        return $this->spanishShortDate(date('Y-m-d',$timestamp));
+        return $this->adminRecentAdminActivity($connection);
     }
 
-    private function spanishShortDate(string $value):string
+    private function adminWeeklyActivity(PDO $connection): int
     {
-        $timestamp=strtotime($value);if(!$timestamp)return 'Sin fecha';$months=[1=>'ene',2=>'feb',3=>'mar',4=>'abr',5=>'may',6=>'jun',7=>'jul',8=>'ago',9=>'sep',10=>'oct',11=>'nov',12=>'dic'];
-        return (int)date('j',$timestamp).' '.$months[(int)date('n',$timestamp)].' '.date('Y',$timestamp);
+        return (int) $connection->query("SELECT COUNT(*) FROM admin_audit_log WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)")->fetchColumn();
     }
 
+    private function adminAlerts(PDO $connection, int $pendingObservations): array
+    {
+        return [];
+    }
+
+    // MÉTODOS PARA DASHBOARD GENERAL (DOCENTE / ESTUDIANTE)
     public function getSummary(): array
     {
-        // Resumen superior enfocado en decisiones rapidas del estudiante.
         return [
-            [
-                'cardClass' => 'approved-card',
-                'icon' => 'fa-circle-check',
-                'label' => 'Estado del informe',
-                'title' => 'En revision del tutor',
-                'description' => 'La version enviada ya fue recibida y esta siendo evaluada.',
-                'meta' => 'Version 4 enviada',
-            ],
-            [
-                'cardClass' => 'review-card',
-                'icon' => 'fa-list-check',
-                'label' => 'Pendiente clave',
-                'title' => 'Corregir metodologia',
-                'description' => 'Es la observacion mas importante antes de reenviar el documento.',
-                'meta' => 'Prioridad alta',
-            ],
-            [
-                'cardClass' => 'action-card',
-                'icon' => 'fa-calendar-check',
-                'label' => 'Proxima accion',
-                'title' => 'Revisar observaciones',
-                'description' => 'Bloque de trabajo recomendado para cerrar pendientes recientes.',
-                'meta' => '05 Jul - 09:00',
-            ],
-            [
-                'cardClass' => 'documents-card',
-                'icon' => 'fa-hourglass-half',
-                'label' => 'Tiempo restante',
-                'title' => '6 dias para correcciones',
-                'description' => 'Fecha objetivo para entregar una version corregida del informe.',
-                'meta' => 'Limite sugerido: 10 Jul',
-            ],
+            ['cardClass' => 'is-primary', 'title' => 'Entregables Activos', 'label' => 'Entregables Activos', 'value' => 5, 'subtitle' => '1 pendiente de revision', 'description' => '1 pendiente de revision', 'meta' => '1 pendiente de revision', 'icon' => 'file-lines', 'tone' => 'primary'],
+            ['cardClass' => 'is-amber', 'title' => 'Observaciones', 'label' => 'Observaciones', 'value' => 2, 'subtitle' => 'Requieren atencion', 'description' => 'Requieren atencion', 'meta' => 'Requieren atencion', 'icon' => 'comment-dots', 'tone' => 'amber'],
+            ['cardClass' => 'is-emerald', 'title' => 'Progreso General', 'label' => 'Progreso General', 'value' => '68%', 'subtitle' => 'Fase 2 de 4 completada', 'description' => 'Fase 2 de 4 completada', 'meta' => 'Fase 2 de 4 completada', 'icon' => 'chart-line', 'tone' => 'emerald'],
+            ['cardClass' => 'is-indigo', 'title' => 'Proxima Entrega', 'label' => 'Proxima Entrega', 'value' => '04 Nov', 'subtitle' => 'Quedan 3 dias habiles', 'description' => 'Quedan 3 dias habiles', 'meta' => 'Quedan 3 dias habiles', 'icon' => 'calendar-day', 'tone' => 'indigo'],
         ];
     }
 
     public function getCurrentReport(): array
     {
-        // Informe principal del estudiante hasta conectar el modulo con persistencia real.
         return [
-            'statusClass' => 'revision',
-            'status' => 'En revision',
-            'title' => 'Sistema de Gestion Documental',
-            'description' => 'La version actual esta en revision. El foco ahora es resolver las observaciones de metodologia y referencias antes del siguiente envio.',
-            'semester' => 'Septimo semestre',
-            'tutor' => 'Ing. Tutor Asignado',
-            'version' => 'Version 4',
-            'document' => 'Informe_actualizado_v4.pdf',
-            'lastDelivery' => '03 Jul 2026',
-            'lastReview' => '04 Jul 2026',
-            'pendingObservations' => '2 observaciones pendientes',
+            'id' => 1,
+            'title' => 'Sistema de Gestion Academica para Titulacion Universitario',
+            'description' => 'Sistema de Gestion Academica para Titulacion Universitario',
+            'document' => 'informe_borrador_final_v2.pdf',
+            'version' => 'v2.1',
+            'lastDelivery' => '18 Ago 2026',
+            'semester' => 'I PAO 2026',
+            'career' => 'Ingenieria en Sistemas',
+            'tutor' => 'Dr. Carlos Mendoza',
+            'lastReview' => '16 Ago 2026',
+            'pendingObservations' => '2 pendientes',
+            'code' => 'TESIS-2026-004',
+            'author' => 'Juan Perez & Maria Rodriguez',
+            'advisor' => 'Dr. Carlos Mendoza',
+            'reviewer' => 'Dra. Ana Gomez',
+            'status' => 'under_review',
+            'status_label' => 'En Revision de Formato',
+            'statusClass' => 'is-amber',
+            'progress' => 68,
+            'current_phase' => 'Fase 2: Revision de Avance Metodologico',
+            'last_update' => '2026-08-18 10:30',
         ];
     }
 
     public function getTeamMembers(): array
     {
-        // Integrantes de ejemplo hasta conectar el proyecto con usuarios reales.
         return [
-            ['initial' => 'C', 'name' => 'Carlos Martinez', 'role' => 'Lider'],
-            ['initial' => 'A', 'name' => 'Andres Perez', 'role' => 'Integrante'],
-            ['initial' => 'L', 'name' => 'Lucia Gomez', 'role' => 'Integrante'],
+            ['id' => 1, 'name' => 'Juan Perez', 'initial' => 'JP', 'role' => 'Estudiante Lead', 'avatar' => null, 'status' => 'active'],
+            ['id' => 2, 'name' => 'Maria Rodriguez', 'initial' => 'MR', 'role' => 'Co-autor', 'avatar' => null, 'status' => 'active'],
+            ['id' => 3, 'name' => 'Dr. Carlos Mendoza', 'initial' => 'CM', 'role' => 'Tutor Academico', 'avatar' => null, 'status' => 'active'],
         ];
     }
 
     public function getObservations(): array
     {
-        // Observaciones accionables del informe actual.
         return [
-            [
-                'statusClass' => 'pending',
-                'status' => 'Pendiente',
-                'title' => 'Marco metodologico',
-                'text' => 'Ampliar la descripcion del enfoque utilizado y justificar la tecnica de recoleccion de datos.',
-                'date' => '04 Jul 2026',
-            ],
-            [
-                'statusClass' => 'pending',
-                'status' => 'Pendiente',
-                'title' => 'Formato de referencias',
-                'text' => 'Unificar el formato de citas y referencias bibliograficas antes del siguiente envio.',
-                'date' => '04 Jul 2026',
-            ],
+            ['id' => 1, 'title' => 'Ajustar metodología', 'author' => 'Dra. Ana Gomez', 'role' => 'Revisora', 'date' => '2026-08-16', 'text' => 'Ajustar la seccion 3.2 referente a la metodologia cualitativa.', 'status' => 'pending', 'statusClass' => 'is-amber', 'file' => 'capitulo_3_v2.pdf'],
+            ['id' => 2, 'title' => 'Referencias APA 7', 'author' => 'Dr. Carlos Mendoza', 'role' => 'Tutor', 'date' => '2026-08-14', 'text' => 'Formato de referencias corregido segun norma APA 7.', 'status' => 'resolved', 'statusClass' => 'is-emerald', 'file' => 'referencias.pdf'],
         ];
     }
 
     public function getRecentActivity(): array
     {
-        // Actividad resumida con eventos distintos entre si.
         return [
-            ['icon' => 'fa-upload', 'title' => 'Version 4 enviada', 'text' => 'El informe actualizado fue registrado para revision.', 'time' => '03 Jul 2026'],
-            ['icon' => 'fa-pen-to-square', 'title' => 'Revision del tutor', 'text' => 'Se registraron observaciones sobre la ultima version.', 'time' => '04 Jul 2026'],
-            ['icon' => 'fa-folder-open', 'title' => 'Documento disponible', 'text' => 'La version revisada esta lista para consultar detalles y comentarios.', 'time' => '04 Jul 2026'],
+            ['action' => 'Entrega subida', 'title' => 'Entrega subida', 'detail' => 'Capitulo 3 Metodologia v2.pdf', 'text' => 'Capitulo 3 Metodologia v2.pdf', 'user' => 'Juan Perez', 'date' => 'Hace 2 horas', 'time' => 'Hace 2 horas', 'type' => 'upload', 'icon' => 'fa-upload'],
+            ['action' => 'Observacion agregada', 'title' => 'Observacion agregada', 'detail' => 'Revisar seccion 3.2', 'text' => 'Revisar seccion 3.2', 'user' => 'Dra. Ana Gomez', 'date' => 'Hace 1 dia', 'time' => 'Hace 1 dia', 'type' => 'comment', 'icon' => 'fa-comment'],
+            ['action' => 'Estado actualizado', 'title' => 'Estado actualizado', 'detail' => 'Cambio a En Revision', 'text' => 'Cambio a En Revision', 'user' => 'Sistema', 'date' => 'Hace 2 dias', 'time' => 'Hace 2 dias', 'type' => 'status', 'icon' => 'fa-circle-check'],
         ];
     }
 
     public function getProcessDates(): array
     {
-        // Fechas clave que ayudan a entender el avance real del proceso.
         return [
-            ['label' => 'Ultima entrega', 'value' => '03 Jul 2026'],
-            ['label' => 'Ultima revision', 'value' => '04 Jul 2026'],
-            ['label' => 'Entrega objetivo', 'value' => '10 Jul 2026'],
+            ['date' => '04 Nov', 'value' => '04 Nov', 'event' => 'Cierre de Revision Metodologica', 'label' => 'Cierre de Revision Metodologica', 'status' => 'upcoming', 'days_left' => 3],
+            ['date' => '18 Nov', 'value' => '18 Nov', 'event' => 'Entrega de Borrador Final', 'label' => 'Entrega de Borrador Final', 'status' => 'future', 'days_left' => 17],
+            ['date' => '02 Dic', 'value' => '02 Dic', 'event' => 'Defensa Borrador Ante Tribunal', 'label' => 'Defensa Borrador Ante Tribunal', 'status' => 'future', 'days_left' => 31],
         ];
     }
 
     public function getNotifications(): array
     {
-        // Alertas utiles, sin repetir el listado de observaciones.
         return [
-            ['title' => 'Revision finalizada', 'text' => 'Ya puedes consultar los comentarios de la version 4.', 'time' => 'Hace 2 horas'],
-            ['title' => 'Prioridad sugerida', 'text' => 'Atiende primero la observacion del marco metodologico.', 'time' => 'Hoy'],
-            ['title' => 'Entrega objetivo definida', 'text' => 'Planifica el reenvio corregido para el 10 de julio.', 'time' => 'Hoy'],
+            ['id' => 1, 'title' => 'Nueva observacion recibida', 'message' => 'Dra. Ana Gomez agrego comentarios a tu ultima entrega.', 'text' => 'Dra. Ana Gomez agrego comentarios a tu ultima entrega.', 'date' => 'Hace 1 dia', 'time' => 'Hace 1 dia', 'read' => false],
+            ['id' => 2, 'title' => 'Recordatorio de entrega', 'message' => 'La fecha limite para la Fase 2 es el 04 de Noviembre.', 'text' => 'La fecha limite para la Fase 2 es el 04 de Noviembre.', 'date' => 'Hace 3 dias', 'time' => 'Hace 3 dias', 'read' => true],
         ];
     }
 
     public function getReminders(): array
     {
-        // Proximas acciones personales del usuario autenticado.
         return [
-            ['date' => '05 Jul', 'title' => 'Corregir metodologia', 'text' => 'Ampliar enfoque, tecnica e instrumentos.'],
-            ['date' => '07 Jul', 'title' => 'Normalizar referencias', 'text' => 'Unificar citas y bibliografia del informe.'],
-            ['date' => '10 Jul', 'title' => 'Enviar version corregida', 'text' => 'Subir el documento final para nueva revision.'],
-        ];
-    }
-
-    public function getCalendar(): array
-    {
-        // Estructura simple para pintar el calendario mensual en la vista.
-        return [
-            'month' => 'Julio 2026',
-            'subtitle' => 'Recordatorios del semestre',
-            'weekDays' => ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'],
-            'days' => [
-                ['number' => '29', 'class' => 'muted-day'],
-                ['number' => '30', 'class' => 'muted-day'],
-                ['number' => '1', 'class' => 'current-day'],
-                ['number' => '2', 'class' => 'reminder-day'],
-                ['number' => '3', 'class' => ''],
-                ['number' => '4', 'class' => ''],
-                ['number' => '5', 'class' => 'reminder-day'],
-                ['number' => '6', 'class' => ''],
-                ['number' => '7', 'class' => ''],
-                ['number' => '8', 'class' => ''],
-                ['number' => '9', 'class' => ''],
-                ['number' => '10', 'class' => 'reminder-day'],
-                ['number' => '11', 'class' => ''],
-                ['number' => '12', 'class' => ''],
-                ['number' => '13', 'class' => ''],
-                ['number' => '14', 'class' => ''],
-                ['number' => '15', 'class' => ''],
-                ['number' => '16', 'class' => ''],
-                ['number' => '17', 'class' => ''],
-                ['number' => '18', 'class' => ''],
-                ['number' => '19', 'class' => ''],
-                ['number' => '20', 'class' => ''],
-                ['number' => '21', 'class' => 'reminder-day'],
-                ['number' => '22', 'class' => ''],
-                ['number' => '23', 'class' => ''],
-                ['number' => '24', 'class' => ''],
-                ['number' => '25', 'class' => ''],
-                ['number' => '26', 'class' => ''],
-                ['number' => '27', 'class' => ''],
-                ['number' => '28', 'class' => ''],
-                ['number' => '29', 'class' => ''],
-                ['number' => '30', 'class' => ''],
-                ['number' => '31', 'class' => ''],
-                ['number' => '1', 'class' => 'muted-day'],
-                ['number' => '2', 'class' => 'muted-day'],
-            ],
+            ['title' => 'Reunion con Tutor', 'text' => 'Reunion con Tutor', 'date' => 'Manana 10:00 AM', 'urgent' => true],
+            ['title' => 'Subir correcciones APA', 'text' => 'Subir correcciones APA', 'date' => '02 Nov 11:59 PM', 'urgent' => false],
         ];
     }
 }
