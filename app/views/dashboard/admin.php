@@ -396,10 +396,12 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
                 ?>
                     <<?= $tagElement ?> class="timeline-v4-item" <?= $actRoute !== null ? 'href="' . e($actRoute) . '"' : '' ?>>
                         <span class="v4-bullet"></span>
-                        <div class="v4-timeline-body">
-                            <span class="v4-act-title"><?= e((string) ($actItem['action'] ?? '')) ?></span>
-                            <p class="v4-act-resource"><?= e((string) ($actItem['detail'] ?? ($actItem['resource'] ?? ''))) ?></p>
-                            <span class="v4-act-meta"><?= e((string) ($actItem['user'] ?? ($actItem['actor'] ?? 'Sistema'))) ?> · <?= e((string) ($actItem['date'] ?? ($actItem['occurred_at'] ?? ''))) ?></span>
+                        <div class="timeline-v4-row">
+                            <div class="v4-timeline-body">
+                                <span class="v4-act-title"><?= e((string) ($actItem['action'] ?? '')) ?></span>
+                                <p class="v4-act-resource"><?= e((string) ($actItem['resource'] ?? ($actItem['detail'] ?? ''))) ?> · <?= e((string) ($actItem['actor'] ?? ($actItem['user'] ?? 'Administración'))) ?></p>
+                            </div>
+                            <time class="v4-act-ts"><?= e((string) ($actItem['date'] ?? ($actItem['occurred_at'] ?? ''))) ?></time>
                         </div>
                     </<?= $tagElement ?>>
                 <?php endforeach; ?>

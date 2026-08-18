@@ -550,7 +550,7 @@ a.status-v4-node:hover {
 .activity-v4-timeline {
     list-style: none;
     margin: 0;
-    padding: 0 0 0 10px;
+    padding: 0 0 0 20px;   /* mayor respiración izquierda */
     position: relative;
 }
 
@@ -559,38 +559,50 @@ a.status-v4-node:hover {
     position: absolute;
     top: 6px;
     bottom: 6px;
-    left: 13px;
+    left: 23px;            /* alineado al centro del bullet ampliado */
     width: 2px;
     background: var(--line);
 }
 
 .timeline-v4-item {
     position: relative;
-    padding-left: 24px;
-    padding-bottom: 14px;
+    padding-left: 28px;    /* más espacio entre línea vertical y contenido */
+    padding-bottom: 0;
     color: var(--text);
     text-decoration: none;
 }
 
-.timeline-v4-item:last-child {
-    padding-bottom: 0;
+.timeline-v4-item:last-child .v4-timeline-body {
+    border-bottom: none;
 }
 
 .v4-bullet {
     position: absolute;
     left: 0;
-    top: 5px;
-    width: 8px;
-    height: 8px;
+    top: 6px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
     background: var(--blue);
     box-shadow: 0 0 0 3px var(--surface);
+}
+
+/* Fila horizontal: contenido (izq) + timestamp (der) */
+.timeline-v4-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    width: 100%;
 }
 
 .v4-timeline-body {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    flex: 1;
+    padding-bottom: 13px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 1px;
 }
 
 .v4-act-title {
@@ -609,12 +621,23 @@ a.timeline-v4-item:hover .v4-act-title {
     color: var(--muted);
     font-size: 0.78rem;
     line-height: 1.35;
-    margin: 1px 0 2px;
+    margin: 2px 0 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.v4-act-meta {
+/* Timestamp a la derecha */
+.v4-act-ts {
+    flex-shrink: 0;
     color: var(--muted);
     font-size: 0.73rem;
+    font-weight: 500;
+    white-space: nowrap;
+    padding-bottom: 13px; /* alineado con el border-bottom de .v4-timeline-body */
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 1px;
+    letter-spacing: 0.01em;
 }
 
 /* Estado Vacío */
