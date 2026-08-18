@@ -38,6 +38,7 @@ match ($page) {
     'profile-avatar-remove' => (new AccountController())->removeAvatar(),
     'profile-avatar' => (new AccountController())->avatar(),
     'profile' => (new AccountController())->profile(),
+    'toggle-admin-mode' => (new AccountController())->toggleAdminMode(),
     'forbidden' => (new AccountController())->forbidden(),
     'admin-users' => (new AdminController())->users(),
     'admin-user-save' => (new AdminController())->saveUser(),

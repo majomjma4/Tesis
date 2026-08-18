@@ -152,6 +152,24 @@ final class AccountController
         return $userId;
     }
 
+    public function toggleAdminMode(): void
+    {
+        $session = new AuthSessionService();
+        if (!$session->isAuthenticated()) {
+            header('Location: ' . route('login'));
+            exit;
+        }
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && $session->validateCsrf('toggle_admin_mode', (string) ($_POST['_csrf'] ?? ''))) {
+            $session->toggleAdminMode();
+        }
+        $returnUrl = (string) ($_POST['return_url'] ?? $_SERVER['HTTP_REFERER'] ?? route('dashboard'));
+        if (!str_starts_with($returnUrl, '/') && !str_starts_with($returnUrl, route('dashboard'))) {
+            $returnUrl = route('dashboard');
+        }
+        header('Location: ' . $returnUrl);
+        exit;
+    }
+
     private function json(bool $success, string $message, int $status = 200, array $data = []): never
     {
         http_response_code($status); header('Content-Type: application/json; charset=utf-8');
