@@ -348,10 +348,22 @@ final class DashboardModel
         $statement = $connection->query(
             "SELECT
                 COUNT(*) total,
-                SUM(CASE WHEN status IN ('development','under_review','defense') THEN 1 ELSE 0 END) in_flow,
-                SUM(CASE WHEN status IN ('approved','tribunal_approved','completed') THEN 1 ELSE 0 END) approved,
-                SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) published
-             FROM projects WHERE deleted_at IS NULL"
+                SUM(CASE WHEN p.status = 'published' THEN 1 ELSE 0 END) published,
+                SUM(CASE
+                    WHEN p.status = 'completed' THEN 1
+                    WHEN p.status = 'tribunal_approved' AND pt.code = 'thesis' THEN 1
+                    WHEN p.status = 'approved' AND pt.code != 'thesis' THEN 1
+                    ELSE 0
+                END) approved,
+                SUM(CASE
+                    WHEN p.status IN ('development', 'under_review', 'corrections_requested', 'changes_required') THEN 1
+                    WHEN p.status = 'approved' AND pt.code = 'thesis' THEN 1
+                    WHEN p.status = 'defense' AND pt.code = 'thesis' THEN 1
+                    ELSE 0
+                END) in_flow
+             FROM projects p
+             INNER JOIN project_types pt ON pt.id = p.project_type_id
+             WHERE p.deleted_at IS NULL"
         );
         $row = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
 
