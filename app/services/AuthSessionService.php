@@ -157,6 +157,10 @@ final class AuthSessionService
         $_SESSION['admin_mode'] = $newMode;
         return $newMode;
     }
+    public function notificationContext(): string
+    {
+        return $this->isAdminModeActive() ? 'admin' : 'teacher';
+    }
     public function isInitialAdmin(): bool { $this->start(); return (bool)($_SESSION['is_initial_admin']??false); }
     public function name(): string { $this->start(); return (string)($_SESSION['user_name']??'Usuario'); }
     public function email(): string { $this->start(); return (string)($_SESSION['user_email']??''); }

@@ -10,7 +10,7 @@ final class RepositoryController
     public function index(): void
     {
         $this->ensureSession();
-        if ((new AuthSessionService())->hasAdminAccess()) {
+        if ((new AuthSessionService())->isAdminModeActive()) {
             header('Location: ' . route('admin-repository'));
             exit;
         }

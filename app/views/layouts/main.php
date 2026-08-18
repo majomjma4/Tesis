@@ -21,7 +21,7 @@
 <?php $isAdministratorLayout = (bool) ($layoutIsAdmin ?? false); $isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen); ?>
 
 <body
-    class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout app-page-loading' : '') . ($isStudentWorkspaceFullscreen ? ' app-student-workspace-fullscreen' : ''))) ?>">
+    class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout' : '') . ($isStudentWorkspaceFullscreen ? ' app-student-workspace-fullscreen' : ''))) ?>">
     <noscript>
         <style>
             .app-global-skeleton {
@@ -114,22 +114,6 @@
                 <?php endif; ?>
             </nav>
         </div>
-
-        <div class="sidebar-footer">
-            <?php if (!empty($layoutCanToggleAdminMode)): ?>
-                <form action="<?= e(route('toggle-admin-mode')) ?>" method="POST" style="margin-bottom: 8px;">
-                    <input type="hidden" name="_csrf" value="<?= e($layoutToggleAdminModeCsrf ?? '') ?>">
-                    <button class="mode-toggle-btn <?= !empty($layoutIsAdminModeActive) ? 'is-admin-active' : '' ?>" type="submit" style="width:100%;padding:9px 12px;background:<?= !empty($layoutIsAdminModeActive) ? '#fef2f2' : '#f0fdf4' ?>;border:1px solid <?= !empty($layoutIsAdminModeActive) ? '#fca5a5' : '#86efac' ?>;border-radius:8px;color:<?= !empty($layoutIsAdminModeActive) ? '#991b1b' : '#166534' ?>;font-size:0.82rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s ease;">
-                        <i class="fa-solid <?= !empty($layoutIsAdminModeActive) ? 'fa-user-gear' : 'fa-sliders' ?>"></i>
-                        <span><?= !empty($layoutIsAdminModeActive) ? 'Volver a modo docente' : 'Activar modo administrador' ?></span>
-                    </button>
-                </form>
-            <?php endif; ?>
-            <button class="close-btn js-logout-trigger" type="button">
-                <i class="fa-solid fa-right-from-bracket"></i>
-                Cerrar sesión
-            </button>
-        </div>
     </aside>
     <!-- Final de menu lateral principal -->
 
@@ -142,18 +126,38 @@
             </button>
 
             <div class="welcome">
-                <h2>Hola, <?= e(explode(' ', trim($layoutUserName ?? 'Usuario'))[0] ?: 'Usuario') ?></h2>
+                <?php
+                $firstName = explode(' ', trim($layoutUserName ?? 'Usuario'))[0] ?: 'Usuario';
+                $greetingName = ($isAdministratorLayout && strtolower($firstName) === 'docente') ? 'Administrador' : $firstName;
+                ?>
+                <h2>Hola, <?= e($greetingName) ?></h2>
                 <p><?= $isAdministratorLayout ? 'Panel de administración del sistema.' : 'Continúa gestionando tus proyectos académicos.' ?>
                 </p>
             </div>
 
             <div class="topbar-right">
-                <a class="topbar-action-btn"
-                    href="<?= e($isAdministratorLayout ? route('projects') . '&action=new' : route('new-project')) ?>">
-                    <i class="fa-solid fa-plus"></i>
-                    <span class="topbar-action-label">Nuevo proyecto</span>
-                    <span class="topbar-action-label-short">Nuevo</span>
-                </a>
+                <?php if (!empty($layoutCanToggleAdminMode)): ?>
+                    <form action="<?= e(route('toggle-admin-mode')) ?>" method="POST" class="topbar-mode-toggle-form">
+                        <input type="hidden" name="_csrf" value="<?= e($layoutToggleAdminModeCsrf ?? '') ?>">
+                        <button class="topbar-mode-pill <?= !empty($layoutIsAdminModeActive) ? 'is-admin' : 'is-teacher' ?>"
+                                type="submit"
+                                title="<?= !empty($layoutIsAdminModeActive) ? 'Volver a modo docente' : 'Cambiar a modo administrador' ?>"
+                                aria-label="<?= !empty($layoutIsAdminModeActive) ? 'Volver a modo docente' : 'Cambiar a modo administrador' ?>">
+                            <span class="mode-pill-badge">
+                                <i class="fa-solid <?= !empty($layoutIsAdminModeActive) ? 'fa-shield-halved' : 'fa-graduation-cap' ?>"></i>
+                                <span class="mode-pill-text"><?= !empty($layoutIsAdminModeActive) ? 'Administración' : 'Docente' ?></span>
+                            </span>
+                            <i class="fa-solid fa-arrow-right-arrow-left mode-pill-switch-icon" aria-hidden="true"></i>
+                        </button>
+                    </form>
+                <?php endif; ?>
+                <?php if (!$isAdministratorLayout): ?>
+                    <a class="topbar-action-btn" href="<?= e(route('new-project')) ?>">
+                        <i class="fa-solid fa-plus"></i>
+                        <span class="topbar-action-label">Nuevo proyecto</span>
+                        <span class="topbar-action-label-short">Nuevo</span>
+                    </a>
+                <?php endif; ?>
                 <button class="icon-btn theme-toggle" id="themeToggle" type="button"
                     aria-label="Cambiar modo claro u oscuro">
                     <i class="fa-solid fa-moon"></i>

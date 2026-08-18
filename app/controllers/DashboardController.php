@@ -8,7 +8,7 @@ final class DashboardController
     {
         $dashboard = new DashboardModel();
 
-        if ((new AuthSessionService())->hasAdminAccess()) {
+        if ((new AuthSessionService())->isAdminModeActive()) {
             $error = null;
             try {
                 $adminDashboard = $dashboard->getAdminDashboard();

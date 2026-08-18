@@ -1078,7 +1078,6 @@ final class AdminController
             'currentPage'=>'projects',
             'title'=>$isAdministrator ? 'Proyectos activos | Administración' : 'Proyectos activos | Gestión Académica',
             'bodyClass'=>'admin-projects-page',
-            'layoutIsAdmin'=>$isAdministrator,
             'isAdministrator'=>$isAdministrator,
             'pageStyles'=>[asset('css/admin-projects.css')],
             'pageScript'=>asset('js/admin-projects.js'),

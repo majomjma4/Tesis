@@ -54,7 +54,8 @@ final class View
 
         try {
             $userId = (int) ($_SESSION['user_id'] ?? $_SESSION['notification_demo_user_id'] ?? 1);
-            $unread = (new NotificationModel())->countUnread($userId);
+            $context = (new AuthSessionService())->notificationContext();
+            $unread = (new NotificationModel())->countUnread($userId, $context);
         } catch (Throwable $exception) {
             if (!isset($_SESSION['notification_demo_items']) || !is_array($_SESSION['notification_demo_items'])) {
                 $_SESSION['notification_demo_items'] = (new NotificationModel())->getDemoNotifications();

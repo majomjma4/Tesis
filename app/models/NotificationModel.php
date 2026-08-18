@@ -17,9 +17,9 @@ final class NotificationModel
         return $this->db ?? Database::connection();
     }
 
-    public function getByUser(int $userId, array $filters = []): array
+    public function getByUser(int $userId, array $filters = [], string $context = ''): array
     {
-        [$conditions, $parameters] = $this->notificationQuery($userId, $filters);
+        [$conditions, $parameters] = $this->notificationQuery($userId, $filters, $context);
         $statement = $this->connection()->prepare(
             'SELECT n.id, n.user_id, n.project_id, n.type, n.title, n.message, n.action_url, n.action_label, n.metadata, n.is_read, n.read_at, n.created_at, n.archived_at, n.deleted_at,
                     COALESCE(p.title, NULLIF(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.project_name")), ""), "Notificacion general") AS project_name
@@ -30,9 +30,9 @@ final class NotificationModel
         return array_map([$this, 'hydrate'], $statement->fetchAll());
     }
 
-    public function getByUserPaginated(int $userId, array $filters = [], array $pagination = []): array
+    public function getByUserPaginated(int $userId, array $filters = [], array $pagination = [], string $context = ''): array
     {
-        [$conditions, $parameters] = $this->notificationQuery($userId, $filters);
+        [$conditions, $parameters] = $this->notificationQuery($userId, $filters, $context);
         $where = ' FROM notifications n LEFT JOIN projects p ON p.id = n.project_id WHERE ' . implode(' AND ', $conditions);
         $result = PaginationService::run(
             $this->connection(),
@@ -46,13 +46,19 @@ final class NotificationModel
         return $result;
     }
 
-    private function notificationQuery(int $userId, array $filters): array
+    private function notificationQuery(int $userId, array $filters, string $context = ''): array
     {
         $visibility = !empty($filters['trash'])
             ? 'n.deleted_at IS NOT NULL'
             : (!empty($filters['hidden']) ? 'n.archived_at IS NOT NULL AND n.deleted_at IS NULL' : 'n.archived_at IS NULL AND n.deleted_at IS NULL');
         $conditions = ['n.user_id = :user_id', $visibility];
         $parameters = ['user_id' => $userId];
+
+        if ($context === 'admin') {
+            $conditions[] = '(n.type = "system" OR n.action_url LIKE "%page=admin-%" OR JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.admin_sender_id")) IS NOT NULL OR JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.context")) = "admin" OR JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.scope")) = "admin")';
+        } elseif ($context === 'teacher') {
+            $conditions[] = '(n.type != "system" AND (n.action_url IS NULL OR n.action_url NOT LIKE "%page=admin-%") AND JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.admin_sender_id")) IS NULL AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.context")), "") != "admin" AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.scope")), "") != "admin")';
+        }
 
         $search = trim((string) ($filters['search'] ?? ''));
         if ($search !== '') {
@@ -119,16 +125,17 @@ final class NotificationModel
         return $notification === false ? null : $this->hydrate($notification);
     }
 
-    public function getCounters(int $userId): array
+    public function getCounters(int $userId, string $context = ''): array
     {
+        [$conditions, $parameters] = $this->notificationQuery($userId, [], $context);
         $statement = $this->connection()->prepare(
             'SELECT COUNT(*) AS total,
-                    SUM(is_read = 0) AS unread,
-                    SUM(DATE(created_at) = CURRENT_DATE()) AS today,
-                    SUM(YEARWEEK(created_at, 1) = YEARWEEK(CURRENT_DATE(), 1)) AS week
-             FROM notifications WHERE user_id = :user_id AND archived_at IS NULL AND deleted_at IS NULL'
+                    COALESCE(SUM(n.is_read = 0), 0) AS unread,
+                    COALESCE(SUM(DATE(n.created_at) = CURRENT_DATE()), 0) AS today,
+                    COALESCE(SUM(YEARWEEK(n.created_at, 1) = YEARWEEK(CURRENT_DATE(), 1)), 0) AS week
+             FROM notifications n WHERE ' . implode(' AND ', $conditions)
         );
-        $statement->execute(['user_id' => $userId]);
+        $statement->execute($parameters);
         $row = $statement->fetch() ?: [];
 
         return [
@@ -139,21 +146,23 @@ final class NotificationModel
         ];
     }
 
-    public function getVisibilityCounters(int $userId, bool $hidden, bool $trash): array
+    public function getVisibilityCounters(int $userId, bool $hidden, bool $trash, string $context = ''): array
     {
-        if (!$hidden && !$trash) return $this->getCounters($userId);
-        $visibility = $trash ? 'deleted_at IS NOT NULL' : 'archived_at IS NOT NULL AND deleted_at IS NULL';
+        if (!$hidden && !$trash) return $this->getCounters($userId, $context);
+        $filters = ['hidden' => $hidden, 'trash' => $trash];
+        [$conditions, $parameters] = $this->notificationQuery($userId, $filters, $context);
         $settings = (new SystemSettingModel())->all();
         $retentionDays = max(1, (int)($settings['notification_trash_retention_days'] ?? 60));
         $expiringCutoff = max(0, $retentionDays - 7);
+        $parameters['exp_cutoff'] = $expiringCutoff;
         $statement = $this->connection()->prepare(
             "SELECT COUNT(*) total,
-                    COALESCE(SUM(is_read = 0), 0) unread,
-                    COALESCE(SUM(YEARWEEK(created_at, 1) = YEARWEEK(CURRENT_DATE(), 1)), 0) week,
-                    COALESCE(SUM(deleted_at IS NOT NULL AND deleted_at <= DATE_SUB(NOW(), INTERVAL :exp_cutoff DAY)), 0) expiring
-             FROM notifications WHERE user_id = :user_id AND $visibility"
+                    COALESCE(SUM(n.is_read = 0), 0) unread,
+                    COALESCE(SUM(YEARWEEK(n.created_at, 1) = YEARWEEK(CURRENT_DATE(), 1)), 0) week,
+                    COALESCE(SUM(n.deleted_at IS NOT NULL AND n.deleted_at <= DATE_SUB(NOW(), INTERVAL :exp_cutoff DAY)), 0) expiring
+             FROM notifications n WHERE " . implode(' AND ', $conditions)
         );
-        $statement->execute(['user_id' => $userId, 'exp_cutoff' => $expiringCutoff]);
+        $statement->execute($parameters);
         $row = $statement->fetch() ?: [];
         return ['total' => (int) ($row['total'] ?? 0), 'unread' => (int) ($row['unread'] ?? 0), 'week' => (int) ($row['week'] ?? 0), 'expiring' => (int) ($row['expiring'] ?? 0)];
     }
@@ -210,9 +219,18 @@ final class NotificationModel
 
     // Inicio de soporte demostrativo
     // Proporciona datos y contadores temporales mientras la base de datos no está habilitada.
-    public function countUnread(int $userId): int
+    public function countUnread(int $userId, string $context = ''): int
     {
-        return $this->getCounters($userId)['unread'];
+        return $this->getCounters($userId, $context)['unread'];
+    }
+
+    public function markAllAsRead(int $userId, string $context = ''): int
+    {
+        [$conditions, $parameters] = $this->notificationQuery($userId, ['status' => 'unread'], $context);
+        $sql = 'UPDATE notifications n SET is_read = 1, read_at = NOW(), updated_at = NOW() WHERE ' . implode(' AND ', $conditions);
+        $statement = $this->connection()->prepare($sql);
+        $statement->execute($parameters);
+        return $statement->rowCount();
     }
 
     public function getDemoNotifications(): array

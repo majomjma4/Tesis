@@ -230,6 +230,62 @@ a{
     gap:14px;
     flex:0 0 auto;
 }
+.topbar-mode-toggle-form{
+    display:inline-flex;
+    align-items:center;
+    margin:0;
+}
+.topbar-mode-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    height:42px;
+    padding:0 14px;
+    border-radius:12px;
+    font-size:0.83rem;
+    font-weight:700;
+    cursor:pointer;
+    border:1px solid var(--line,#e2e8f0);
+    background:var(--surface,#ffffff);
+    color:var(--text-main,#1e293b);
+    transition:all 0.2s ease;
+    box-shadow:0 1px 3px rgba(0,0,0,0.05);
+    white-space:nowrap;
+}
+.topbar-mode-pill.is-teacher{
+    border-color:rgba(37,99,235,0.28);
+    background:linear-gradient(135deg,rgba(239,246,255,0.95),rgba(240,253,244,0.95));
+    color:#1e40af;
+}
+.topbar-mode-pill.is-teacher:hover{
+    border-color:rgba(37,99,235,0.5);
+    box-shadow:0 2px 8px rgba(37,99,235,0.18);
+    transform:translateY(-1px);
+}
+.topbar-mode-pill.is-admin{
+    border-color:rgba(225,29,72,0.28);
+    background:linear-gradient(135deg,rgba(255,241,242,0.95),rgba(254,242,242,0.95));
+    color:#9f1239;
+}
+.topbar-mode-pill.is-admin:hover{
+    border-color:rgba(225,29,72,0.5);
+    box-shadow:0 2px 8px rgba(225,29,72,0.18);
+    transform:translateY(-1px);
+}
+.mode-pill-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+}
+.mode-pill-switch-icon{
+    font-size:0.75rem;
+    opacity:0.65;
+    transition:transform 0.25s ease,opacity 0.2s ease;
+}
+.topbar-mode-pill:hover .mode-pill-switch-icon{
+    opacity:1;
+    transform:rotate(180deg);
+}
 .topbar-action-btn{
     min-height:46px;
     background:var(--accent);

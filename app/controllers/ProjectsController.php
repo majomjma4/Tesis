@@ -9,7 +9,7 @@ final class ProjectsController
     {
         $session = new AuthSessionService();
         $access = new ProjectAccessService();
-        $isTeacher = !$session->hasAdminAccess() && in_array('teacher', $access->currentRoles(), true);
+        $isTeacher = in_array('teacher', $access->currentRoles(), true);
         if (!$isTeacher) {
             (new AccountController())->forbidden();
             return;
@@ -870,7 +870,7 @@ final class ProjectsController
         $context=$repository?'repository':($academicManagement?'academic_management':'academic');$projectId=filter_var($_GET['project_id']??null,FILTER_VALIDATE_INT);
         $capabilities=$projectId?(new ProjectCapabilityService())->forProjectId((int)$projectId,$context):(new ProjectCapabilityService())->none();
         if(empty($capabilities['download_files']))$this->failProjectArchive(403,'No tienes autorización para consultar archivos de este proyecto.',$json);
-        $access=new ProjectAccessService();$session=new AuthSessionService();$teacher=!$session->hasAdminAccess()&&in_array('teacher',$access->currentRoles(),true);
+        $access=new ProjectAccessService();$session=new AuthSessionService();$teacher=in_array('teacher',$access->currentRoles(),true);
         $project=$projectId&&$access->can('project.view')?(new ProjectRecordModel())->find((int)$projectId,$access->currentUserId(),$session->hasAdminAccess()||$teacher,$repository):null;
         if($project===null)$this->failProjectArchive(404,'El proyecto solicitado no está disponible en este contexto.',$json);
         return [$project,$context];
@@ -897,7 +897,7 @@ final class ProjectsController
         if (session_status()!==PHP_SESSION_ACTIVE) session_start();
         if (($_SERVER['REQUEST_METHOD']??'GET')!=='GET') { http_response_code(405); exit; }
         $projectId=filter_var($_GET['project_id']??null,FILTER_VALIDATE_INT); $fileId=filter_var($_GET['file_id']??null,FILTER_VALIDATE_INT);
-        $access=new ProjectAccessService(); $admin=(new AuthSessionService())->hasAdminAccess(); $teacher=!$admin&&in_array('teacher',$access->currentRoles(),true);
+        $access=new ProjectAccessService(); $admin=(new AuthSessionService())->hasAdminAccess(); $teacher=in_array('teacher',$access->currentRoles(),true);
         $model=new ProjectRecordModel();
         $repositoryScope=(string)($_GET['scope']??'')==='repository';
         $academicManagement=(string)($_GET['context']??'')==='academic_management';
