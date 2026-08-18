@@ -688,8 +688,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const documentStatus = fileObject?.dataset.documentStatus || '';
         const fileName = fileObject?.dataset.fileName || '';
 
-        // Filtrar observaciones: sólo las pertenecientes a las versiones activas de los archivos
-        const activeObservations = allStudentObservations.filter((item) => isObservationForActiveVersion(item, activeChecksumsMap));
+        const projectStatus = String(manager?.dataset.projectStatus || '').toLowerCase().trim();
+        const isStudentCorrectionStage = projectStatus === 'development' || projectStatus === 'corrections_requested';
+
+        // Filtrar observaciones: sólo las pertenecientes a las versiones activas si el estudiante está en etapa activa de corrección
+        const activeObservations = isStudentCorrectionStage
+            ? allStudentObservations.filter((item) => isObservationForActiveVersion(item, activeChecksumsMap))
+            : [];
 
         const items = selectedObservationFileId === 0
             ? activeObservations
