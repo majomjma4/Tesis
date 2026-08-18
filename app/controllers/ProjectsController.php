@@ -251,7 +251,21 @@ final class ProjectsController
         $tab = $legacyTabs[$requestedTab] ?? $requestedTab;
         $tab = in_array($tab, ['information','files','evolution'], true) ? $tab : 'information';
         $project['review_situation']=(new ProjectReviewSituationService())->forProject((int)$project['id']);
-        $academicPage = (new ProjectAcademicTimelineService())->page((int) $project['id']);
+        $rawHistoryPerPage = (int) ($_GET['history_per_page'] ?? $this->query['history_per_page'] ?? 10);
+        $historyLimit = ($rawHistoryPerPage >= 1 && $rawHistoryPerPage <= 100) ? $rawHistoryPerPage : 10;
+        $historyPageNumber = max(1, (int) ($_GET['history_page'] ?? $this->query['history_page'] ?? 1));
+        $historyOffset = ($historyPageNumber - 1) * $historyLimit;
+        $academicPage = (new ProjectAcademicTimelineService())->page((int) $project['id'], $historyOffset, $historyLimit);
+
+        $totalEvents = (int) ($academicPage['total'] ?? 0);
+        $totalPages = max(1, (int) ceil($totalEvents / $historyLimit));
+        $currentPage = min($historyPageNumber, $totalPages);
+        $actualOffset = ($currentPage - 1) * $historyLimit;
+
+        if ($currentPage !== $historyPageNumber) {
+            $academicPage = (new ProjectAcademicTimelineService())->page((int) $project['id'], $actualOffset, $historyLimit);
+        }
+
         foreach ($academicPage['events'] as &$academicEvent) {
             $academicEvent['date'] = (string)($academicEvent['occurred_at_local'] ?? $academicEvent['date'] ?? '');
             $visibleMeta = (array)($academicEvent['meta'] ?? []);
@@ -264,8 +278,19 @@ final class ProjectsController
             $academicEvent['meta'] = array_values(array_unique($visibleMeta));
         }
         unset($academicEvent);
+
         $project['academic_history'] = $academicPage['events'];
-        $project['academic_history_total'] = $academicPage['total'];
+        $project['academic_history_total'] = $totalEvents;
+        $project['academic_history_pagination'] = [
+            'page' => $currentPage,
+            'per_page' => $historyLimit,
+            'total' => $totalEvents,
+            'pages' => $totalPages,
+            'from' => $totalEvents > 0 ? $actualOffset + 1 : 0,
+            'to' => min($actualOffset + count($academicPage['events']), $totalEvents),
+            'page_key' => 'history_page',
+            'size_key' => 'history_per_page',
+        ];
 
         $descriptionService = new ProjectDescriptionService();
         $isStudentParticipant = !$isAdministrator && in_array('student', $access->currentRoles(), true)
@@ -304,12 +329,14 @@ final class ProjectsController
             $project['files'] = $documentReview['files'];
         }
         $studentDocumentReview = null;
+        $correctionReadiness = null;
         $studentVersions = [];
         $historicalVersion = null;
         $studentDefense = null;
         if (!$isAdministrator) {
+            $correctionReadiness = (new ProjectCorrectionReadinessService())->forProject((int) $project['id']);
             $studentDocumentReview = (new ProjectDocumentReviewService())->describeCurrentFiles(
-                (int) $project['id'], (array) $project['files'], $isTeacher
+                (int) $project['id'], (array) $project['files'], $isTeacher, $isTeacher
             );
             $project['files'] = $studentDocumentReview['files'];
             $studentVersions = (new ProjectDocumentModel())->versions((int) $project['id']);
@@ -372,6 +399,7 @@ final class ProjectsController
             'activeTab' => $tab,
             'studentActiveTab' => $studentTab,
             'studentDocumentReview' => $studentDocumentReview,
+            'correctionReadiness' => $correctionReadiness,
             'studentVersions' => $studentVersions,
             'historicalVersion' => $historicalVersion,
             'studentDefense' => $studentDefense,
@@ -879,6 +907,29 @@ final class ProjectsController
         $project=($projectId && $access->can('project.view'))?$model->find((int)$projectId,$access->currentUserId(),$admin||$teacher,$repositoryScope):null;
         $file=($project && $fileId)?$model->findFile((int)$projectId,(int)$fileId):null;
         if(!$project||!$file){http_response_code(404);if($json)$this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);exit('El archivo solicitado no está disponible.');}
+        $requestedVersionId = filter_var($_GET['version_id'] ?? null, FILTER_VALIDATE_INT);
+        $requestedV = trim((string)($_GET['v'] ?? $_GET['checksum'] ?? ''));
+        if ($requestedVersionId > 0 || ($requestedV !== '' && !hash_equals(substr((string)$file['checksum_sha256'], 0, strlen($requestedV)), $requestedV))) {
+            $db = Database::connection();
+            $verQuery = null;
+            if ($requestedVersionId > 0) {
+                $verQuery = $db->prepare('SELECT * FROM project_file_versions WHERE id = :vid AND file_id = :fid AND project_id = :pid LIMIT 1');
+                $verQuery->execute(['vid' => $requestedVersionId, 'fid' => (int)$fileId, 'pid' => (int)$projectId]);
+            } else if ($requestedV !== '') {
+                $verQuery = $db->prepare('SELECT * FROM project_file_versions WHERE file_id = :fid AND project_id = :pid AND (checksum_sha256 = :v1 OR checksum_sha256 LIKE :v2) ORDER BY id DESC LIMIT 1');
+                $verQuery->execute(['fid' => (int)$fileId, 'pid' => (int)$projectId, 'v1' => $requestedV, 'v2' => $requestedV . '%']);
+            }
+            $hist = $verQuery ? $verQuery->fetch(PDO::FETCH_ASSOC) : null;
+            if ($hist) {
+                $file['storage_name'] = $hist['storage_name'];
+                $file['storage_path'] = $hist['storage_path'];
+                $file['checksum_sha256'] = $hist['checksum_sha256'];
+                $file['original_name'] = $hist['original_name'];
+                $file['extension'] = $hist['extension'];
+                $file['mime_type'] = $hist['mime_type'];
+                $file['size_bytes'] = $hist['size_bytes'];
+            }
+        }
         try{$fileStorage=$admin||$teacher||$repositoryScope?new ProjectDocumentFileService():new PrivateProjectFileService();$path=$fileStorage->resolveStoredFile((int)$projectId,(string)$file['storage_name']);$stream=fopen($path,'rb');}catch(Throwable){$stream=false;}
         if($stream===false){http_response_code(404);if($json)$this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);exit('El archivo solicitado no está disponible.');}
         return [$project,$file,$stream,$path];

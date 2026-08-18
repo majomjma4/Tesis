@@ -379,6 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (Number(item.file_id || 0) !== fileId) return false;
             if (!expectedChecksum) return true;
             const obsChecksum = String(item.file_checksum_sha256 || '').toLowerCase().trim();
+            return obsChecksum === expectedChecksum;
         });
     };
     const resolveObservationDisplayType = (item, file = null, meta = null) => {
@@ -1126,7 +1127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 toggleBtn.innerHTML = expanded
                     ? '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Ver más'
-                    : '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i> Ver menos';
+                    : '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i> Ocultar';
             });
             card.append(toggleBtn);
         }
@@ -2561,21 +2562,26 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const positionPopoverElement = (popoverEl, rangeRect) => {
-        if (!popoverEl || !previewStage || !floatingLayer) return;
+        if (!popoverEl || !floatingLayer) return;
         const viewportPadding = 12;
-        const stageRect = previewStage.getBoundingClientRect();
         const layerRect = floatingLayer.getBoundingClientRect();
         const popoverRect = popoverEl.getBoundingClientRect();
-        const minLeft = Math.max(viewportPadding, stageRect.left + viewportPadding);
-        const maxLeft = Math.max(minLeft, Math.min(window.innerWidth - popoverRect.width - viewportPadding, stageRect.right - popoverRect.width - viewportPadding));
-        let left = rangeRect.left + (rangeRect.width - popoverRect.width) / 2;
+        const popoverWidth = popoverRect.width || 320;
+        const popoverHeight = popoverRect.height || 260;
+
+        const minLeft = viewportPadding;
+        const maxLeft = window.innerWidth - popoverWidth - viewportPadding;
+        let left = rangeRect.left + (rangeRect.width - popoverWidth) / 2;
         left = Math.min(maxLeft, Math.max(minLeft, left));
-        let top = rangeRect.top - popoverRect.height - 10;
-        const minTop = Math.max(viewportPadding, stageRect.top + viewportPadding);
+
+        let top = rangeRect.top - popoverHeight - 10;
+        const minTop = viewportPadding;
         if (top < minTop) {
             top = rangeRect.bottom + 10;
         }
-        top = Math.min(window.innerHeight - popoverRect.height - viewportPadding, Math.max(minTop, top));
+        const maxTop = window.innerHeight - popoverHeight - viewportPadding;
+        top = Math.min(maxTop, Math.max(minTop, top));
+
         popoverEl.style.left = `${Math.round(left - layerRect.left)}px`;
         popoverEl.style.top = `${Math.round(top - layerRect.top)}px`;
     };
@@ -2926,6 +2932,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 errorEl.hidden = true;
                 errorEl.textContent = '';
             }
+            if (selectionState?.rangeRect) positionPopover(selectionState.rangeRect);
         });
 
         textarea.addEventListener('keydown', (e) => {
@@ -2946,6 +2953,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (body.length < limits.bodyMin || body.length > limits.bodyMax) {
                 errorEl.textContent = `Escribe un comentario de entre ${limits.bodyMin} y ${limits.bodyMax} caracteres.`;
                 errorEl.hidden = false;
+                if (selectionState?.rangeRect) positionPopover(selectionState.rangeRect);
                 return;
             }
 

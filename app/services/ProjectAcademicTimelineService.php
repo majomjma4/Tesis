@@ -10,13 +10,13 @@ final class ProjectAcademicTimelineService
 
     public function __construct(private readonly ?PDO $db = null) {}
 
-    public function page(int $projectId, int $offset = 0, int $limit = 15): array
+    public function page(int $projectId, int $offset = 0, int $limit = 10): array
     {
-        $offset=max(0,$offset);$limit=max(1,min(50,$limit));$this->currentProjectId=$projectId;$db=$this->db??Database::connection();
+        $offset=max(0,$offset);$limit=max(1,min(100,$limit));$this->currentProjectId=$projectId;$db=$this->db??Database::connection();
         $exists=$db->prepare('SELECT 1 FROM projects WHERE id=:id AND deleted_at IS NULL');$exists->execute(['id'=>$projectId]);
         if(!$exists->fetchColumn())return ['events'=>[],'total'=>0,'loaded'=>0,'has_more'=>false,'next_offset'=>$offset,'cursor'=>null];
         $union=$this->unionSql();$parameters=array_fill(0,substr_count($union,'?'),$projectId);
-        $query=$db->prepare("SELECT timeline.*,COUNT(*) OVER() total_count FROM ($union) timeline ORDER BY occurred_at ASC,source_type ASC,source_id ASC,event_key ASC LIMIT $limit OFFSET $offset");
+        $query=$db->prepare("SELECT timeline.*,COUNT(*) OVER() total_count FROM ($union) timeline ORDER BY occurred_at DESC,source_type DESC,source_id DESC,event_key DESC LIMIT $limit OFFSET $offset");
         $query->execute($parameters);$rows=$query->fetchAll();$total=isset($rows[0])?(int)$rows[0]['total_count']:0;
         if($rows===[]&&$offset>0){$count=$db->prepare("SELECT COUNT(*) FROM ($union) timeline_count");$count->execute($parameters);$total=(int)$count->fetchColumn();}
         $events=[];$seen=[];
@@ -170,14 +170,17 @@ SQL;
 
     private function deliveryCopy(array $p): array
     {
-        $version = (int)($p['version_number'] ?? 1);
-        if ($version >= 2) {
-            $fileCount = (int)($p['file_count'] ?? 1);
-            if ($fileCount <= 0) $fileCount = 1;
-            $filesLabel = $fileCount === 1 ? '1 archivo corregido' : $fileCount . ' archivos corregidos';
-            return ['Correcciones reenviadas', $filesLabel, 'delivery'];
+        $version = max(1, (int)($p['version_number'] ?? 1));
+        $fileCount = max(1, (int)($p['file_count'] ?? 1));
+        $docText = $fileCount === 1 ? '1 documento enviado a revisión.' : $fileCount . ' documentos enviados a revisión.';
+        $description = 'Se registró la entrega N.º ' . $version . ' con ' . $docText;
+
+        $comment = trim((string)($p['comment'] ?? ''));
+        if ($comment !== '' && !in_array(mb_strtolower($comment), ['entrega inicial', 'entrega de prueba', 'contenido de entrega', 'documentos enviados a revisión por el estudiante.'], true)) {
+            $description .= ' ' . $comment;
         }
-        return ['Entrega enviada a revisión', $this->deliveryDescription($p), 'delivery'];
+
+        return ['Entrega documental registrada', $description, 'delivery'];
     }
 
     private function observationBatchDescription(array $p): string

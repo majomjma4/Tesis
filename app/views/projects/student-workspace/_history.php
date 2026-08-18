@@ -166,6 +166,12 @@ foreach ($versions as $ver) {
                     </article>
                 <?php endforeach; ?>
             </div>
+            <?php
+            $pagination = (array) ($project['academic_history_pagination'] ?? []);
+            if (!empty($pagination) && ($pagination['total'] ?? 0) > 0):
+                require APP_PATH . '/views/components/pagination.php';
+            endif;
+            ?>
         <?php endif; ?>
     </section>
 </div>

@@ -16,7 +16,7 @@ final class ProjectDocumentReviewService
     public function __construct(private readonly ?PDO $db = null) {}
 
     /** @return array{files:array<int,array<string,mixed>>,summary:array<string,mixed>} */
-    public function describeCurrentFiles(int $projectId, array $files, bool $reviewScope = false): array
+    public function describeCurrentFiles(int $projectId, array $files, bool $reviewScope = false, bool $forTeacherReview = false): array
     {
         $active = array_values(array_filter($files, static fn(array $file): bool =>
             (int)($file['project_id'] ?? 0) === $projectId && empty($file['deleted_at']) && empty($file['purged_at'])
@@ -26,7 +26,8 @@ final class ProjectDocumentReviewService
 
         $ids = array_map(static fn(array $file): int => (int)$file['id'], $active);
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $query = ($this->db ?? Database::connection())->prepare(
+        $db = $this->db ?? Database::connection();
+        $query = $db->prepare(
             "SELECT f.id,
                     COALESCE(s.status,'development') document_status,
                     COALESCE(v.latest_version,0)+1 current_version_number,
@@ -45,17 +46,76 @@ final class ProjectDocumentReviewService
         $states = [];
         foreach ($query->fetchAll() as $row) $states[(int)$row['id']] = $row;
 
+        $closedMap = [];
+        if ($forTeacherReview && !$this->isProjectUnderActiveReview($projectId)) {
+            $closedMap = $this->getHistoricalClosedReviewMap($projectId);
+        }
+
         foreach ($active as &$file) {
-            $state = $states[(int)$file['id']] ?? [];
-            $status = in_array((string)($state['document_status'] ?? ''), self::STATUSES, true)
-                ? (string)$state['document_status'] : 'development';
-            $file['document_status'] = $status;
-            $file['document_status_label'] = $this->label($status);
-            $file['current_version_number'] = max(1, (int)($state['current_version_number'] ?? 1));
-            $file['current_updated_at'] = $state['current_updated_at'] ?? ($file['created_at'] ?? null);
+            $fileId = (int)$file['id'];
+            if (!empty($closedMap[$fileId])) {
+                $hist = $closedMap[$fileId];
+                $status = in_array((string)($hist['document_status'] ?? ''), self::STATUSES, true)
+                    ? (string)$hist['document_status'] : 'development';
+                $file['checksum_sha256'] = (string)($hist['checksum'] ?? ($file['checksum_sha256'] ?? ''));
+                $file['document_status'] = $status;
+                $file['document_status_label'] = $this->label($status);
+                $state = $states[$fileId] ?? [];
+                $file['current_version_number'] = max(1, (int)($state['current_version_number'] ?? 1));
+                $file['current_updated_at'] = $state['current_updated_at'] ?? ($file['created_at'] ?? null);
+            } else {
+                $state = $states[$fileId] ?? [];
+                $status = in_array((string)($state['document_status'] ?? ''), self::STATUSES, true)
+                    ? (string)$state['document_status'] : 'development';
+                $file['document_status'] = $status;
+                $file['document_status_label'] = $this->label($status);
+                $file['current_version_number'] = max(1, (int)($state['current_version_number'] ?? 1));
+                $file['current_updated_at'] = $state['current_updated_at'] ?? ($file['created_at'] ?? null);
+            }
         }
         unset($file);
         return ['files'=>$active, 'summary'=>$this->summary($active)];
+    }
+
+    public function isProjectUnderActiveReview(int $projectId): bool
+    {
+        $db = $this->db ?? Database::connection();
+        $p = $db->prepare("SELECT status FROM projects WHERE id=:id AND deleted_at IS NULL");
+        $p->execute(['id'=>$projectId]);
+        $status = strtolower(trim((string)($p->fetchColumn() ?: '')));
+        return $status === 'under_review';
+    }
+
+    public function getHistoricalClosedReviewMap(int $projectId): array
+    {
+        $db = $this->db ?? Database::connection();
+        $audits = $db->prepare("
+            SELECT new_state, created_at
+            FROM project_audit_log
+            WHERE project_id = :project
+              AND action IN ('project_document_review_completed', 'project_observation_batch_created')
+            ORDER BY id ASC
+        ");
+        $audits->execute(['project'=>$projectId]);
+        $rows = $audits->fetchAll(PDO::FETCH_ASSOC);
+
+        $map = [];
+        foreach ($rows as $a) {
+            $payload = json_decode($a['new_state'] ?? '{}', true);
+            $documents = is_array($payload['documents'] ?? null) ? $payload['documents'] : [];
+            foreach ($documents as $doc) {
+                $fileId = (int) ($doc['file_id'] ?? 0);
+                if ($fileId > 0 && !empty($doc['checksum']) && !empty($doc['status'])) {
+                    $map[$fileId] = [
+                        'file_id' => $fileId,
+                        'checksum' => (string) $doc['checksum'],
+                        'document_status' => (string) $doc['status'],
+                        'closed_at' => $a['created_at'],
+                    ];
+                }
+            }
+        }
+        return $map;
     }
 
     /** @return array<string,mixed> */

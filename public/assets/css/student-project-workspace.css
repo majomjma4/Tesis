@@ -3650,15 +3650,16 @@ body.sw-modal-open {
     min-height: 0 !important;
     overflow-y: auto !important;
     scrollbar-gutter: stable;
+    padding-bottom: 0 !important;
 }
 
 .student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel .sw-obs-footer {
     display: block !important;
     flex: 0 0 auto !important;
-    padding: 0.65rem 0.85rem !important;
+    padding: 0.4rem 0.85rem 0.65rem !important;
     border-top: 1px solid var(--sw-border, #e2e8f0) !important;
     background: var(--sw-surface, #ffffff) !important;
-    margin-top: auto !important;
+    margin-top: 0 !important;
     z-index: 6 !important;
 }
 
@@ -3757,25 +3758,41 @@ body.sw-modal-open {
 .sw-observations-panel.is-collapsed [data-sw-file-observations],
 .sw-observations-panel.is-collapsed .sw-obs-header,
 .sw-observations-panel.is-collapsed .sw-obs-footer,
+.sw-observations-panel.is-collapsed .sw-review-ready-action,
 .student-workspace.sw-observations-collapsed .sw-observations-panel > *:not(.sw-panel-reopen-btn),
 .student-workspace.sw-observations-collapsed .sw-observations-panel [data-sw-file-observations],
 .student-workspace.sw-observations-collapsed .sw-observations-panel .sw-obs-header,
 .student-workspace.sw-observations-collapsed .sw-observations-panel .sw-obs-footer,
+.student-workspace.sw-observations-collapsed .sw-observations-panel .sw-review-ready-action,
 .student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed > *:not(.sw-panel-reopen-btn),
 .student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed [data-sw-file-observations],
 .student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed .sw-obs-header,
 .student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed .sw-obs-footer,
+.student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed .sw-review-ready-action,
 .student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel > *:not(.sw-panel-reopen-btn),
 .student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel [data-sw-file-observations],
 .student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel .sw-obs-header,
-.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel .sw-obs-footer {
+.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel .sw-obs-footer,
+.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel .sw-review-ready-action,
+.student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel.is-collapsed > *:not(.sw-panel-reopen-btn),
+.student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel.is-collapsed [data-sw-file-observations],
+.student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel.is-collapsed .sw-obs-header,
+.student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel.is-collapsed .sw-obs-footer,
+.student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel.is-collapsed .sw-review-ready-action,
+.student-workspace.sw-observations-collapsed .sw-doc-workspace.is-teacher-review .sw-observations-panel > *:not(.sw-panel-reopen-btn),
+.student-workspace.sw-observations-collapsed .sw-doc-workspace.is-teacher-review .sw-observations-panel [data-sw-file-observations],
+.student-workspace.sw-observations-collapsed .sw-doc-workspace.is-teacher-review .sw-observations-panel .sw-obs-header,
+.student-workspace.sw-observations-collapsed .sw-doc-workspace.is-teacher-review .sw-observations-panel .sw-obs-footer,
+.student-workspace.sw-observations-collapsed .sw-doc-workspace.is-teacher-review .sw-observations-panel .sw-review-ready-action {
     display: none !important;
 }
 
 .sw-observations-panel.is-collapsed .sw-panel-reopen-btn,
 .student-workspace.sw-observations-collapsed .sw-observations-panel .sw-panel-reopen-btn,
 .student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed .sw-panel-reopen-btn,
-.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel .sw-panel-reopen-btn {
+.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel .sw-panel-reopen-btn,
+.student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel.is-collapsed .sw-panel-reopen-btn,
+.student-workspace.sw-observations-collapsed .sw-doc-workspace.is-teacher-review .sw-observations-panel .sw-panel-reopen-btn {
     display: flex !important;
     margin: 0 auto !important;
 }
@@ -3784,7 +3801,9 @@ body.sw-modal-open {
 .student-workspace .sw-observations-panel.is-collapsed,
 .student-workspace.sw-observations-collapsed .sw-observations-panel,
 .student-workspace .sw-doc-workspace .sw-observations-panel.is-collapsed,
-.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel {
+.student-workspace.sw-observations-collapsed .sw-doc-workspace .sw-observations-panel,
+.student-workspace .sw-doc-workspace.is-teacher-review .sw-observations-panel.is-collapsed,
+.student-workspace.sw-observations-collapsed .sw-doc-workspace.is-teacher-review .sw-observations-panel {
     flex: 0 0 40px !important;
     width: 40px !important;
     min-width: 40px !important;
@@ -4147,10 +4166,12 @@ body.sw-modal-open {
 
 .student-workspace .sw-review-observation-card p,
 .student-workspace .sw-review-observation-card blockquote {
-    overflow-wrap: anywhere;
+    word-break: normal;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
     margin: 0.45rem 0;
     color: #334155;
-    font-size: 0.76rem;
+    font-size: 0.78rem;
     line-height: 1.45;
 }
 
@@ -4255,7 +4276,15 @@ body.sw-modal-open {
 
 .student-workspace .sw-review-selection-context span,
 .student-workspace .sw-review-selection-context small { display: block; color: #1e40af; font-size: 0.68rem; font-weight: 700; }
-.student-workspace .sw-review-selection-context blockquote { overflow-wrap: anywhere; margin: 0.35rem 0; color: #334155; font-size: 0.74rem; line-height: 1.4; }
+.student-workspace .sw-review-selection-context blockquote {
+    word-break: normal;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    margin: 0.35rem 0;
+    color: #334155;
+    font-size: 0.74rem;
+    line-height: 1.4;
+}
 
 .student-workspace .sw-review-form-actions {
     display: flex;
@@ -4296,17 +4325,36 @@ body.sw-modal-open {
 .student-workspace .sw-review-ready-action {
     position: sticky;
     bottom: 0;
-    z-index: 3;
+    z-index: 5;
     display: grid;
-    gap: 0.45rem;
-    padding: 0.75rem 0.85rem;
-    border-top: 1px solid #e2e8f0;
-    background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(8px);
+    gap: 0.25rem;
+    padding: 0.45rem 0.75rem 0.45rem;
+    border-top: 1px solid var(--sw-border, #e2e8f0);
+    background: var(--sw-surface, #ffffff) !important;
+    backdrop-filter: none;
+    margin-top: 0.4rem;
+    margin-bottom: 0 !important;
+    box-sizing: border-box;
 }
 
-.student-workspace .sw-review-ready-action span { color: #64748b; font-size: 0.69rem; text-align: center; }
-.student-workspace .sw-review-ready-action button { min-height: 40px; border-color: var(--sw-primary, #2563eb); background: var(--sw-primary, #2563eb); color: #fff; }
+.student-workspace .sw-review-ready-action span {
+    color: var(--sw-text-muted, #64748b);
+    font-size: 0.68rem;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.25;
+}
+
+.student-workspace .sw-review-ready-action button {
+    min-height: 36px;
+    padding: 0.4rem 0.75rem;
+    border-radius: 8px;
+    border-color: var(--sw-primary, #2563eb);
+    background: var(--sw-primary, #2563eb);
+    color: #ffffff;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
 
 .student-workspace .sw-review-unavailable,
 .student-workspace .sw-review-persisted-approved {
@@ -4437,7 +4485,7 @@ body.sw-modal-open {
 
 .student-workspace .sw-review-selection-editor {
     position: absolute;
-    z-index: 10100;
+    z-index: 100000 !important;
     display: grid;
     gap: 0.6rem;
     width: min(320px, calc(100vw - 24px));
@@ -4445,14 +4493,14 @@ body.sw-modal-open {
     border: 1px solid var(--sw-border, #cbd5e1);
     border-radius: 12px;
     background: #ffffff;
-    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.22);
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.28);
     font-family: inherit;
     font-size: 0.82rem;
     animation: swFadeInScale 0.18s ease;
 }
 
-.sw-viewer-panel { position: relative; }
-.sw-review-floating-layer { position:absolute; inset:0; z-index:10100; pointer-events:none !important; overflow:hidden; }
+.sw-viewer-panel { position: relative; overflow: visible !important; }
+.sw-review-floating-layer { position:absolute; inset:0; z-index:100000 !important; pointer-events:none !important; overflow:visible !important; }
 .sw-review-floating-layer .sw-review-selection-editor,
 .sw-review-floating-layer .sw-review-note-popover,
 .sw-review-floating-layer .sw-review-highlight-overlay,
@@ -4772,9 +4820,9 @@ body.sw-modal-open {
     font-size: 0.82rem;
     line-height: 1.4;
     color: #0f172a;
-    word-break: break-word;
+    word-break: normal;
     white-space: pre-wrap;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
 }
 
 .student-workspace .sw-review-note-footer {

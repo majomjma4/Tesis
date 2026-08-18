@@ -154,13 +154,8 @@ final class StudentProjectSubmissionService
         $rows = $query->fetchAll();
 
         if ($hasDeliveries) {
-            $unreplacedCount = 0;
-            foreach ($rows as $row) {
-                if ((string)$row['review_status'] === 'corrections_requested') {
-                    $unreplacedCount++;
-                }
-            }
-            if ($unreplacedCount > 0) {
+            $correctionReadiness = (new ProjectCorrectionReadinessService($db))->forProject($projectId);
+            if (!$correctionReadiness['eligible']) {
                 throw new StudentProjectSubmissionException('Debes corregir todos los documentos observados antes de reenviar el proyecto.', 422);
             }
         }

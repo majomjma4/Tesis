@@ -522,19 +522,21 @@ document.addEventListener('DOMContentLoaded', () => {
     let observationFilter='all', selectedObservationFileId=0;
     const observationIsAddressed=(item)=>['addressed','resolved'].includes(String(item.status||'').toLowerCase());
     const observationTone=(item,index)=>['amber','blue','green','violet','rose'][(Number(item.id||index)||index)%5];
+    let correctionReadiness={}; try { correctionReadiness=JSON.parse(manager.dataset.correctionReadiness||'{}'); } catch (error) { correctionReadiness={}; }
 
     const canResubmitCorrections = () => {
-        const hasProjectDeliveries = Number(manager.dataset.deliveryCount || 0) > 0 || Boolean(manager.querySelector('[data-document-status="approved"], [data-document-status="corrections_requested"]'));
         const files = [...manager.querySelectorAll('[data-sw-file]')];
-
-        const correctionsRequestedFiles = files.filter((f) => f.dataset.documentStatus === 'corrections_requested');
-        const replacedFiles = files.filter((f) => f.dataset.documentStatus === 'development' && hasProjectDeliveries);
-
-        const totalNeeded = correctionsRequestedFiles.length + replacedFiles.length;
-        const completed = replacedFiles.length;
-        const unreplaced = correctionsRequestedFiles.length;
-        const eligible = !hasProjectDeliveries || (totalNeeded > 0 ? unreplaced === 0 : true);
-
+        const hasProjectDeliveries = correctionReadiness.has_deliveries === true;
+        const required = Array.isArray(correctionReadiness.required) ? correctionReadiness.required : [];
+        const completed = required.filter((item) => {
+            const file = files.find((candidate) => String(candidate.dataset.fileId || '') === String(item.file_id || ''));
+            if (!file) return false;
+            return file.dataset.documentStatus !== 'corrections_requested'
+                && String(file.dataset.fileChecksum || '').toLowerCase() !== String(item.checksum || '').toLowerCase();
+        }).length;
+        const totalNeeded = required.length;
+        const unreplaced = totalNeeded - completed;
+        const eligible = !hasProjectDeliveries || unreplaced === 0;
         return { eligible, totalNeeded, completed, unreplaced, hasDeliveries: hasProjectDeliveries };
     };
 
@@ -656,6 +658,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const isObservationForActiveVersion = (item, activeChecksumsMap) => {
         const fileId = Number(item.file_id || 0);
         if (fileId <= 0) return true; // General del proyecto
+
+        const requiredItems = Array.isArray(correctionReadiness?.required) ? correctionReadiness.required : [];
+        const isRequiredForCorrections = requiredItems.some((r) => Number(r.file_id || 0) === fileId);
+
+        if (isRequiredForCorrections) {
+            const reqItem = requiredItems.find((r) => Number(r.file_id || 0) === fileId);
+            if (reqItem && reqItem.checksum) {
+                const obsChecksum = String(item.file_checksum_sha256 || '').toLowerCase().trim();
+                const targetChecksum = String(reqItem.checksum || '').toLowerCase().trim();
+                return obsChecksum === targetChecksum;
+            }
+            return true;
+        }
+
         const activeChecksum = activeChecksumsMap.get(fileId);
         if (!activeChecksum) return true;
         const obsChecksum = String(item.file_checksum_sha256 || '').toLowerCase().trim();
@@ -865,13 +881,40 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // 3. Cuerpo del comentario
+            const fullBodyText = String(item.body || '');
+            const truncatedBodyText = truncateText(fullBodyText, 140);
             const body = document.createElement('p');
             body.className = 'sw-obs-card-body';
             body.style.margin = '2px 0';
             body.style.color = '#1e293b';
             body.style.fontSize = '0.86rem';
             body.style.lineHeight = '1.4';
-            body.textContent = String(item.body || '');
+
+            if (truncatedBodyText) {
+                const bodyText = document.createElement('span');
+                bodyText.className = 'sw-obs-body-text';
+                bodyText.textContent = truncatedBodyText;
+
+                const toggleMoreBtn = document.createElement('button');
+                toggleMoreBtn.type = 'button';
+                toggleMoreBtn.className = 'sw-obs-toggle-more-btn';
+                toggleMoreBtn.style.cssText = 'background:none;border:none;padding:2px 0;margin-top:2px;color:#2563eb;font-size:0.75rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;';
+                toggleMoreBtn.innerHTML = '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Ver más';
+
+                let isExpanded = false;
+                toggleMoreBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    isExpanded = !isExpanded;
+                    bodyText.textContent = isExpanded ? fullBodyText : truncatedBodyText;
+                    toggleMoreBtn.innerHTML = isExpanded
+                        ? '<i class="fa-solid fa-chevron-up" aria-hidden="true"></i> Ocultar'
+                        : '<i class="fa-solid fa-chevron-down" aria-hidden="true"></i> Ver más';
+                });
+
+                body.append(bodyText, document.createElement('br'), toggleMoreBtn);
+            } else {
+                body.textContent = fullBodyText;
+            }
 
             // 4. Footer con Autor, Fecha y Botón Discreto de Alternar Estado
             const footer = document.createElement('div');
