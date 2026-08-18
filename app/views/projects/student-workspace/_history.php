@@ -4,49 +4,76 @@
 /** @var \Closure(?string, bool=): string $formatDate */
 $events = (array) ($project['academic_history'] ?? []);
 $versions = (array) ($studentVersions ?? []);
+$groupedVersions = [];
+foreach ($versions as $ver) {
+    $fileId = (int) ($ver['file_id'] ?? 0);
+    if (!isset($groupedVersions[$fileId])) {
+        $groupedVersions[$fileId] = [
+            'file_id' => $fileId,
+            'name' => (string) ($ver['original_name'] ?? 'Archivo'),
+            'items' => [],
+        ];
+    }
+    $groupedVersions[$fileId]['items'][] = $ver;
+}
 ?>
 <div class="sw-history-container" style="display:flex; flex-direction:column; gap:1.5rem;">
-    <?php if ($versions !== []): ?>
+    <?php if ($groupedVersions !== []): ?>
         <section class="sw-card">
             <header class="sw-section-heading">
                 <div>
-                    <h2><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Versiones históricas de documentos
-                    </h2>
-                    <p>Histórico de versiones anteriores reemplazadas para este proyecto.</p>
+                    <h2><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Versiones históricas de documentos</h2>
+                    <p>Histórico de versiones anteriores reemplazadas para este proyecto, agrupadas por documento.</p>
                 </div>
             </header>
-            <div class="sw-record-list">
-                <?php foreach ($versions as $ver): ?>
-                    <article class="sw-record"
-                        style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
-                        <div style="display:flex; flex-direction:column; gap:0.25rem; min-width:0; flex:1 1 280px;">
-                            <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-                                <strong style="font-size:0.92rem; color:var(--sw-text);">
-                                    <i class="fa-regular fa-file-lines" aria-hidden="true"></i>
-                                    <?= e((string) ($ver['original_name'] ?? 'Archivo')) ?>
-                                </strong>
-                                <span class="sw-badge-type" style="background:#e0f2fe; color:#0369a1; text-transform:none;">
-                                    Versión <?= (int) ($ver['version_number'] ?? 1) ?>
-                                </span>
+            <div class="sw-history-accordion-list">
+                <?php foreach ($groupedVersions as $group): ?>
+                    <?php
+                    $vCount = count($group['items']);
+                    $vLabel = $vCount === 1 ? '1 versión anterior' : $vCount . ' versiones anteriores';
+                    $fileName = (string) ($group['items'][0]['original_name'] ?? $group['name']);
+                    ?>
+                    <details class="sw-history-accordion">
+                        <summary class="sw-history-accordion-header">
+                            <div class="sw-history-accordion-title">
+                                <i class="fa-regular fa-file-lines" aria-hidden="true"></i>
+                                <strong class="sw-history-file-name"><?= e($fileName) ?></strong>
                             </div>
-                            <?php if (!empty($ver['replacement_reason'])): ?>
-                                <p style="margin:0.2rem 0 0; font-size:0.85rem; color:var(--sw-text-muted);">
-                                    <strong>Motivo:</strong> <?= e((string) $ver['replacement_reason']) ?>
-                                </p>
-                            <?php endif; ?>
-                            <small style="color:var(--sw-text-muted); font-size:0.78rem;">
-                                <?= e($formatDate((string) ($ver['replaced_at'] ?? ''), true)) ?>
-                                <?= !empty($ver['responsible']) ? ' · Autor: ' . e((string) $ver['responsible']) : '' ?>
-                            </small>
+                            <div class="sw-history-accordion-meta">
+                                <span class="sw-badge-type sw-history-count-badge"><?= e($vLabel) ?></span>
+                                <i class="fa-solid fa-chevron-down sw-history-chevron" aria-hidden="true"></i>
+                            </div>
+                        </summary>
+                        <div class="sw-history-accordion-body">
+                            <?php foreach ($group['items'] as $ver): ?>
+                                <article class="sw-record sw-history-subrecord">
+                                    <div class="sw-history-subrecord-info">
+                                        <div class="sw-history-subrecord-header">
+                                            <span class="sw-badge-type sw-history-version-badge">
+                                                Versión <?= (int) ($ver['version_number'] ?? 1) ?>
+                                            </span>
+                                            <small class="sw-history-subrecord-date">
+                                                <?= e($formatDate((string) ($ver['replaced_at'] ?? ''), true)) ?>
+                                                <?= !empty($ver['responsible']) ? ' · Autor: ' . e((string) $ver['responsible']) : '' ?>
+                                            </small>
+                                        </div>
+                                        <?php if (!empty($ver['replacement_reason'])): ?>
+                                            <p class="sw-history-subrecord-reason">
+                                                <strong>Motivo:</strong> <?= e((string) $ver['replacement_reason']) ?>
+                                            </p>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="sw-history-subrecord-actions">
+                                        <a class="sw-secondary-link"
+                                            href="<?= e($detailUrl . '&tab=documents&version_id=' . (int) $ver['id']) ?>"
+                                            title="Ver esta versión en el visor de documentos">
+                                            <i class="fa-solid fa-eye" aria-hidden="true"></i> Ver versión
+                                        </a>
+                                    </div>
+                                </article>
+                            <?php endforeach; ?>
                         </div>
-                        <div>
-                            <a class="sw-secondary-link"
-                                href="<?= e($detailUrl . '&tab=documents&version_id=' . (int) $ver['id']) ?>"
-                                title="Ver esta versión en el visor de documentos">
-                                <i class="fa-solid fa-eye" aria-hidden="true"></i> Ver versión
-                            </a>
-                        </div>
-                    </article>
+                    </details>
                 <?php endforeach; ?>
             </div>
         </section>
@@ -91,6 +118,7 @@ $versions = (array) ($studentVersions ?? []);
                     $actor = !empty($event['actor']) ? (string) $event['actor'] : '';
                     $rawDate = (string) ($event['occurred_at_local'] ?? $event['date'] ?? '');
                     $formattedDate = $rawDate !== '' ? $formatDate($rawDate, true) : '';
+                    $fileName = (string) ($event['file']['name'] ?? $event['metadata']['payload']['file_name'] ?? '');
                     ?>
                     <article class="sw-history-event <?= e($eventCategory) ?>">
                         <div class="sw-history-main">
@@ -100,6 +128,12 @@ $versions = (array) ($studentVersions ?? []);
                             </strong>
                             <?php if (!empty($event['description'])): ?>
                                 <p class="sw-history-desc"><?= e((string) $event['description']) ?></p>
+                            <?php endif; ?>
+                            <?php if ($fileName !== '' && in_array($eventType, ['document_version_uploaded', 'file_version_registered'], true)): ?>
+                                <div class="sw-history-file-ref">
+                                    <i class="fa-regular fa-file-lines" aria-hidden="true"></i>
+                                    <strong><?= e($fileName) ?></strong>
+                                </div>
                             <?php endif; ?>
                             <?php if (!empty($event['badges']) && is_array($event['badges'])): ?>
                                 <div class="sw-history-badges">

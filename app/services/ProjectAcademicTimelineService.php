@@ -83,8 +83,8 @@ UNION ALL
 SELECT CONCAT('document-version:',c.id),'document_version_uploaded','project_file_version_change',c.id,c.changed_at,u.id,u.full_name,
        JSON_OBJECT('checksum',c.previous_checksum,'version_number',c.previous_version_number,'document_status',c.previous_document_status),
        JSON_OBJECT('checksum',c.new_checksum,'version_number',c.new_version_number,'document_status',c.new_document_status),
-       JSON_OBJECT('file_id',c.file_id,'file_name',f.original_name,'previous_version_number',c.previous_version_number,'new_version_number',c.new_version_number,'previous_checksum',c.previous_checksum,'new_checksum',c.new_checksum,'reason',c.reason,'declared_summary',c.declared_summary,'sections_json',c.sections_json,'previous_document_status',c.previous_document_status,'new_document_status',c.new_document_status,'addressed_observation_count',(SELECT COUNT(*) FROM project_file_version_addressed_observations link WHERE link.change_id=c.id))
-FROM project_file_version_changes c JOIN project_files f ON f.id=c.file_id LEFT JOIN users u ON u.id=c.changed_by WHERE c.project_id=?
+       JSON_OBJECT('file_id',c.file_id,'file_name',f.original_name,'previous_file_name',v.original_name,'previous_version_number',c.previous_version_number,'new_version_number',c.new_version_number,'previous_checksum',c.previous_checksum,'new_checksum',c.new_checksum,'reason',c.reason,'declared_summary',c.declared_summary,'sections_json',c.sections_json,'previous_document_status',c.previous_document_status,'new_document_status',c.new_document_status,'addressed_observation_count',(SELECT COUNT(*) FROM project_file_version_addressed_observations link WHERE link.change_id=c.id))
+FROM project_file_version_changes c JOIN project_files f ON f.id=c.file_id LEFT JOIN project_file_versions v ON v.id=c.previous_version_id LEFT JOIN users u ON u.id=c.changed_by WHERE c.project_id=?
 UNION ALL
 SELECT CONCAT('document-archive:',l.id),'document_version_archived','project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason,'archived_count',JSON_VALUE(l.new_state,'$.archived_count'),'unavailable_count',JSON_VALUE(l.new_state,'$.unavailable_count'))
@@ -152,8 +152,8 @@ SQL;
             'adjustment_closed'=>['Solicitud de ajuste cerrada',(string)($p['message']??''),'adjustment'],
             'document_review_completed'=>['Revisión documental confirmada',$this->reviewDescription($new),'document-review'],
             'document_status_recorded'=>['Estado documental registrado',$this->documentStatusLabel((string)($p['status']??'')),'document-review'],
-            'file_version_registered'=>['Nueva versión documental registrada',trim((string)($p['reason']??$p['file_name']??'')),'file'],
-            'document_version_uploaded'=>['Nueva versión documental registrada',!empty($p['declared_summary'])?(string)$p['declared_summary']:(!empty($p['file_name'])?(string)$p['file_name'].' fue actualizada.':'Se actualizó la versión de un documento.'),'file'],
+            'file_version_registered'=>['Nueva versión documental registrada',!empty($p['reason'])?(string)$p['reason']:'Archivo actualizado durante la preparación documental.','file'],
+            'document_version_uploaded'=>['Nueva versión documental registrada',!empty($p['declared_summary'])?(string)$p['declared_summary']:'Archivo actualizado durante la preparación documental.','file'],
             'document_version_archived'=>['Versiones documentales archivadas','Se archivaron '.(int)($p['archived_count']??0).' versiones históricas.','file'],
             'project_publication_reverted','project_unpublished'=>['Publicación revertida',$this->transitionDescription($previous,$new),'status'],
             'project_published','project_republished'=>['Proyecto publicado','El expediente fue publicado institucionalmente.','publication'],

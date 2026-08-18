@@ -489,6 +489,24 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     overflow-wrap: anywhere;
     word-break: break-word;
 }
+.student-workspace .sw-history-file-ref {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--sw-text, #1e293b);
+    margin-top: 0.3rem;
+    margin-bottom: 0.1rem;
+    word-break: normal;
+    overflow-wrap: break-word;
+    max-width: 100%;
+}
+.student-workspace .sw-history-file-ref i {
+    color: var(--sw-violet, #6366f1);
+    font-size: 0.88rem;
+    flex-shrink: 0;
+}
 .student-workspace .sw-history-badges {
     display: flex;
     gap: 0.4rem;
@@ -529,9 +547,11 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     .sw-tabs-nav {
         flex-wrap: nowrap !important;
         overflow-x: auto !important;
+        overflow-y: hidden !important;
         -webkit-overflow-scrolling: touch !important;
         scrollbar-width: none;
-        max-width: 100%;
+        max-width: 100% !important;
+        min-width: 0 !important;
     }
     .sw-tabs-nav::-webkit-scrollbar {
         display: none;
@@ -541,6 +561,15 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
         font-size: 0.88rem !important;
         flex-shrink: 0 !important;
         white-space: nowrap !important;
+    }
+    .student-workspace .sw-tutor-group,
+    .student-workspace .sw-students-group {
+        flex: 1 1 100% !important;
+        min-width: 0 !important;
+    }
+    .student-workspace .sw-header-people-grid {
+        padding: 0.65rem 0.75rem !important;
+        gap: 0.85rem !important;
     }
     .student-workspace .sw-card {
         padding: 0.85rem !important;
@@ -563,6 +592,18 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
         text-align: left;
         padding-top: 0.5rem;
         border-top: 1px dashed var(--sw-border);
+    }
+}
+@media (max-width: 480px) {
+    body.app-student-workspace-fullscreen .app-page-content {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    .sw-header-card {
+        padding: 0.85rem 0.75rem !important;
+    }
+    .student-workspace .sw-card {
+        padding: 0.75rem 0.65rem !important;
     }
 }
 .student-workspace .sw-record div { display:flex; align-items:baseline; justify-content:space-between; gap:.75rem; }
@@ -1881,7 +1922,8 @@ body > .sw-file-menu button,body > .sw-file-menu a { border:0;background:transpa
 }
 @media (max-width: 760px) {
     .student-workspace .sw-resizer { display: none !important; }
-    .student-workspace .sw-tabs-nav { position:relative; display:flex; flex-wrap:nowrap; overflow:visible; }
+    .student-workspace .sw-tabs-nav { position:relative; display:flex; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; max-width:100%; min-width:0; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+    .student-workspace .sw-tabs-nav::-webkit-scrollbar { display:none; }
     .student-workspace .sw-tabs-nav .sw-tab-secondary { display:none; }
     .student-workspace .sw-tabs-more { display:block; margin-left:auto; }
     .student-workspace .sw-doc-workspace { display:flex; flex-direction:column; gap:1rem; }
@@ -2174,7 +2216,10 @@ body > .sw-file-menu button,body > .sw-file-menu a { border:0;background:transpa
 
 @media (max-width: 768px) {
     .student-workspace {
-        overflow-x: hidden;
+        overflow-x: clip;
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
     }
 
     .sw-doc-workspace {
@@ -5490,4 +5535,198 @@ canvas.hiddenCanvasElement {
 .student-workspace .sw-obs-quote-toggle:hover {
     color: #334155;
     text-decoration: underline;
+}
+
+/* Acordeón de versiones históricas agrupadas por documento */
+.student-workspace .sw-history-accordion-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.student-workspace .sw-history-accordion {
+    border: 1px solid var(--sw-border, #e2e8f0);
+    border-left: 4px solid var(--sw-violet, #7c3aed);
+    border-radius: 10px;
+    background: var(--sw-bg-soft, #f8fafc);
+    overflow: hidden;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.student-workspace .sw-history-accordion[open] {
+    background: var(--sw-surface, #ffffff);
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.student-workspace .sw-history-accordion-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.85rem 1.15rem;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+}
+
+.student-workspace .sw-history-accordion-header::-webkit-details-marker {
+    display: none;
+}
+
+.student-workspace .sw-history-accordion-header:hover {
+    background: color-mix(in srgb, var(--sw-primary, #2563eb) 4%, transparent);
+}
+
+.student-workspace .sw-history-accordion-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.student-workspace .sw-history-accordion-title i {
+    color: var(--sw-violet, #7c3aed);
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.student-workspace .sw-history-file-name {
+    font-size: 0.92rem;
+    color: var(--sw-text, #0f172a);
+    word-break: normal;
+    overflow-wrap: break-word;
+}
+
+.student-workspace .sw-history-accordion-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-shrink: 0;
+}
+
+.student-workspace .sw-history-count-badge {
+    background: #e0f2fe !important;
+    color: #0369a1 !important;
+    border: 1px solid #bae6fd !important;
+    font-size: 0.78rem !important;
+    padding: 0.2rem 0.65rem !important;
+    border-radius: 999px !important;
+    font-weight: 600 !important;
+    white-space: nowrap;
+}
+
+.student-workspace .sw-history-chevron {
+    color: var(--sw-text-muted, #64748b);
+    font-size: 0.85rem;
+    transition: transform 0.2s ease;
+}
+
+.student-workspace .sw-history-accordion[open] .sw-history-chevron {
+    transform: rotate(180deg);
+}
+
+.student-workspace .sw-history-accordion-body {
+    padding: 0 1.15rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    border-top: 1px solid var(--sw-border, #e2e8f0);
+    background: var(--sw-surface, #ffffff);
+}
+
+.student-workspace .sw-history-subrecord {
+    border: 1px solid var(--sw-border, #e2e8f0);
+    border-left: 3px solid #0284c7;
+    border-radius: 8px;
+    background: #f0f9ff;
+    padding: 0.75rem 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.85rem;
+    flex-wrap: wrap;
+    margin-top: 0.6rem;
+}
+
+.student-workspace .sw-history-subrecord-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+    flex: 1 1 240px;
+}
+
+.student-workspace .sw-history-subrecord-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.student-workspace .sw-history-version-badge {
+    background: #e0f2fe !important;
+    color: #0369a1 !important;
+    border: 1px solid #bae6fd !important;
+    font-size: 0.75rem !important;
+    padding: 0.15rem 0.55rem !important;
+    border-radius: 6px !important;
+    font-weight: 700 !important;
+    white-space: nowrap;
+}
+
+.student-workspace .sw-history-subrecord-date {
+    color: var(--sw-text-muted, #64748b);
+    font-size: 0.78rem;
+}
+
+.student-workspace .sw-history-subrecord-reason {
+    margin: 0.15rem 0 0;
+    font-size: 0.83rem;
+    color: var(--sw-text, #334155);
+    word-break: normal;
+    overflow-wrap: break-word;
+}
+
+.student-workspace .sw-history-subrecord-actions {
+    flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+    .student-workspace .sw-history-accordion-header {
+        flex-wrap: wrap;
+        padding: 0.75rem 0.85rem;
+        gap: 0.4rem 0.75rem;
+    }
+
+    .student-workspace .sw-history-accordion-title {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    .student-workspace .sw-history-accordion-meta {
+        flex: 1 1 100%;
+        width: 100%;
+        justify-content: space-between;
+        margin-top: 0.15rem;
+    }
+
+    .student-workspace .sw-history-accordion-body {
+        padding: 0 0.85rem 0.75rem;
+    }
+
+    .student-workspace .sw-history-subrecord {
+        padding: 0.65rem 0.75rem;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.6rem;
+    }
+
+    .student-workspace .sw-history-subrecord-actions {
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+    }
 }
