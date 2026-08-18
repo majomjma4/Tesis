@@ -7,7 +7,15 @@
 .project-adjustment-dialog h2{margin:3px 0 0;font-size:19px;line-height:1.25}
 .project-adjustment-dialog header button{width:42px;min-height:42px;border-radius:10px}
 .project-adjustment-dialog form{padding:20px 22px;gap:16px}
-.project-adjustment-dialog form>p{font-size:12px;line-height:1.5}
+#projectAdjustmentHelp,
+.project-adjustment-dialog form > p#projectAdjustmentHelp {
+  margin: 0 0 2px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+}
 .project-adjustment-fields{gap:14px}
 .project-adjustment-dialog label{gap:7px;font-size:12px;font-weight:800;line-height:1.4}
 .project-adjustment-dialog :is(input,select,textarea){min-height:43px;padding:10px 12px;border-radius:11px;background:var(--surface-soft);font-size:13px;font-weight:650;line-height:1.45}
@@ -23,3 +31,8 @@ body.project-adjustment-dialog-open .custom-select-panel{border-radius:11px;font
 body.project-adjustment-dialog-open .custom-select-option{min-height:42px;padding:10px 12px;font-size:13px;font-weight:650;line-height:1.45}
 @media(max-width:520px){.project-adjustment-dialog header,.project-adjustment-dialog form{padding:16px}.project-adjustment-dialog header{gap:12px}.project-adjustment-dialog h2{font-size:18px}.project-adjustment-dialog footer{gap:8px}.project-adjustment-dialog :is(input,select,textarea){font-size:13px}}
 .project-adjustment-document-field{grid-column:1/-1}
+@media (min-width: 993px) {
+  .project-adjustment-dialog {
+    left: calc(280px + var(--app-shell-gutter, 0px));
+  }
+}

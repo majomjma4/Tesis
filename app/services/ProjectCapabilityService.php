@@ -81,7 +81,14 @@ final class ProjectCapabilityService
             if (!$capabilities['view_project']) return $capabilities;
             $capabilities['view_academic_history'] = true;
             $capabilities['download_files'] = true;
-            if ($administrator) foreach (['edit_information','manage_files','view_admin_history','manage_publication'] as $key) $capabilities[$key] = true;
+            $isTeacher = in_array('teacher', $roles, true);
+            if ($isTeacher) {
+                $capabilities['create_adjustment_request'] = true;
+            }
+            if ($isTeacher || $administrator) {
+                $capabilities['view_adjustment_requests'] = true;
+            }
+            if ($administrator) foreach (['edit_information','manage_files','view_admin_history','manage_publication','close_adjustment_request','address_adjustment_request'] as $key) $capabilities[$key] = true;
             return $capabilities;
         }
 

@@ -2,13 +2,48 @@
 
 declare(strict_types=1);
 
-/** Centraliza la gestión de Material de apoyo por rol y propiedad persistida. */
+/** Centraliza la gestión de Material de apoyo por rol, colaboración y propiedad persistida. */
 final class SupportMaterialCapabilityService
 {
     public function canCreate(AuthSessionService $session): bool
     {
         return $session->hasAdminAccess()
             || in_array('teacher', array_map('strtolower', $session->roles()), true);
+    }
+
+    public function canEditInformation(AuthSessionService $session, ?array $material): bool
+    {
+        if ($material === null) return false;
+        return $session->hasAdminAccess()
+            || in_array('teacher', array_map('strtolower', $session->roles()), true);
+    }
+
+    public function canManageFiles(AuthSessionService $session, ?array $material): bool
+    {
+        if ($material === null) return false;
+        return $session->hasAdminAccess()
+            || in_array('teacher', array_map('strtolower', $session->roles()), true);
+    }
+
+    public function canChangeStatus(AuthSessionService $session, ?array $material): bool
+    {
+        if ($material === null) return false;
+        if ($session->hasAdminAccess()) return true;
+        $isTeacher = in_array('teacher', array_map('strtolower', $session->roles()), true);
+        return $isTeacher && (int) ($material['created_by'] ?? 0) === (int) ($session->userId() ?? 0);
+    }
+
+    public function canWithdraw(AuthSessionService $session, ?array $material): bool
+    {
+        return $this->canChangeStatus($session, $material);
+    }
+
+    public function canDelete(AuthSessionService $session, ?array $material): bool
+    {
+        if ($material === null) return false;
+        if ($session->hasAdminAccess()) return true;
+        $isTeacher = in_array('teacher', array_map('strtolower', $session->roles()), true);
+        return $isTeacher && (int) ($material['created_by'] ?? 0) === (int) ($session->userId() ?? 0);
     }
 
     public function canManage(AuthSessionService $session, ?array $material): bool
@@ -31,6 +66,34 @@ final class SupportMaterialCapabilityService
         if (!$isTeacher || (int) ($session->userId() ?? 0) < 1) {
             throw new SupportMaterialAccessException('No tienes autorización para gestionar este material de apoyo.');
         }
+    }
+
+    public function assertCanEditInformation(AuthSessionService $session, ?array $material): void
+    {
+        if ($material === null) throw new SupportMaterialAccessException('El material solicitado no existe.', 404);
+        if ($this->canEditInformation($session, $material)) return;
+        throw new SupportMaterialAccessException('No tienes autorización para editar la información de este material de apoyo.');
+    }
+
+    public function assertCanManageFiles(AuthSessionService $session, ?array $material): void
+    {
+        if ($material === null) throw new SupportMaterialAccessException('El material solicitado no existe.', 404);
+        if ($this->canManageFiles($session, $material)) return;
+        throw new SupportMaterialAccessException('No tienes autorización para gestionar los archivos de este material de apoyo.');
+    }
+
+    public function assertCanChangeStatus(AuthSessionService $session, ?array $material): void
+    {
+        if ($material === null) throw new SupportMaterialAccessException('El material solicitado no existe.', 404);
+        if ($this->canChangeStatus($session, $material)) return;
+        throw new SupportMaterialAccessException('Solo el docente propietario o el administrador pueden modificar el estado o visibilidad de este material de apoyo.');
+    }
+
+    public function assertCanDelete(AuthSessionService $session, ?array $material): void
+    {
+        if ($material === null) throw new SupportMaterialAccessException('El material solicitado no existe.', 404);
+        if ($this->canDelete($session, $material)) return;
+        throw new SupportMaterialAccessException('Solo el docente propietario o el administrador pueden eliminar este material de apoyo.');
     }
 }
 
