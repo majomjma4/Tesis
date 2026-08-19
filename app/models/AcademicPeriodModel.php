@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 final class AcademicPeriodModel
 {
-    public function active(): ?array
+    public function all(): array
     {
-        $statement = Database::connection()->query(
+        return Database::connection()->query(
             "SELECT id, code, name, starts_on, ends_on, status
              FROM academic_periods
-             WHERE status = 'active'
-             ORDER BY starts_on DESC, id DESC
-             LIMIT 1"
-        );
-        $period = $statement->fetch(PDO::FETCH_ASSOC);
+             ORDER BY starts_on DESC, id DESC"
+        )->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function active(): ?array
+    {
+        $period = array_values(array_filter($this->all(), static fn(array $item): bool => ($item['status'] ?? '') === 'active'))[0] ?? null;
         return $period ?: null;
     }
 }

@@ -5,6 +5,12 @@
     $defaultTo = (string)($reportBaseTo ?? $reportTo);
     $isCustomFilterActive = ($reportFrom !== $defaultFrom || $reportTo !== $defaultTo);
     $resetUrl = route('admin-reports');
+    $reportPeriods = $reportPeriods ?? [];
+    $reportPeriodsAreMultiple = (bool)($reportPeriodsAreMultiple ?? count($reportPeriods) > 1);
+    $reportSelectedPeriodId = $reportSelectedPeriodId ?? null;
+    $periodLabel = static function(array $period): string {
+        return (string)$period['name'] . (($period['status'] ?? '') === 'active' ? ' · Activo' : '');
+    };
 ?>
 <div class="rp-filter-wrapper">
     <?php if ($isCustomFilterActive): ?>
@@ -12,6 +18,23 @@
             <span>Período filtrado: <strong><?=e(date('d/m/Y', strtotime($reportFrom)))?> – <?=e(date('d/m/Y', strtotime($reportTo)))?></strong></span>
             <a href="<?=e($resetUrl)?>" title="Quitar filtro de fecha y restaurar predeterminado" aria-label="Quitar filtro de fecha">×</a>
         </div>
+    <?php endif; ?>
+
+    <?php if (!$reportPeriodsAreMultiple && $reportPeriods !== []):
+        $fixedPeriod = $reportPeriods[0];
+    ?>
+        <span class="rp-period-control rp-period-fixed"><i class="fa-regular fa-calendar-check" aria-hidden="true"></i><?=e($periodLabel($fixedPeriod))?></span>
+    <?php elseif ($reportPeriodsAreMultiple): ?>
+        <form method="get" action="index.php" class="rp-period-form">
+            <input type="hidden" name="page" value="admin-reports">
+            <input type="hidden" name="reports_per_page" value="<?=e((string)($pagePaginationData['per_page'] ?? 10))?>">
+            <select name="period_id" class="rp-period-control" aria-label="Período académico" onchange="this.form.submit()">
+                <option value="">Todos los períodos</option>
+                <?php foreach ($reportPeriods as $period): ?>
+                    <option value="<?=e((string)$period['id'])?>" <?=((int)$reportSelectedPeriodId === (int)$period['id']) ? 'selected' : ''?>><?=e($periodLabel($period))?></option>
+                <?php endforeach; ?>
+            </select>
+        </form>
     <?php endif; ?>
 
     <button type="button" class="rp-filter-trigger <?= $isCustomFilterActive ? 'is-active' : '' ?>" id="rpFilterBtn" aria-expanded="false" aria-controls="rpDatePopover">
@@ -131,9 +154,10 @@
             $fromItem = (int)($pagination['from'] ?? 0);
             $toItem = (int)($pagination['to'] ?? 0);
 
-            $buildUrl = static function(int $p, ?int $size = null) use ($reportFrom, $reportTo, $perPage): string {
+            $buildUrl = static function(int $p, ?int $size = null) use ($reportFrom, $reportTo, $perPage, $reportSelectedPeriodId): string {
                 $sz = $size ?? $perPage;
-                return route('admin-reports') . '&from=' . urlencode($reportFrom) . '&to=' . urlencode($reportTo) . '&report_page=' . $p . '&reports_per_page=' . $sz;
+                $period = $reportSelectedPeriodId !== null ? '&period_id=' . (int)$reportSelectedPeriodId : '';
+                return route('admin-reports') . $period . '&from=' . urlencode($reportFrom) . '&to=' . urlencode($reportTo) . '&report_page=' . $p . '&reports_per_page=' . $sz;
             };
         ?>
         <div class="rp-pagination-summary">
@@ -194,6 +218,7 @@
                 <input type="hidden" name="page" value="admin-reports">
                 <input type="hidden" name="from" value="<?=e($reportFrom)?>">
                 <input type="hidden" name="to" value="<?=e($reportTo)?>">
+                <?php if ($reportSelectedPeriodId !== null): ?><input type="hidden" name="period_id" value="<?=e((string)$reportSelectedPeriodId)?>"><?php endif; ?>
                 <input type="hidden" name="reports_per_page" value="<?=$perPage?>">
                 <label>
                     Ir a página:

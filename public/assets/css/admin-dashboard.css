@@ -357,6 +357,21 @@ a.strip-card:focus-visible {
     white-space: nowrap;
 }
 
+.v4-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.v4-header-count {
+    color: var(--muted);
+    font-size: 0.76rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 .v4-header-link:hover {
     color: var(--primary);
     text-decoration: underline;
@@ -699,6 +714,14 @@ a.timeline-v4-item:hover .v4-act-title {
     .hero-milestone {
         width: 100%;
         min-width: auto;
+        max-width: 100%;
+    }
+
+    .hero-identity,
+    .hero-side,
+    .hero-progress-wrapper {
+        min-width: 0;
+        max-width: 100%;
     }
 
     .status-row.row-top,
@@ -713,6 +736,38 @@ a.timeline-v4-item:hover .v4-act-title {
 
     .v4-row-cta {
         display: none;
+    }
+}
+
+@media (max-width: 1100px) {
+    .admin-institutional-hero,
+    .hero-main,
+    .hero-identity,
+    .hero-side {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .hero-main {
+        flex-wrap: wrap;
+    }
+
+    .hero-identity {
+        flex: 1 1 260px;
+    }
+
+    .hero-side {
+        flex: 1 1 360px;
+        flex-wrap: wrap;
+    }
+
+    .hero-countdown {
+        flex: 0 1 120px;
+    }
+
+    .hero-milestone {
+        min-width: 0;
+        flex: 1 1 180px;
     }
 }
 

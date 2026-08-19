@@ -33,6 +33,39 @@
 .rp-filter-trigger i {
     color: var(--blue);
 }
+.rp-period-form {
+    display: inline-flex;
+    margin: 0;
+}
+.rp-period-control {
+    display: inline-flex;
+    align-items: center;
+    min-height: 42px;
+    box-sizing: border-box;
+    padding: 0 13px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: .88rem;
+    font-weight: 700;
+}
+.rp-period-form .rp-period-control {
+    cursor: pointer;
+}
+.rp-period-control:focus-visible,
+.rp-period-form .rp-period-control:hover {
+    border-color: var(--blue);
+    outline: none;
+}
+.rp-period-fixed {
+    gap: 8px;
+    color: var(--muted);
+}
+.rp-period-fixed i {
+    color: var(--blue);
+}
 
 /* Badge de Filtro Activo */
 .rp-active-filter-badge {

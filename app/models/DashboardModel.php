@@ -299,22 +299,12 @@ final class DashboardModel
             if (!$period) {
                 return [];
             }
-            $stmt = $connection->prepare("SELECT id, action, action_label, module, entity_type, element_label, created_at FROM (
-                    SELECT id, action, action_label, module, entity_type, element_label, created_at FROM admin_audit_log
-                    WHERE created_at BETWEEN :from1 AND :to1
-                    UNION ALL
-                    SELECT id, action, NULL, NULL, entity_type, NULL, created_at FROM project_audit_log
-                    WHERE created_at BETWEEN :from2 AND :to2
-                ) audit_events ORDER BY created_at DESC, id DESC LIMIT 6");
-            $params = ['from1' => $period['starts_on'].' 00:00:00', 'to1' => $period['ends_on'].' 23:59:59', 'from2' => $period['starts_on'].' 00:00:00', 'to2' => $period['ends_on'].' 23:59:59'];
-            $stmt->execute($params);
-            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $events = (new AdminReportModel())->auditEvents((string) $period['starts_on'], (string) $period['ends_on']);
+            $rows = array_slice($events, 0, 6);
             $activity = [];
             foreach ($rows as $r) {
-                $actionKey = (string) ($r['action'] ?? '');
-                $actionLabel = AuditLabelFormatter::action($actionKey, (string) ($r['action_label'] ?? ''));
-                $resourceCode = !empty($r['entity_type']) ? (string) $r['entity_type'] : (string) ($r['module'] ?? '');
-                $resource = !empty($r['element_label']) ? (string) $r['element_label'] : ($resourceCode !== '' ? AuditLabelFormatter::context($resourceCode) : 'Sistema');
+                $actionLabel = (string) ($r['action_label'] ?? '');
+                $resource = !empty($r['element_label']) ? (string) $r['element_label'] : (string) ($r['entity_label'] ?? 'Sistema');
                 $activity[] = [
                     'action' => $actionLabel,
                     'label' => $actionLabel,
@@ -339,14 +329,7 @@ final class DashboardModel
             if (!$period) {
                 return 0;
             }
-            $stmt = $connection->prepare("SELECT (
-                    SELECT COUNT(*) FROM admin_audit_log WHERE created_at BETWEEN :from1 AND :to1
-                ) + (
-                    SELECT COUNT(*) FROM project_audit_log WHERE created_at BETWEEN :from2 AND :to2
-                )");
-            $params = ['from1' => $period['starts_on'].' 00:00:00', 'to1' => $period['ends_on'].' 23:59:59', 'from2' => $period['starts_on'].' 00:00:00', 'to2' => $period['ends_on'].' 23:59:59'];
-            $stmt->execute($params);
-            return (int) $stmt->fetchColumn();
+            return count((new AdminReportModel())->auditEvents((string) $period['starts_on'], (string) $period['ends_on']));
         } catch (Throwable $e) {
             error_log('adminRecentAdminActivityTotal error: ' . $e->getMessage());
             return 0;

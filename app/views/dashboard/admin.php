@@ -376,12 +376,22 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
 
     <!-- E. TRAZABILIDAD ADMINISTRATIVA (TIMELINE SECUENCIAL) -->
     <section class="v4-section activity-v4-section">
+        <?php
+        $recentActivityCount = count($recentActivity);
+        $recentActivityTotal = (int) ($dashboard['recent_admin_activity_total'] ?? 0);
+        $activityCountLabel = $recentActivityTotal === 0
+            ? '0 eventos'
+            : $recentActivityCount . ' de ' . $recentActivityTotal . ' ' . ($recentActivityTotal === 1 ? 'evento' : 'eventos');
+        ?>
         <div class="section-v4-header">
             <div>
                 <span class="v4-tag">Auditoría Institucional</span>
                 <h2 class="v4-title">Trazabilidad administrativa</h2>
             </div>
-            <a href="<?= e(route('admin-reports')) ?>" class="v4-header-link">Abrir registro de auditoría <span aria-hidden="true">-&gt;</span></a>
+            <div class="v4-header-actions">
+                <span class="v4-header-count"><?= e($activityCountLabel) ?></span>
+                <a href="<?= e(route('admin-reports')) ?>" class="v4-header-link">Abrir registro de auditoría <span aria-hidden="true">-&gt;</span></a>
+            </div>
         </div>
 
         <?php if ($recentActivity === []): ?>

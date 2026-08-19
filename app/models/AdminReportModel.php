@@ -11,17 +11,7 @@ final class AdminReportModel
         $db = Database::connection();
         $range = ['from'=>$from.' 00:00:00','to'=>$to.' 23:59:59'];
         
-        $params=['from1'=>$range['from'],'to1'=>$range['to'],'from2'=>$range['from'],'to2'=>$range['to']];
-        $sql = "SELECT action, action_label, module, entity_type, entity_id, element_label, created_at, actor FROM (
-                    SELECT a.action, a.action_label, a.module, a.entity_type, a.entity_id, a.element_label, a.created_at, u.full_name actor FROM admin_audit_log a LEFT JOIN users u ON u.id=a.actor_user_id WHERE a.created_at BETWEEN :from1 AND :to1
-                    UNION ALL
-                    SELECT p.action, NULL action_label, NULL module, p.entity_type, p.entity_id, NULL element_label, p.created_at, u.full_name actor FROM project_audit_log p LEFT JOIN users u ON u.id=p.user_id WHERE p.created_at BETWEEN :from2 AND :to2
-                ) audit_events ORDER BY created_at DESC";
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        $rawEvents = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        $processed = $this->processEvents($rawEvents);
+        $processed = $this->auditEvents($from, $to);
 
         $summary = [
             'users'=>$this->count($db,'SELECT COUNT(*) FROM users WHERE created_at BETWEEN :from AND :to',$range),
@@ -71,6 +61,20 @@ final class AdminReportModel
         ];
 
         return compact('summary','roles','statuses','reviewSituations') + ['activity' => $items, 'pagination' => $paginationData];
+    }
+
+    /** Returns the canonical, reportable audit universe for the requested base range. */
+    public function auditEvents(string $from, string $to): array
+    {
+        $db = Database::connection();
+        $stmt = $db->prepare("SELECT id, action, action_label, module, entity_type, entity_id, element_label, created_at, actor FROM (
+                    SELECT a.id, a.action, a.action_label, a.module, a.entity_type, a.entity_id, a.element_label, a.created_at, u.full_name actor FROM admin_audit_log a LEFT JOIN users u ON u.id=a.actor_user_id WHERE a.created_at BETWEEN :from1 AND :to1
+                    UNION ALL
+                    SELECT p.id, p.action, NULL action_label, NULL module, p.entity_type, p.entity_id, NULL element_label, p.created_at, u.full_name actor FROM project_audit_log p LEFT JOIN users u ON u.id=p.user_id WHERE p.created_at BETWEEN :from2 AND :to2
+                ) audit_events ORDER BY created_at DESC, id DESC");
+        $value = ['from1'=>$from.' 00:00:00','to1'=>$to.' 23:59:59','from2'=>$from.' 00:00:00','to2'=>$to.' 23:59:59'];
+        $stmt->execute($value);
+        return $this->processEvents($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
     private function processEvents(array $events): array
