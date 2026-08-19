@@ -104,10 +104,9 @@ final class AdminReportModel
             }
 
             // Mapear traducción limpia
-            $labels = $this->translateAction($action, $entityType);
-            $actionLabel = trim((string)($event['action_label'] ?? '')) ?: $labels['action_label'];
+            $actionLabel = AuditLabelFormatter::action($action, (string)($event['action_label'] ?? ''));
             $elementLabel = trim((string)($event['element_label'] ?? ''));
-            $entityLabel = $elementLabel !== '' ? $elementLabel : $labels['entity_label'];
+            $entityLabel = $elementLabel !== '' ? $elementLabel : AuditLabelFormatter::context($entityType);
             
             // Llave de deduplicación basada en actor, acción traducida, entidad y ventana de 3 segundos
             $timestamp = strtotime($createdAt);
@@ -204,8 +203,8 @@ final class AdminReportModel
             'support_material' => 'Material de apoyo',
         ];
 
-        $actionLabel = $map[$action] ?? ucfirst(str_replace(['_', '.'], ' ', $action));
-        $entityLabel = $entityMap[$entityType] ?? ucfirst(str_replace('_', ' ', $entityType));
+        $actionLabel = AuditLabelFormatter::action($action, $map[$action] ?? '');
+        $entityLabel = AuditLabelFormatter::context($entityType);
 
         return ['action_label' => $actionLabel, 'entity_label' => $entityLabel];
     }

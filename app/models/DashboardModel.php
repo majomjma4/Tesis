@@ -312,8 +312,9 @@ final class DashboardModel
             $activity = [];
             foreach ($rows as $r) {
                 $actionKey = (string) ($r['action'] ?? '');
-                $actionLabel = !empty($r['action_label']) ? (string) $r['action_label'] : $this->humanizeAction($actionKey);
-                $resource = !empty($r['element_label']) ? (string) $r['element_label'] : (!empty($r['module']) ? (string) $r['module'] : 'Sistema');
+                $actionLabel = AuditLabelFormatter::action($actionKey, (string) ($r['action_label'] ?? ''));
+                $resourceCode = !empty($r['entity_type']) ? (string) $r['entity_type'] : (string) ($r['module'] ?? '');
+                $resource = !empty($r['element_label']) ? (string) $r['element_label'] : ($resourceCode !== '' ? AuditLabelFormatter::context($resourceCode) : 'Sistema');
                 $activity[] = [
                     'action' => $actionLabel,
                     'label' => $actionLabel,
