@@ -680,22 +680,46 @@ a.timeline-v4-item:hover .v4-act-title {
 
 /* Responsividad */
 @media (max-width: 950px) {
+    .v4-summary-strip,
+    .status-v4-compact-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .summary-row,
+    .status-row {
+        display: contents;
+    }
+
     .summary-row.row-top,
     .summary-row.row-bottom {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
         max-width: 100%;
     }
     .status-row.row-top,
     .status-row.row-bottom {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
         max-width: 100%;
+    }
+
+    .summary-row.row-bottom .strip-card:last-child,
+    .status-row.row-bottom .status-v4-node:last-child {
+        grid-column: 1 / -1;
+        width: calc(50% - 6px);
+        justify-self: center;
     }
 }
 
-@media (max-width: 600px) {
-    .summary-row.row-top,
-    .summary-row.row-bottom {
+@media (max-width: 650px) {
+    .v4-summary-strip,
+    .status-v4-compact-grid {
         grid-template-columns: 1fr;
+    }
+
+    .summary-row.row-bottom .strip-card:last-child,
+    .status-row.row-bottom .status-v4-node:last-child {
+        grid-column: auto;
+        width: 100%;
+        justify-self: stretch;
     }
 }
 
