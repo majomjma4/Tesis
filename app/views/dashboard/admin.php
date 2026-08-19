@@ -381,7 +381,7 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
                 <span class="v4-tag">Auditoría Institucional</span>
                 <h2 class="v4-title">Trazabilidad administrativa</h2>
             </div>
-            <a href="<?= e(route('admin-reports')) ?>" class="v4-header-link">Abrir registro de auditor�a <span aria-hidden="true">-&gt;</span></a>
+            <a href="<?= e(route('admin-reports')) ?>" class="v4-header-link">Abrir registro de auditoría <span aria-hidden="true">-&gt;</span></a>
         </div>
 
         <?php if ($recentActivity === []): ?>
