@@ -1,8 +1,8 @@
 <header class="rp-head"><span>Administración</span><h1>Auditoría y reportes</h1><p>Indicadores institucionales y trazabilidad obtenidos desde MariaDB.</p></header>
 <?php if($reportError):?><p class="rp-error"><?=e($reportError)?></p><?php endif;?>
 <?php
-    $defaultFrom = date('Y-m-01');
-    $defaultTo = date('Y-m-d');
+    $defaultFrom = (string)($reportBaseFrom ?? $reportFrom);
+    $defaultTo = (string)($reportBaseTo ?? $reportTo);
     $isCustomFilterActive = ($reportFrom !== $defaultFrom || $reportTo !== $defaultTo);
     $resetUrl = route('admin-reports');
 ?>

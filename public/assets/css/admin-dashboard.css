@@ -566,7 +566,7 @@ a.status-v4-node:hover {
 
 .timeline-v4-item {
     position: relative;
-    padding-left: 28px;    /* más espacio entre línea vertical y contenido */
+    padding-left: 0;    /* más espacio entre línea vertical y contenido */
     padding-bottom: 0;
     color: var(--text);
     text-decoration: none;
@@ -579,7 +579,7 @@ a.status-v4-node:hover {
 .v4-bullet {
     position: absolute;
     left: 0;
-    top: 6px;
+    top: 3px;
     width: 9px;
     height: 9px;
     border-radius: 50%;
@@ -589,10 +589,11 @@ a.status-v4-node:hover {
 
 /* Fila horizontal: contenido (izq) + timestamp (der) */
 .timeline-v4-row {
+    margin-left: 40px;
     display: flex;
     align-items: flex-end;
     gap: 12px;
-    width: 100%;
+    width: calc(100% - 40px);
 }
 
 .v4-timeline-body {

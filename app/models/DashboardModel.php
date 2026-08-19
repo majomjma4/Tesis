@@ -60,6 +60,7 @@ final class DashboardModel
             'trash' => $trashSummary,
             'project_status_distribution' => $statusDistribution,
             'recent_admin_activity' => $recentAdminActivity,
+            'recent_admin_activity_total' => $this->adminRecentAdminActivityTotal($connection),
             'updated_at' => date('Y-m-d H:i:s'),
 
             // ALIASES DE COMPATIBILIDAD TRANSITORIA — LEGACY / REMOVE AFTER ADMIN DASHBOARD FINAL QA
@@ -122,6 +123,7 @@ final class DashboardModel
             ],
             'project_status_distribution' => [],
             'recent_admin_activity' => [],
+            'recent_admin_activity_total' => 0,
             'updated_at' => null,
 
             // LEGACY ALIASES
@@ -293,7 +295,19 @@ final class DashboardModel
     private function adminRecentAdminActivity(PDO $connection): array
     {
         try {
-            $stmt = $connection->query("SELECT id, action, action_label, module, entity_type, element_label, created_at FROM admin_audit_log ORDER BY id DESC LIMIT 6");
+            $period = (new AcademicPeriodModel())->active();
+            if (!$period) {
+                return [];
+            }
+            $stmt = $connection->prepare("SELECT id, action, action_label, module, entity_type, element_label, created_at FROM (
+                    SELECT id, action, action_label, module, entity_type, element_label, created_at FROM admin_audit_log
+                    WHERE created_at BETWEEN :from1 AND :to1
+                    UNION ALL
+                    SELECT id, action, NULL, NULL, entity_type, NULL, created_at FROM project_audit_log
+                    WHERE created_at BETWEEN :from2 AND :to2
+                ) audit_events ORDER BY created_at DESC, id DESC LIMIT 6");
+            $params = ['from1' => $period['starts_on'].' 00:00:00', 'to1' => $period['ends_on'].' 23:59:59', 'from2' => $period['starts_on'].' 00:00:00', 'to2' => $period['ends_on'].' 23:59:59'];
+            $stmt->execute($params);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
             $activity = [];
             foreach ($rows as $r) {
@@ -314,6 +328,27 @@ final class DashboardModel
         } catch (Throwable $e) {
             error_log('adminRecentAdminActivity error: ' . $e->getMessage());
             return [];
+        }
+    }
+
+    private function adminRecentAdminActivityTotal(PDO $connection): int
+    {
+        try {
+            $period = (new AcademicPeriodModel())->active();
+            if (!$period) {
+                return 0;
+            }
+            $stmt = $connection->prepare("SELECT (
+                    SELECT COUNT(*) FROM admin_audit_log WHERE created_at BETWEEN :from1 AND :to1
+                ) + (
+                    SELECT COUNT(*) FROM project_audit_log WHERE created_at BETWEEN :from2 AND :to2
+                )");
+            $params = ['from1' => $period['starts_on'].' 00:00:00', 'to1' => $period['ends_on'].' 23:59:59', 'from2' => $period['starts_on'].' 00:00:00', 'to2' => $period['ends_on'].' 23:59:59'];
+            $stmt->execute($params);
+            return (int) $stmt->fetchColumn();
+        } catch (Throwable $e) {
+            error_log('adminRecentAdminActivityTotal error: ' . $e->getMessage());
+            return 0;
         }
     }
 

@@ -26,6 +26,7 @@ $attention = is_array($dashboard['attention'] ?? null) ? $dashboard['attention']
 $trash = is_array($dashboard['trash'] ?? null) ? $dashboard['trash'] : ['total' => 0, 'projects' => 0, 'users' => 0, 'support_materials' => 0, 'route' => route('admin-trash')];
 $statusDistribution = is_array($dashboard['project_status_distribution'] ?? null) ? $dashboard['project_status_distribution'] : [];
 $recentActivity = is_array($dashboard['recent_admin_activity'] ?? null) ? $dashboard['recent_admin_activity'] : [];
+$recentActivityTotal = max(0, (int) ($dashboard['recent_admin_activity_total'] ?? 0));
 $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'] : null;
 ?>
 
@@ -380,13 +381,13 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
                 <span class="v4-tag">Auditoría Institucional</span>
                 <h2 class="v4-title">Trazabilidad administrativa</h2>
             </div>
-            <a href="<?= e(route('admin-reports')) ?>" class="v4-header-link">Abrir registro de auditoría</a>
+            <a href="<?= e(route('admin-reports')) ?>" class="v4-header-link">Abrir registro de auditor�a <span aria-hidden="true">-&gt;</span></a>
         </div>
 
         <?php if ($recentActivity === []): ?>
             <div class="v4-empty-inline">
                 <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
-                <span>Sin registros recientes en el registro de auditoría administrativa.</span>
+                <span>0 registros</span>
             </div>
         <?php else: ?>
             <ol class="activity-v4-timeline">
