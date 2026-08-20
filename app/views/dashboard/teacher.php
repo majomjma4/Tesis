@@ -1,150 +1,199 @@
 <?php
-$context = is_array($teacherDashboard['context'] ?? null) ? $teacherDashboard['context'] : [];
-$period = is_array($context['academic_period'] ?? null) ? $context['academic_period'] : null;
-$capabilities = is_array($context['capabilities'] ?? null) ? $context['capabilities'] : [];
-$thesisManagement = is_array($context['thesis_management'] ?? null) ? $context['thesis_management'] : [];
-$summary = is_array($teacherDashboard['summary'] ?? null) ? $teacherDashboard['summary'] : [];
-$projectData = is_array($teacherDashboard['projects'] ?? null) ? $teacherDashboard['projects'] : [];
-$projects = is_array($projectData['items'] ?? null) ? $projectData['items'] : [];
-$upcoming = is_array($teacherDashboard['upcoming']['items'] ?? null) ? $teacherDashboard['upcoming']['items'] : [];
-$visibleProjects = array_slice($projects, 0, 5);
-$hasMoreProjects = count($projects) > count($visibleProjects);
-?>
 
+$dashboard = is_array($teacherDashboard ?? null) ? $teacherDashboard : [];
+$context = is_array($dashboard['context'] ?? null) ? $dashboard['context'] : [];
+$period = is_array($context['academic_period'] ?? null) ? $context['academic_period'] : null;
+$assigned = is_array($dashboard['assigned_projects'] ?? null) ? $dashboard['assigned_projects'] : [];
+$projects = is_array($assigned['items'] ?? null) ? $assigned['items'] : [];
+$follow = is_array($dashboard['follow_up'] ?? null) ? $dashboard['follow_up'] : [];
+$upcoming = is_array($dashboard['upcoming'] ?? null) ? $dashboard['upcoming'] : [];
+$notifications = is_array($dashboard['notifications'] ?? null) ? $dashboard['notifications'] : [];
+$repository = is_array($dashboard['repository'] ?? null) ? $dashboard['repository'] : [];
+
+$empty = static function (string $title, string $detail = ''): void {
+    echo '<div class="teacher-empty-state"><strong>' . e($title) . '</strong>'
+        . ($detail !== '' ? '<span>' . e($detail) . '</span>' : '') . '</div>';
+};
+
+$relativeTime = static function (string $value): string {
+    if ($value === '') return '';
+    try {
+        $created = new DateTimeImmutable($value, new DateTimeZone('UTC'));
+        $seconds = time() - $created->getTimestamp();
+    } catch (Throwable) {
+        return '';
+    }
+    if ($seconds < 0) return 'ahora';
+    if ($seconds < 60) return 'hace ' . max(1, $seconds) . ' s';
+    if ($seconds < 3600) return 'hace ' . intdiv($seconds, 60) . ' min';
+    if ($seconds < 86400) return 'hace ' . intdiv($seconds, 3600) . ' h';
+    if ($seconds < 604800) return 'hace ' . intdiv($seconds, 86400) . ' d';
+    if ($seconds < 2592000) return 'hace ' . intdiv($seconds, 604800) . ' sem';
+    $months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return (int) $created->format('j') . ' ' . $months[(int) $created->format('n') - 1];
+};
+
+$projectSentence = static function (int $count, string $ending): string {
+    return $count . ' ' . ($count === 1 ? 'proyecto' : 'proyectos') . ' ' . $ending;
+};
+?>
 <main class="teacher-dashboard" aria-labelledby="teacherDashboardTitle">
     <?php if (!empty($teacherDashboardError)): ?>
         <p class="teacher-dashboard-error" role="alert"><?= e($teacherDashboardError) ?></p>
     <?php endif; ?>
-
     <header class="teacher-dashboard-header">
         <div>
-            <span class="teacher-dashboard-eyebrow">Espacio de trabajo docente</span>
-            <h1 id="teacherDashboardTitle">Panel docente</h1>
-            <p>Seguimiento de tus proyectos y revisiones académicas.</p>
+            <p class="teacher-section-label">Panel del docente</p>
+            <h1 id="teacherDashboardTitle">Seguimiento académico</h1>
+            <p>Seguimiento académico y revisión de proyectos.</p>
         </div>
-        <div class="teacher-dashboard-context" aria-label="Contexto académico">
-            <?php if ($period !== null): ?>
-                <strong><?= e((string) ($period['name'] ?? '')) ?></strong>
-                <span><?= (int) ($period['days_remaining'] ?? 0) ?> días restantes</span>
-            <?php else: ?>
-                <span>Sin período académico activo</span>
+        <div class="teacher-dashboard-context">
+            <span>Período académico</span>
+            <strong><?= e($period['name'] ?? 'Sin período activo') ?></strong>
+            <?php if ($period !== null && isset($period['days_remaining'])): ?>
+                <small><?= (int) $period['days_remaining'] ?> días restantes</small>
             <?php endif; ?>
         </div>
     </header>
 
-    <section class="teacher-summary" aria-labelledby="teacherSummaryTitle">
-        <h2 id="teacherSummaryTitle">Resumen operativo</h2>
-        <div class="teacher-summary-grid">
-            <?php
-            $summaryItems = [
-                ['key' => 'assigned_projects', 'icon' => 'fa-folder-open', 'label' => 'Proyectos asignados', 'description' => 'Bajo tu responsabilidad'],
-                ['key' => 'deliveries_to_review', 'icon' => 'fa-file-circle-check', 'label' => 'Entregas por revisar', 'description' => 'Requieren revisión docente'],
-                ['key' => 'projects_in_review', 'icon' => 'fa-magnifying-glass', 'label' => 'Proyectos en revisión', 'description' => 'Seguimiento activo'],
-                ['key' => 'pending_adjustments', 'icon' => 'fa-pen-to-square', 'label' => 'Ajustes pendientes', 'description' => 'Solicitudes por atender'],
-            ];
-            foreach ($summaryItems as $item):
-                $metric = is_array($summary[$item['key']] ?? null) ? $summary[$item['key']] : ['count' => 0];
-                $count = (int) ($metric['count'] ?? 0);
-                $route = trim((string) ($metric['route'] ?? ''));
-            ?>
-                <article class="teacher-summary-item">
-                    <i class="fa-solid <?= e($item['icon']) ?>" aria-hidden="true"></i>
-                    <div>
-                        <strong><?= $count ?></strong>
-                        <span><?= e($item['label']) ?></span>
-                        <small><?= e($count === 0 && $item['key'] === 'pending_adjustments' ? 'Sin solicitudes por atender' : $item['description']) ?></small>
-                    </div>
-                    <?php if ($route !== ''): ?><a href="<?= e($route) ?>" aria-label="Ver <?= e(strtolower($item['label'])) ?>">Ver</a><?php endif; ?>
-                </article>
-            <?php endforeach; ?>
-        </div>
-    </section>
-
-    <section class="teacher-projects" aria-labelledby="teacherProjectsTitle">
-        <header class="teacher-section-header">
-            <div>
-                <h2 id="teacherProjectsTitle">Mis proyectos</h2>
-                <p>Proyectos en los que participas como tutor, cotutor, evaluador o tribunal.</p>
-            </div>
-            <?php if ($hasMoreProjects): ?><a href="<?= e(route('assigned-projects')) ?>">Ver todos mis proyectos <span aria-hidden="true">→</span></a><?php endif; ?>
-        </header>
-
-        <?php if (!$visibleProjects): ?>
-            <p class="teacher-empty-state">No tienes proyectos asignados actualmente.</p>
-        <?php else: ?>
-            <div class="teacher-project-list">
-                <?php foreach ($visibleProjects as $project):
-                    $roles = array_values(array_filter(array_map('strval', (array) ($project['roles'] ?? []))));
-                    $pendingActions = array_values(array_filter(array_map('strval', (array) ($project['pending_actions'] ?? []))));
-                    $projectRoute = trim((string) ($project['route'] ?? ''));
-                    $situation = trim((string) ($project['teacher_situation'] ?? ''));
-                ?>
-                    <article class="teacher-project-item">
-                        <div class="teacher-project-identity">
-                            <span class="teacher-project-type"><?= e((string) ($project['type'] ?? 'Proyecto')) ?></span>
-                            <h3><?= e((string) ($project['title'] ?? '')) ?></h3>
-                            <span><?= e((string) ($project['code'] ?? '')) ?></span>
-                        </div>
-                        <div class="teacher-project-role">
-                            <span>Tu relación</span>
-                            <strong><?= e($roles ? implode(' · ', $roles) : 'Participante') ?></strong>
-                        </div>
-                        <div class="teacher-project-status">
-                            <span>Estado</span>
-                            <strong><?= e((string) ($project['status_label'] ?? '')) ?></strong>
-                            <?php if ($situation !== ''): ?><p><?= e($situation) ?></p><?php endif; ?>
-                        </div>
-                        <div class="teacher-project-context">
-                            <span><?= (int) ($project['deliveries_to_review'] ?? 0) ?> entregas por revisar</span>
-                            <span><?= (int) ($project['observations_total'] ?? 0) ?> observaciones registradas</span>
-                            <?php if ((int) ($project['adjustments_pending'] ?? 0) > 0): ?><span><?= (int) $project['adjustments_pending'] ?> ajustes pendientes</span><?php endif; ?>
-                        </div>
-                        <div class="teacher-project-action">
-                            <?php if ($projectRoute !== ''): ?><a href="<?= e($projectRoute) ?>"><?= e($pendingActions[0] ?? ($situation !== '' ? 'Revisar proyecto' : 'Ver proyecto')) ?> <span aria-hidden="true">→</span></a><?php endif; ?>
-                        </div>
-                    </article>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
-    </section>
-
-    <section class="teacher-upcoming" aria-labelledby="teacherUpcomingTitle">
-        <header class="teacher-section-header">
-            <div>
-                <h2 id="teacherUpcomingTitle">Próximas fechas</h2>
-                <p>Compromisos relevantes para tu trabajo docente.</p>
-            </div>
-            <a href="<?= e(route('calendar')) ?>">Abrir calendario <span aria-hidden="true">→</span></a>
-        </header>
-        <?php if (!$upcoming): ?>
-            <p class="teacher-empty-state">No hay próximas fechas relevantes.</p>
-        <?php else: ?>
-            <div class="teacher-upcoming-list">
-                <?php foreach ($upcoming as $event):
-                    $eventRoute = trim((string) ($event['route'] ?? route('calendar')));
-                ?>
-                    <article class="teacher-upcoming-item">
-                        <time datetime="<?= e((string) ($event['date'] ?? '')) ?>"><?= e((string) ($event['date'] ?? '')) ?></time>
-                        <div>
-                            <h3><?= e((string) ($event['title'] ?? '')) ?></h3>
-                            <?php if (!empty($event['project_id']) && !empty($event['project_title'])): ?>
-                                <p><?= e((string) $event['project_title']) ?></p>
-                            <?php else: ?>
-                                <p>Evento personal</p>
-                            <?php endif; ?>
-                        </div>
-                        <a href="<?= e($eventRoute) ?>" aria-label="Abrir <?= e((string) ($event['title'] ?? 'evento')) ?>">Ver <span aria-hidden="true">→</span></a>
-                    </article>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
-    </section>
-
-    <?php if (!empty($capabilities['manage_thesis_process']) && !empty($thesisManagement['enabled'])): ?>
-        <section class="teacher-thesis-management" aria-labelledby="teacherThesisTitle">
-            <h2 id="teacherThesisTitle">Gestión de titulación</h2>
-            <p>Accede a los procesos de titulación que tienes habilitados.</p>
-            <a href="<?= e((string) ($thesisManagement['route'] ?? route('thesis-management'))) ?>">Abrir gestión de titulación <span aria-hidden="true">→</span></a>
+    <div class="teacher-dashboard-main">
+        <section class="teacher-projects-section" aria-labelledby="teacherProjectsTitle">
+            <header class="teacher-section-header">
+                <div>
+                    <p class="teacher-section-label">Proyectos asignados</p>
+                    <h2 id="teacherProjectsTitle">Proyectos del período activo</h2>
+                    <p><?= (int) ($assigned['count'] ?? count($projects)) ?> proyecto(s) bajo tu responsabilidad.</p>
+                </div>
+                <?php if (!empty($assigned['has_more'])): ?>
+                    <a class="teacher-inline-link" href="<?= e($assigned['route'] ?? route('assigned-projects')) ?>">Ver todos los proyectos →</a>
+                <?php endif; ?>
+            </header>
+            <?php if (!$projects): ?>
+                <?php $empty('Sin proyectos asignados en este período.', 'Cuando tengas participación como tutor, cotutor o tribunal, aparecerá aquí.'); ?>
+            <?php else: ?>
+                <div class="teacher-projects-grid">
+                    <?php foreach ($projects as $project):
+                        $situation = is_array($project['teacher_situation'] ?? null) ? $project['teacher_situation'] : [];
+                        $students = is_array($project['students'] ?? null) ? $project['students'] : [];
+                        $names = array_values(array_filter(array_map(static fn (array $student): string => (string) ($student['name'] ?? ''), $students)));
+                        $action = is_array($project['action'] ?? null) ? $project['action'] : [];
+                    ?>
+                        <article class="teacher-project-card">
+                            <div class="teacher-project-meta">
+                                <span><?= e($project['code'] ?? '') ?></span>
+                                <span><?= e($project['type'] ?? 'Proyecto') ?></span>
+                            </div>
+                            <h3><?= e($project['title'] ?? '') ?></h3>
+                            <p class="teacher-project-students"><i class="fa-solid fa-users" aria-hidden="true"></i> <?= e(implode(' · ', array_slice($names, 0, 2)) ?: 'Sin estudiantes registrados') ?><?php if (count($names) > 2): ?> +<?= count($names) - 2 ?><?php endif; ?></p>
+                            <p class="teacher-project-role"><span>Rol docente</span><strong><?= e(implode(' · ', (array) ($project['roles'] ?? []))) ?></strong></p>
+                            <div class="teacher-project-status">
+                                <span><?= e($project['status_label'] ?? $project['status'] ?? '') ?></span>
+                                <strong><?= e($situation['label'] ?? 'En seguimiento') ?></strong>
+                                <?php if (!empty($situation['description'])): ?><small><?= e($situation['description']) ?></small><?php endif; ?>
+                            </div>
+                            <?php if (!empty($action['route'])): ?><a class="teacher-project-action" href="<?= e($action['route']) ?>"><?= e($action['label'] ?? 'Ver proyecto') ?> →</a><?php endif; ?>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
         </section>
-    <?php endif; ?>
+
+        <section class="teacher-agenda" aria-labelledby="teacherAgendaTitle">
+            <header class="teacher-section-header">
+                <div><p class="teacher-section-label">Agenda</p><h2 id="teacherAgendaTitle">Próximas fechas</h2></div>
+                <i class="fa-regular fa-calendar-days" aria-hidden="true"></i>
+            </header>
+            <?php $events = is_array($upcoming['items'] ?? null) ? $upcoming['items'] : []; ?>
+            <?php if (!$events): ?>
+                <?php $empty('No tienes próximas fechas.'); ?>
+            <?php else: ?>
+                <ul class="teacher-agenda-list">
+                    <?php foreach (array_slice($events, 0, 3) as $event): ?>
+                        <li>
+                            <time><?= e($event['date'] ?? '') ?></time>
+                            <strong><?= e($event['title'] ?? 'Fecha académica') ?></strong>
+                            <?php if (!empty($event['context'])): ?><span><?= e($event['context']) ?></span><?php endif; ?>
+                            <?php if (!empty($event['time'])): ?><span><?= e($event['time']) ?></span><?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+            <a class="teacher-inline-link" href="<?= e($upcoming['route'] ?? route('calendar')) ?>">Abrir calendario →</a>
+        </section>
+
+        <section class="teacher-follow-up" aria-labelledby="teacherFollowUpTitle">
+            <header class="teacher-section-header">
+                <div><p class="teacher-section-label">Trabajo pendiente</p><h2 id="teacherFollowUpTitle">Seguimiento</h2><p>Lo que requiere atención o seguimiento docente.</p></div>
+            </header>
+            <div class="teacher-follow-up-grid">
+                <?php $review = is_array($follow['review_required'] ?? null) ? $follow['review_required'] : []; $reviewProjects = (int) ($review['projects_count'] ?? 0); ?>
+                <article class="teacher-follow-up-card teacher-follow-up-card--review-required">
+                    <i class="fa-solid fa-file-circle-check" aria-hidden="true"></i>
+                    <div><h3>Por revisar</h3><strong><?= (int) ($review['count'] ?? 0) ?></strong><p><?= e($projectSentence($reviewProjects, 'requieren revisión')) ?></p><?php if (!empty($review['route'])): ?><a class="teacher-follow-up-link" href="<?= e($review['route']) ?>">Ver pendientes →</a><?php endif; ?></div>
+                </article>
+                <?php $waiting = is_array($follow['waiting_student'] ?? null) ? $follow['waiting_student'] : []; $waitingProjects = (int) ($waiting['projects_count'] ?? $waiting['count'] ?? 0); ?>
+                <article class="teacher-follow-up-card teacher-follow-up-card--waiting-student">
+                    <i class="fa-solid fa-user-clock" aria-hidden="true"></i>
+                    <div><h3>Esperando estudiante</h3><strong><?= (int) ($waiting['count'] ?? 0) ?></strong><p><?= e($projectSentence($waitingProjects, 'en espera')) ?></p></div>
+                </article>
+                <?php $tribunal = is_array($follow['tribunal_assignment'] ?? null) ? $follow['tribunal_assignment'] : []; ?>
+                <?php if (!empty($tribunal['visible']) && (int) ($tribunal['count'] ?? 0) > 0): ?>
+                    <article class="teacher-follow-up-card teacher-follow-up-card--tribunal-assignment">
+                        <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+                        <div><h3>Asignación de tribunal</h3><strong><?= (int) $tribunal['count'] ?></strong><p>En espera</p></div>
+                    </article>
+                <?php endif; ?>
+            </div>
+        </section>
+
+        <section class="teacher-notifications" aria-labelledby="teacherNotificationsTitle">
+            <header class="teacher-section-header">
+                <div><p class="teacher-section-label">Actualidad</p><h2 id="teacherNotificationsTitle">Notificaciones</h2></div>
+                <a class="teacher-inline-link" href="<?= e($notifications['route'] ?? route('notifications')) ?>">Ver todas →</a>
+            </header>
+            <?php $items = is_array($notifications['items'] ?? null) ? $notifications['items'] : []; ?>
+            <?php if (!$items): ?>
+                <?php $empty('Todo al día', 'No tienes notificaciones nuevas.'); ?>
+            <?php else: ?>
+                <ul class="teacher-notification-list">
+                    <?php foreach (array_slice($items, 0, 3) as $item):
+                        $actionUrl = trim((string) ($item['action_url'] ?? ''));
+                        $entryClass = 'teacher-notification-entry' . (empty($item['is_read']) ? ' is-unread' : '');
+                    ?>
+                        <li class="<?= empty($item['is_read']) ? 'is-unread' : '' ?>">
+                            <?php if ($actionUrl !== ''): ?><a class="<?= $entryClass ?>" href="<?= e($actionUrl) ?>"><?php else: ?><div class="<?= $entryClass ?>"><?php endif; ?>
+                                <i class="fa-regular fa-bell" aria-hidden="true"></i>
+                                <span class="teacher-notification-main">
+                                    <span class="teacher-notification-heading"><strong><?= e($item['title'] ?? 'Notificación') ?></strong><time><?= e($relativeTime((string) ($item['created_at'] ?? ''))) ?></time></span>
+                                    <?php if (!empty($item['context'])): ?><small><?= e($item['context']) ?></small><?php endif; ?>
+                                </span>
+                            <?php if ($actionUrl !== ''): ?></a><?php else: ?></div><?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </section>
+
+        <section class="teacher-repository" aria-labelledby="teacherRepositoryTitle">
+            <header class="teacher-section-header">
+                <div><p class="teacher-section-label">Repositorio académico</p><h2 id="teacherRepositoryTitle">Proyectos publicados</h2><p>Trabajos disponibles en el repositorio institucional.</p></div>
+                <a class="teacher-inline-link" href="<?= e($repository['route'] ?? route('repository')) ?>">Explorar repositorio →</a>
+            </header>
+            <?php $repo = is_array($repository['items'] ?? null) ? $repository['items'] : []; ?>
+            <?php if (!$repo): ?>
+                <?php $empty('Aún no hay proyectos publicados disponibles.'); ?>
+            <?php else: ?>
+                <div class="teacher-repository-grid">
+                    <?php foreach ($repo as $item): ?>
+                        <a class="teacher-repository-card" href="<?= e($item['route'] ?? route('repository')) ?>">
+                            <div class="teacher-project-meta"><span><?= e($item['code'] ?? '') ?></span><span><?= e($item['type'] ?? 'Proyecto') ?></span></div>
+                            <h3><?= e($item['title'] ?? '') ?></h3>
+                            <p><?= e(is_array($item['authors'] ?? null) ? implode(' · ', $item['authors']) : ($item['authors'] ?? '')) ?></p>
+                            <small><?= e(trim(($item['career'] ?? '') . ' · ' . ($item['period'] ?? ''), ' ·')) ?></small>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </section>
+    </div>
 </main>

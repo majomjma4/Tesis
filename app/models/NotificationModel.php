@@ -17,13 +17,14 @@ final class NotificationModel
         return $this->db ?? Database::connection();
     }
 
-    public function getByUser(int $userId, array $filters = [], string $context = ''): array
+    public function getByUser(int $userId, array $filters = [], string $context = '', ?int $limit = null): array
     {
         [$conditions, $parameters] = $this->notificationQuery($userId, $filters, $context);
+        $limitClause = $limit !== null ? ' LIMIT ' . max(1, min($limit, 50)) : '';
         $statement = $this->connection()->prepare(
             'SELECT n.id, n.user_id, n.project_id, n.type, n.title, n.message, n.action_url, n.action_label, n.metadata, n.is_read, n.read_at, n.created_at, n.archived_at, n.deleted_at,
                     COALESCE(p.title, NULLIF(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.project_name")), ""), "Notificacion general") AS project_name
-             FROM notifications n LEFT JOIN projects p ON p.id = n.project_id WHERE ' . implode(' AND ', $conditions) . ' ORDER BY n.created_at DESC, n.id DESC'
+             FROM notifications n LEFT JOIN projects p ON p.id = n.project_id WHERE ' . implode(' AND ', $conditions) . ' ORDER BY n.created_at DESC, n.id DESC' . $limitClause
         );
         $statement->execute($parameters);
 
