@@ -4,6 +4,190 @@ declare(strict_types=1);
 
 final class DashboardModel
 {
+    public function getTeacherDashboard(int $teacherId): array
+    {
+        if ($teacherId < 1) return $this->emptyTeacherDashboard($teacherId);
+
+        $db = Database::connection();
+        $teacher = $this->teacherIdentity($db, $teacherId);
+        $assigned = (new TeacherAssignedProjectService())->forTeacher($teacherId);
+        $projects = $assigned['projects'];
+        $projectIds = array_values(array_unique(array_map(static fn(array $item): int => (int) $item['id'], $projects)));
+        $relations = [];
+        foreach ($projects as $project) {
+            $relations[(int) $project['id']] = array_values(array_map(
+                static fn(array $relation): string => (string) $relation['label'],
+                (array) ($project['relationships'] ?? [])
+            ));
+        }
+
+        $this->addTeacherProjectContext($db, $projects, $projectIds);
+        $deliveries = $this->teacherDeliveriesToReview($db, $projectIds);
+        $adjustments = $this->teacherPendingAdjustments($db, $projectIds);
+        $upcoming = $this->teacherUpcomingEvents($db, $teacherId, $projectIds);
+        $capabilities = $this->teacherCapabilities($db, $teacherId, $projects, $teacher);
+
+        $byStatus = array_fill_keys(['development', 'under_review', 'approved', 'defense', 'published'], 0);
+        foreach ($projects as $project) {
+            $status = (string) ($project['status_key'] ?? '');
+            if (array_key_exists($status, $byStatus)) $byStatus[$status]++;
+        }
+
+        $projectItems = array_map(static function (array $project) use ($deliveries, $adjustments): array {
+            $id = (int) $project['id'];
+            return [
+                'id' => $id,
+                'code' => (string) ($project['code'] ?? ''),
+                'title' => (string) ($project['title'] ?? ''),
+                'type' => (string) ($project['type'] ?? ''),
+                'status' => (string) ($project['status_key'] ?? ''),
+                'status_label' => (string) ($project['status'] ?? ''),
+                'roles' => array_values(array_map(static fn(array $role): string => (string) ($role['label'] ?? $role['code'] ?? ''), (array) ($project['relationships'] ?? []))),
+                'teacher_situation' => $project['teacher_situation'] ?? null,
+                'pending_actions' => $project['teacher_situation_requires_attention'] ? ['Revisar entregas'] : [],
+                'observations_total' => (int) ($project['observations_total'] ?? 0),
+                'observations_pending' => (int) ($project['observations_pending'] ?? 0),
+                'observations_teacher_actionable' => 0,
+                'deliveries_to_review' => (int) ($deliveries[$id] ?? 0),
+                'adjustments_pending' => (int) ($adjustments[$id] ?? 0),
+                'route' => route('project-detail') . '&id=' . $id,
+            ];
+        }, $projects);
+
+        return [
+            'context' => [
+                'teacher' => $teacher,
+                'academic_period' => $this->teacherAcademicPeriod($db),
+                'capabilities' => $capabilities,
+                'thesis_management' => [
+                    'enabled' => $capabilities['manage_thesis_process'],
+                    'route' => route('thesis-management'),
+                ],
+            ],
+            'summary' => [
+                'assigned_projects' => ['count' => count($projectItems), 'route' => route('assigned-projects')],
+                'deliveries_to_review' => ['count' => array_sum($deliveries), 'route' => route('assigned-projects')],
+                'projects_in_review' => ['count' => $byStatus['under_review'], 'route' => route('assigned-projects')],
+                'pending_adjustments' => ['count' => array_sum($adjustments), 'route' => route('assigned-projects')],
+            ],
+            'projects' => ['total' => count($projectItems), 'by_status' => $byStatus, 'items' => $projectItems],
+            'upcoming' => ['items' => $upcoming],
+        ];
+    }
+
+    public function emptyTeacherDashboard(int $teacherId = 0): array
+    {
+        return [
+            'context' => [
+                'teacher' => ['id' => $teacherId, 'name' => 'Usuario', 'roles' => ['teacher']],
+                'academic_period' => null,
+                'capabilities' => ['is_tutor' => false, 'is_reviewer' => false, 'is_tribunal_member' => false, 'manage_thesis_process' => false],
+                'thesis_management' => ['enabled' => false, 'route' => route('thesis-management')],
+            ],
+            'summary' => [
+                'assigned_projects' => ['count' => 0, 'route' => route('assigned-projects')],
+                'deliveries_to_review' => ['count' => 0, 'route' => route('assigned-projects')],
+                'projects_in_review' => ['count' => 0, 'route' => route('assigned-projects')],
+                'pending_adjustments' => ['count' => 0, 'route' => route('assigned-projects')],
+            ],
+            'projects' => ['total' => 0, 'by_status' => array_fill_keys(['development', 'under_review', 'approved', 'defense', 'published'], 0), 'items' => []],
+            'upcoming' => ['items' => []],
+        ];
+    }
+
+    private function teacherIdentity(PDO $db, int $teacherId): array
+    {
+        $query = $db->prepare("SELECT u.id,u.full_name,u.email,tp.can_tutor,tp.can_manage_thesis,GROUP_CONCAT(DISTINCT r.code ORDER BY r.code) roles
+            FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id
+            LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id
+            WHERE u.id=:id AND u.deleted_at IS NULL AND u.purged_at IS NULL GROUP BY u.id,u.full_name,u.email,tp.can_tutor,tp.can_manage_thesis");
+        $query->execute(['id' => $teacherId]);
+        $row = $query->fetch(PDO::FETCH_ASSOC) ?: [];
+        return [
+            'id' => (int) ($row['id'] ?? $teacherId),
+            'name' => (string) ($row['full_name'] ?? 'Usuario'),
+            'email' => (string) ($row['email'] ?? ''),
+            'roles' => $row['roles'] ? explode(',', (string) $row['roles']) : ['teacher'],
+            'can_tutor' => (bool) ($row['can_tutor'] ?? false),
+            'can_manage_thesis' => (bool) ($row['can_manage_thesis'] ?? false),
+        ];
+    }
+
+    private function teacherAcademicPeriod(PDO $db): ?array
+    {
+        $row = $db->query("SELECT id,code,name,status,starts_on,ends_on FROM academic_periods WHERE status='active' ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        $ends = strtotime((string) $row['ends_on']);
+        return [
+            'id' => (int) $row['id'], 'code' => (string) $row['code'], 'name' => (string) $row['name'],
+            'status' => (string) $row['status'], 'starts_on' => (string) $row['starts_on'], 'ends_on' => (string) $row['ends_on'],
+            'days_remaining' => max(0, (int) ceil(($ends - time()) / 86400)),
+        ];
+    }
+
+    private function teacherCapabilities(PDO $db, int $teacherId, array $projects, array $teacher): array
+    {
+        $tribunal = false; $reviewer = false;
+        foreach ($projects as $project) foreach ((array) ($project['relationships'] ?? []) as $relation) {
+            $code = strtolower((string) ($relation['code'] ?? ''));
+            $tribunal = $tribunal || $code === 'tribunal';
+            $reviewer = $reviewer || in_array($code, ['tribunal', 'cotutor'], true);
+        }
+        return ['is_tutor' => (bool) $teacher['can_tutor'], 'is_reviewer' => $reviewer, 'is_tribunal_member' => $tribunal, 'manage_thesis_process' => (bool) $teacher['can_manage_thesis']];
+    }
+
+    private function addTeacherProjectContext(PDO $db, array &$projects, array $projectIds): void
+    {
+        if (!$projectIds) return;
+        $marks = implode(',', array_fill(0, count($projectIds), '?'));
+        $query = $db->prepare("SELECT project_id,COUNT(*) observations_total,SUM(status='pending') observations_pending FROM project_observations WHERE project_id IN ($marks) GROUP BY project_id");
+        $query->execute($projectIds); $context = [];
+        foreach ($query->fetchAll(PDO::FETCH_ASSOC) as $row) $context[(int) $row['project_id']] = $row;
+        foreach ($projects as &$project) {
+            $row = $context[(int) $project['id']] ?? [];
+            $project['observations_total'] = (int) ($row['observations_total'] ?? 0);
+            $project['observations_pending'] = (int) ($row['observations_pending'] ?? 0);
+        }
+        unset($project);
+    }
+
+    private function teacherDeliveriesToReview(PDO $db, array $projectIds): array
+    {
+        if (!$projectIds) return [];
+        $marks = implode(',', array_fill(0, count($projectIds), '?'));
+        $query = $db->prepare("SELECT project_id,COUNT(*) total FROM project_deliveries WHERE project_id IN ($marks) AND status IN ('submitted','under_review') GROUP BY project_id");
+        $query->execute($projectIds); $result = [];
+        foreach ($query->fetchAll(PDO::FETCH_ASSOC) as $row) $result[(int) $row['project_id']] = (int) $row['total'];
+        return $result;
+    }
+
+    private function teacherPendingAdjustments(PDO $db, array $projectIds): array
+    {
+        if (!$projectIds) return [];
+        $marks = implode(',', array_fill(0, count($projectIds), '?'));
+        $query = $db->prepare("SELECT project_id,COUNT(*) total FROM project_adjustment_requests WHERE project_id IN ($marks) AND status='pending' GROUP BY project_id");
+        $query->execute($projectIds); $result = [];
+        foreach ($query->fetchAll(PDO::FETCH_ASSOC) as $row) $result[(int) $row['project_id']] = (int) $row['total'];
+        return $result;
+    }
+
+    private function teacherUpcomingEvents(PDO $db, int $teacherId, array $projectIds): array
+    {
+        $projectIds = array_values(array_unique($projectIds));
+        $projectClause = $projectIds ? ' OR e.project_id IN (' . implode(',', array_fill(0, count($projectIds), '?')) . ')' : '';
+        $params = array_merge([$teacherId], $projectIds, [date('Y-m-d')]);
+        $query = $db->prepare("SELECT e.id,e.title,e.event_type,e.event_date,e.event_time,e.project_id,e.is_completed,p.title project_title
+            FROM project_events e LEFT JOIN projects p ON p.id=e.project_id
+            WHERE (e.created_by=? $projectClause) AND e.event_date>=? AND e.is_completed=0
+            ORDER BY e.event_date,e.event_time IS NULL,e.event_time,e.id LIMIT 3");
+        $query->execute($params);
+        return array_map(static fn(array $row): array => [
+            'id' => (int) $row['id'], 'title' => (string) $row['title'], 'type' => (string) $row['event_type'],
+            'date' => (string) $row['event_date'], 'project_id' => $row['project_id'] === null ? null : (int) $row['project_id'],
+            'project_title' => $row['project_title'] === null ? null : (string) $row['project_title'], 'completed' => (bool) $row['is_completed'],
+            'route' => $row['project_id'] === null ? route('calendar') : route('project-detail') . '&id=' . (int) $row['project_id'],
+        ], $query->fetchAll(PDO::FETCH_ASSOC));
+    }
     public function getAdminDashboard(): array
     {
         $connection = Database::connection();

@@ -30,6 +30,29 @@ final class DashboardController
             return;
         }
 
+        $session = new AuthSessionService();
+        if ($session->isTeacher()) {
+            $error = null;
+            try {
+                $teacherDashboard = $dashboard->getTeacherDashboard((int) $session->userId());
+            } catch (Throwable $exception) {
+                error_log('Teacher dashboard error: ' . $exception->getMessage());
+                $error = 'No fue posible consultar la información docente en este momento.';
+                $teacherDashboard = $dashboard->emptyTeacherDashboard((int) $session->userId());
+            }
+
+            View::render('dashboard/teacher', [
+                'currentPage' => 'dashboard',
+                'title' => 'Dashboard docente | Gestión Documental Académica',
+                'bodyClass' => 'teacher-dashboard-page',
+                'pageStyles' => [asset('css/teacher-dashboard.css')],
+                'pageScript' => null,
+                'teacherDashboard' => $teacherDashboard,
+                'teacherDashboardError' => $error,
+            ]);
+            return;
+        }
+
         View::render('dashboard/index', [
             'currentPage' => 'dashboard',
             'title' => 'Dashboard | Gestion Documental Academica',

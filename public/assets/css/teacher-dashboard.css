@@ -1,0 +1,421 @@
+.teacher-dashboard {
+    width: min(100%, 1200px);
+    margin: 0 auto;
+    padding: 12px 0 36px;
+    color: var(--text);
+}
+
+.teacher-dashboard-header,
+.teacher-section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+}
+
+.teacher-dashboard-header {
+    padding: 10px 0 24px;
+    border-bottom: 1px solid var(--line);
+}
+
+.teacher-dashboard-eyebrow,
+.teacher-project-type {
+    color: var(--blue);
+    font-size: .72rem;
+    font-weight: 850;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.teacher-dashboard h1 {
+    margin: 5px 0 6px;
+    font-size: clamp(1.65rem, 3vw, 2.2rem);
+    line-height: 1.15;
+}
+
+.teacher-dashboard-header p,
+.teacher-section-header p {
+    margin: 0;
+    color: var(--muted);
+    font-size: .9rem;
+    line-height: 1.5;
+}
+
+.teacher-dashboard-context {
+    display: grid;
+    gap: 3px;
+    min-width: 156px;
+    padding: 11px 14px;
+    border: 1px solid color-mix(in srgb, var(--blue) 24%, var(--line));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--blue) 6%, var(--surface));
+    text-align: right;
+}
+
+.teacher-dashboard-context strong {
+    color: var(--text);
+    font-size: .9rem;
+}
+
+.teacher-dashboard-context span {
+    color: var(--muted);
+    font-size: .76rem;
+}
+
+.teacher-summary,
+.teacher-projects,
+.teacher-upcoming,
+.teacher-thesis-management {
+    margin-top: 22px;
+}
+
+.teacher-summary h2,
+.teacher-section-header h2,
+.teacher-thesis-management h2 {
+    margin: 0;
+    font-size: 1.08rem;
+    line-height: 1.3;
+}
+
+.teacher-summary h2 {
+    margin-bottom: 10px;
+}
+
+.teacher-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.teacher-summary-item {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 13px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: 0 5px 16px rgba(15, 23, 42, .04);
+}
+
+.teacher-summary-item > i {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--blue) 11%, var(--surface));
+    color: var(--blue);
+    font-size: .95rem;
+}
+
+.teacher-summary-item > div {
+    display: grid;
+    min-width: 0;
+    gap: 1px;
+}
+
+.teacher-summary-item strong {
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.teacher-summary-item span {
+    color: var(--text);
+    font-size: .78rem;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.teacher-summary-item small {
+    color: var(--muted);
+    font-size: .7rem;
+    line-height: 1.25;
+}
+
+.teacher-summary-item a,
+.teacher-section-header > a,
+.teacher-project-action a,
+.teacher-upcoming-item > a,
+.teacher-thesis-management a {
+    color: var(--blue);
+    font-size: .76rem;
+    font-weight: 800;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.teacher-summary-item a:hover,
+.teacher-section-header > a:hover,
+.teacher-project-action a:hover,
+.teacher-upcoming-item > a:hover,
+.teacher-thesis-management a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.teacher-projects {
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: 0 9px 24px rgba(15, 23, 42, .05);
+}
+
+.teacher-section-header {
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.teacher-project-list {
+    display: grid;
+    gap: 10px;
+}
+
+.teacher-project-item {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.35fr) minmax(100px, .55fr) minmax(180px, 1fr) minmax(170px, .9fr) auto;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+    padding: 17px 18px;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--blue);
+    border-radius: 12px;
+    background: var(--surface-soft);
+}
+
+.teacher-project-identity,
+.teacher-project-status,
+.teacher-project-role,
+.teacher-project-context {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+}
+
+.teacher-project-identity h3 {
+    margin: 2px 0 0;
+    color: var(--text);
+    font-size: .98rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.teacher-project-identity > span:last-child,
+.teacher-project-role span,
+.teacher-project-status > span {
+    color: var(--muted);
+    font-size: .72rem;
+}
+
+.teacher-project-role strong,
+.teacher-project-status strong {
+    color: var(--text);
+    font-size: .8rem;
+    line-height: 1.3;
+}
+
+.teacher-project-status strong {
+    color: var(--blue);
+}
+
+.teacher-project-status p {
+    margin: 2px 0 0;
+    color: var(--text);
+    font-size: .78rem;
+    font-weight: 750;
+    line-height: 1.35;
+}
+
+.teacher-project-context {
+    color: var(--muted);
+    font-size: .74rem;
+    line-height: 1.35;
+}
+
+.teacher-project-action {
+    justify-self: end;
+}
+
+.teacher-empty-state {
+    margin: 0;
+    padding: 18px;
+    border: 1px dashed var(--line);
+    border-radius: 11px;
+    background: var(--surface-soft);
+    color: var(--muted);
+    font-size: .84rem;
+}
+
+.teacher-upcoming {
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+}
+
+.teacher-upcoming-list {
+    display: grid;
+    gap: 8px;
+}
+
+.teacher-upcoming-item {
+    display: grid;
+    grid-template-columns: 60px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 13px;
+    min-width: 0;
+    padding: 10px 0;
+    border-top: 1px solid var(--line);
+}
+
+.teacher-upcoming-item:first-child {
+    border-top: 0;
+}
+
+.teacher-upcoming-item time {
+    color: var(--blue);
+    font-size: .78rem;
+    font-weight: 850;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.teacher-upcoming-item h3 {
+    margin: 0;
+    color: var(--text);
+    font-size: .84rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.teacher-upcoming-item p {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: .74rem;
+}
+
+.teacher-thesis-management {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 16px 20px;
+    border: 1px solid color-mix(in srgb, var(--blue) 24%, var(--line));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--blue) 5%, var(--surface));
+}
+
+.teacher-thesis-management p {
+    flex: 1;
+    margin: 0;
+    color: var(--muted);
+    font-size: .82rem;
+}
+
+.teacher-dashboard-error {
+    margin: 0 0 16px;
+    padding: 11px 14px;
+    border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--line));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+    color: var(--text);
+    font-size: .84rem;
+}
+
+@media (max-width: 1050px) {
+    .teacher-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .teacher-project-item {
+        grid-template-columns: minmax(210px, 1.25fr) minmax(110px, .65fr) minmax(180px, 1fr);
+    }
+
+    .teacher-project-context,
+    .teacher-project-action {
+        grid-column: span 1;
+    }
+
+    .teacher-project-action {
+        justify-self: start;
+    }
+}
+
+@media (max-width: 700px) {
+    .teacher-dashboard {
+        padding: 4px 0 28px;
+    }
+
+    .teacher-dashboard-header,
+    .teacher-section-header,
+    .teacher-thesis-management {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .teacher-dashboard-context {
+        width: 100%;
+        min-width: 0;
+        text-align: left;
+    }
+
+    .teacher-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .teacher-projects,
+    .teacher-upcoming {
+        padding: 16px;
+    }
+
+    .teacher-project-item {
+        grid-template-columns: 1fr;
+        gap: 11px;
+        padding: 15px;
+    }
+
+    .teacher-project-action {
+        justify-self: start;
+    }
+
+    .teacher-project-action a {
+        display: inline-flex;
+        min-height: 40px;
+        align-items: center;
+    }
+}
+
+@media (max-width: 380px) {
+    .teacher-dashboard-header p,
+    .teacher-section-header p {
+        font-size: .82rem;
+    }
+
+    .teacher-summary-item {
+        grid-template-columns: 32px minmax(0, 1fr);
+    }
+
+    .teacher-summary-item > i {
+        width: 32px;
+        height: 32px;
+    }
+
+    .teacher-summary-item a {
+        grid-column: 2;
+        justify-self: start;
+    }
+
+    .teacher-upcoming-item {
+        grid-template-columns: 48px minmax(0, 1fr);
+    }
+
+    .teacher-upcoming-item > a {
+        grid-column: 2;
+        justify-self: start;
+    }
+}
