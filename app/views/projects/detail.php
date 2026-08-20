@@ -284,7 +284,7 @@ if ($project === null): ?>
     .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="description"]{grid-column:1/-1}
     .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="description"]{padding:20px;border-top:3px solid var(--primary)}
     .digital-record[data-entity-type="project"] .ed-document-section-header{margin-bottom:13px;padding-bottom:11px}
-    .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="description"] .ed-prose{max-width:82ch;font-size:14px;line-height:1.72;overflow-wrap:anywhere}
+    .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="description"] .ed-prose{max-width:82ch;font-size:var(--font-md);line-height:1.72;overflow-wrap:anywhere}
     .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="description"] .ed-prose p{margin-bottom:12px}
     .digital-record[data-record-context="academic_management"] :is(.ed-information-meta dd,.ed-participant-identity strong,.ed-participant-identity span,.ed-participant-identity small,.ed-classification-tag>span){word-break:normal;overflow-wrap:break-word}
     .digital-record[data-record-context="academic_management"] .ed-meta [data-record-meta="code"]{--ed-meta-accent:#0891b2}
@@ -318,13 +318,13 @@ if ($project === null): ?>
     .digital-record[data-record-context="academic"] .ed-academic-progress li{position:relative;min-width:0;display:grid;grid-template-rows:30px auto;justify-items:center;gap:8px;color:var(--muted);text-align:center}
     .digital-record[data-record-context="academic"] .ed-academic-progress li:not(:last-child)::after{position:absolute;z-index:0;top:14px;left:calc(50% + 15px);width:calc(100% - 30px);height:2px;background:var(--line);content:""}
     .digital-record[data-record-context="academic"] .ed-academic-progress li[data-step-state="completed"]:not(:last-child)::after{background:#16a34a}
-    .digital-record[data-record-context="academic"] .ed-academic-progress-marker{position:relative;z-index:1;width:30px;height:30px;border:2px solid var(--line);border-radius:50%;background:var(--surface);color:var(--muted);display:grid;place-items:center;font-size:10px;font-weight:850}
+    .digital-record[data-record-context="academic"] .ed-academic-progress-marker{position:relative;z-index:1;width:30px;height:30px;border:2px solid var(--line);border-radius:50%;background:var(--surface);color:var(--muted);display:grid;place-items:center;font-size:var(--font-xs);font-weight:850}
     .digital-record[data-record-context="academic"] .ed-academic-progress li[data-step-state="completed"] .ed-academic-progress-marker{border-color:#16a34a;background:#16a34a;color:#fff}
     .digital-record[data-record-context="academic"] .ed-academic-progress li[aria-current="step"] .ed-academic-progress-marker{border-color:var(--primary);background:var(--primary);color:#fff;box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 14%,transparent)}
-    .digital-record[data-record-context="academic"] .ed-academic-progress-label{max-width:112px;font-size:10px;font-weight:780;line-height:1.35;word-break:normal;overflow-wrap:break-word}
+    .digital-record[data-record-context="academic"] .ed-academic-progress-label{max-width:112px;font-size:var(--font-xs);font-weight:780;line-height:1.35;word-break:normal;overflow-wrap:break-word}
     .digital-record[data-record-context="academic"] .ed-academic-progress li[data-step-state="completed"] .ed-academic-progress-label{color:#15803d}
     .digital-record[data-record-context="academic"] .ed-academic-progress li[aria-current="step"] .ed-academic-progress-label{color:var(--primary);font-weight:900}
-    .digital-record[data-record-context="academic"] .ed-academic-progress-current{display:block;margin-top:2px;font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+    .digital-record[data-record-context="academic"] .ed-academic-progress-current{display:block;margin-top:2px;font-size:var(--font-xs);font-weight:900;letter-spacing:.06em;text-transform:uppercase}
     .digital-record[data-record-context="academic_management"] .ed-header{container:project-admin-header/inline-size}
     .digital-record[data-record-context="academic_management"] .ed-meta>div{min-width:0}
     .digital-record[data-record-context="academic_management"] .ed-meta :is(dt,dd){word-break:normal;overflow-wrap:break-word}
@@ -335,21 +335,21 @@ if ($project === null): ?>
     .digital-record[data-record-context="academic_management"] .ed-review-notice-inline{min-width:0;display:flex;align-items:flex-start;gap:10px}
     .digital-record[data-record-context="academic_management"] .ed-review-notice-inline>i{flex:0 0 auto;margin-top:2px}
     .digital-record[data-record-context="academic_management"] .ed-review-notice-inline>div{min-width:0;display:grid;gap:3px}
-    .digital-record[data-record-context="academic_management"] .ed-review-notice-inline strong{font-size:12px;line-height:1.5}
-    .digital-record[data-record-context="academic_management"] .ed-review-notice-inline span{font-size:11px;line-height:1.45}
+    .digital-record[data-record-context="academic_management"] .ed-review-notice-inline strong{font-size:var(--font-sm);line-height:1.5}
+    .digital-record[data-record-context="academic_management"] .ed-review-notice-inline span{font-size:var(--font-xs);line-height:1.45}
     .digital-record[data-record-context="academic_management"] .ed-academic-progress-scroll{max-width:100%;min-width:0;overflow:visible}
     .digital-record[data-record-context="academic_management"] .ed-academic-progress{min-width:0;margin:0;padding:4px 0 2px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));list-style:none}
     .digital-record[data-record-context="academic_management"] .ed-academic-progress[data-step-count="4"]{min-width:0;grid-template-columns:repeat(4,minmax(0,1fr))}
     .digital-record[data-record-context="academic_management"] .ed-academic-progress li{position:relative;min-width:0;display:grid;grid-template-rows:30px auto;justify-items:center;gap:8px;color:var(--muted);text-align:center}
     .digital-record[data-record-context="academic_management"] .ed-academic-progress li:not(:last-child)::after{position:absolute;z-index:0;top:14px;left:calc(50% + 15px);width:calc(100% - 30px);height:2px;background:var(--line);content:""}
     .digital-record[data-record-context="academic_management"] .ed-academic-progress li[data-step-state="completed"]:not(:last-child)::after{background:#16a34a}
-    .digital-record[data-record-context="academic_management"] .ed-academic-progress-marker{position:relative;z-index:1;width:30px;height:30px;border:2px solid var(--line);border-radius:50%;background:var(--surface);color:var(--muted);display:grid;place-items:center;font-size:10px;font-weight:850}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress-marker{position:relative;z-index:1;width:30px;height:30px;border:2px solid var(--line);border-radius:50%;background:var(--surface);color:var(--muted);display:grid;place-items:center;font-size:var(--font-xs);font-weight:850}
     .digital-record[data-record-context="academic_management"] .ed-academic-progress li[data-step-state="completed"] .ed-academic-progress-marker{border-color:#16a34a;background:#16a34a;color:#fff}
     .digital-record[data-record-context="academic_management"] .ed-academic-progress li[aria-current="step"] .ed-academic-progress-marker{border-color:var(--primary);background:var(--primary);color:#fff;box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 14%,transparent)}
-    .digital-record[data-record-context="academic_management"] .ed-academic-progress-label{max-width:112px;font-size:10px;font-weight:780;line-height:1.35;word-break:normal;overflow-wrap:break-word}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress-label{max-width:112px;font-size:var(--font-xs);font-weight:780;line-height:1.35;word-break:normal;overflow-wrap:break-word}
     .digital-record[data-record-context="academic_management"] .ed-academic-progress li[data-step-state="completed"] .ed-academic-progress-label{color:#15803d}
     .digital-record[data-record-context="academic_management"] .ed-academic-progress li[aria-current="step"] .ed-academic-progress-label{color:var(--primary);font-weight:900}
-    .digital-record[data-record-context="academic_management"] .ed-academic-progress-current{display:block;margin-top:2px;font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+    .digital-record[data-record-context="academic_management"] .ed-academic-progress-current{display:block;margin-top:2px;font-size:var(--font-xs);font-weight:900;letter-spacing:.06em;text-transform:uppercase}
     @container project-admin-header (min-width:900px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(5,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:auto}}
     @container project-admin-header (min-width:650px) and (max-width:899.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(6,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div:nth-child(-n+3){grid-column:span 2}.digital-record[data-record-context="academic_management"] .ed-meta>div:nth-child(n+4){grid-column:span 3}}
     @container project-admin-header (min-width:480px) and (max-width:649.98px){.digital-record[data-record-context="academic_management"] .ed-meta{grid-template-columns:repeat(2,minmax(0,1fr))}.digital-record[data-record-context="academic_management"] .ed-meta>div{grid-column:auto}}
@@ -391,7 +391,7 @@ if ($project === null): ?>
         .digital-record[data-record-context="academic_management"] .ed-header h1{font-size:clamp(1.35rem,10vw,1.65rem)}
         .digital-record[data-record-context="academic_management"] .ed-content{padding-right:10px;padding-left:10px}
         .digital-record[data-record-context="academic_management"] .ed-document-section{padding:12px}
-        .digital-record[data-record-context="academic_management"] .ed-document-heading{align-items:flex-start;font-size:14px;line-height:1.35}
+        .digital-record[data-record-context="academic_management"] .ed-document-heading{align-items:flex-start;font-size:var(--font-md);line-height:1.35}
     }
     </style><?php endif;
     require __DIR__.'/../repository/_ficha-institucional.php';

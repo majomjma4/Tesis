@@ -4,7 +4,7 @@
 }
 
 /* Fase 2.5: controles y destinatarios del módulo, sin afectar otros formularios. */
-.notification-toolbar .notification-filter-control{min-width:150px}.notification-toolbar .notification-filter-control select{width:100%;text-overflow:ellipsis}.notification-filter-chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:6px 10px;color:var(--text);font:inherit;font-size:12px;cursor:pointer}.notification-active-filter{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.notification-recipient-results{max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:var(--shadow);margin-top:6px}.notification-recipient-results button{display:grid;gap:3px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;padding:10px 12px;color:var(--text);font:inherit;cursor:pointer}.notification-recipient-results button:hover{background:var(--surface-soft)}.notification-recipient-results small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.notification-recipient-chips{display:flex;gap:6px;flex-wrap:wrap}.notification-recipient-chip{border:0;border-radius:999px;background:var(--blue-soft);color:var(--blue);padding:5px 9px;font:inherit;font-size:12px;cursor:pointer}.notification-send-summary{margin:0;color:var(--muted);font-size:13px}.notification-detail-modal #notificationCreateForm{display:grid;gap:14px}.notification-detail-modal #notificationCreateForm label{display:grid;gap:6px;font-weight:700;font-size:13px}.notification-detail-modal #notificationCreateForm input,.notification-detail-modal #notificationCreateForm select,.notification-detail-modal #notificationCreateForm textarea{width:100%;min-height:40px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-soft);color:var(--text);font:inherit}.notification-detail-modal #notificationCreateForm textarea{min-height:120px;resize:vertical}@media(max-width:480px){.notification-toolbar .notification-filter-control,.notification-date-filter{min-width:0}.notification-recipient-results{max-height:40vh}.notification-detail-modal{width:calc(100vw - 20px)}}
+.notification-toolbar .notification-filter-control{min-width:150px}.notification-toolbar .notification-filter-control select{width:100%;text-overflow:ellipsis}.notification-filter-chip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:6px 10px;color:var(--text);font:inherit;font-size:var(--font-sm);cursor:pointer}.notification-active-filter{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.notification-recipient-results{max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:var(--shadow);margin-top:6px}.notification-recipient-results button{display:grid;gap:3px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;padding:10px 12px;color:var(--text);font:inherit;cursor:pointer}.notification-recipient-results button:hover{background:var(--surface-soft)}.notification-recipient-results small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.notification-recipient-chips{display:flex;gap:6px;flex-wrap:wrap}.notification-recipient-chip{border:0;border-radius:999px;background:var(--blue-soft);color:var(--blue);padding:5px 9px;font:inherit;font-size:var(--font-sm);cursor:pointer}.notification-send-summary{margin:0;color:var(--muted);font-size:var(--font-md)}.notification-detail-modal #notificationCreateForm{display:grid;gap:14px}.notification-detail-modal #notificationCreateForm label{display:grid;gap:6px;font-weight:700;font-size:var(--font-md)}.notification-detail-modal #notificationCreateForm input,.notification-detail-modal #notificationCreateForm select,.notification-detail-modal #notificationCreateForm textarea{width:100%;min-height:40px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface-soft);color:var(--text);font:inherit}.notification-detail-modal #notificationCreateForm textarea{min-height:120px;resize:vertical}@media(max-width:480px){.notification-toolbar .notification-filter-control,.notification-date-filter{min-width:0}.notification-recipient-results{max-height:40vh}.notification-detail-modal{width:calc(100vw - 20px)}}
 
 .notifications-shell.is-loading {
     position: absolute;
@@ -273,7 +273,7 @@ html.theme-dark .notification-skeleton::after {
     align-items: center;
     gap: 8px;
     color: var(--blue);
-    font-size: 13px;
+    font-size: var(--font-sm);
     font-weight: 800;
     letter-spacing: .08em;
     text-transform: uppercase;
@@ -281,7 +281,7 @@ html.theme-dark .notification-skeleton::after {
 }
 
 .notifications-heading h1 {
-    font-size: clamp(30px, 3vw, 42px);
+    font-size: var(--font-2xl);
     line-height: 1.08;
     letter-spacing: -.035em;
     margin-bottom: 8px
@@ -289,7 +289,7 @@ html.theme-dark .notification-skeleton::after {
 
 .notifications-heading p {
     color: var(--muted);
-    font-size: 16px
+    font-size: var(--font-md)
 }
 
 .notifications-heading-actions {
@@ -299,7 +299,7 @@ html.theme-dark .notification-skeleton::after {
 }
 
 .notification-action {
-    min-height: 46px;
+    min-height: var(--control-height);
     padding: 0 17px;
     border-radius: 14px;
     display: inline-flex;
@@ -337,7 +337,7 @@ html.theme-dark .notification-skeleton::after {
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 18px;
-    padding: 17px;
+    padding: var(--space-md);
     display: flex;
     align-items: center;
     gap: 13px;
@@ -371,7 +371,7 @@ html.theme-dark .notification-skeleton::after {
 
 .notification-stat div span {
     color: var(--muted);
-    font-size: 13px;
+    font-size: var(--font-sm);
     margin-top: 6px
 }
 
@@ -409,7 +409,7 @@ html.theme-dark .notification-skeleton::after {
 
 .notification-search,
 .notification-filter {
-    min-height: 48px;
+    min-height: var(--control-height);
     background: var(--surface-soft);
     border: 1px solid transparent;
     border-radius: 13px;
@@ -447,7 +447,7 @@ html.theme-dark .notification-skeleton::after {
     border-radius: 6px;
     padding: 3px 6px;
     background: var(--surface);
-    font-size: 11px;
+    font-size: var(--font-xs);
     white-space: nowrap
 }
 
@@ -491,12 +491,12 @@ html.theme-dark .notification-skeleton::after {
 }
 
 .notification-group-heading h2 {
-    font-size: 15px;
+    font-size: var(--font-lg);
     letter-spacing: .01em
 }
 
 .notification-group-heading span {
-    font-size: 12px;
+    font-size: var(--font-xs);
     color: var(--muted);
     background: var(--surface);
     border: 1px solid var(--line);
@@ -610,7 +610,7 @@ html.theme-dark .notification-skeleton::after {
 .notification-category {
     color: var(--type-color);
     font-weight: 800;
-    font-size: 11px;
+    font-size: var(--font-xs);
     text-transform: uppercase;
     letter-spacing: .06em
 }
@@ -618,11 +618,11 @@ html.theme-dark .notification-skeleton::after {
 .notification-date-mobile {
     display: none;
     color: var(--muted);
-    font-size: 12px
+    font-size: var(--font-sm)
 }
 
 .notification-copy h3 {
-    font-size: 15px;
+    font-size: var(--font-lg);
     margin: 5px 0;
     color: var(--text)
 }
@@ -637,7 +637,7 @@ html.theme-dark .notification-skeleton::after {
 
 .notification-copy p {
     color: var(--muted);
-    font-size: 13px;
+    font-size: var(--font-md);
     line-height: 1.45;
     white-space: nowrap;
     overflow: hidden;
@@ -649,7 +649,7 @@ html.theme-dark .notification-skeleton::after {
     align-items: center;
     gap: 6px;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--font-xs);
     margin-top: 7px;
     white-space: nowrap;
     overflow: hidden;
@@ -664,12 +664,12 @@ html.theme-dark .notification-skeleton::after {
     display: flex;
     flex-direction: column;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--font-xs);
     line-height: 1.35
 }
 
 .notification-meta time strong {
-    font-size: 13px;
+    font-size: var(--font-sm);
     color: var(--text)
 }
 
@@ -719,7 +719,7 @@ html.theme-dark .notification-skeleton::after {
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 20px;
-    padding: 19px;
+    padding: var(--space-lg);
     box-shadow: 0 8px 24px rgba(15, 23, 42, .045)
 }
 
@@ -742,13 +742,13 @@ html.theme-dark .notification-skeleton::after {
 
 .side-panel-heading small {
     color: var(--muted);
-    font-size: 10px;
+    font-size: var(--font-xs);
     text-transform: uppercase;
     letter-spacing: .08em
 }
 
 .side-panel-heading h2 {
-    font-size: 17px
+    font-size: var(--font-lg)
 }
 
 .side-panel-heading.compact>span {
@@ -777,7 +777,7 @@ html.theme-dark .notification-skeleton::after {
     align-items: center;
     justify-content: space-between;
     padding: 9px 0;
-    font-size: 13px
+    font-size: var(--font-sm)
 }
 
 .side-metric span {
@@ -813,12 +813,12 @@ html.theme-dark .notification-skeleton::after {
 .side-update div {
     display: flex;
     flex-direction: column;
-    font-size: 11px
+    font-size: var(--font-xs)
 }
 
 .side-update strong {
     color: var(--text);
-    font-size: 12px;
+    font-size: var(--font-sm);
     margin-top: 2px
 }
 
@@ -835,7 +835,7 @@ html.theme-dark .notification-skeleton::after {
     padding: 12px;
     border-radius: 12px;
     background: var(--surface-soft);
-    font-size: 13px;
+    font-size: var(--font-sm);
     font-weight: 700;
     transition: .2s
 }
@@ -887,13 +887,13 @@ html.theme-dark .notification-skeleton::after {
 }
 
 .notifications-empty h2 {
-    font-size: 19px
+    font-size: var(--font-xl)
 }
 
 .notifications-empty p {
     color: var(--muted);
     margin-top: 6px;
-    font-size: 14px
+    font-size: var(--font-md)
 }
 
 .notifications-shell [hidden],
@@ -1111,11 +1111,11 @@ html.theme-dark .notification-type-icon {
     }
 
     .notification-copy h3 {
-        font-size: 14px
+        font-size:var(--font-md)
     }
 
     .notification-copy p {
-        font-size: 12px
+        font-size:var(--font-sm)
     }
 
     .skeleton-title {
@@ -1201,7 +1201,7 @@ html.theme-dark .notification-row.is-read .mark-notification {
     align-items: center;
     gap: 7px;
     color: var(--muted);
-    font-size: 12px
+    font-size:var(--font-sm)
 }
 
 .notification-active-filter>span {
@@ -1230,12 +1230,12 @@ html.theme-dark .notification-row.is-read .mark-notification {
     justify-content: space-between;
     margin-bottom: 7px;
     color: var(--muted);
-    font-size: 11px
+    font-size:var(--font-xs)
 }
 
 .side-progress-label strong {
     color: var(--text);
-    font-size: 12px
+    font-size:var(--font-sm)
 }
 
 .notification-toast {
@@ -1308,7 +1308,7 @@ html.theme-dark .notification-row.is-read .mark-notification {
     border-radius: 9px;
     background: var(--surface);
     color: var(--muted);
-    font-size: 11px
+    font-size:var(--font-xs)
 }
 
 .notification-message-context span:first-child {
@@ -1327,7 +1327,7 @@ html.theme-dark .notification-row.is-read .mark-notification {
 
 .notification-message-body p {
     color: var(--text);
-    font-size: 15px;
+    font-size:var(--font-lg);
     line-height: 1.75;
     white-space: pre-line
 }
@@ -1398,13 +1398,13 @@ html.theme-dark .notification-row.is-read .mark-notification {
 }
 
 .notification-trash-notice strong {
-    font-size: 13px
+    font-size:var(--font-md)
 }
 
 .notification-trash-notice p {
     margin-top: 3px;
     color: var(--muted);
-    font-size: 11px
+    font-size:var(--font-xs)
 }
 
 .notification-trash-selection {
@@ -1415,7 +1415,7 @@ html.theme-dark .notification-row.is-read .mark-notification {
     padding-top: 11px;
     border-top: 1px solid rgba(245, 158, 11, .2);
     color: var(--muted);
-    font-size: 12px
+    font-size:var(--font-sm)
 }
 
 .notification-trash-selection label {
@@ -1443,7 +1443,7 @@ html.theme-dark .notification-row.is-read .mark-notification {
 .notification-trash-actions .notification-action {
     min-height: 38px;
     padding: 0 12px;
-    font-size: 12px
+    font-size:var(--font-sm)
 }
 
 .notification-action.ghost-danger {
@@ -1507,12 +1507,12 @@ html.theme-dark .notification-row.is-read .mark-notification {
 }
 
 .notification-context-menu button strong {
-    font-size: 12px
+    font-size:var(--font-sm)
 }
 
 .notification-context-menu button small {
     color: var(--muted);
-    font-size: 10px;
+    font-size:var(--font-xs);
     font-weight: 500;
     line-height: 1.3
 }
@@ -1538,7 +1538,7 @@ html.theme-dark .notification-row.is-unread {
     padding: 11px 12px;
     border-radius: 12px;
     background: var(--surface-soft);
-    font-size: 12px
+    font-size:var(--font-sm)
 }
 
 .activity-summary-item span {
@@ -1624,7 +1624,7 @@ html.theme-dark .notification-row.is-unread {
     gap: 10px;
     text-align: left;
     font: inherit;
-    font-size: 13px;
+    font-size:var(--font-md);
     font-weight: 500;
     cursor: pointer;
 }
@@ -1708,7 +1708,7 @@ html.theme-dark .notification-row.is-unread {
     background: var(--surface-soft);
     border-radius: 13px;
     color: var(--muted);
-    font-size: 13px
+    font-size:var(--font-md)
 }
 
 .notification-modal-actions {
@@ -1735,7 +1735,7 @@ html.theme-dark .notification-row.is-unread {
     color: #fff;
     box-shadow: 0 14px 35px rgba(15, 23, 42, .22);
     font-weight: 700;
-    font-size: 13px
+    font-size:var(--font-md)
 }
 
 .notification-toast.is-error {
@@ -1804,7 +1804,7 @@ html.theme-dark .notification-row.is-unread {
 .notification-pagination p {
     margin: 0;
     color: var(--muted);
-    font-size: 13px
+    font-size:var(--font-md)
 }
 
 .notification-pagination label {
@@ -1812,7 +1812,7 @@ html.theme-dark .notification-row.is-unread {
     align-items: center;
     gap: 8px;
     color: var(--muted);
-    font-size: 12px
+    font-size:var(--font-sm)
 }
 
 .notification-pagination select {
@@ -1888,7 +1888,7 @@ html.theme-dark .notification-row.is-unread {
     height: 32px;
     padding: 0 6px;
     border-radius: 8px;
-    font-size: 12px
+    font-size:var(--font-sm)
 }
 
 .notification-pagination-pages .pagination-ellipsis {
@@ -1897,7 +1897,7 @@ html.theme-dark .notification-row.is-unread {
     min-width: 17px;
     height: 32px;
     color: var(--muted);
-    font-size: 12px;
+    font-size:var(--font-sm);
     font-weight: 850;
     user-select: none
 }
@@ -1932,13 +1932,13 @@ html.theme-dark .notification-row.is-unread {
         min-width: 29px;
         height: 29px;
         padding: 0 5px;
-        font-size: 11px
+        font-size:var(--font-xs)
     }
 
     .notification-pagination-pages .pagination-ellipsis {
         min-width: 14px;
         height: 29px;
-        font-size: 10px
+        font-size:var(--font-xs)
     }
 }
 
@@ -2063,7 +2063,7 @@ html.theme-dark .notification-row.is-unread {
 .filter-option-check {
     opacity: 0;
     color: var(--blue);
-    font-size: 11px
+    font-size:var(--font-xs)
 }
 
 .notification-filter-menu button[aria-selected="true"] .filter-option-check {
@@ -2105,7 +2105,7 @@ html.theme-dark .notification-filter-menu button[aria-selected="true"] {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    font-size: 12px;
+    font-size:var(--font-sm);
     font-weight: 780;
     white-space: nowrap;
     cursor: pointer;
@@ -2154,7 +2154,7 @@ html.theme-dark .notification-filter-menu button[aria-selected="true"] {
 
 .notification-date-input {
     min-height: 40px;
-    font-size: 13px;
+    font-size:var(--font-md);
     color-scheme: light dark
 }
 
@@ -2434,7 +2434,7 @@ html.theme-dark .notification-date-input {
 .notification-filter-control>span {
     padding-left: 2px;
     color: var(--muted);
-    font-size: .68rem;
+    font-size:var(--font-xs);
     font-weight: 800;
     text-transform: uppercase
 }
@@ -2451,7 +2451,7 @@ html.theme-dark .notification-date-input {
     background: var(--surface-soft);
     color: var(--text);
     font: inherit;
-    font-size: .83rem;
+    font-size:var(--font-md);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2492,7 +2492,7 @@ html.theme-dark .notification-date-input {
 .notification-date-trigger small {
     align-self: start;
     color: var(--muted);
-    font-size: .68rem
+    font-size:var(--font-xs)
 }
 
 .notification-date-popover {
@@ -2514,7 +2514,7 @@ html.theme-dark .notification-date-input {
     display: grid;
     gap: 5px;
     color: var(--muted);
-    font-size: .72rem;
+    font-size:var(--font-xs);
     font-weight: 800
 }
 
@@ -2538,7 +2538,7 @@ html.theme-dark .notification-date-input {
 .notification-date-popover .notification-action {
     min-height: 38px;
     padding-inline: 12px;
-    font-size: .78rem
+    font-size:var(--font-sm)
 }
 
 .notification-listing-heading {
@@ -2552,7 +2552,7 @@ html.theme-dark .notification-date-input {
 
 .notification-listing-heading>div>span {
     color: var(--muted);
-    font-size: .7rem;
+    font-size:var(--font-xs);
     font-weight: 800;
     letter-spacing: .06em;
     text-transform: uppercase
@@ -2560,13 +2560,13 @@ html.theme-dark .notification-date-input {
 
 .notification-listing-heading h2 {
     margin: 2px 0 0;
-    font-size: 1.05rem
+    font-size:var(--font-lg)
 }
 
 .notification-listing-heading .notification-action {
     min-height: 40px;
     padding-inline: 13px;
-    font-size: .8rem
+    font-size:var(--font-sm)
 }
 
 @media(max-width:1180px) {
@@ -2626,7 +2626,7 @@ html.theme-dark .notification-date-input {
 }
 
 #notificationCreateForm .notification-confirmation-check span {
-    font-size: 13px;
+    font-size:var(--font-md);
     font-weight: 600;
 }
 
@@ -2640,7 +2640,7 @@ html.theme-dark .notification-date-input {
     margin: 0;
     padding: 10px 12px;
     color: var(--muted);
-    font-size: 13px;
+    font-size:var(--font-md);
 }
 
 #newNotificationTemplate {
@@ -2716,7 +2716,7 @@ html.theme-dark .notification-date-input {
     background: #ecfdf5;
     color: #047857;
     box-shadow: 0 16px 40px rgba(15, 23, 42, .18);
-    font-size: .84rem;
+    font-size:var(--font-md);
     font-weight: 850;
 }
 
@@ -2767,7 +2767,7 @@ html.theme-dark .notification-date-input {
 
 #notificationDetailModal .notification-message-header h2 {
     margin: 4px 34px 10px 0;
-    font-size: 1.25rem;
+    font-size:var(--font-xl);
     line-height: 1.3;
 }
 
@@ -2785,7 +2785,7 @@ html.theme-dark .notification-date-input {
 
 #notificationDetailModal .notification-message-body p {
     margin: 0;
-    font-size: 0.92rem;
+    font-size:var(--font-md);
     line-height: 1.6;
     color: var(--text);
     white-space: pre-line;
@@ -2793,7 +2793,7 @@ html.theme-dark .notification-date-input {
 
 .notification-detail-label {
     display: block;
-    font-size: 0.68rem;
+    font-size:var(--font-xs);
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -2809,7 +2809,7 @@ html.theme-dark .notification-date-input {
 }
 
 .notification-detail-sender strong {
-    font-size: 0.86rem;
+    font-size:var(--font-md);
     color: var(--text);
 }
 
@@ -2832,12 +2832,12 @@ html.theme-dark .notification-date-input {
 }
 
 .notification-detail-context-box strong {
-    font-size: 0.88rem;
+    font-size:var(--font-md);
     color: var(--text);
 }
 
 .notification-detail-sub {
-    font-size: 0.78rem;
+    font-size:var(--font-sm);
     color: var(--muted);
 }
 
