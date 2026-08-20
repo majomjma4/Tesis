@@ -106,3 +106,66 @@
     .student-dashboard .student-dashboard-main>.student-resources{grid-column:1;grid-row:auto}
     .student-dashboard .student-follow-up .student-process{grid-column:1/-1;max-width:none;width:100%;margin:0}
 }
+
+/* Acentos semánticos sutiles: el azul institucional continúa dominando. */
+.student-dashboard{
+    --student-amber:#b7791f;
+    --student-amber-soft:rgba(245,158,11,.15);
+    --student-green:#16805b;
+    --student-green-soft:rgba(16,185,129,.14);
+    --student-cyan:#0e7490;
+    --student-cyan-soft:rgba(6,182,212,.14);
+    --student-violet:#6d4bc1;
+    --student-violet-soft:rgba(124,92,224,.14);
+    --student-indigo:#4f46a5;
+    --student-indigo-soft:rgba(99,102,241,.13);
+}
+body.dark-mode .student-dashboard,html.theme-dark .student-dashboard{
+    --student-amber:#f6c453;
+    --student-amber-soft:rgba(245,158,11,.17);
+    --student-green:#5ee0ae;
+    --student-green-soft:rgba(16,185,129,.16);
+    --student-cyan:#67e8f9;
+    --student-cyan-soft:rgba(6,182,212,.16);
+    --student-violet:#b9a4ff;
+    --student-violet-soft:rgba(167,139,250,.17);
+    --student-indigo:#a5b4fc;
+    --student-indigo-soft:rgba(129,140,248,.16);
+}
+
+.student-project-focus.is-warning .student-review-state{border-left:3px solid color-mix(in srgb,var(--student-amber) 58%,var(--line));background:color-mix(in srgb,var(--student-amber) 4%,var(--surface-soft))}
+.student-project-focus.is-warning .student-review-state__icon{background:var(--student-amber-soft);color:var(--student-amber)}
+.student-project-focus.is-warning .student-review-state .student-section-label{color:var(--student-amber)}
+.student-project-focus.is-warning .student-status{background:var(--student-amber-soft);color:var(--student-amber)}
+.student-project-focus.is-success .student-status{background:var(--student-green-soft);color:var(--student-green)}
+.student-project-focus.is-violet .student-status{background:var(--student-violet-soft);color:var(--student-violet)}
+
+.student-observations{border-top:2px solid color-mix(in srgb,var(--student-amber) 64%,var(--line))}
+.student-observations .student-card-icon{background:var(--student-amber-soft);color:var(--student-amber)}
+.student-observation-counts .is-pending strong{color:var(--student-amber)}
+.student-observation-counts div:nth-child(2) strong{color:var(--student-green)}
+.student-observation-counts .is-pending{background:color-mix(in srgb,var(--student-amber) 10%,var(--surface-soft));border:1px solid color-mix(in srgb,var(--student-amber) 28%,var(--line))}
+.student-observation-counts div:nth-child(2){background:color-mix(in srgb,var(--student-green) 9%,var(--surface-soft));border:1px solid color-mix(in srgb,var(--student-green) 24%,var(--line))}
+
+.student-delivery{border-top:2px solid color-mix(in srgb,var(--student-cyan) 60%,var(--line))}
+.student-delivery .student-card-icon{background:var(--student-cyan-soft);color:var(--student-cyan)}
+
+.student-process{border-top:2px solid color-mix(in srgb,var(--student-green) 58%,var(--line))}
+.student-process .student-card-icon{background:var(--student-green-soft);color:var(--student-green)}
+.student-process__steps li.is-complete span{border-color:var(--student-green);background:var(--student-green)}
+
+.student-upcoming{border-top:2px solid color-mix(in srgb,var(--student-cyan) 62%,var(--line))}
+.student-upcoming .student-card-heading>a{background:var(--student-cyan-soft);color:var(--student-cyan)}
+.student-upcoming__list time{color:var(--student-cyan)}
+
+.student-notifications{border-top:2px solid color-mix(in srgb,var(--student-indigo) 60%,var(--line))}
+.student-notification__icon{background:var(--student-indigo-soft);color:var(--student-indigo)}
+.student-notifications .student-inline-link{color:var(--student-indigo)}
+.student-notifications .student-inline-empty>i{color:var(--student-green)}
+
+.student-resources{border-top:2px solid color-mix(in srgb,var(--student-violet) 62%,var(--line))}
+.student-resources .student-section-label,.student-resources .student-inline-link{color:var(--student-violet)}
+.student-resource-card__visual{background:linear-gradient(135deg,color-mix(in srgb,var(--student-violet) 12%,var(--surface)),var(--surface-soft));color:var(--student-violet)}
+.student-resource-card__visual span{padding:4px 7px;border:1px solid color-mix(in srgb,var(--student-violet) 28%,var(--line));border-radius:7px;background:var(--student-violet-soft)}
+.student-resource-card.is-more .student-resource-card__visual{background:var(--surface-soft);color:var(--muted)}
+.student-resource-card.is-more .student-resource-card__visual span{border-color:var(--line);background:var(--surface);color:var(--muted)}
