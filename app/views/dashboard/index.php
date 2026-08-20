@@ -1,267 +1,63 @@
-<!-- Inicio de skeleton loader -->
-<section class="skeleton-loader" id="dashboardSkeleton" aria-label="Cargando informacion del dashboard" hidden>
-    <div class="skeleton-status-grid">
-        <?php for ($i = 0; $i < 4; $i++): ?>
-            <article class="skeleton-card">
-                <span class="skeleton-line short"></span>
-                <span class="skeleton-line title"></span>
-                <span class="skeleton-line"></span>
-                <span class="skeleton-pill"></span>
-            </article>
-        <?php endfor; ?>
-    </div>
-    <div class="skeleton-dashboard-grid">
-        <div class="skeleton-card large">
-            <span class="skeleton-line title"></span>
-            <span class="skeleton-line"></span>
-            <span class="skeleton-line"></span>
-            <span class="skeleton-line medium"></span>
-        </div>
-        <div class="skeleton-card side">
-            <span class="skeleton-line title"></span>
-            <span class="skeleton-line"></span>
-            <span class="skeleton-line"></span>
-            <span class="skeleton-line short"></span>
-        </div>
-    </div>
-</section>
-<!-- Final de skeleton loader -->
+<?php
+$report = is_array($currentReport ?? null) ? $currentReport : [];
+$studentProjects = is_array($studentProjects ?? null) ? $studentProjects : [];
+$studentUpcoming = is_array($studentUpcoming ?? null) ? $studentUpcoming : [];
+$studentNotifications = is_array($studentNotifications ?? null) ? array_slice($studentNotifications, 0, 4) : [];
+$studentResources = is_array($studentResources ?? null) ? array_slice($studentResources, 0, 7) : [];
+$hasProject = !empty($report['id']) || trim((string) ($report['title'] ?? '')) !== '';
+$status = strtolower(trim((string) ($report['status'] ?? '')));
+$labels = ['development'=>'En preparación','under_review'=>'En revisión','corrections_requested'=>'Cambios solicitados','changes_required'=>'Cambios solicitados','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el Tribunal','published'=>'Proyecto publicado'];
+$statusLabel = $labels[$status] ?? trim((string) ($report['status_label'] ?? 'Estado no disponible'));
+$tone = match ($status) { 'corrections_requested','changes_required' => 'is-warning', 'approved','tribunal_approved','published' => 'is-success', 'defense' => 'is-violet', default => 'is-info' };
+$observationItems = is_array($observations ?? null) ? $observations : [];
+$pending = count(array_filter($observationItems, static fn(array $item): bool => strtolower((string) ($item['status'] ?? '')) === 'pending'));
+$addressed = count(array_filter($observationItems, static fn(array $item): bool => strtolower((string) ($item['status'] ?? '')) === 'addressed'));
+// El resumen del Dashboard sólo presenta pendientes y atendidas; el detalle conserva los resueltos.
+$needsAction = in_array($status, ['corrections_requested','changes_required'], true) || $pending > 0;
+$projectType = trim((string) ($report['type_code'] ?? $report['type'] ?? $report['type_name'] ?? ''));
+$isThesis = strtolower($projectType) === 'thesis' || str_contains(strtolower($projectType), 'tesis') || str_contains(strtolower($projectType), 'titulación');
+$processSteps = $isThesis ? ['development'=>'Desarrollo','under_review'=>'Revisión','approved'=>'Aprobación','defense'=>'Tribunal','published'=>'Publicación'] : ['development'=>'Desarrollo','under_review'=>'Revisión','approved'=>'Aprobación','published'=>'Publicación'];
+$stepOrder = array_keys($processSteps);
+$currentStep = $status === 'tribunal_approved' ? 'approved' : ($status === 'corrections_requested' || $status === 'changes_required' ? 'under_review' : $status);
+$currentIndex = array_search($currentStep, $stepOrder, true);
+$currentIndex = $currentIndex === false ? 0 : $currentIndex;
+$review = match (true) {
+    $status === 'published' => ['icon'=>'fa-circle-check','eyebrow'=>'Proceso finalizado','title'=>'Proyecto publicado','text'=>'El proceso académico de este proyecto ha finalizado.','action'=>'Ver en repositorio','url'=>route('repository')],
+    $status === 'defense' => ['icon'=>'fa-scale-balanced','eyebrow'=>'Etapa académica','title'=>'En tribunal','text'=>'El proyecto se encuentra en la etapa de evaluación por Tribunal.','action'=>'Revisar proyecto','url'=>$projectUrls['summary'] ?? route('projects')],
+    $needsAction => ['icon'=>'fa-pen-to-square','eyebrow'=>'Requiere tu atención','title'=>'Cambios solicitados','text'=>$pending > 0 ? $pending . ($pending === 1 ? ' observación requiere corrección.' : ' observaciones requieren corrección.') : 'Revisa los comentarios del docente y actualiza el documento correspondiente.','action'=>'Ver observaciones','url'=>$projectUrls['observations'] ?? route('projects')],
+    $status === 'under_review' => ['icon'=>'fa-magnifying-glass','eyebrow'=>'Revisión en curso','title'=>'Esperando revisión docente','text'=>'Tu entrega está siendo revisada. No hay una acción pendiente por ahora.','action'=>'Revisar proyecto','url'=>$projectUrls['summary'] ?? route('projects')],
+    in_array($status, ['approved','tribunal_approved'], true) => ['icon'=>'fa-circle-check','eyebrow'=>'Revisión completada','title'=>$statusLabel,'text'=>'La revisión académica fue aprobada. Consulta el proyecto para conocer el siguiente paso.','action'=>'Revisar proyecto','url'=>$projectUrls['summary'] ?? route('projects')],
+    default => ['icon'=>'fa-file-pen','eyebrow'=>'Trabajo en curso','title'=>'En preparación','text'=>'Continúa preparando la información y los documentos de tu proyecto.','action'=>'Abrir proyecto','url'=>$projectUrls['summary'] ?? route('projects')],
+};
+$projectUrl = (string) ($projectUrls['summary'] ?? route('projects'));
+?>
+<main class="student-dashboard" aria-labelledby="studentDashboardTitle">
+    <header class="student-context">
+        <div><span class="student-context__eyebrow">Panel del estudiante</span><h1 id="studentDashboardTitle">Seguimiento de tu proceso académico</h1></div>
+        <div class="student-context__period"><i class="fa-regular fa-calendar" aria-hidden="true"></i><div><span>Período académico</span><strong><?= e((string) ($report['semester'] ?? 'Período no disponible')) ?></strong></div></div>
+    </header>
 
-<!-- Inicio de resumen academico -->
-<section class="status-section" aria-label="Resumen academico">
-    <?php foreach ($summaryCards as $card): ?>
-        <article class="status-card <?= e($card['cardClass']) ?>">
-            <div class="status-card-header">
-                <span class="icon"><i class="fa-solid <?= e($card['icon']) ?>"></i></span>
-                <span class="status-label"><?= e($card['label']) ?></span>
-            </div>
-            <h3><?= e($card['title']) ?></h3>
-            <p><?= e($card['description']) ?></p>
-            <span class="status-meta"><?= e($card['meta']) ?></span>
-        </article>
-    <?php endforeach; ?>
-</section>
-<!-- Final de resumen academico -->
-
-<!-- Inicio de contenido del dashboard -->
-<div class="dashboard-container">
-    <?php
-        $teamCount = count($teamMembers);
-        $teamSummary = $teamCount === 1 ? $teamMembers[0]['name'] : $teamCount . ' Integrantes';
-        $teamLabel = $teamCount === 1 ? 'Realizado por' : 'Integrantes';
-    ?>
-    <!-- Inicio de fila superior -->
-    <div class="dashboard-top-grid">
-        <!-- Inicio de informe actual -->
-        <section class="current-report" aria-label="Informe academico actual">
-            <div class="report-main">
-                <div class="report-heading">
-                    <span class="section-eyebrow">Seguimiento academico</span>
-                    <span class="project-status <?= e($currentReport['statusClass']) ?>"><?= e($currentReport['status']) ?></span>
-                </div>
-
-                <h2><?= e($currentReport['title']) ?></h2>
-                <p><?= e($currentReport['description']) ?></p>
-
-                <div class="report-actions">
-                    <a class="upload-btn" href="<?= e($projectUrls['deliveries']) ?>">
-                        <i class="fa-solid fa-upload"></i>
-                        Subir nueva version
-                    </a>
-                    <a class="open-btn" href="<?= e($projectUrls['summary']) ?>">
-                        <i class="fa-solid fa-folder-open"></i>
-                        Ver informe completo
-                    </a>
-                </div>
-            </div>
-
-            <div class="report-side">
-                <div class="report-version">
-                    <span>Documento actual</span>
-                    <strong><?= e($currentReport['document']) ?></strong>
-                    <small><?= e($currentReport['version']) ?> - Entregado el <?= e($currentReport['lastDelivery']) ?></small>
-                </div>
-
-                <div class="report-meta-grid">
-                    <div>
-                        <span>Semestre</span>
-                        <strong><?= e($currentReport['semester']) ?></strong>
-                    </div>
-                    <div>
-                        <span>Tutor</span>
-                        <strong><?= e($currentReport['tutor']) ?></strong>
-                    </div>
-                    <div>
-                        <span>Ultima revision</span>
-                        <strong><?= e($currentReport['lastReview']) ?></strong>
-                    </div>
-                    <div>
-                        <span>Observaciones</span>
-                        <strong><?= e($currentReport['pendingObservations']) ?></strong>
-                    </div>
-                </div>
-            </div>
-
-            <div class="report-extra-row">
-                <div class="report-quick-actions" aria-label="Accesos rapidos del informe">
-                    <a href="<?= e($projectUrls['deliveries']) ?>">
-                        <i class="fa-solid fa-file-lines"></i>
-                        Entregas
-                    </a>
-                    <a href="<?= e($projectUrls['history']) ?>">
-                        <i class="fa-solid fa-clock-rotate-left"></i>
-                        Historial
-                    </a>
-                    <a href="<?= e($projectUrls['observations']) ?>">
-                        <i class="fa-solid fa-pen-to-square"></i>
-                        Observaciones
-                    </a>
-                </div>
-
-                <div class="report-team" aria-label="Integrantes del proyecto">
-                    <button class="team-toggle <?= $teamCount === 1 ? 'single-member' : 'multiple-members' ?>" id="teamToggle" type="button" aria-label="Ver integrantes del proyecto" aria-expanded="false">
-                        <?php if ($teamCount === 1): ?>
-                            <span><?= e($teamLabel) ?></span>
-                            <strong><?= e($teamSummary) ?></strong>
-                        <?php else: ?>
-                            <strong><?= e($teamSummary) ?></strong>
-                            <span class="team-stack">
-                                <?php foreach ($teamMembers as $member): ?>
-                                    <span class="team-avatar" title="<?= e($member['name'] . ' - ' . $member['role']) ?>">
-                                        <?= e($member['initial']) ?>
-                                    </span>
-                                <?php endforeach; ?>
-                            </span>
-                        <?php endif; ?>
-                        <i class="fa-solid fa-chevron-down"></i>
-                    </button>
-
-                    <div class="team-dropdown" id="teamDropdown">
-                        <?php foreach ($teamMembers as $member): ?>
-                            <div class="team-member">
-                                <span class="team-avatar"><?= e($member['initial']) ?></span>
-                                <div>
-                                    <strong><?= e($member['name']) ?></strong>
-                                    <small><?= e($member['role']) ?></small>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
-
-        </section>
-        <!-- Final de informe actual -->
-
-        <!-- Inicio de notificaciones -->
-        <aside class="right-column" aria-label="Informacion complementaria">
-            <section class="notifications-panel">
-                <div class="panel-heading">
-                    <h2><i class="fa-solid fa-bell"></i> Alertas clave</h2>
-                    <span><?= count($notifications) ?> importantes</span>
-                </div>
-
-                <?php foreach ($notifications as $notification): ?>
-                    <article class="notification-card">
-                        <strong><?= e($notification['title']) ?></strong>
-                        <p><?= e($notification['text']) ?></p>
-                        <span><?= e($notification['time']) ?></span>
-                    </article>
-                <?php endforeach; ?>
-
-                <a class="open-btn ghost-btn" href="<?= e($projectUrls['notifications']) ?>">
-                    Ver alertas
-                    <i class="fa-solid fa-arrow-right"></i>
-                </a>
+    <div class="student-dashboard-main">
+        <?php if (!$hasProject): ?>
+            <section class="student-empty student-project-empty"><span class="student-empty__icon"><i class="fa-regular fa-folder-open" aria-hidden="true"></i></span><p class="student-section-label">Proyecto del período</p><h2>Aún no tienes proyectos en este período</h2><p>Registra un nuevo proyecto para iniciar su proceso de revisión académica.</p><a class="student-button is-primary" href="<?= e(route('new-project')) ?>"><i class="fa-solid fa-plus" aria-hidden="true"></i> Registrar nuevo proyecto</a></section>
+        <?php else: ?>
+            <section class="student-project-focus <?= e($tone) ?>" aria-labelledby="studentProjectTitle">
+                <?php if (count($studentProjects) > 1): ?><div class="student-project-pager"><span>Proyecto 1 de <?= count($studentProjects) ?></span><button type="button" aria-label="Proyecto anterior" disabled><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button><button type="button" aria-label="Proyecto siguiente"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></div><?php endif; ?>
+                <div class="student-project-focus__identity"><div class="student-project-focus__topline"><span class="student-project-type"><?= e(mb_strtoupper($projectType !== '' ? $projectType : 'PROYECTO ACADÉMICO', 'UTF-8')) ?></span><span class="student-status"><i class="fa-solid fa-circle" aria-hidden="true"></i><?= e($statusLabel) ?></span></div><h2 id="studentProjectTitle"><?= e((string) ($report['title'] ?? 'Proyecto sin título')) ?></h2><div class="student-project-meta"><?php if (!empty($report['code'])): ?><span><?= e((string) $report['code']) ?></span><?php endif; ?><?php if (!empty($report['tutor'])): ?><span><i class="fa-solid fa-user-tie" aria-hidden="true"></i><?= e((string) $report['tutor']) ?></span><?php endif; ?></div></div>
+                <div class="student-review-state"><span class="student-review-state__icon"><i class="fa-solid <?= e($review['icon']) ?>" aria-hidden="true"></i></span><div><p class="student-section-label"><?= e($review['eyebrow']) ?></p><h3><?= e($review['title']) ?></h3><p><?= e($review['text']) ?></p><div class="student-actions"><a class="student-button is-primary" href="<?= e((string) $review['url']) ?>"><?= e($review['action']) ?><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a><?php if (($review['url'] ?? '') !== $projectUrl): ?><a class="student-button is-secondary" href="<?= e($projectUrl) ?>">Revisar proyecto</a><?php endif; ?></div></div></div>
             </section>
-        </aside>
-        <!-- Final de notificaciones -->
+        <?php endif; ?>
+
+    <?php if ($hasProject): ?><section class="student-follow-up" aria-label="Seguimiento del proyecto">
+        <article class="student-observations"><header class="student-card-heading"><div><p class="student-section-label">Seguimiento</p><h2>Observaciones</h2></div><span class="student-card-icon"><i class="fa-regular fa-comments" aria-hidden="true"></i></span></header><?php if ($pending || $addressed): ?><div class="student-observation-counts"><div class="is-pending"><strong><?= $pending ?></strong><span>pendientes</span></div><div><strong><?= $addressed ?></strong><span>atendidas</span></div></div><p class="student-observation-message"><?= $pending ? 'Requieren tu atención.' : 'No tienes observaciones pendientes.' ?></p><a class="student-inline-link" href="<?= e((string) ($projectUrls['observations'] ?? $projectUrl)) ?>">Ver observaciones <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a><?php else: ?><div class="student-compact-empty is-inline"><i class="fa-regular fa-circle-check" aria-hidden="true"></i><p>Sin observaciones pendientes.</p></div><?php endif; ?></article>
+        <article class="student-delivery"><header class="student-card-heading"><div><p class="student-section-label">Documento enviado</p><h2>Última entrega</h2></div><span class="student-card-icon"><i class="fa-regular fa-file-lines" aria-hidden="true"></i></span></header><?php if (!empty($report['lastDelivery']) || !empty($report['document'])): ?><div class="student-delivery__summary"><div><span>Estado</span><strong><?= e($status === 'under_review' ? 'En revisión' : $statusLabel) ?></strong></div><div><span>Fecha</span><strong><?= e((string) ($report['lastDelivery'] ?? 'Fecha no disponible')) ?></strong></div></div><p class="student-delivery__situation"><?= e($status === 'under_review' ? 'Esperando revisión docente' : ($needsAction ? 'Requiere correcciones' : 'Situación disponible en el proyecto')) ?></p><a class="student-inline-link" href="<?= e((string) ($projectUrls['deliveries'] ?? $projectUrl)) ?>">Ver entregas <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a><?php else: ?><div class="student-compact-empty is-inline"><i class="fa-regular fa-file" aria-hidden="true"></i><p>Aún no has realizado entregas.</p></div><?php endif; ?></article>
+        <article class="student-process"><header class="student-card-heading"><div><p class="student-section-label">Ruta académica</p><h2>Estado del proceso</h2></div><span class="student-card-icon"><i class="fa-solid fa-route" aria-hidden="true"></i></span></header><ol class="student-process__steps"><?php foreach ($processSteps as $stepKey => $stepLabel): $stepIndex = array_search($stepKey, $stepOrder, true); $stepClass = $stepIndex < $currentIndex ? 'is-complete' : ($stepIndex === $currentIndex ? 'is-current' : ''); ?><li class="<?= e($stepClass) ?>"><span><?= $stepIndex < $currentIndex ? '✓' : ($stepIndex === $currentIndex ? '●' : '○') ?></span><strong><?= e($stepLabel) ?></strong></li><?php endforeach; ?></ol></article>
+    </section><?php endif; ?>
+
+    <aside class="student-upcoming" aria-labelledby="studentUpcomingTitle"><header class="student-card-heading"><div><p class="student-section-label">Agenda</p><h2 id="studentUpcomingTitle">Próximas fechas</h2></div><a href="<?= e(route('calendar')) ?>" aria-label="Abrir calendario"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a></header><?php if ($studentUpcoming === []): ?><div class="student-compact-empty"><i class="fa-regular fa-calendar-xmark" aria-hidden="true"></i><p>No tienes próximas fechas.</p><span>Agrega recordatorios para organizar tus entregas y actividades.</span><a class="student-inline-link" href="<?= e(route('calendar')) ?>">Agregar evento <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></div><?php else: ?><div class="student-upcoming__list"><?php foreach (array_slice($studentUpcoming, 0, 3) as $date): ?><article><time><?= e((string) ($date['date'] ?? '—')) ?></time><div><strong><?= e((string) ($date['title'] ?? 'Fecha académica')) ?></strong><?php if (!empty($date['context'])): ?><span><?= e((string) $date['context']) ?></span><?php endif; ?></div></article><?php endforeach; ?></div><a class="student-inline-link student-calendar-link" href="<?= e(route('calendar')) ?>">Abrir calendario <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a><?php endif; ?></aside>
+
+    <section class="student-notifications" aria-labelledby="studentNotificationsTitle"><header class="student-section-header"><div><p class="student-section-label">Actualidad</p><h2 id="studentNotificationsTitle">Notificaciones recientes</h2></div><a class="student-inline-link" href="<?= e(route('notifications')) ?>">Ver todas <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></header><?php if ($studentNotifications === []): ?><div class="student-inline-empty"><i class="fa-regular fa-bell-slash" aria-hidden="true"></i><div><strong>Todo al día</strong><span>No tienes notificaciones nuevas.</span></div></div><?php else: ?><div class="student-notification-list"><?php foreach ($studentNotifications as $notification): ?><a class="student-notification <?= empty($notification['is_read']) ? 'is-unread' : '' ?>" href="<?= e((string) ($notification['action_url'] ?? route('notifications'))) ?>"><span class="student-notification__icon"><i class="fa-regular fa-bell" aria-hidden="true"></i></span><span><strong><?= e((string) ($notification['title'] ?? 'Notificación')) ?></strong><small><?= e((string) ($notification['message'] ?? '')) ?></small></span><time><?= e((string) ($notification['created_at'] ?? '')) ?></time></a><?php endforeach; ?></div><?php endif; ?></section>
+
+    <section class="student-resources" aria-labelledby="studentResourcesTitle"><header class="student-section-header"><div><p class="student-section-label">Biblioteca institucional</p><h2 id="studentResourcesTitle">Recursos para ti</h2><p>Explora material de apoyo y proyectos académicos disponibles en el repositorio.</p></div><a class="student-inline-link" href="<?= e(route('repository')) ?>">Explorar repositorio <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></header><?php if ($studentResources === []): ?><div class="student-resource-empty"><i class="fa-regular fa-folder-open" aria-hidden="true"></i><strong>Aún no hay recursos disponibles.</strong><span>Los proyectos académicos y materiales de apoyo publicados aparecerán aquí cuando estén disponibles.</span></div><?php else: ?><div class="student-carousel" data-student-carousel><button class="student-carousel__control is-prev" type="button" data-carousel-prev aria-label="Recursos anteriores"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button><div class="student-carousel__viewport"><div class="student-carousel__track"><?php foreach ($studentResources as $resource): ?><a class="student-resource-card" href="<?= e((string) ($resource['route'] ?? route('repository'))) ?>"><div class="student-resource-card__visual"><span><?= e((string) ($resource['badge'] ?? 'Recurso')) ?></span><i class="fa-solid <?= e((string) ($resource['icon'] ?? 'fa-book-open')) ?>" aria-hidden="true"></i></div><h3><?= e((string) ($resource['title'] ?? 'Recurso académico')) ?></h3><p><?= e((string) ($resource['description'] ?? '')) ?></p><small><?= e((string) ($resource['meta'] ?? '')) ?></small><strong>Ver recurso <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></strong></a><?php endforeach; ?><?php if (count($studentResources) > 6): ?><a class="student-resource-card is-more" href="<?= e(route('repository')) ?>"><div class="student-resource-card__visual"><span>Más contenido</span><i class="fa-solid fa-compass" aria-hidden="true"></i></div><h3>Ver más recursos</h3><p>Explora todos los proyectos académicos y materiales del repositorio.</p><strong>Explorar repositorio <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></strong></a><?php endif; ?></div></div><button class="student-carousel__control is-next" type="button" data-carousel-next aria-label="Recursos siguientes"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></div><?php endif; ?></section>
     </div>
-    <!-- Final de fila superior -->
-
-    <!-- Inicio de seguimiento rapido -->
-    <div class="dashboard-follow-grid">
-        <section class="observations-preview" aria-label="Observaciones recientes">
-            <div class="section-heading compact-heading">
-                <div>
-                    <span class="section-eyebrow">Pendientes por corregir</span>
-                    <h2 class="section-title">Observaciones accionables</h2>
-                </div>
-                <a class="open-btn ghost-btn compact-action" href="<?= e($projectUrls['observations']) ?>">
-                    Revisar todas
-                    <i class="fa-solid fa-arrow-right"></i>
-                </a>
-            </div>
-
-            <?php foreach ($observations as $observation): ?>
-                <article class="observation-card">
-                    <div class="observation-top">
-                        <strong><?= e($observation['title']) ?></strong>
-                        <span class="observation-status <?= e($observation['statusClass']) ?>"><?= e($observation['status']) ?></span>
-                    </div>
-                    <p><?= e($observation['text']) ?></p>
-                    <small><?= e($observation['date']) ?></small>
-                </article>
-            <?php endforeach; ?>
-        </section>
-
-        <section class="reminders-panel">
-            <div class="panel-heading">
-                <h2><i class="fa-solid fa-thumbtack"></i> Proximas acciones</h2>
-                <span>Plan</span>
-            </div>
-
-            <?php foreach ($reminders as $reminder): ?>
-                <article class="reminder-card">
-                    <div class="reminder-date"><?= e($reminder['date']) ?></div>
-                    <div>
-                        <strong><?= e($reminder['title']) ?></strong>
-                        <p><?= e($reminder['text']) ?></p>
-                    </div>
-                </article>
-            <?php endforeach; ?>
-
-            <a class="open-btn ghost-btn" href="<?= e($projectUrls['calendar']) ?>">
-                Ver plan
-                <i class="fa-solid fa-arrow-right"></i>
-            </a>
-        </section>
-    </div>
-    <!-- Final de seguimiento rapido -->
-
-    <!-- Inicio de historial resumido completo -->
-    <section class="activity-summary" aria-label="Actividad reciente del informe">
-        <div class="section-heading compact-heading">
-            <div>
-                <span class="section-eyebrow">Trazabilidad</span>
-                <h2 class="section-title">Ultimos cambios del informe</h2>
-            </div>
-        </div>
-
-        <div class="activity-list">
-            <?php foreach ($recentActivity as $activity): ?>
-                <article class="activity-item">
-                    <span class="activity-icon"><i class="fa-solid <?= e($activity['icon']) ?>"></i></span>
-                    <div>
-                        <strong><?= e($activity['title']) ?></strong>
-                        <p><?= e($activity['text']) ?></p>
-                        <small><?= e($activity['time']) ?></small>
-                    </div>
-                </article>
-            <?php endforeach; ?>
-        </div>
-    </section>
-    <!-- Final de historial resumido completo -->
-
-    <!-- Inicio de fechas del proceso -->
-    <section class="process-dates" aria-label="Fechas importantes del proceso">
-        <?php foreach ($processDates as $date): ?>
-            <article>
-                <span><?= e($date['label']) ?></span>
-                <strong><?= e($date['value']) ?></strong>
-            </article>
-        <?php endforeach; ?>
-    </section>
-    <!-- Final de fechas del proceso -->
-</div>
-<!-- Final de contenido del dashboard -->
+</main>

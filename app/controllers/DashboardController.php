@@ -56,7 +56,9 @@ final class DashboardController
         View::render('dashboard/index', [
             'currentPage' => 'dashboard',
             'title' => 'Dashboard | Gestion Documental Academica',
-            'pageScript' => asset('js/dashboard.js'),
+            'bodyClass' => 'student-dashboard-page',
+            'pageStyles' => [asset('css/student-dashboard.css')],
+            'pageScript' => asset('js/student-dashboard.js'),
             'summaryCards' => $dashboard->getSummary(),
             'currentReport' => $dashboard->getCurrentReport(),
             'teamMembers' => $dashboard->getTeamMembers(),
