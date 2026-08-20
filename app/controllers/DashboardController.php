@@ -53,7 +53,7 @@ final class DashboardController
             return;
         }
 
-        View::render('dashboard/index', [
+        View::render('dashboard/student', [
             'currentPage' => 'dashboard',
             'title' => 'Dashboard | Gestion Documental Academica',
             'bodyClass' => 'student-dashboard-page',
