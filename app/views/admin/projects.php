@@ -3,7 +3,15 @@
 $statusLabels = [];
 foreach (['development', 'under_review', 'approved', 'defense', 'tribunal_approved'] as $projectStatusCode)
     $statusLabels[$projectStatusCode] = project_academic_labels($projectStatusCode)['status'];
-$projectStageLabel = !empty($projectEditorOnly) && !empty($projectEditorPayload) ? project_academic_labels((string) ($projectEditorPayload['status'] ?? ''))['stage'] : 'Etapa no disponible'; ?>
+$projectStageLabel = !empty($projectEditorOnly) && !empty($projectEditorPayload) ? project_academic_labels((string) ($projectEditorPayload['status'] ?? ''))['stage'] : 'Etapa no disponible';
+$typeLabels = [
+    'thesis' => 'Titulación',
+    'thesis_profile' => 'Perfil de Titulación',
+    'practice' => 'Proyecto de Prácticas',
+    'pis' => 'Proyecto PIS',
+    'community' => 'Proyecto de Vinculación'
+];
+?>
 <?php if (empty($projectEditorOnly)): ?>
     <section class="ap-head">
         <div><span>Administración</span>
@@ -69,7 +77,7 @@ $projectStageLabel = !empty($projectEditorOnly) && !empty($projectEditorPayload)
         <label class="ap-filter-control admin-filter-control"><span>Tipo</span><select name="type_id"
                 aria-label="Filtrar proyectos por tipo" <?= $emptyProjectsDataset ? 'disabled' : '' ?>>
                 <option value="">Todos</option><?php foreach ($catalogs['types'] as $item): ?>
-                    <option value="<?= $item['id'] ?>" <?= $filters['type_id'] === $item['id'] ? 'selected' : '' ?>><?= e($item['name']) ?>
+                    <option value="<?= $item['id'] ?>" <?= $filters['type_id'] === $item['id'] ? 'selected' : '' ?>><?= e($typeLabels[(string)$item['code']] ?? $item['name']) ?>
                     </option><?php endforeach; ?>
             </select></label>
         <?php if (count($catalogs['periods']) >= 2): ?>
@@ -128,7 +136,7 @@ $projectStageLabel = !empty($projectEditorOnly) && !empty($projectEditorPayload)
     <?php else: foreach ($projects as $p): $pending = !empty($p['review_situation']['has_pending_observations']); ?>
                 <article data-project-status="<?= e($p['status']) ?>" data-project-type-id="<?= (int) $p['project_type_id'] ?>"
                     data-project-period-id="<?= (int) $p['academic_period_id'] ?>">
-                    <div class="ap-main"><span><?= e($p['code']) ?> · <?= e($p['type_name']) ?></span>
+                    <div class="ap-main"><span><?= e($p['code']) ?> · <?= e($typeLabels[(string)$p['type_code']] ?? $p['type_name']) ?></span>
                         <h2><?= e($p['title']) ?></h2>
                         <p><?= e($p['career_name']) ?> · <?= e($p['period_name']) ?></p>
                     </div>
