@@ -11,9 +11,10 @@ final class ProjectRepositoryPackageService
     }
 
     /** Paquete privado de seguimiento para un expediente aún no publicado. */
-    public static function academicPackagePath(int $projectId): string
+    public static function academicPackagePath(int $projectId, bool $institutionalOnly = false): string
     {
-        return ROOT_PATH . '/storage/private/project-packages/project_' . $projectId . '.zip';
+        $suffix = $institutionalOnly ? '_institutional' : '';
+        return ROOT_PATH . '/storage/private/project-packages/project_' . $projectId . $suffix . '.zip';
     }
 
     /** @return array{available:bool,download_url:string,file_count:int,size_bytes:int,size:string,source:string} */
@@ -46,23 +47,24 @@ final class ProjectRepositoryPackageService
      *
      * @return array{available:bool,download_url:string,file_count:int,size_bytes:int,size:string,source:string}
      */
-    public function describeAcademic(int $projectId, string $downloadUrl = ''): array
+    public function describeAcademic(int $projectId, string $downloadUrl = '', bool $institutionalOnly = false): array
     {
-        return $this->describeAtPath($projectId, self::academicPackagePath($projectId), $downloadUrl, 'academic');
+        return $this->describeAtPath($projectId, self::academicPackagePath($projectId, $institutionalOnly), $downloadUrl, 'academic', $institutionalOnly);
     }
 
     /** Genera o reconstruye el paquete privado de seguimiento. */
-    public function prepareAcademic(int $projectId, string $downloadUrl = ''): array
+    public function prepareAcademic(int $projectId, string $downloadUrl = '', bool $institutionalOnly = false): array
     {
         $descriptor = ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'academic'];
         if ($projectId < 1) return $descriptor;
-        $this->buildPackage($projectId, self::academicPackagePath($projectId));
-        return $this->describeAcademic($projectId, $downloadUrl);
+        $this->buildPackage($projectId, self::academicPackagePath($projectId, $institutionalOnly), $institutionalOnly);
+        return $this->describeAcademic($projectId, $downloadUrl, $institutionalOnly);
     }
 
     public function invalidateAcademic(int $projectId): void
     {
-        $this->invalidateAtPath(self::academicPackagePath($projectId));
+        $this->invalidateAtPath(self::academicPackagePath($projectId, false));
+        $this->invalidateAtPath(self::academicPackagePath($projectId, true));
     }
 
     /** Generates a package only for a published, non-deleted project. */
@@ -86,11 +88,11 @@ final class ProjectRepositoryPackageService
         $this->invalidateAtPath(self::packagePath($projectId));
     }
 
-    private function describeAtPath(int $projectId, string $path, string $downloadUrl, string $source = 'stored'): array
+    private function describeAtPath(int $projectId, string $path, string $downloadUrl, string $source = 'stored', bool $institutionalOnly = false): array
     {
         $descriptor = ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>$source];
         if ($projectId < 1) return $descriptor;
-        $files = $this->activeFiles($projectId);
+        $files = $this->activeFiles($projectId, $institutionalOnly);
         $descriptor['file_count'] = count($files);
         $descriptor['download_url'] = $downloadUrl;
         if ($files === [] || !is_file($path) || !is_readable($path)) return $descriptor;
@@ -103,10 +105,10 @@ final class ProjectRepositoryPackageService
         return $descriptor;
     }
 
-    private function buildPackage(int $projectId, ?string $targetPath = null): ?array
+    private function buildPackage(int $projectId, ?string $targetPath = null, bool $institutionalOnly = false): ?array
     {
         $final = $targetPath ?? self::packagePath($projectId);
-        $rows = $this->activeFiles($projectId);
+        $rows = $this->activeFiles($projectId, $institutionalOnly);
         if ($rows === []) {
             $this->invalidateAtPath($final);
             return null;
@@ -170,13 +172,20 @@ final class ProjectRepositoryPackageService
     }
 
     /** @return list<array{id:int,original_name:string,size_bytes:int,storage_name:string}> */
-    private function activeFiles(int $projectId): array
+    private function activeFiles(int $projectId, bool $institutionalOnly = false): array
     {
         $statement = Database::connection()->prepare(
             'SELECT id,original_name,size_bytes,storage_name FROM project_files WHERE project_id=:id AND deleted_at IS NULL AND purged_at IS NULL ORDER BY sort_order ASC,id ASC'
         );
         $statement->execute(['id'=>$projectId]);
-        return $statement->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
+        if ($institutionalOnly) {
+            $rows = array_values(array_filter($rows, static function (array $row): bool {
+                $ext = strtolower(pathinfo((string)$row['original_name'], PATHINFO_EXTENSION));
+                return !in_array($ext, ['zip', 'rar', '7z', 'tar', 'gz'], true);
+            }));
+        }
+        return $rows;
     }
 
     private function matchesActiveFiles(string $path, array $files): bool

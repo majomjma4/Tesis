@@ -5,7 +5,13 @@
 /** @var list<array{value:string,label:string}> $assignedProjectRelations */
 $courseCount = count(array_filter($assignedProjects, static fn(array $project): bool => $project['tab'] === 'course'));
 $completedCount = count($assignedProjects) - $courseCount;
-$typeLabels = ['thesis'=>'TIT','thesis_profile'=>'PFT','practice'=>'PRA','pis'=>'Proyecto PIS','community'=>'VIN'];
+$typeLabels = [
+    'thesis' => 'Titulación',
+    'thesis_profile' => 'Perfil de Titulación',
+    'practice' => 'Proyecto de Prácticas',
+    'pis' => 'Proyecto PIS',
+    'community' => 'Proyecto de Vinculación'
+];
 $visibleTypeLabel = static function (string $label): string {
     return mb_strtolower(trim($label), 'UTF-8') === 'proyecto integrador de saberes' ? 'Proyecto PIS' : $label;
 };

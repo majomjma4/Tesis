@@ -8,7 +8,7 @@ final class TeacherThesisCapabilityService
     public function canManageCurrentUser(): bool
     {
         $session = new AuthSessionService();
-        return $this->canManage((int) ($session->userId() ?? 0), $session->roles(), $session->hasAdminAccess());
+        return $this->canManage((int) ($session->userId() ?? 0), $session->roles(), $session->isAdminModeActive());
     }
 
     /** @return array{manage_thesis_process:bool} */

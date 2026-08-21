@@ -20,7 +20,7 @@ final class ProjectsController
         $packages = new ProjectRepositoryPackageService();
         foreach ($assigned['projects'] as &$project) {
             $project['package'] = ['available'=>false,'download_url'=>'','file_count'=>0,'size'=>''];
-            if (empty($capabilities[(int)$project['id']]['download_files'])) continue;
+            if (empty($capabilities[(int)$project['id']]['download_academic_package'])) continue;
             try {
                 $project['package'] = $packages->describeAcademic(
                     (int)$project['id'],
@@ -777,10 +777,14 @@ final class ProjectsController
         $administrator = $session->isAdminModeActive();
         $context = $administrator ? 'academic_management' : 'academic';
         $policy = new ProjectCapabilityService();
-        if (!$policy->canViewProjectResource((int)$projectId, $context)) { http_response_code(403); exit('No tienes autorización para descargar este paquete.'); }
+        $isTeacher = in_array('teacher', array_map('strtolower', array_map('strval', $access->currentRoles())), true);
+        $canViewPrivate = $policy->canViewProjectResource((int)$projectId, $context);
+        $canViewInstitutional = !$administrator && $isTeacher && $policy->canViewActiveProject((int)$projectId, $context);
+        if (!$canViewPrivate && !$canViewInstitutional) { http_response_code(403); exit('No tienes autorización para descargar este paquete.'); }
+        $institutionalReadOnly = $canViewInstitutional && !$canViewPrivate;
         $capabilities = $policy->forProjectId((int)$projectId, $context);
-        if (empty($capabilities['download_files'])) { http_response_code(403); exit('No tienes autorización para descargar este paquete.'); }
-        $project = (new ProjectRecordModel())->find((int)$projectId, $access->currentUserId(), $administrator);
+        if (empty($capabilities['download_academic_package'])) { http_response_code(403); exit('No tienes autorización para descargar este paquete.'); }
+        $project = (new ProjectRecordModel())->find((int)$projectId, $access->currentUserId(), $administrator, false, $institutionalReadOnly);
         if ($project === null) { http_response_code(404); exit('El proyecto solicitado no está disponible.'); }
         try {
             $packages = new ProjectRepositoryPackageService();

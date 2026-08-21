@@ -176,7 +176,7 @@ final class ProjectCapabilityService
 
         if ($context === 'academic_management') {
             if (!$administrator) return $capabilities;
-            foreach (['view_project','edit_information','manage_files','view_academic_history','view_admin_history','change_status','request_corrections','manage_participants','manage_tutoring','manage_tribunal','manage_publication','download_files','view_institutional_files'] as $key) $capabilities[$key] = true;
+            foreach (['view_project','edit_information','manage_files','view_academic_history','view_admin_history','change_status','request_corrections','manage_participants','manage_tutoring','manage_tribunal','manage_publication','download_files','download_academic_package','view_institutional_files'] as $key) $capabilities[$key] = true;
             foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request'] as $key) $capabilities[$key] = true;
             if ((string)($project['status'] ?? '') === 'development') $capabilities['manage_files'] = false;
             return $capabilities;
@@ -191,6 +191,7 @@ final class ProjectCapabilityService
             if (!$capabilities['view_project']) return $capabilities;
             $capabilities['view_academic_history'] = true;
             $capabilities['download_files'] = true;
+            $capabilities['download_academic_package'] = true;
             $capabilities['view_institutional_files'] = true;
             $isTeacher = in_array('teacher', $roles, true);
             if ($isTeacher) {
@@ -214,6 +215,7 @@ final class ProjectCapabilityService
         $capabilities['view_academic_history'] = !$isTeacher;
         $capabilities['view_institutional_files'] = $isTeacher || $isStudent;
         $capabilities['download_files'] = !$isTeacher || $related;
+        $capabilities['download_academic_package'] = !$isTeacher || $related;
 
         $assignedTutor = (int) ($project['tutor_id'] ?? 0) === $userId
             || count(array_filter($participants, static fn (array $participant): bool =>
@@ -222,6 +224,7 @@ final class ProjectCapabilityService
             )) > 0;
         if ($isTeacher && $assignedTutor) $capabilities['view_academic_history'] = true;
         if ($isTeacher) $capabilities['download_files'] = $assignedTutor;
+        if ($isTeacher) $capabilities['download_academic_package'] = true;
         $capabilities['review_documents'] = $isTeacher && $assignedTutor;
         // El seguimiento de Proyectos activos permite a cualquier Docente solicitar
         // y consultar ajustes, sin concederle edición ni revisión formal.

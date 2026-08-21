@@ -294,3 +294,26 @@
 .assigned-projects-page .assigned-teacher-situation.requires-attention > i {
     color: #d97706;
 }
+
+/* Ensure long project type badges adapt responsively */
+.assigned-projects-page .assigned-project-card header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+}
+.assigned-projects-page .assigned-project-card header .ar-project-type {
+    white-space: normal !important;
+    text-align: right !important;
+    max-width: 70% !important;
+    display: inline-block !important;
+}
+@media(max-width:360px) {
+    .assigned-projects-page .assigned-project-card header .ar-project-type {
+        max-width: 100% !important;
+        text-align: left !important;
+        margin-left: 0 !important;
+        flex: 1 1 100% !important;
+    }
+}

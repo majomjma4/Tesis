@@ -14,7 +14,13 @@ final class ProjectReviewRepresentationController
         try {
             if (!(new ProjectCapabilityService())->canViewProjectResource($projectId,'academic')) $this->json(false,'No tienes acceso a este proyecto.',[],403);
             if ($action==='upload') $this->json(true,'La representación PDF fue asociada correctamente.',(new ProjectReviewRepresentationService())->uploadSupplemental($projectId,(int)($_POST['file_id']??0),$_FILES['file']??[],$actor));
-            if ($action==='readiness') $this->json(true,'Validación completada.',(new ProjectReviewReadinessService())->check($projectId,false));
+            if ($action==='readiness') {
+                $capabilities = (new ProjectCapabilityService())->forProjectId($projectId, $session->isAdminModeActive() ? 'academic_management' : 'academic');
+                if (!$session->isAdminModeActive() && empty($capabilities['review_documents'])) {
+                    $this->json(false,'No tienes autorización para realizar la revisión de este proyecto.',[],403);
+                }
+                $this->json(true,'Validación completada.',(new ProjectReviewReadinessService())->check($projectId,false));
+            }
             $this->json(false,'La operación no es válida.',[],422);
         } catch (InvalidArgumentException $exception) { $this->json(false,$exception->getMessage(),[],422); }
         catch (Throwable $exception) { error_log('Review representation: '.$exception->getMessage()); $this->json(false,'No fue posible preparar la representación PDF.',[],500); }
