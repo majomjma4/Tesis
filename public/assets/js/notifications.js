@@ -1,6 +1,11 @@
 const shell = document.querySelector("#notificationsShell");
 const preloader = document.querySelector("#notificationsPreloader");
 const searchInput = document.querySelector("#notificationSearch");
+const searchPlaceholder = document.querySelector(".notification-search-placeholder");
+
+function syncSearchPlaceholder() {
+    if (searchPlaceholder) searchPlaceholder.hidden = Boolean(searchInput?.value);
+}
 
 const statusFilter = document.querySelector("#notificationStatusFilter");
 
@@ -309,7 +314,7 @@ async function loadNotifications(showMessage = false) {
 
 function debounce(callback, delay) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => callback(...args), delay); }; }
 const debouncedLoad = debounce(() => loadNotifications(), 300);
-searchInput?.addEventListener("input", () => { currentPage = 1; updateFilterState(); debouncedLoad(); });
+searchInput?.addEventListener("input", () => { syncSearchPlaceholder(); currentPage = 1; updateFilterState(); debouncedLoad(); });
 
 function closeFilterMenus(restoreFocus = false) {
     filterControls.forEach((control) => {
@@ -503,6 +508,7 @@ filterControls.forEach((control) => {
 
 function clearAllFilters() {
     searchInput.value = "";
+    syncSearchPlaceholder();
     currentPage = 1;
     filterControls.forEach((control) => {
         const defaultValue = "all";
@@ -516,6 +522,7 @@ function clearAllFilters() {
 }
 document.querySelector("#clearActiveNotificationFilter")?.addEventListener("click", clearAllFilters);
 updateFilterState();
+syncSearchPlaceholder();
 renderPagination(paginationState);
 selectAllTrash?.addEventListener("change", () => { document.querySelectorAll(".trash-notification-checkbox").forEach((checkbox) => { checkbox.checked = selectAllTrash.checked; }); updateTrashSelection(); });
 groupsContainer?.addEventListener("change", (event) => { if (event.target.matches(".trash-notification-checkbox")) updateTrashSelection(); });
@@ -870,7 +877,7 @@ document.addEventListener("click", (event) => {
         modalMenuBtn?.setAttribute("aria-expanded", "false");
     }
 });
-document.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchInput?.focus(); } if (event.key === "Escape") { closeMenus(); if (modalContextMenu) modalContextMenu.hidden = true; const hasOpenFilter = filterControls.some((control) => { const menu = control.querySelector(".notification-filter-menu"); return menu && !menu.hidden; }); if (hasOpenFilter) closeFilterMenus(true); else if (detailModal && !detailModal.hidden) closeModal(detailModal); else if (deleteModal && !deleteModal.hidden) closeModal(deleteModal); else if (createModal && !createModal.hidden) closeModal(createModal); else if (document.activeElement === searchInput) { searchInput.value = ""; searchInput.blur(); updateFilterState(); loadNotifications(); } } });
+document.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchInput?.focus(); } if (event.key === "Escape") { closeMenus(); if (modalContextMenu) modalContextMenu.hidden = true; const hasOpenFilter = filterControls.some((control) => { const menu = control.querySelector(".notification-filter-menu"); return menu && !menu.hidden; }); if (hasOpenFilter) closeFilterMenus(true); else if (detailModal && !detailModal.hidden) closeModal(detailModal); else if (deleteModal && !deleteModal.hidden) closeModal(deleteModal); else if (createModal && !createModal.hidden) closeModal(createModal); else if (document.activeElement === searchInput) { searchInput.value = ""; syncSearchPlaceholder(); searchInput.blur(); updateFilterState(); loadNotifications(); } } });
 
 let notificationsRevealed = false;
 

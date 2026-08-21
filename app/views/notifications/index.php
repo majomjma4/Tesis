@@ -80,7 +80,8 @@
     <section class="notification-toolbar notification-projects-pattern" aria-label="Búsqueda y filtros">
         <label class="notification-search notification-filter-search" for="notificationSearch">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input id="notificationSearch" type="search" placeholder="Buscar por título, mensaje o proyecto" autocomplete="off">
+            <span class="notification-search-placeholder" aria-hidden="true">Buscar por título, mensaje o proyecto</span>
+            <input id="notificationSearch" type="search" placeholder="" aria-label="Buscar por título, mensaje o proyecto" autocomplete="off">
         </label>
 
         <label class="notification-filter-control" data-filter-control="status"><span>Mostrar</span><select id="notificationStatusFilter" aria-label="Mostrar notificaciones"><option value="all">Todas</option><option value="unread">No leídas</option><option value="hidden">Archivadas</option><?php if ($isAdmin): ?><option value="sent">Enviadas</option><?php endif; ?><option value="trash">Papelera</option></select></label>
