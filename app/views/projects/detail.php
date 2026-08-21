@@ -3,8 +3,8 @@
 if ($project === null): ?>
     <section class="repository-detail-not-found"><i class="fa-solid fa-folder-open"></i><h1>Proyecto no encontrado</h1><p>El expediente solicitado no existe o no está disponible para tu cuenta.</p><a class="open-btn" href="<?= e($returnUrl) ?>">Volver</a></section>
 <?php else:
-    $isStudentContext = !empty($isStudentContext) || ($projectContext === 'academic' && empty($isTeacherContext) && !(new AuthSessionService())->hasAdminAccess());
-    if ($isStudentContext) {
+    $useModernWorkspace = !empty($isStudentContext) || ($projectContext === 'academic' && !(new AuthSessionService())->hasAdminAccess());
+    if ($useModernWorkspace) {
         require __DIR__ . '/_student-workspace.php';
         return;
     }
@@ -198,8 +198,11 @@ if ($project === null): ?>
     if ($publicContext && !empty($projectCapabilities['edit_information'])) {
         $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
     }
-    if (!$publicContext && !empty($projectCapabilities['create_adjustment_request'])) $actions[]=['id'=>'adjustment','label'=>'Solicitar ajuste','kind'=>'secondary','icon'=>'fa-comment-dots','enabled'=>true,'url'=>'#projectAdjustmentDialog'];
-    elseif (!$publicContext && !empty($projectCapabilities['register_delivery']) && $canDeliver) $actions[]=['id'=>'delivery','label'=>'Registrar entrega','kind'=>'primary','icon'=>'fa-upload','url'=>$detailUrl.'&tab=review','enabled'=>true];
+    if (!$isAdministrator && !empty($projectCapabilities['create_adjustment_request'])) {
+        $actions[] = ['id' => 'adjustment', 'label' => 'Solicitar cambios', 'kind' => 'secondary', 'icon' => 'fa-comment-dots', 'enabled' => true, 'url' => '#projectAdjustmentDialog'];
+    } elseif (!$publicContext && !empty($projectCapabilities['register_delivery']) && $canDeliver) {
+        $actions[] = ['id' => 'delivery', 'label' => 'Registrar entrega', 'kind' => 'primary', 'icon' => 'fa-upload', 'url' => $detailUrl . '&tab=review', 'enabled' => true];
+    }
     if (!$isAcademicManagement && empty($isTeacherContext) && !empty($projectCapabilities['download_files']) && !empty($headerPackage['available'])) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'],'enabled'=>true,'download'=>true];
     if($isAcademicManagement&&(string)$project['status']==='published')$actions[]=['id'=>'repository','label'=>'Ver en Repositorio','kind'=>'secondary','icon'=>'fa-book-open','url'=>route('repository-detail').'&id='.$projectId,'enabled'=>true];
     $statusActionCount=$isAcademicManagement&&!empty($projectCapabilities['change_status'])?count($projectStatusTransitions):0;

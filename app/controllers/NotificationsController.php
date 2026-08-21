@@ -10,7 +10,7 @@ final class NotificationsController
     {
         $this->ensureSession();
         $auth = new AuthSessionService();
-        $isAdmin = $auth->hasAdminAccess();
+        $isAdmin = $auth->isAdminModeActive();
         
         $error = null;
         $notifications = [];
@@ -20,11 +20,12 @@ final class NotificationsController
 
         try {
             $model = new NotificationModel();
-            $result = $model->getByUserPaginated($this->currentUserId(), [], PaginationService::request('notification_page', 'notifications_per_page'));
+            $context = (new AuthSessionService())->notificationContext();
+            $result = $model->getByUserPaginated($this->currentUserId(), [], PaginationService::request('notification_page', 'notifications_per_page'), $context);
             $notifications = $result['items'];
             $pagination = $result['pagination'];
-            $counters = $model->getCounters($this->currentUserId());
-            $archivedCount = $model->getVisibilityCounters($this->currentUserId(), true, false)['total'];
+            $counters = $model->getCounters($this->currentUserId(), $context);
+            $archivedCount = $model->getVisibilityCounters($this->currentUserId(), true, false, $context)['total'];
 
             if ($isAdmin) {
                 $adminModel = new AdminNotificationModel();
@@ -142,11 +143,12 @@ final class NotificationsController
             ];
             // La limpieza global programada queda pendiente como mejora posterior; aquí solo se depura la papelera del usuario actual.
             $model->purgeExpiredTrashForUser($this->currentUserId());
-            $result = $model->getByUserPaginated($this->currentUserId(), $filters, ['page' => $page, 'size' => $perPage, 'pageKey' => 'notification_page', 'sizeKey' => 'notifications_per_page']);
+            $context = (new AuthSessionService())->notificationContext();
+            $result = $model->getByUserPaginated($this->currentUserId(), $filters, ['page' => $page, 'size' => $perPage, 'pageKey' => 'notification_page', 'sizeKey' => 'notifications_per_page'], $context);
             $notifications = $result['items'];
             $pagination = $result['pagination'];
-            $counters = $model->getCounters($this->currentUserId());
-            $sectionCounters = $model->getVisibilityCounters($this->currentUserId(), $hidden, $trash);
+            $counters = $model->getCounters($this->currentUserId(), $context);
+            $sectionCounters = $model->getVisibilityCounters($this->currentUserId(), $hidden, $trash, $context);
         } catch (Throwable $exception) {
             error_log('Notifications list fallback: ' . $exception->getMessage());
             $allNotifications = $this->demoNotifications();
@@ -196,8 +198,9 @@ final class NotificationsController
     {
         $this->requirePostAndCsrf();
         $this->runJson(function (NotificationModel $model, int $userId): array {
-            $updated = $model->markAllAsRead($userId);
-            return ['updated' => $updated, 'counters' => $model->getCounters($userId)];
+            $context = (new AuthSessionService())->notificationContext();
+            $updated = $model->markAllAsRead($userId, $context);
+            return ['updated' => $updated, 'counters' => $model->getCounters($userId, $context)];
         }, 'Todas las notificaciones fueron marcadas como leidas.', function (): array {
             $notifications = $this->demoNotifications();
             $updated = 0;
@@ -250,7 +253,10 @@ final class NotificationsController
     {
         $this->requireMethod('GET');
         $this->runJson(
-            fn (NotificationModel $model, int $userId): array => ['counters' => $model->getCounters($userId)],
+            function (NotificationModel $model, int $userId): array {
+                $context = (new AuthSessionService())->notificationContext();
+                return ['counters' => $model->getCounters($userId, $context)];
+            },
             'Contadores actualizados.',
             fn (): array => ['counters' => (new NotificationModel())->getDemoCounters($this->demoNotifications())]
         );

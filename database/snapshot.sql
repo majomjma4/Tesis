@@ -368,6 +368,8 @@ CREATE TABLE `project_comments` (
   `parent_id` bigint(20) unsigned DEFAULT NULL,
   `delivery_id` bigint(20) unsigned DEFAULT NULL,
   `file_id` bigint(20) unsigned DEFAULT NULL,
+  `file_checksum_sha256` char(64) DEFAULT NULL,
+  `project_file_version_id` bigint(20) unsigned DEFAULT NULL,
   `observation_id` bigint(20) unsigned DEFAULT NULL,
   `body` text NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
@@ -689,10 +691,13 @@ CREATE TABLE `project_observations` (
   KEY `fk_observations_project` (`project_id`),
   KEY `fk_observations_delivery` (`delivery_id`),
   KEY `fk_observations_file` (`file_id`),
+  KEY `idx_project_observations_file_revision` (`file_id`,`file_checksum_sha256`),
+  KEY `idx_project_observations_file_version` (`project_file_version_id`),
   KEY `fk_observations_author` (`author_id`),
   CONSTRAINT `fk_observations_author` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_observations_delivery` FOREIGN KEY (`delivery_id`) REFERENCES `project_deliveries` (`id`),
   CONSTRAINT `fk_observations_file` FOREIGN KEY (`file_id`) REFERENCES `project_files` (`id`),
+  CONSTRAINT `fk_project_observations_file_version` FOREIGN KEY (`project_file_version_id`) REFERENCES `project_file_versions` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_observations_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1468,6 +1473,36 @@ CREATE TABLE `academic_defense_schedules` (
   KEY `idx_academic_defense_schedules_updated_by` (`updated_by`),
   CONSTRAINT `fk_academic_defense_schedules_period` FOREIGN KEY (`academic_period_id`) REFERENCES `academic_periods` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_academic_defense_schedules_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Table structure for table `project_review_representations`
+--
+
+DROP TABLE IF EXISTS `project_review_representations`;
+CREATE TABLE `project_review_representations` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `project_id` bigint(20) unsigned NOT NULL,
+  `file_id` bigint(20) unsigned NOT NULL,
+  `project_file_version_id` bigint(20) unsigned DEFAULT NULL,
+  `checksum_sha256` char(64) NOT NULL,
+  `representation_type` enum('libreoffice_pdf','supplemental_pdf') NOT NULL,
+  `storage_name` varchar(190) NOT NULL,
+  `storage_path` varchar(500) NOT NULL,
+  `mime_type` varchar(120) NOT NULL DEFAULT 'application/pdf',
+  `size_bytes` bigint(20) unsigned NOT NULL,
+  `pdf_checksum_sha256` char(64) NOT NULL,
+  `created_by` bigint(20) unsigned DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_review_representation_revision` (`file_id`,`checksum_sha256`,`representation_type`),
+  UNIQUE KEY `uq_review_representation_storage` (`storage_name`),
+  KEY `idx_review_representation_project` (`project_id`,`file_id`,`checksum_sha256`),
+  KEY `idx_review_representation_version` (`project_file_version_id`),
+  CONSTRAINT `fk_review_representation_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_review_representation_file` FOREIGN KEY (`file_id`) REFERENCES `project_files` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_review_representation_version` FOREIGN KEY (`project_file_version_id`) REFERENCES `project_file_versions` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_review_representation_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --

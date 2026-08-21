@@ -19,7 +19,7 @@ final class AccountController
         }
         try { $profile = $model->profile((int) $session->userId()); }
         catch (Throwable) { $profile = ['full_name'=>$session->name(),'email'=>$session->email(),'created_at'=>null,'last_login_at'=>null,'password_changed_at'=>null,'roles'=>$session->roles()]; $error ??= 'No fue posible consultar todos los datos del perfil.'; }
-        View::render('account/profile',['currentPage'=>'profile','title'=>'Mi perfil | Administración','bodyClass'=>'account-profile-page','pageStyles'=>[asset('css/account-profile.css')],'profile'=>$profile,'profileError'=>$error,'profileSuccess'=>$success,'profileCsrf'=>$session->csrfToken('profile'),'profileAvatarCsrf'=>$session->csrfToken('profile_avatar')]);
+        View::render('account/profile',['currentPage'=>'profile','title'=>$session->isAdminModeActive() ? 'Mi perfil | Administración' : 'Mi perfil | Gestión Documental Académica','bodyClass'=>'account-profile-page','pageStyles'=>[asset('css/account-profile.css')],'profile'=>$profile,'profileError'=>$error,'profileSuccess'=>$success,'profileCsrf'=>$session->csrfToken('profile'),'profileAvatarCsrf'=>$session->csrfToken('profile_avatar')]);
     }
 
     public function changePassword(): void
@@ -150,6 +150,24 @@ final class AccountController
             throw new RuntimeException('Inactive session.');
         }
         return $userId;
+    }
+
+    public function toggleAdminMode(): void
+    {
+        $session = new AuthSessionService();
+        if (!$session->isAuthenticated()) {
+            header('Location: ' . route('login'));
+            exit;
+        }
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && $session->validateCsrf('toggle_admin_mode', (string) ($_POST['_csrf'] ?? ''))) {
+            $session->toggleAdminMode();
+        }
+        $returnUrl = (string) ($_POST['return_url'] ?? $_SERVER['HTTP_REFERER'] ?? route('dashboard'));
+        if (!str_starts_with($returnUrl, '/') && !str_starts_with($returnUrl, route('dashboard'))) {
+            $returnUrl = route('dashboard');
+        }
+        header('Location: ' . $returnUrl);
+        exit;
     }
 
     private function json(bool $success, string $message, int $status = 200, array $data = []): never

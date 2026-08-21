@@ -28,7 +28,7 @@ final class ProjectDocumentReviewBatchService
         }
 
         $projectQuery = $db->prepare(
-            'SELECT id,title,status,tutor_id,deleted_at FROM projects WHERE id=:id FOR UPDATE'
+            'SELECT id,code,title,status,tutor_id,deleted_at FROM projects WHERE id=:id FOR UPDATE'
         );
         $projectQuery->execute(['id'=>$projectId]);
         $project = $projectQuery->fetch();
@@ -44,12 +44,7 @@ final class ProjectDocumentReviewBatchService
         }
 
         $normalized = $this->normalizeDecisions($decisions);
-        $filesQuery = $db->prepare(
-            'SELECT id,project_id,original_name,checksum_sha256,created_at,deleted_at,purged_at
-             FROM project_files WHERE project_id=:project AND deleted_at IS NULL AND purged_at IS NULL ORDER BY id FOR UPDATE'
-        );
-        $filesQuery->execute(['project'=>$projectId]);
-        $files = $filesQuery->fetchAll();
+        $files = (new ProjectDocumentReviewService($db))->loadFilesInReviewScope($db, $projectId, true);
         if ($files === []) throw new ProjectStatusTransitionException('El proyecto no puede revisarse porque no contiene documentos activos.');
         $byId = [];
         foreach ($files as $file) $byId[(int)$file['id']] = $file;
@@ -63,7 +58,7 @@ final class ProjectDocumentReviewBatchService
         }
 
         $reviewService = new ProjectDocumentReviewService($db);
-        $before = $reviewService->describeCurrentFiles($projectId, $files);
+        $before = $reviewService->describeCurrentFiles($projectId, $files, true);
         $previousById = [];
         foreach ($before['files'] as $file) $previousById[(int)$file['id']] = (string)$file['document_status'];
         foreach ($files as $file) {
@@ -75,16 +70,20 @@ final class ProjectDocumentReviewBatchService
 
         $observationInsert = $db->prepare(
             "INSERT INTO project_observations
-             (project_id,delivery_id,file_id,author_id,category,location_reference,body,status)
-             VALUES (:project,NULL,:file,:actor,:category,:location,:body,'pending')"
+             (project_id,delivery_id,file_id,file_checksum_sha256,author_id,category,location_reference,selection_anchor,body,status)
+             VALUES (:project,NULL,:file,:checksum,:actor,:category,:location,:anchor,:body,'pending')"
         );
         $observationCount = 0;
         $auditDocuments = [];
         foreach ($normalized as $decision) {
+            $decisionFile = $byId[$decision['file_id']];
+            $decisionChecksum = strtolower((string)$decisionFile['checksum_sha256']);
             foreach ($decision['observations'] as $observation) {
                 $observationInsert->execute([
-                    'project'=>$projectId, 'file'=>$decision['file_id'], 'actor'=>$actor,
-                    'category'=>$observation['category'], 'location'=>$observation['location_reference'], 'body'=>$observation['body'],
+                    'project'=>$projectId, 'file'=>$decision['file_id'], 'checksum'=>$decisionChecksum, 'actor'=>$actor,
+                    'category'=>$observation['category'], 'location'=>$observation['location_reference'],
+                    'anchor'=>$observation['anchor'] === null ? null : json_encode($observation['anchor'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
+                    'body'=>$observation['body'],
                 ]);
                 $observationCount++;
             }
@@ -98,12 +97,23 @@ final class ProjectDocumentReviewBatchService
             ];
         }
 
-        $after = $reviewService->describeCurrentFiles($projectId, $files);
+        $after = $reviewService->describeCurrentFiles($projectId, $files, true);
         $summary = $after['summary'];
-        $finalProjectStatus = $summary['corrections_requested'] > 0 ? 'development' : 'under_review';
+        $finalProjectStatus = $summary['corrections_requested'] > 0
+            ? 'development'
+            : (!empty($summary['all_active_documents_approved']) ? 'approved' : 'under_review');
         if ($finalProjectStatus !== (string)$project['status']) {
-            $update = $db->prepare('UPDATE projects SET status=:status WHERE id=:project AND status=:expected');
-            $update->execute(['status'=>$finalProjectStatus, 'project'=>$projectId, 'expected'=>$expectedProjectStatus]);
+            $update = $db->prepare(
+                'UPDATE projects SET status=:status,
+                 approved_at=CASE WHEN :completion=1 AND approved_at IS NULL THEN CURRENT_TIMESTAMP ELSE approved_at END
+                 WHERE id=:project AND status=:expected'
+            );
+            $update->execute([
+                'status'=>$finalProjectStatus,
+                'completion'=>$finalProjectStatus === 'approved' ? 1 : 0,
+                'project'=>$projectId,
+                'expected'=>$expectedProjectStatus,
+            ]);
             if ($update->rowCount() !== 1) throw new ProjectStatusTransitionException('El proyecto cambió de estado mientras realizabas la revisión. Recarga el expediente antes de continuar.', 409);
         }
 
@@ -120,6 +130,12 @@ final class ProjectDocumentReviewBatchService
         );
         if ((int)$summary['corrections_requested'] > 0) {
             $this->notifyStudents($db, $projectId, (int)$summary['corrections_requested'], $auditId);
+        } elseif ($finalProjectStatus === 'approved') {
+            $labels = project_academic_labels('approved');
+            (new ProjectAcademicNotificationService())->finalApproval(
+                $db, $projectId, (string)$project['code'], (string)$project['title'],
+                'approved', (string)$labels['status'], $auditId
+            );
         }
 
         return [
@@ -166,17 +182,74 @@ final class ProjectDocumentReviewBatchService
                 if ($category === '' || mb_strlen($category) > 60 || mb_strlen($location) > 180) {
                     throw new ProjectStatusTransitionException('La categoría o referencia de una observación no es válida.');
                 }
-                $observations[] = ['body'=>$body, 'category'=>$category, 'location_reference'=>$location !== '' ? $location : null];
+                $observations[] = [
+                    'body'=>$body, 'category'=>$category, 'location_reference'=>$location !== '' ? $location : null,
+                    'anchor'=>$this->normalizeAnchor($raw['anchor'] ?? null),
+                ];
             }
-            if ($observations !== [] && $status === 'approved') {
-                throw new ProjectStatusTransitionException('Un documento aprobado no puede incluir observaciones pendientes.');
+            if ($status === 'corrections_requested' && $observations === []) {
+                throw new ProjectStatusTransitionException('Debes agregar al menos una observación para solicitar correcciones en este documento.');
             }
-            if ($observations !== []) $status = 'corrections_requested';
             $normalized[$fileId] = [
                 'file_id'=>$fileId, 'expected_checksum'=>$checksum, 'status'=>$status, 'observations'=>$observations,
             ];
         }
         return $normalized;
+    }
+
+    private function normalizeAnchor(mixed $raw): ?array
+    {
+        if ($raw === null || $raw === '') return null;
+        if (!is_array($raw)) throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+        $page = filter_var($raw['page_number'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1, 'max_range'=>10000]]);
+        $text = trim((string)($raw['selected_text'] ?? ''));
+        $rects = $raw['relative_rects'] ?? null;
+        if ($page === false || $text === '' || mb_strlen($text) > 500 || !is_array($rects) || count($rects) < 1 || count($rects) > 50) {
+            throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+        }
+        $entry = $raw['internal_entry'] ?? $raw['entry_name'] ?? null;
+        if ($entry !== null) {
+            $entry = trim((string)$entry);
+            if ($entry === '') {
+                $entry = null;
+            } else {
+                $cleanEntry = preg_replace('#^[/\\\\]+#', '', str_replace('\\', '/', $entry));
+                if ($cleanEntry === null || $cleanEntry === '' || mb_strlen($cleanEntry) > 500 || str_contains($cleanEntry, '<') || preg_match('#^(?:[A-Za-z]:|/|\\\\)#', $cleanEntry)) {
+                    throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+                }
+                $entry = $cleanEntry;
+            }
+        }
+        $normalizedRects = [];
+        $epsilon = 0.002;
+        foreach ($rects as $rect) {
+            if (!is_array($rect)) throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+            $rawValues = [];
+            foreach (['left','top','width','height'] as $key) {
+                if (!isset($rect[$key]) || !is_numeric($rect[$key])) throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+                $rawValues[$key] = (float)$rect[$key];
+            }
+            $rawLeft = $rawValues['left'];
+            $rawTop = $rawValues['top'];
+            $rawWidth = $rawValues['width'];
+            $rawHeight = $rawValues['height'];
+
+            if ($rawLeft < -$epsilon || $rawTop < -$epsilon || $rawWidth <= 0 || $rawHeight <= 0 || ($rawLeft + $rawWidth) > (1.0 + $epsilon) || ($rawTop + $rawHeight) > (1.0 + $epsilon)) {
+                throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+            }
+
+            $left = max(0.0, min(1.0, $rawLeft));
+            $top = max(0.0, min(1.0, $rawTop));
+            $width = min($rawWidth, 1.0 - $left);
+            $height = min($rawHeight, 1.0 - $top);
+
+            if ($width <= 0 || $height <= 0) {
+                throw new ProjectStatusTransitionException('El ancla de la observación no es válida.');
+            }
+
+            $normalizedRects[] = ['left' => $left, 'top' => $top, 'width' => $width, 'height' => $height];
+        }
+        return ['selected_text'=>$text, 'page_number'=>$page, 'relative_rects'=>$normalizedRects, 'internal_entry'=>$entry];
     }
 
     private function notifyStudents(PDO $db, int $projectId, int $documentCount, int $auditId): void

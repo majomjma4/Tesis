@@ -25,4 +25,14 @@ final class ProjectFileVersionHistoryService
         if(!in_array($context,['academic','academic_management'],true)||$actor<1)return false;$identity=$db->prepare("SELECT u.is_admin,GROUP_CONCAT(DISTINCT r.code) roles FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id WHERE u.id=:actor AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL GROUP BY u.id");$identity->execute(['actor'=>$actor]);$user=$identity->fetch();if(!$user)return false;if($context==='academic_management')return !empty($user['is_admin']);$roles=explode(',',(string)$user['roles']);
         $assignment=$db->prepare("SELECT LOWER(role_code) FROM project_participants WHERE project_id=:project AND user_id=:actor AND status='active' AND removed_at IS NULL");$assignment->execute(['project'=>$project,'actor'=>$actor]);$projectRoles=array_map('strval',$assignment->fetchAll(PDO::FETCH_COLUMN));$tutor=$db->prepare('SELECT tutor_id FROM projects WHERE id=:project AND deleted_at IS NULL');$tutor->execute(['project'=>$project]);$tutorId=(int)$tutor->fetchColumn();return (in_array('student',$roles,true)&&in_array('student',$projectRoles,true))||(in_array('teacher',$roles,true)&&($tutorId===$actor||array_intersect($projectRoles,['tutor','co_tutor','cotutor','co-tutor'])!==[]));
     }
+
+    public function accessibleVersion(int $projectId, int $versionId, int $actorId, string $context): array
+    {
+        $db=$this->db??Database::connection();
+        if (!$this->canView($db,$projectId,$actorId,$context)) throw new InvalidArgumentException('No tienes autorización para consultar esta versión.');
+        $q=$db->prepare('SELECT v.*,p.deleted_at project_deleted_at,f.deleted_at file_deleted_at,f.purged_at file_purged_at FROM project_file_versions v JOIN projects p ON p.id=v.project_id JOIN project_files f ON f.id=v.file_id WHERE v.id=:version AND v.project_id=:project');
+        $q->execute(['version'=>$versionId,'project'=>$projectId]); $row=$q->fetch();
+        if (!$row || !empty($row['project_deleted_at']) || !empty($row['file_deleted_at']) || !empty($row['file_purged_at']) || (string)$row['physical_status']==='unavailable') throw new InvalidArgumentException('La versión histórica no está disponible.');
+        return $row;
+    }
 }

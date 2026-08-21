@@ -5,13 +5,13 @@ final class AdminController
 {
     public function settings():void{$model=new SystemSettingModel();$error=null;try{$settings=$model->all();$uploadPolicy=$model->fileUploadPolicy();}catch(Throwable $e){error_log('Admin settings: '.$e->getMessage());$error='No fue posible consultar la configuración.';$settings=$model->defaults();$uploadPolicy=['max_mb'=>20,'total_max_mb'=>35,'file_ceiling_mb'=>20,'operation_ceiling_mb'=>35,'application_file_ceiling_mb'=>500,'application_operation_ceiling_mb'=>1024];}$s=new AuthSessionService();View::render('admin/settings',['currentPage'=>'admin-settings','title'=>'Configuración | Administración','bodyClass'=>'admin-settings-page','pageStyles'=>[asset('css/admin-settings.css')],'pageScript'=>asset('js/admin-settings.js'),'settings'=>$settings,'uploadPolicy'=>$uploadPolicy,'settingsError'=>$error,'settingsCsrf'=>$s->csrfToken('admin_settings'),'settingsSaveEndpoint'=>route('admin-settings-save')]);}
     public function saveSettings():void{$this->requirePost();$s=new AuthSessionService();if(!$s->validateCsrf('admin_settings',(string)($_POST['_csrf']??'')))$this->json(false,'La solicitud ya no es válida. Recarga la página e inténtalo nuevamente.',[],403);try{(new SystemSettingModel())->save($_POST,(int)$s->userId());$this->json(true,'Configuración guardada y aplicada.');}catch(InvalidArgumentException $e){$this->activityFailure($s,'settings_updated','Intentó actualizar la configuración institucional','Configuración','settings',null,'Configuración del sistema',$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,'settings_updated','Intentó actualizar la configuración institucional','Configuración','settings',null,'Configuración del sistema',$e);error_log('Save settings: '.$e->getMessage());$this->json(false,'No fue posible guardar la configuración.',[],500);}}
-    public function reports():void{$from=$this->reportDate('from',date('Y-m-01'));$to=$this->reportDate('to',date('Y-m-d'));$model=new AdminReportModel();$error=null;$paginationRequest=['page'=>(int)($_GET['report_page']??PaginationService::request()['page']??1),'size'=>(int)($_GET['reports_per_page']??PaginationService::request()['size']??10)];try{$data=$model->dashboard($from,$to,$paginationRequest);}catch(Throwable $e){error_log('Admin reports: '.$e->getMessage());$error='No fue posible generar los reportes.';$data=['summary'=>['users'=>0,'projects'=>0,'deliveries'=>0,'actions'=>0],'roles'=>[],'statuses'=>[],'reviewSituations'=>[],'activity'=>[],'pagination'=>['total'=>0]];}View::render('admin/reports',['currentPage'=>'admin-reports','title'=>'Reportes | Administración','bodyClass'=>'admin-reports-page','pageStyles'=>[asset('css/admin-reports.css')],'reportData'=>$data,'pagePaginationData'=>$data['pagination'],'reportFrom'=>$from,'reportTo'=>$to,'reportError'=>$error]);}
+    public function reports():void{$periods=(new AcademicPeriodModel())->all();$selection=$this->reportPeriodSelection($periods);$base=['from'=>$selection['from'],'to'=>$selection['to']];$from=$this->reportDate('from',$base['from']);$to=$this->reportDate('to',$base['to']);$manualDates=array_key_exists('from',$_GET)||array_key_exists('to',$_GET);if($manualDates&&$selection['id']!==null&&($from!==$selection['from']||$to!==$selection['to'])&&count($periods)>1)$selection=['id'=>null,'from'=>$from,'to'=>$to];$model=new AdminReportModel();$error=null;$paginationRequest=['page'=>(int)($_GET['report_page']??PaginationService::request()['page']??1),'size'=>(int)($_GET['reports_per_page']??PaginationService::request()['size']??10)];try{$data=$model->dashboard($from,$to,$paginationRequest);}catch(Throwable $e){error_log('Admin reports: '.$e->getMessage());$error='No fue posible generar los reportes.';$data=['summary'=>['users'=>0,'projects'=>0,'deliveries'=>0,'actions'=>0],'roles'=>[],'statuses'=>[],'reviewSituations'=>[],'activity'=>[],'pagination'=>['total'=>0]];}View::render('admin/reports',['currentPage'=>'admin-reports','title'=>'Reportes | Administración','bodyClass'=>'admin-reports-page','pageStyles'=>[asset('css/admin-reports.css')],'reportData'=>$data,'pagePaginationData'=>$data['pagination'],'reportFrom'=>$from,'reportTo'=>$to,'reportBaseFrom'=>$base['from'],'reportBaseTo'=>$base['to'],'reportPeriods'=>$periods,'reportSelectedPeriodId'=>$selection['id'],'reportPeriodsAreMultiple'=>count($periods)>1,'reportError'=>$error]);}
     public function exportReport():never{
         $type=(string)($_GET['type']??'');
         $format=(string)($_GET['format']??'pdf');
         $scope=(string)($_GET['scope']??'');
-        $from=$this->reportDate('from',date('Y-m-01'));
-        $to=$this->reportDate('to',date('Y-m-d'));
+        $from=$this->reportDate('from',($this->reportBaseRange())['from']);
+        $to=$this->reportDate('to',($this->reportBaseRange())['to']);
         if(!in_array($type,['users','projects','audit'],true)){http_response_code(422);exit('Reporte no válido.');}
         try{
             $model=new AdminReportModel();
@@ -297,6 +297,26 @@ final class AdminController
             exit('No fue posible generar el reporte.');
         }
     }
+    private function reportPeriodSelection(array $periods): array
+    {
+        $count = count($periods);
+        if ($count === 0) {
+            $today = date('Y-m-d');
+            return ['id'=>null,'from'=>$today,'to'=>$today];
+        }
+        $requested = (int) ($_GET['period_id'] ?? 0);
+        if ($count === 1) $requested = (int) $periods[0]['id'];
+        if ($requested > 0) {
+            foreach ($periods as $period) {
+                if ((int) $period['id'] === $requested) return ['id'=>$requested,'from'=>(string)$period['starts_on'],'to'=>(string)$period['ends_on']];
+            }
+        }
+        $starts = array_map(static fn(array $period): string => (string) $period['starts_on'], $periods);
+        $ends = array_map(static fn(array $period): string => (string) $period['ends_on'], $periods);
+        return ['id'=>null,'from'=>min($starts),'to'=>max($ends)];
+    }
+
+    private function reportBaseRange():array{$period=(new AcademicPeriodModel())->active();if($period&&$period['starts_on']&&$period['ends_on'])return ['from'=>(string)$period['starts_on'],'to'=>(string)$period['ends_on']];$today=date('Y-m-d');return ['from'=>$today,'to'=>$today];}
     private function reportDate(string $key,string $fallback):string{$value=(string)($_GET[$key]??$fallback);$date=DateTimeImmutable::createFromFormat('Y-m-d',$value);return $date&&$date->format('Y-m-d')===$value?$value:$fallback;}
     public function trash():void
     {
@@ -1078,7 +1098,6 @@ final class AdminController
             'currentPage'=>'projects',
             'title'=>$isAdministrator ? 'Proyectos activos | Administración' : 'Proyectos activos | Gestión Académica',
             'bodyClass'=>'admin-projects-page',
-            'layoutIsAdmin'=>$isAdministrator,
             'isAdministrator'=>$isAdministrator,
             'pageStyles'=>[asset('css/admin-projects.css')],
             'pageScript'=>asset('js/admin-projects.js'),
@@ -1129,7 +1148,7 @@ final class AdminController
             $payload=['title'=>$title,'subtitle'=>trim((string)($_POST['subtitle']??'')),'summary'=>trim((string)($_POST['summary']??'')),'project_type_id'=>(int)($_POST['project_type_id']??0),'career_id'=>(int)($_POST['career_id']??0),'academic_period_id'=>(int)($_POST['academic_period_id']??0),'tutor_id'=>(int)($_POST['tutor_id']??0),'tutoring_managed'=>(string)($_POST['tutoring_managed']??'')==='1','tutoring_user_ids'=>(array)($_POST['tutoring_user_ids']??[]),'tutoring_primary_id'=>(int)($_POST['tutoring_primary_id']??0),'authors_managed'=>(string)($_POST['authors_managed']??'')==='1','author_user_ids'=>(array)($_POST['author_user_ids']??[]),'author_leader_id'=>(int)($_POST['author_leader_id']??0),'status'=>(string)($_POST['status']??'development'),'presentation_file_id'=>(int)($_POST['presentation_file_id']??0),'public_description'=>(string)($_POST['public_description']??''),'description_origin'=>(string)($_POST['description_origin']??''),'keywords'=>(array)($_POST['project_keywords']??[])];
             $saved=(new AdminProjectModel())->save($payload,$id,(int)$session->userId(),$publicationIntent);
             $this->json(true,$publicationIntent?'El proyecto fue publicado correctamente y ahora puede consultarse desde el Repositorio.':($id?'Proyecto actualizado correctamente.':'Proyecto creado correctamente.'),['id'=>$saved]);
-        }catch(ProjectStatusTransitionException $exception){$this->json(false,$exception->getMessage(),[],$exception->httpStatus());}
+        }catch(ProjectStatusTransitionException $exception){$this->json(false,$exception->getMessage(),$exception->details(),$exception->httpStatus());}
         catch(ProjectTutoringException $exception){$this->json(false,$exception->getMessage(),[],422);}
         catch(ProjectAuthorException $exception){$this->json(false,$exception->getMessage(),[],422);}
         catch(InvalidArgumentException $exception){if($id)$this->activityFailure($session,'project_status_changed','Intentó modificar el estado de un proyecto','Proyectos','project',$id,$title?:'Proyecto #'.$id,$exception);$this->json(false,$exception->getMessage(),[],422);}

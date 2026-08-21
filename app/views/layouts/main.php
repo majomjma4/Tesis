@@ -18,10 +18,10 @@
     <link rel="stylesheet" href="<?= e(asset('css/card-accents.css')) ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
-<?php $isAdministratorLayout = (bool) ($layoutIsAdmin ?? false); ?>
+<?php $isAdministratorLayout = (bool) ($layoutIsAdmin ?? false); $isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen); ?>
 
 <body
-    class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout app-page-loading' : ''))) ?>">
+    class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout' : '') . ($isStudentWorkspaceFullscreen ? ' app-student-workspace-fullscreen' : ''))) ?>">
     <noscript>
         <style>
             .app-global-skeleton {
@@ -114,13 +114,6 @@
                 <?php endif; ?>
             </nav>
         </div>
-
-        <div class="sidebar-footer">
-            <button class="close-btn js-logout-trigger" type="button">
-                <i class="fa-solid fa-right-from-bracket"></i>
-                Cerrar sesión
-            </button>
-        </div>
     </aside>
     <!-- Final de menu lateral principal -->
 
@@ -133,18 +126,38 @@
             </button>
 
             <div class="welcome">
-                <h2>Hola, <?= e(explode(' ', trim($layoutUserName ?? 'Usuario'))[0] ?: 'Usuario') ?></h2>
+                <?php
+                $firstName = explode(' ', trim($layoutUserName ?? 'Usuario'))[0] ?: 'Usuario';
+                $greetingName = ($isAdministratorLayout && strtolower($firstName) === 'docente') ? 'Administrador' : $firstName;
+                ?>
+                <h2>Hola, <?= e($greetingName) ?></h2>
                 <p><?= $isAdministratorLayout ? 'Panel de administración del sistema.' : 'Continúa gestionando tus proyectos académicos.' ?>
                 </p>
             </div>
 
             <div class="topbar-right">
-                <a class="topbar-action-btn"
-                    href="<?= e($isAdministratorLayout ? route('projects') . '&action=new' : route('new-project')) ?>">
-                    <i class="fa-solid fa-plus"></i>
-                    <span class="topbar-action-label">Nuevo proyecto</span>
-                    <span class="topbar-action-label-short">Nuevo</span>
-                </a>
+                <?php if (!empty($layoutCanToggleAdminMode)): ?>
+                    <form action="<?= e(route('toggle-admin-mode')) ?>" method="POST" class="topbar-mode-toggle-form">
+                        <input type="hidden" name="_csrf" value="<?= e($layoutToggleAdminModeCsrf ?? '') ?>">
+                        <button class="topbar-mode-pill <?= !empty($layoutIsAdminModeActive) ? 'is-admin' : 'is-teacher' ?>"
+                                type="submit"
+                                title="<?= !empty($layoutIsAdminModeActive) ? 'Volver a modo docente' : 'Cambiar a modo administrador' ?>"
+                                aria-label="<?= !empty($layoutIsAdminModeActive) ? 'Volver a modo docente' : 'Cambiar a modo administrador' ?>">
+                            <span class="mode-pill-badge">
+                                <i class="fa-solid <?= !empty($layoutIsAdminModeActive) ? 'fa-shield-halved' : 'fa-graduation-cap' ?>"></i>
+                                <span class="mode-pill-text"><?= !empty($layoutIsAdminModeActive) ? 'Administración' : 'Docente' ?></span>
+                            </span>
+                            <i class="fa-solid fa-arrow-right-arrow-left mode-pill-switch-icon" aria-hidden="true"></i>
+                        </button>
+                    </form>
+                <?php endif; ?>
+                <?php if (!$isAdministratorLayout): ?>
+                    <a class="topbar-action-btn" href="<?= e(route('new-project')) ?>">
+                        <i class="fa-solid fa-plus"></i>
+                        <span class="topbar-action-label">Nuevo proyecto</span>
+                        <span class="topbar-action-label-short">Nuevo</span>
+                    </a>
+                <?php endif; ?>
                 <button class="icon-btn theme-toggle" id="themeToggle" type="button"
                     aria-label="Cambiar modo claro u oscuro">
                     <i class="fa-solid fa-moon"></i>

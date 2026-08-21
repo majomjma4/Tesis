@@ -139,6 +139,28 @@ final class AuthSessionService
     public function userId(): ?int { return $this->isAuthenticated() ? (int) $_SESSION['user_id'] : null; }
     public function roles(): array { $this->start(); return array_values(array_filter(array_map('strval', (array) ($_SESSION['roles'] ?? [$_SESSION['role'] ?? ''])))); }
     public function hasAdminAccess(): bool { $this->start(); return (bool)($_SESSION['is_admin']??false); }
+    public function isTeacher(): bool { $this->start(); return in_array('teacher', $this->roles(), true); }
+    public function isTeacherAndAdmin(): bool { return $this->isTeacher() && $this->hasAdminAccess(); }
+    public function isAdminOnly(): bool { return $this->hasAdminAccess() && !$this->isTeacher(); }
+    public function isAdminModeActive(): bool
+    {
+        $this->start();
+        if ($this->isAdminOnly()) return true;
+        if (!$this->hasAdminAccess()) return false;
+        return (bool) ($_SESSION['admin_mode'] ?? false);
+    }
+    public function toggleAdminMode(): bool
+    {
+        $this->start();
+        if (!$this->hasAdminAccess()) return false;
+        $newMode = !$this->isAdminModeActive();
+        $_SESSION['admin_mode'] = $newMode;
+        return $newMode;
+    }
+    public function notificationContext(): string
+    {
+        return $this->isAdminModeActive() ? 'admin' : 'teacher';
+    }
     public function isInitialAdmin(): bool { $this->start(); return (bool)($_SESSION['is_initial_admin']??false); }
     public function name(): string { $this->start(); return (string)($_SESSION['user_name']??'Usuario'); }
     public function email(): string { $this->start(); return (string)($_SESSION['user_email']??''); }

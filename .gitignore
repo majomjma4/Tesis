@@ -14,9 +14,14 @@
 !/storage/support-materials/informe_vinculacion.docx
 !/storage/support-materials/reglamento_material_apoyo.txt
 /storage/private/projects/*
+/storage/private/project-previews/*
+!/storage/private/project-previews/.gitkeep
 /app/config/database.local.php
 /app/config/app.local.php
 /database/snapshot.before-portability.local.sql
 /dist/
 storage/private/avatars/*
 !storage/private/avatars/.gitkeep
+/storage/private/project-review-representations/*
+!/storage/private/project-review-representations/.gitkeep
+scratch_*

@@ -33,12 +33,12 @@ $visualForExtension = static function (string $extension): array {
     $normalized = mb_strtolower(ltrim(trim($extension), '.'), 'UTF-8');
     return match ($normalized) {
         'pdf' => ['icon' => 'fa-file-lines', 'label' => 'PDF'],
-        'doc', 'docx' => ['icon' => 'fa-file-pen', 'label' => mb_strtoupper($normalized, 'UTF-8')],
-        'xls', 'xlsx' => ['icon' => 'fa-table', 'label' => mb_strtoupper($normalized, 'UTF-8')],
-        'ppt', 'pptx' => ['icon' => 'fa-display', 'label' => mb_strtoupper($normalized, 'UTF-8')],
-        'zip', 'rar', '7z', 'tar', 'gz' => ['icon' => 'fa-box-archive', 'label' => mb_strtoupper($normalized, 'UTF-8')],
-        'png', 'jpg', 'jpeg', 'webp', 'gif', 'svg' => ['icon' => 'fa-image', 'label' => mb_strtoupper($normalized, 'UTF-8')],
-        'txt' => ['icon' => 'fa-align-left', 'label' => 'TXT'],
+        'doc', 'docx', 'odt', 'rtf' => ['icon' => 'fa-file-word', 'label' => mb_strtoupper($normalized, 'UTF-8')],
+        'xls', 'xlsx', 'csv', 'ods' => ['icon' => 'fa-file-excel', 'label' => mb_strtoupper($normalized, 'UTF-8')],
+        'ppt', 'pptx', 'odp' => ['icon' => 'fa-file-powerpoint', 'label' => mb_strtoupper($normalized, 'UTF-8')],
+        'zip', 'rar', '7z', 'tar', 'gz' => ['icon' => 'fa-file-zipper', 'label' => mb_strtoupper($normalized, 'UTF-8')],
+        'png', 'jpg', 'jpeg', 'webp', 'gif', 'svg' => ['icon' => 'fa-file-image', 'label' => mb_strtoupper($normalized, 'UTF-8')],
+        'txt', 'md' => ['icon' => 'fa-file-lines', 'label' => mb_strtoupper($normalized, 'UTF-8')],
         default => ['icon' => 'fa-file', 'label' => 'FILE'],
     };
 };

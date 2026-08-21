@@ -10,7 +10,7 @@ final class RepositoryController
     public function index(): void
     {
         $this->ensureSession();
-        if ((new AuthSessionService())->hasAdminAccess()) {
+        if ((new AuthSessionService())->isAdminModeActive()) {
             header('Location: ' . route('admin-repository'));
             exit;
         }
@@ -64,45 +64,97 @@ final class RepositoryController
     public function detail(): void
     {
         $this->ensureSession();
-        $session=new AuthSessionService();
-        $isAdministrator=$session->hasAdminAccess();
+        $session = new AuthSessionService();
+        $hasRealAdminAccess = $session->hasAdminAccess();
+        $isAdministratorView = $session->isAdminModeActive() && $hasRealAdminAccess;
         $projectId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
         $access = new ProjectAccessService();
         $project = ($projectId !== false && $projectId !== null && $access->can('project.view'))
-            ? (new ProjectRecordModel())->find((int)$projectId, $access->currentUserId(), $isAdministrator, true) : null;
+            ? (new ProjectRecordModel())->find((int)$projectId, $access->currentUserId(), $isAdministratorView, true) : null;
         if ($project === null) http_response_code(404);
-        $projectCapabilities=$project!==null?(new ProjectCapabilityService())->forCurrentUser($project,'repository'):(new ProjectCapabilityService())->none();
-        if($project!==null){$academicPage=(new ProjectRecordModel())->academicHistoryPage((int)$project['id']);$project['academic_history']=$academicPage['events'];$project['academic_history_total']=$academicPage['total'];}
-        $requestedTab=strtolower(trim((string)($_GET['tab']??'information')));
-        $activeTab=in_array($requestedTab,['information','files','evolution'],true)?$requestedTab:'information';
-        $returnUrl=$this->repositoryReturnUrl((string)($_GET['return']??''));
-        $projectDocuments=null;
-        if($project!==null&&!empty($projectCapabilities['manage_files'])){
-            $documentModel=new ProjectDocumentModel();
-            $projectDocuments=['context'=>'repository','restorable'=>$documentModel->restorable((int)$project['id']),'versions'=>$documentModel->versions((int)$project['id']),'limits'=>(new ProjectDocumentFileService())->limits(),'endpoint'=>route('admin-project-file'),'csrf'=>$session->csrfToken('admin_repository')];
+        $projectCapabilities = $project !== null
+            ? (new ProjectCapabilityService())->resolve($project, 'repository', (int) ($session->userId() ?? 0), $access->currentRoles(), $isAdministratorView)
+            : (new ProjectCapabilityService())->none();
+        if ($project !== null) {
+            $academicPage = (new ProjectRecordModel())->academicHistoryPage((int)$project['id']);
+            $project['academic_history'] = $academicPage['events'];
+            $project['academic_history_total'] = $academicPage['total'];
         }
+        $requestedTab = strtolower(trim((string)($_GET['tab'] ?? 'information')));
+        $activeTab = in_array($requestedTab, ['information', 'files', 'evolution'], true) ? $requestedTab : 'information';
+        $returnUrl = $this->repositoryReturnUrl((string)($_GET['return'] ?? ''));
+        $projectDocuments = null;
+        if ($project !== null && !empty($projectCapabilities['manage_files'])) {
+            $documentModel = new ProjectDocumentModel();
+            $projectDocuments = [
+                'context' => 'repository',
+                'restorable' => $documentModel->restorable((int)$project['id']),
+                'versions' => $documentModel->versions((int)$project['id']),
+                'limits' => (new ProjectDocumentFileService())->limits(),
+                'endpoint' => route('admin-project-file'),
+                'csrf' => $session->csrfToken('admin_repository')
+            ];
+        }
+        $adjustmentData = ['items' => [], 'summary' => ['has_pending_adjustments' => false, 'pending_count' => 0, 'latest' => null]];
+        if ($project !== null && !empty($projectCapabilities['view_adjustment_requests'])) {
+            try {
+                $adjustmentData = (new ProjectAdjustmentRequestService())->listForProject(
+                    (int) $project['id'],
+                    (string) $project['status'],
+                    (int) ($session->userId() ?? 0),
+                    'repository'
+                );
+            } catch (Throwable $e) {
+                error_log('Repository detail adjustment list: ' . $e->getMessage());
+            }
+        }
+        $adjustmentEndpoints = [
+            'create' => route('project-adjustment-request-create'),
+            'respond' => route('project-adjustment-request-respond'),
+            'address' => route('project-adjustment-request-status'),
+            'close' => route('project-adjustment-request-status'),
+        ];
         View::render('projects/detail', [
             'currentPage' => 'repository',
             'title' => $project === null ? 'Proyecto no encontrado | Repositorio' : $project['title'] . ' | Repositorio',
-            'pageStyles'=>$isAdministrator?[asset('css/admin-projects.css')]:[],
-            'pageScript' => $isAdministrator?asset('js/admin-projects.js'):asset('js/repository-detail.js'),
-            'pageScripts'=>$isAdministrator?[asset('js/material-admin-actions.js'),asset('js/repository-detail.js')]:[],
+            'pageStyles' => array_values(array_filter([
+                $isAdministratorView ? asset('css/admin-projects.css') : null,
+                !empty($projectCapabilities['view_adjustment_requests']) ? asset('css/project-adjustments.css') : null,
+            ])),
+            'pageScript' => $isAdministratorView ? asset('js/admin-projects.js') : asset('js/repository-detail.js'),
+            'pageScripts' => array_values(array_filter([
+                $isAdministratorView ? asset('js/material-admin-actions.js') : null,
+                asset('js/repository-detail.js'),
+                !empty($projectCapabilities['view_adjustment_requests']) ? asset('js/project-adjustments.js') : null,
+            ])),
             'project' => $project,
-            'activeTab'=>$activeTab,'isAdministrator'=>$isAdministrator,'publicContext'=>true,'canReview'=>false,'canDeliver'=>false,
-            'projectContext'=>'repository',
-            'projectCapabilities'=>$projectCapabilities,
-            'projectEditUrl'=>'','detailUrl'=>route('repository-detail').'&id='.(int)($project['id']??0),
-            'returnUrl'=>$returnUrl,'previewActionUrl'=>route('project-file-preview').'&scope=repository',
-            'downloadActionUrl'=>route('project-file-download').'&scope=repository',
-            'projectAdminEndpoint'=>!empty($projectCapabilities['manage_publication'])?route('admin-repository-publish'):'',
-            'projectHistoryEndpoint'=>!empty($projectCapabilities['view_admin_history'])?route('admin-project-history').'&id='.(int)($project['id']??0).'&context=repository':'',
-            'projectTrashEndpoint'=>!empty($projectCapabilities['edit_information'])?route('admin-project-trash'):'',
-            'projectSaveEndpoint'=>!empty($projectCapabilities['edit_information'])?route('admin-project-save'):'',
-            'projectAdminCsrf'=>!empty($projectCapabilities['manage_publication'])?$session->csrfToken('admin_repository'):'',
-            'projectTrashCsrf'=>!empty($projectCapabilities['edit_information'])?$session->csrfToken('admin_projects'):'',
-            'projectEditorCatalogs'=>!empty($projectCapabilities['edit_information'])?(new AdminProjectModel())->catalogs():[],
-            'projectDocuments'=>$projectDocuments,
-            'academicHistoryEndpoint'=>!empty($projectCapabilities['view_academic_history'])?route('project-academic-history-events').'&project_id='.(int)($project['id']??0).'&context=repository':'',
+            'activeTab' => $activeTab,
+            'isAdministrator' => $isAdministratorView,
+            'publicContext' => true,
+            'canReview' => false,
+            'canDeliver' => false,
+            'projectContext' => 'repository',
+            'projectCapabilities' => $projectCapabilities,
+            'adjustmentData' => $adjustmentData,
+            'adjustmentCsrf' => $session->csrfToken('project_adjustment'),
+            'adjustmentEndpoints' => $adjustmentEndpoints,
+            'adjustmentEndpoint' => route('project-adjustment-request-create'),
+            'adjustmentRespondEndpoint' => route('project-adjustment-request-respond'),
+            'adjustmentStatusEndpoint' => route('project-adjustment-request-status'),
+            'projectEditUrl' => '',
+            'detailUrl' => route('repository-detail') . '&id=' . (int)($project['id'] ?? 0),
+            'returnUrl' => $returnUrl,
+            'previewActionUrl' => route('project-file-preview') . '&scope=repository',
+            'downloadActionUrl' => route('project-file-download') . '&scope=repository',
+            'projectAdminEndpoint' => !empty($projectCapabilities['manage_publication']) ? route('admin-repository-publish') : '',
+            'projectHistoryEndpoint' => !empty($projectCapabilities['view_admin_history']) ? route('admin-project-history') . '&id=' . (int)($project['id'] ?? 0) . '&context=repository' : '',
+            'projectTrashEndpoint' => !empty($projectCapabilities['edit_information']) ? route('admin-project-trash') : '',
+            'projectSaveEndpoint' => !empty($projectCapabilities['edit_information']) ? route('admin-project-save') : '',
+            'projectAdminCsrf' => !empty($projectCapabilities['manage_publication']) ? $session->csrfToken('admin_repository') : '',
+            'projectTrashCsrf' => !empty($projectCapabilities['edit_information']) ? $session->csrfToken('admin_projects') : '',
+            'projectEditorCatalogs' => !empty($projectCapabilities['edit_information']) ? (new AdminProjectModel())->catalogs() : [],
+            'projectDocuments' => $projectDocuments,
+            'academicHistoryEndpoint' => !empty($projectCapabilities['view_academic_history']) ? route('project-academic-history-events') . '&project_id=' . (int)($project['id'] ?? 0) . '&context=repository' : '',
         ]);
     }
 

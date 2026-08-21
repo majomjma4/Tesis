@@ -13,11 +13,11 @@ final class TeacherAssignedProjectService
     private const TERMINAL_STATUSES = ['tribunal_approved','published'];
 
     /** @return array{projects:list<array<string,mixed>>,types:list<array{value:string,label:string}>,periods:list<array{value:string,label:string}>,relations:list<array{value:string,label:string}>} */
-    public function forTeacher(int $teacherId): array
+    public function forTeacher(int $teacherId, ?int $periodId = null): array
     {
         if ($teacherId < 1) return ['projects'=>[], 'types'=>[], 'periods'=>[], 'relations'=>[]];
         $db = Database::connection();
-        $projects = $this->projects($db, $teacherId);
+        $projects = $this->projects($db, $teacherId, $periodId);
         if ($projects === []) return ['projects'=>[], 'types'=>[], 'periods'=>[], 'relations'=>[]];
         $ids = array_map(static fn(array $row): int => (int)$row['id'], $projects);
         $relations = $this->relations($db, $teacherId, $ids);
@@ -29,15 +29,16 @@ final class TeacherAssignedProjectService
             $codes = $relations[$id] ?? [];
             if ((int)$project['tutor_id'] === $teacherId) $codes[] = 'tutor';
             $codes = $this->orderedUnique($codes);
-            $names = $authors[$id] ?? [];
+            $studentRows = $authors[$id] ?? [];
+            $names = array_map(static fn(array $row): string => (string)$row['name'], $studentRows);
             $status = (string)$project['status'];
             $labels = project_academic_labels($status);
             $teacherSituation = $this->teacherSituation($status, $reviewSituations[$id] ?? ProjectReviewSituationService::emptySituation());
             $items[] = [
                 'id'=>$id, 'code'=>(string)$project['code'], 'title'=>(string)$project['title'],
-                'type'=>(string)$project['type_name'], 'type_code'=>(string)$project['type_code'],
+                'type'=>(string)$project['type_name'], 'type_code'=>(string)$project['type_code'], 'updated_at'=>(string)$project['updated_at'],
                 'period'=>(string)$project['period_name'], 'period_id'=>(string)$project['period_id'],
-                'students'=>$this->compactNames($names), 'students_search'=>implode(' ', $names),
+                'students'=>$this->compactNames($names), 'student_rows'=>$studentRows, 'students_search'=>implode(' ', $names),
                 'relationships'=>array_map(static fn(string $code): array => ['code'=>$code, 'label'=>self::RELATION_LABELS[$code]], $codes),
                 'status'=>(string)$labels['status'], 'status_key'=>$status,
                 'teacher_situation'=>$teacherSituation['label'],
@@ -53,10 +54,12 @@ final class TeacherAssignedProjectService
     }
 
     /** @return list<array<string,mixed>> */
-    private function projects(PDO $db, int $teacherId): array
+    private function projects(PDO $db, int $teacherId, ?int $periodId): array
     {
-        $query = $db->prepare("SELECT p.id,p.code,p.title,p.status,p.tutor_id,p.updated_at,pt.code type_code,pt.name type_name,ap.id period_id,ap.name period_name FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id INNER JOIN academic_periods ap ON ap.id=p.academic_period_id WHERE p.deleted_at IS NULL AND (p.tutor_id=:teacher_tutor OR EXISTS (SELECT 1 FROM project_participants pp WHERE pp.project_id=p.id AND pp.user_id=:teacher_participant AND pp.status='active' AND pp.removed_at IS NULL AND LOWER(pp.role_code) IN ('tutor','cotutor','co_tutor','co-tutor','tribunal','jury'))) ORDER BY p.updated_at DESC,p.id DESC");
-        $query->execute(['teacher_tutor'=>$teacherId, 'teacher_participant'=>$teacherId]);
+        $period = $periodId !== null ? ' AND p.academic_period_id=:period_id' : '';
+        $query = $db->prepare("SELECT p.id,p.code,p.title,p.status,p.tutor_id,p.updated_at,pt.code type_code,pt.name type_name,ap.id period_id,ap.name period_name FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id INNER JOIN academic_periods ap ON ap.id=p.academic_period_id WHERE p.deleted_at IS NULL{$period} AND (p.tutor_id=:teacher_tutor OR EXISTS (SELECT 1 FROM project_participants pp WHERE pp.project_id=p.id AND pp.user_id=:teacher_participant AND pp.status='active' AND pp.removed_at IS NULL AND LOWER(pp.role_code) IN ('tutor','cotutor','co_tutor','co-tutor','tribunal','jury'))) ORDER BY p.updated_at DESC,p.id DESC");
+        $params=['teacher_tutor'=>$teacherId, 'teacher_participant'=>$teacherId]; if ($periodId !== null) $params['period_id']=$periodId;
+        $query->execute($params);
         return $query->fetchAll();
     }
 
@@ -74,9 +77,9 @@ final class TeacherAssignedProjectService
     private function authors(PDO $db, array $ids): array
     {
         $params=[]; $placeholders=$this->placeholders($ids, 'author', $params);
-        $query=$db->prepare("SELECT pp.project_id,u.full_name FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id WHERE pp.project_id IN ({$placeholders}) AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL ORDER BY pp.project_id,pp.is_leader DESC,u.full_name");
+        $query=$db->prepare("SELECT pp.project_id,pp.user_id,u.full_name FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id WHERE pp.project_id IN ({$placeholders}) AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL AND u.deleted_at IS NULL AND u.purged_at IS NULL ORDER BY pp.project_id,pp.is_leader DESC,u.full_name");
         $query->execute($params); $result=[];
-        foreach ($query->fetchAll() as $row) $result[(int)$row['project_id']][]=(string)$row['full_name'];
+        foreach ($query->fetchAll() as $row) $result[(int)$row['project_id']][]=['id'=>(int)$row['user_id'],'name'=>(string)$row['full_name']];
         return $result;
     }
 

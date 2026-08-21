@@ -21,13 +21,13 @@ final class ProjectDraftRegistrationService
 
             $type=$catalogs['types'][$draft['type']]??null;if($type===null)throw new ProjectDraftRegistrationException('El tipo de proyecto ya no está disponible.',['type'=>'Selecciona nuevamente el tipo de proyecto.']);
             $student=$catalogs['student'];$code=(new ProjectCodeService())->next($db,(int)$type['id'],(string)$draft['type'],(int)date('Y'));
-            $projectId=$this->insertProject($db,$code,$draft,$type,$student,(int)$catalogs['active_period']['id']);
+            $projectId=$this->insertProject($db,$code,$draft,$type,$student,(int)$catalogs['active_period']['id'],'development');
             $this->insertParticipants($db,$projectId,$draft,$userId);
             $this->syncKeywords($db,$projectId,$draft,$catalogs);
             $this->promoteFiles($db,$projectId,$files,$draftStorage,$fileStorage,$userId,$draftId,$moved);
             (new ProjectAuditService($db))->record($projectId,$userId,'project_created','project',$projectId,null,[
                 'code'=>$code,'type'=>(string)$type['label'],'tutor_id'=>(int)$draft['tutor_id'],'participants'=>count($draft['members']),'files'=>count($files),
-                'academic_period_id'=>(int)$catalogs['active_period']['id'],'status'=>'under_review','current_stage'=>'registration',
+                'academic_period_id'=>(int)$catalogs['active_period']['id'],'status'=>'development','current_stage'=>'registration',
             ]);
             $db->prepare('DELETE FROM project_draft_files WHERE draft_id=:draft AND user_id=:user')->execute(['draft'=>$draftId,'user'=>$userId]);
             $delete=$db->prepare('DELETE FROM project_drafts WHERE id=:draft AND user_id=:user');$delete->execute(['draft'=>$draftId,'user'=>$userId]);
@@ -36,8 +36,6 @@ final class ProjectDraftRegistrationService
         } catch(Throwable $exception) {
             if($db->inTransaction())$db->rollBack();$this->restoreMovedFiles($moved);throw $exception;
         }
-        try {(new ProjectAcademicNotificationService())->notifyProjectRegisteredForReview($db,$projectId,(int)$draft['tutor_id'],$code,(string)$draft['title']);}
-        catch(Throwable $exception){error_log('Project registration notification: '.$exception->getMessage());}
         try {$draftStorage->cleanupConsumedDirectory($userId,$draftId);}catch(Throwable $exception){error_log('Project registration temporary cleanup: '.$exception->getMessage());}
         return ['project_id'=>$projectId,'project_code'=>$code,'redirect_url'=>route('project-detail').'&id='.$projectId];
     }
@@ -71,12 +69,12 @@ final class ProjectDraftRegistrationService
         if($total>(int)$fileStorage->limits()['max_total_bytes'])throw new ProjectDraftRegistrationException('Los archivos temporales superan el límite permitido.',['files'=>'Reduce los archivos cargados.']);
     }
 
-    private function insertProject(PDO $db,string $code,array $draft,array $type,array $student,int $periodId):int
+    private function insertProject(PDO $db,string $code,array $draft,array $type,array $student,int $periodId,string $status='under_review'):int
     {
         $research=in_array($draft['type'],['thesis','thesis_profile'],true)?(int)$draft['research_line']:null;
         $modality=$draft['type']==='practice'?'individual':($draft['type']==='thesis'?(string)$draft['modality']:null);
-        $q=$db->prepare("INSERT INTO projects(code,project_type_id,career_id,academic_period_id,title,subtitle,summary,modality,research_line_id,academic_subject_id,proposed_tutor_id,tutor_id,status,current_stage,is_available,created_by) VALUES(:code,:type,:career,:period,:title,NULL,:summary,:modality,:research,NULL,NULL,:tutor,'under_review','registration',1,:creator)");
-        $q->execute(['code'=>$code,'type'=>(int)$type['id'],'career'=>(int)$student['career_id'],'period'=>$periodId,'title'=>$draft['title'],'summary'=>$draft['description'],'modality'=>$modality,'research'=>$research,'tutor'=>(int)$draft['tutor_id'],'creator'=>(int)$student['user_id']]);
+        $q=$db->prepare("INSERT INTO projects(code,project_type_id,career_id,academic_period_id,title,subtitle,summary,modality,research_line_id,academic_subject_id,proposed_tutor_id,tutor_id,status,current_stage,is_available,created_by) VALUES(:code,:type,:career,:period,:title,NULL,:summary,:modality,:research,NULL,NULL,:tutor,:status,'registration',1,:creator)");
+        $q->execute(['code'=>$code,'type'=>(int)$type['id'],'career'=>(int)$student['career_id'],'period'=>$periodId,'title'=>$draft['title'],'summary'=>$draft['description'],'modality'=>$modality,'research'=>$research,'tutor'=>(int)$draft['tutor_id'],'status'=>$status,'creator'=>(int)$student['user_id']]);
         return (int)$db->lastInsertId();
     }
 

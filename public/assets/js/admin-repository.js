@@ -289,7 +289,7 @@
     let presentationMaterial = null;
     const previewExtensions = new Set(["pdf", "docx", "txt", "png", "jpg", "jpeg", "webp"]);
     const presentationIcon = (extension) => {
-        if (extension === "pdf") return "fa-file-pdf";
+        if (extension === "pdf") return "fa-file-lines";
         if (["doc", "docx"].includes(extension)) return "fa-file-word";
         if (["png", "jpg", "jpeg", "webp"].includes(extension)) return "fa-file-image";
         if (extension === "txt") return "fa-file-lines";

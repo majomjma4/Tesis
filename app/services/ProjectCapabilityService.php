@@ -11,6 +11,7 @@ final class ProjectCapabilityService
         'manage_tribunal', 'manage_publication', 'register_delivery', 'review_delivery',
         'create_observation', 'respond_observation', 'request_corrections', 'download_files',
         'review_documents', 'publish_project',
+        'manage_workspace_files', 'send_for_review',
         'create_adjustment_request', 'view_adjustment_requests', 'respond_adjustment_request',
         'address_adjustment_request', 'close_adjustment_request',
     ];
@@ -80,7 +81,14 @@ final class ProjectCapabilityService
             if (!$capabilities['view_project']) return $capabilities;
             $capabilities['view_academic_history'] = true;
             $capabilities['download_files'] = true;
-            if ($administrator) foreach (['edit_information','manage_files','view_admin_history','manage_publication'] as $key) $capabilities[$key] = true;
+            $isTeacher = in_array('teacher', $roles, true);
+            if ($isTeacher) {
+                $capabilities['create_adjustment_request'] = true;
+            }
+            if ($isTeacher || $administrator) {
+                $capabilities['view_adjustment_requests'] = true;
+            }
+            if ($administrator) foreach (['edit_information','manage_files','view_admin_history','manage_publication','close_adjustment_request','address_adjustment_request'] as $key) $capabilities[$key] = true;
             return $capabilities;
         }
 
@@ -110,6 +118,7 @@ final class ProjectCapabilityService
             (int) ($participant['user_id'] ?? 0) === $userId && strtolower((string) ($participant['role_code'] ?? '')) === 'student'
         )) > 0;
         if ($isOwnerStudent) {
+            $capabilities['edit_information'] = (string) ($project['status'] ?? '') === 'development';
             $capabilities['view_adjustment_requests'] = true;
             $capabilities['respond_adjustment_request'] = true;
             $capabilities['address_adjustment_request'] = true;
@@ -117,10 +126,12 @@ final class ProjectCapabilityService
             $status = (string) ($project['status'] ?? '');
             $capabilities['publish_project'] = ($type === 'thesis' && $status === 'tribunal_approved')
                 || ($type !== 'thesis' && $status === 'approved');
+            $capabilities['manage_workspace_files'] = $status === 'development';
+            $capabilities['send_for_review'] = $status === 'development';
         }
 
-        // Los permisos académicos globales existen, pero esta pantalla aún no tiene endpoints operativos.
-        $capabilities['register_delivery'] = false;
+        // La entrega estudiantil se habilita únicamente mientras el expediente sigue en desarrollo.
+        $capabilities['register_delivery'] = !empty($capabilities['send_for_review']);
         $capabilities['review_delivery'] = false;
         $capabilities['create_observation'] = false;
         $capabilities['respond_observation'] = false;
@@ -192,7 +203,8 @@ final class ProjectCapabilityService
         );
         $assignment->execute(['project'=>(int)$project['id'], 'user'=>$userId]);
         $projectRoles = array_map('strval', $assignment->fetchAll(PDO::FETCH_COLUMN));
-        $teacher = in_array('teacher', $roles, true);
+        $isTutor = ((int)($project['tutor_id'] ?? 0) === $userId) || count(array_intersect(['tutor', 'co_tutor', 'cotutor', 'co-tutor'], $projectRoles)) > 0;
+        $teacher = in_array('teacher', $roles, true) && $isTutor;
         $student = in_array('student', $roles, true) && in_array('student', $projectRoles, true);
         if ($teacher || $student) $result['view_adjustment_requests'] = true;
         if ($teacher) $result['create_adjustment_request'] = true;

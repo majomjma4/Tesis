@@ -1,15 +1,19 @@
 <?php if ($material === null): ?>
     <section class="repository-detail-not-found"><i class="fa-solid fa-folder-open"></i><h1>Contenido no encontrado</h1><p>El contenido solicitado no existe o ya no se encuentra disponible.</p><a class="open-btn" href="<?= e($repositoryUrl) ?>">Volver al repositorio</a></section>
 <?php else:
-    $administratorView = !empty($isAdministrator);
-    $canManageMaterial = !empty($canManageSupportMaterial);
+    $administratorView = !empty($isAdministrator) || !empty($administratorView);
+    $canEditInfo = !empty($canEditInformation) || $administratorView;
+    $canFiles = !empty($canManageFiles) || $administratorView;
+    $canStatus = !empty($canChangeStatus) || $administratorView;
+    $canDel = !empty($canDelete) || $administratorView;
+    $canManageMaterial = $canEditInfo || $canFiles || $canStatus || $canDel || !empty($canManageSupportMaterial);
     $allowedTabs = $administratorView ? ['information', 'files', 'evolution'] : ['information', 'files'];
     $requestedTab = strtolower(trim((string) ($_GET['tab'] ?? 'information')));
     $activeTab = in_array($requestedTab, $allowedTabs, true) ? $requestedTab : 'information';
     $materialId = (int) ($material['id'] ?? 0);
     $detailUrl = route('support-material-detail') . '&id=' . $materialId;
     $requestedMode = strtolower(trim((string) ($_GET['mode'] ?? 'view')));
-    $mode = $requestedMode === 'edit' && $canManageMaterial ? 'edit' : 'view';
+    $mode = $requestedMode === 'edit' && $canEditInfo ? 'edit' : 'view';
     $modeQuery = $mode === 'edit' ? '&mode=edit' : '&mode=view';
     $viewUrl = $detailUrl . '&mode=view&tab=information';
     $updatedAtValue = trim((string) ($material['information_updated_at'] ?? ''));
@@ -57,6 +61,16 @@
     $legacyKeywords = array_values(array_filter(
         $selectedKeywords,
         static fn (string $keyword): bool => !in_array($keyword, $keywordCatalog, true)
+    ));
+    $classificationLabels = array_values(array_filter(
+        array_map('strval', (array) ($material['keywords'] ?? [])),
+        static fn (string $label): bool => trim($label) !== ''
+    ));
+    $relatedResources = array_values(array_filter(
+        (array) ($material['related_resources'] ?? $material['resources'] ?? []),
+        static fn (mixed $resource): bool => is_array($resource)
+            ? trim((string) ($resource['title'] ?? $resource['label'] ?? $resource['name'] ?? $resource['url'] ?? '')) !== ''
+            : trim((string) $resource) !== ''
     ));
 
     $materialFiles = array_values(array_filter(
@@ -118,15 +132,24 @@
 
     $publicationState = (string) ($material['status_key'] ?? 'published');
     $isPublished = $publicationState === 'published';
-    $downloadUrl = $packageDownloadUrl !== '' ? $packageDownloadUrl : null;
-    $classificationLabels = array_values(array_filter(
-        array_map('strval', (array) ($material['keywords'] ?? [])),
-        static fn (string $label): bool => trim($label) !== ''
+    $materialFiles = array_values(array_filter(
+        (array) ($material['files'] ?? []),
+        static fn (array $file): bool => ($file['state'] ?? '') === 'available'
     ));
-    $relatedResources = array_values(array_filter(
-        (array) ($material['related_resources'] ?? []),
+    $presentationFile = array_values(array_filter(
+        $materialFiles,
+        static fn (array $file): bool => !empty($file['presentation'])
+    ))[0] ?? ($materialFiles[0] ?? null);
+    $downloadUrl = $presentationFile !== null
+        ? route('support-material-download') . '&material_id=' . $materialId . '&file_id=' . (int) $presentationFile['id']
+        : (!empty($material['package_descriptor']['available'])
+            ? route('support-material-package-download') . '&id=' . $materialId
+            : null);
+    $packageAvailable = !empty($material['package_descriptor']['available']);
+    $resourceCount = count(array_filter(
+        (array) ($material['resources'] ?? []),
         static fn (mixed $resource): bool => is_array($resource)
-            ? trim((string) ($resource['title'] ?? $resource['label'] ?? $resource['name'] ?? '')) !== ''
+            ? !empty($resource['url'])
             : trim((string) $resource) !== ''
     ));
     $registeredFileCount = count($materialFiles);
@@ -155,15 +178,15 @@
             ['key' => 'availability', 'label' => 'Disponibilidad', 'value' => $isPublished ? ($materialAvailable ? 'Disponible' : 'No disponible') : 'No aplica', 'tone' => 'secondary'],
         ], static fn (array $item): bool => $item['value'] !== '')),
         'actions' => $mode === 'edit' ? [] : array_values(array_filter([
-            $canManageMaterial ? ['id' => 'edit', 'label' => 'Editar', 'kind' => 'primary', 'icon' => 'fa-pen-to-square', 'url' => $materialEditUrl ?: null, 'enabled' => $materialEditUrl !== '', 'modal' => true] : null,
+            $canEditInfo ? ['id' => 'edit', 'label' => 'Editar', 'kind' => 'primary', 'icon' => 'fa-pen-to-square', 'url' => $materialEditUrl ?: null, 'enabled' => $materialEditUrl !== '', 'modal' => true] : null,
             $downloadUrl !== null ? ['id' => 'download', 'label' => 'Descargar', 'kind' => 'secondary', 'icon' => 'fa-download', 'icon_style' => 'fa-solid', 'url' => $downloadUrl, 'enabled' => true, 'download' => true] : null,
         ])),
-        'menu_actions' => $mode === 'view' && $administratorView ? [
-            ['label' => $materialAvailable ? 'Marcar como no disponible' : 'Marcar como disponible', 'icon' => $materialAvailable ? 'fa-ban' : 'fa-circle-check', 'enabled' => true, 'hidden' => !$isPublished, 'danger' => false, 'action' => 'availability'],
-            ['label' => $isPublished ? 'Retirar publicación' : 'Publicar material', 'icon' => $isPublished ? 'fa-box-archive' : 'fa-box-open', 'enabled' => true, 'danger' => false, 'action' => 'publication'],
-            ['label' => 'Ver historial administrativo', 'icon' => 'fa-clock-rotate-left', 'enabled' => true, 'danger' => false, 'action' => 'admin-history', 'separator' => true, 'unread' => !empty($hasUnreadAdministrativeActivity)],
-            ['label' => 'Enviar a Papelera', 'icon' => 'fa-trash-can', 'enabled' => true, 'danger' => true, 'action' => 'trash'],
-        ] : [],
+        'menu_actions' => $mode === 'view' && ($administratorView || $canStatus || $canDel) ? array_values(array_filter([
+            ($administratorView || $canStatus) ? ['label' => $materialAvailable ? 'Marcar como no disponible' : 'Marcar como disponible', 'icon' => $materialAvailable ? 'fa-ban' : 'fa-circle-check', 'enabled' => true, 'hidden' => !$isPublished, 'danger' => false, 'action' => 'availability'] : null,
+            ($administratorView || $canStatus) ? ['label' => $isPublished ? 'Retirar publicación' : 'Publicar material', 'icon' => $isPublished ? 'fa-box-archive' : 'fa-box-open', 'enabled' => true, 'danger' => false, 'action' => 'publication'] : null,
+            $administratorView ? ['label' => 'Ver historial administrativo', 'icon' => 'fa-clock-rotate-left', 'enabled' => true, 'danger' => false, 'action' => 'admin-history', 'separator' => true, 'unread' => !empty($hasUnreadAdministrativeActivity)] : null,
+            ($administratorView || $canDel) ? ['label' => 'Enviar a Papelera', 'icon' => 'fa-trash-can', 'enabled' => true, 'danger' => true, 'action' => 'trash'] : null,
+        ])) : [],
         'tabs' => array_values(array_filter([
             ['id' => 'information', 'label' => 'Información', 'icon' => 'fa-file-lines', 'url' => $detailUrl . $modeQuery . '&tab=information'],
             ['id' => 'files', 'label' => 'Archivos', 'icon' => 'fa-folder-open', 'url' => $detailUrl . $modeQuery . '&tab=files'],

@@ -120,7 +120,8 @@
         if (config.availabilityMessage) return announce(config.availabilityMessage, true), false;
         const type = selectedType(); if (!type) return announce('Selecciona un tipo de proyecto disponible.', true), false;
         if (target !== 'type') {
-            if (form.elements.title.value.trim().length < 8) return announce('El título debe tener al menos 8 caracteres.', true), false;
+            if (form.elements.title.value.trim().length < 5) return announce('El título debe tener al menos 5 caracteres.', true), false;
+            if (form.elements.title.value.trim().length > 240) return announce('El título no puede superar 240 caracteres.', true), false;
             if (form.elements.description.value.trim().length < 30) return announce('La descripción debe tener al menos 30 caracteres.', true), false;
             if (type === 'thesis' && !form.elements.modality.value) return announce('Selecciona una modalidad.', true), false;
             if (['thesis', 'thesis_profile'].includes(type) && !form.elements.research_line.value) return announce('Selecciona una línea de investigación.', true), false;
