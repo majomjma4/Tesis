@@ -13,7 +13,7 @@
     color: var(--blue);
     font-weight: 800;
     text-transform: uppercase;
-    font-size:var(--font-sm)
+    font-size: var(--font-sm)
 }
 
 .ap-head h1 {
@@ -55,7 +55,7 @@
 }
 
 .ap-stats strong {
-    font-size:var(--font-2xl)
+    font-size: var(--font-2xl)
 }
 
 .ap-stats span {
@@ -126,7 +126,7 @@
 .ap-status-column small {
     display: block;
     margin-bottom: 4px;
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: .02em
@@ -145,7 +145,7 @@
 }
 
 .ap-main h2 {
-    font-size:var(--font-lg);
+    font-size: var(--font-lg);
     margin: 4px 0
 }
 
@@ -163,7 +163,7 @@
     border-radius: 99px;
     background: rgba(37, 99, 235, .1);
     color: var(--blue);
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     font-weight: 800
 }
 
@@ -185,7 +185,7 @@
     border-radius: 50%;
     background: rgba(194, 65, 12, .12);
     color: #c2410c;
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     cursor: pointer;
     flex-shrink: 0;
     transition: transform .15s ease, background-color .15s ease
@@ -292,7 +292,7 @@
     border: 0;
     background: transparent;
     color: var(--text);
-    font-size:var(--font-2xl)
+    font-size: var(--font-2xl)
 }
 
 .ap-modal label {
@@ -336,14 +336,36 @@
     }
 
     .ap-list>article {
-        grid-template-columns: 1fr minmax(180px, 220px) minmax(120px, 150px) auto;
-        gap: 16px
+        grid-template-columns: 1.5fr minmax(160px, 1.2fr) minmax(120px, 1fr);
+        gap: 16px;
+    }
+
+    .ap-list>article .ap-actions {
+        grid-column: 1 / -1;
+        justify-self: end;
+        margin-top: 4px;
     }
 }
 
 @media(max-width:850px) {
     .ap-list>article {
-        grid-template-columns: 1fr
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .ap-list>article .ap-actions {
+        grid-column: auto;
+        justify-self: stretch;
+        margin-top: 0;
+    }
+
+    .ap-list>article .ap-actions a,
+    .ap-list>article .ap-actions button {
+        width: 100% !important;
+        text-align: center !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
     .ap-stats {
@@ -389,7 +411,7 @@
     border-radius: 13px;
     background: color-mix(in srgb, var(--surface) 86%, var(--surface-soft));
     color: var(--muted);
-    font-size:var(--font-md)
+    font-size: var(--font-md)
 }
 
 .ap-connection-notice>i {
@@ -411,7 +433,7 @@
 .ap-connection-notice strong {
     margin-bottom: 2px;
     color: var(--text);
-    font-size:var(--font-md)
+    font-size: var(--font-md)
 }
 
 .ap-connection-notice a {
@@ -536,7 +558,7 @@
 .ap-filter-control>span:first-child {
     padding-left: 2px;
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 800;
     text-transform: uppercase
 }
@@ -548,7 +570,7 @@
     height: 44px;
     padding: 0 36px 0 12px;
     border-radius: 12px;
-    font-size:var(--font-md);
+    font-size: var(--font-md);
     cursor: pointer;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -601,7 +623,7 @@
     align-items: center;
     gap: 9px;
     color: var(--text);
-    font-size:var(--font-md)
+    font-size: var(--font-md)
 }
 
 .ap-fixed-filter>div i {
@@ -619,17 +641,27 @@
 .ap-results-count {
     margin: -6px 2px 13px;
     color: var(--muted);
-    font-size:var(--font-md);
+    font-size: var(--font-md);
     font-weight: 700
 }
 
-@media(max-width:900px) {
+@media(max-width:1100px) {
     .ap-filters {
-        grid-template-columns: repeat(2, minmax(0, 1fr))
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .ap-filter-search {
-        grid-column: 1/-1
+        grid-column: 1 / -1;
+    }
+}
+
+@media(max-width:850px) {
+    .ap-filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ap-filter-search {
+        grid-column: 1 / -1;
     }
 }
 
@@ -804,7 +836,7 @@ body.project-dialog-open {
     justify-content: space-between;
     gap: 12px;
     color: var(--muted);
-    font-size:var(--font-sm)
+    font-size: var(--font-sm)
 }
 
 .ap-public-description-dialog [data-confirm-public-description] {
@@ -856,14 +888,14 @@ body.project-dialog-open {
 .ap-fixed-field small {
     margin-bottom: 3px;
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 750
 }
 
 .ap-fixed-field strong {
     overflow: hidden;
     color: var(--text);
-    font-size:var(--font-md);
+    font-size: var(--font-md);
     font-weight: 800;
     text-overflow: ellipsis;
     white-space: nowrap
@@ -875,7 +907,7 @@ body.project-dialog-open {
 }
 
 .ap-quick-text {
-    font-size:var(--font-md);
+    font-size: var(--font-md);
     color: var(--muted)
 }
 
@@ -885,7 +917,7 @@ body.project-dialog-open {
     gap: 7px;
     margin: 8px 0 2px;
     color: var(--muted);
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     line-height: 1.45
 }
 
@@ -921,7 +953,7 @@ body.project-dialog-open {
     justify-content: space-between;
     gap: 12px;
     font: inherit;
-    font-size:var(--font-md);
+    font-size: var(--font-md);
     text-align: left;
     cursor: pointer;
     transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease
@@ -973,7 +1005,7 @@ body.project-dialog-open {
     justify-content: space-between;
     gap: 10px;
     font: inherit;
-    font-size:var(--font-md);
+    font-size: var(--font-md);
     text-align: left;
     cursor: pointer
 }
@@ -1014,12 +1046,12 @@ body.project-dialog-open {
 
 .ap-edit-warning strong {
     color: var(--text);
-    font-size:var(--font-md)
+    font-size: var(--font-md)
 }
 
 .ap-edit-warning p {
     margin: 3px 0 0;
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     line-height: 1.45
 }
 
@@ -1061,13 +1093,13 @@ body.project-dialog-open {
 }
 
 .ap-confirm h2 {
-    font-size:var(--font-xl)
+    font-size: var(--font-xl)
 }
 
 .ap-confirm p {
     margin: 8px 0 20px;
     color: var(--muted);
-    font-size:var(--font-md);
+    font-size: var(--font-md);
     line-height: 1.55
 }
 
@@ -1121,7 +1153,7 @@ body.project-dialog-open {
     justify-content: space-between;
     gap: 12px;
     color: var(--text);
-    font-size:var(--font-md);
+    font-size: var(--font-md);
     font-weight: 850;
     cursor: pointer;
     list-style: none
@@ -1163,7 +1195,7 @@ body.project-dialog-open {
     border-radius: 99px;
     background: rgba(245, 158, 11, .1);
     color: var(--muted);
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     line-height: 1.45
 }
 
@@ -1218,13 +1250,13 @@ body.project-dialog-open {
 }
 
 .ap-advanced-grid strong {
-    font-size:var(--font-md)
+    font-size: var(--font-md)
 }
 
 .ap-advanced-grid small {
     margin-top: 2px;
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     line-height: 1.35
 }
 
@@ -1290,7 +1322,7 @@ body.project-dialog-open {
 
 .ap-editor-header h2 {
     margin: 0;
-    font-size:var(--font-xl)
+    font-size: var(--font-xl)
 }
 
 .ap-editor-header button {
@@ -1301,7 +1333,7 @@ body.project-dialog-open {
     border: 1px solid var(--line);
     border-radius: 11px !important;
     background: var(--surface-soft) !important;
-    font-size:var(--font-lg) !important;
+    font-size: var(--font-lg) !important;
     cursor: pointer
 }
 
@@ -1334,7 +1366,7 @@ body.project-dialog-open {
     display: flex;
     align-items: center;
     gap: 12px;
-    font-size:var(--font-md)
+    font-size: var(--font-md)
 }
 
 .ap-section h3 i {
@@ -1391,13 +1423,13 @@ body.project-dialog-open {
 .ap-readonly small {
     margin-bottom: 4px;
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 750
 }
 
 .ap-readonly strong {
     overflow-wrap: anywhere;
-    font-size:var(--font-md)
+    font-size: var(--font-md)
 }
 
 .ap-readonly select,
@@ -1433,7 +1465,7 @@ body.project-dialog-open {
     border-radius: 99px;
     background: var(--surface);
     color: var(--muted);
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     overflow-wrap: anywhere
 }
 
@@ -1441,7 +1473,7 @@ body.project-dialog-open {
     display: block;
     margin-top: 9px;
     color: var(--muted);
-    font-size:var(--font-xs)
+    font-size: var(--font-xs)
 }
 
 .ap-editor .ap-advanced {
@@ -1461,7 +1493,7 @@ body.project-dialog-open {
     display: block;
     margin-top: 7px;
     color: var(--blue);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-style: normal;
     font-weight: 800
 }
@@ -1488,7 +1520,7 @@ body.project-dialog-open {
 
 .ap-editor-footer>span {
     color: var(--muted);
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     font-weight: 700
 }
 
@@ -1636,7 +1668,7 @@ body.project-dialog-open {
 
 .ap-institutional>.ap-readonly.is-discreet small {
     margin: 0;
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 650
 }
 
@@ -1645,7 +1677,7 @@ body.project-dialog-open {
 }
 
 .ap-institutional>.ap-readonly.is-discreet strong {
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     font-weight: 500
 }
 
@@ -1687,7 +1719,7 @@ body.project-dialog-open {
     align-items: center;
     gap: 8px;
     color: var(--muted);
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     line-height: 1.45
 }
 
@@ -1746,7 +1778,7 @@ body.project-dialog-open {
     color: var(--primary);
     display: grid;
     place-items: center;
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 850;
     overflow: hidden
 }
@@ -1764,13 +1796,13 @@ body.project-dialog-open {
 }
 
 .ap-readonly .ap-tribunal-identity strong {
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     line-height: 1.35
 }
 
 .ap-tribunal-identity span {
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     line-height: 1.35;
     overflow-wrap: anywhere
 }
@@ -1778,7 +1810,7 @@ body.project-dialog-open {
 .ap-readonly .ap-tribunal-identity small {
     margin: 0;
     color: var(--blue);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 800
 }
 
@@ -1802,14 +1834,14 @@ body.project-dialog-open {
 .ap-tribunal-contact small {
     margin: 0;
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     text-transform: uppercase
 }
 
 .ap-tribunal-contact a {
     min-width: 0;
     color: var(--blue);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 750;
     overflow-wrap: anywhere
 }
@@ -1855,12 +1887,12 @@ body.project-dialog-open {
 
 .ap-tutoring-heading small {
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 750
 }
 
 .ap-tutoring-heading strong {
-    font-size:var(--font-md)
+    font-size: var(--font-md)
 }
 
 .ap-tutoring-list {
@@ -1896,11 +1928,11 @@ body.project-dialog-open {
 
 .ap-tutor-identity small {
     color: var(--muted);
-    font-size:var(--font-xs)
+    font-size: var(--font-xs)
 }
 
 .ap-tutor-identity strong {
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     line-height: 1.35;
     overflow-wrap: anywhere
 }
@@ -1913,7 +1945,7 @@ body.project-dialog-open {
     border-radius: 999px;
     background: rgba(37, 99, 235, .1);
     color: var(--blue);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-style: normal;
     font-weight: 800
 }
@@ -1930,7 +1962,7 @@ body.project-dialog-open {
     grid-column: 1/-1;
     margin: 4px 0 0 43px;
     color: var(--blue);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 700;
     overflow-wrap: anywhere
 }
@@ -1955,7 +1987,7 @@ body.project-dialog-open {
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 750;
     cursor: pointer
 }
@@ -1987,7 +2019,7 @@ body.project-dialog-open {
 .ap-tutoring-editor p {
     margin: 0 0 8px;
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     line-height: 1.45
 }
 
@@ -2016,7 +2048,7 @@ body.project-dialog-open {
     border-radius: 8px;
     background: var(--surface-soft);
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     line-height: 1.45
 }
 
@@ -2049,12 +2081,12 @@ body.project-dialog-open {
 
 .ap-tutoring-heading small {
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 750
 }
 
 .ap-tutoring-heading strong {
-    font-size:var(--font-md)
+    font-size: var(--font-md)
 }
 
 .ap-tutoring-warning {
@@ -2080,7 +2112,7 @@ body.project-dialog-open {
 .ap-tutoring-warning p {
     min-width: 0;
     margin: 0;
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     line-height: 1.45;
     overflow-wrap: anywhere
 }
@@ -2089,7 +2121,7 @@ body.project-dialog-open {
     display: block;
     margin-top: 3px;
     color: var(--text);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 750
 }
 
@@ -2126,11 +2158,11 @@ body.project-dialog-open {
 
 .ap-tutor-identity small {
     color: var(--muted);
-    font-size:var(--font-xs)
+    font-size: var(--font-xs)
 }
 
 .ap-tutor-identity strong {
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     line-height: 1.35;
     overflow-wrap: anywhere
 }
@@ -2143,7 +2175,7 @@ body.project-dialog-open {
     border-radius: 999px;
     background: rgba(37, 99, 235, .1);
     color: var(--blue);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-style: normal;
     font-weight: 800
 }
@@ -2160,7 +2192,7 @@ body.project-dialog-open {
     grid-column: 1/-1;
     margin: 4px 0 0 43px;
     color: var(--blue);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 700;
     overflow-wrap: anywhere
 }
@@ -2185,7 +2217,7 @@ body.project-dialog-open {
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 750;
     cursor: pointer
 }
@@ -2217,7 +2249,7 @@ body.project-dialog-open {
 .ap-tutoring-editor p {
     margin: 0 0 8px;
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     line-height: 1.45
 }
 
@@ -2246,7 +2278,7 @@ body.project-dialog-open {
     border-radius: 8px;
     background: var(--surface-soft);
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     line-height: 1.45
 }
 
@@ -2460,13 +2492,13 @@ body.project-dialog-open {
 }
 
 .ap-tutor-picker-options strong {
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     overflow-wrap: anywhere
 }
 
 .ap-tutor-picker-options small {
     color: var(--muted);
-    font-size:var(--font-xs)
+    font-size: var(--font-xs)
 }
 
 .ap-tutor-picker-options [role=option]>i {
@@ -2554,7 +2586,7 @@ body.project-dialog-open {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    font-size:var(--font-sm);
+    font-size: var(--font-sm);
     font-weight: 750
 }
 
@@ -2623,7 +2655,7 @@ body.project-dialog-open {
     display: block;
     margin: 0 0 3px;
     color: var(--muted);
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 750
 }
 
@@ -2639,7 +2671,7 @@ body.project-dialog-open {
     height: 30px;
     padding-inline: 9px;
     border-radius: 8px;
-    font-size:var(--font-sm)
+    font-size: var(--font-sm)
 }
 
 .ap-card-field .custom-select {
@@ -2649,7 +2681,7 @@ body.project-dialog-open {
 .ap-readonly>span>strong {
     display: block;
     overflow-wrap: anywhere;
-    font-size:var(--font-md)
+    font-size: var(--font-md)
 }
 
 .ap-tribunal {
@@ -2679,7 +2711,7 @@ body.project-dialog-open {
     justify-content: space-between;
     gap: 10px;
     font: inherit;
-    font-size:var(--font-md);
+    font-size: var(--font-md);
     text-align: left;
     cursor: pointer
 }
@@ -2765,7 +2797,7 @@ body.project-dialog-open {
     display: flex !important;
     align-items: center;
     gap: 9px;
-    font-size:var(--font-sm) !important;
+    font-size: var(--font-sm) !important;
     font-weight: 650 !important;
     cursor: pointer
 }
@@ -2803,7 +2835,7 @@ body.project-dialog-open {
     border-radius: 8px;
     background: rgba(245, 158, 11, .11);
     color: #9a5b00;
-    font-size:var(--font-xs)
+    font-size: var(--font-xs)
 }
 
 .ap-keyword-chips {
@@ -2830,7 +2862,7 @@ body.project-dialog-open {
     align-items: center;
     gap: 7px;
     font: inherit;
-    font-size:var(--font-xs);
+    font-size: var(--font-xs);
     font-weight: 750;
     cursor: pointer
 }
@@ -2901,7 +2933,7 @@ body.project-dialog-open {
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size:var(--font-xs)
+    font-size: var(--font-xs)
 }
 
 .ap-tutoring [data-authors-editor] .ap-tutor-picker-search:focus-visible {
@@ -2930,7 +2962,7 @@ body.project-dialog-open {
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size:var(--font-xs)
+    font-size: var(--font-xs)
 }
 
 .ap-tutoring-editor .ap-tutor-picker-search:focus-visible {
