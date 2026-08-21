@@ -21,7 +21,7 @@ final class RepositoryModel
                 LEFT JOIN users t ON t.id=p.tutor_id LEFT JOIN project_participants pp ON pp.project_id=p.id AND pp.status='active' AND pp.removed_at IS NULL
                 LEFT JOIN users u ON u.id=pp.user_id AND u.deleted_at IS NULL AND u.purged_at IS NULL
                 WHERE p.status='published' AND p.is_available=1 AND p.withdrawn_at IS NULL AND p.deleted_at IS NULL
-                  AND EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.id AND pf.deleted_at IS NULL)
+                  AND EXISTS (SELECT 1 FROM project_files pf WHERE pf.project_id=p.id AND pf.deleted_at IS NULL AND pf.purged_at IS NULL)
                   AND EXISTS (SELECT 1 FROM project_participants sp INNER JOIN student_profiles profile ON profile.user_id=sp.user_id INNER JOIN users su ON su.id=sp.user_id WHERE sp.project_id=p.id AND sp.role_code='student' AND sp.status='active' AND sp.removed_at IS NULL AND su.deleted_at IS NULL AND su.purged_at IS NULL)
                 GROUP BY p.id,p.title,p.subtitle,p.summary,c.name,pt.name,pt.code,ap.name,ap.code,s.semester,t.full_name,p.published_at,p.updated_at
                 ORDER BY COALESCE(p.published_at,p.updated_at) DESC,p.id DESC");

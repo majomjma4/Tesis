@@ -10,7 +10,7 @@ final class TeacherAssignedProjectService
     /** @var list<string> */
     private const RELATION_ORDER = ['tutor','cotutor','tribunal'];
     /** @var list<string> */
-    private const TERMINAL_STATUSES = ['tribunal_approved','published'];
+    private const TERMINAL_STATUSES = ['completed','published','closed','withdrawn'];
 
     /** @return array{projects:list<array<string,mixed>>,types:list<array{value:string,label:string}>,periods:list<array{value:string,label:string}>,relations:list<array{value:string,label:string}>} */
     public function forTeacher(int $teacherId, ?int $periodId = null): array
@@ -22,7 +22,19 @@ final class TeacherAssignedProjectService
         $ids = array_map(static fn(array $row): int => (int)$row['id'], $projects);
         $relations = $this->relations($db, $teacherId, $ids);
         $authors = $this->authors($db, $ids);
-        $reviewSituations = (new ProjectReviewSituationService())->forProjects($ids, $db);
+        $situationRelations = [];
+        foreach ($projects as $project) {
+            $projectId = (int)$project['id'];
+            $codes = $relations[$projectId] ?? [];
+            if ((int)$project['tutor_id'] === $teacherId) $codes[] = 'tutor';
+            $situationRelations[$projectId] = array_values(array_unique($codes));
+        }
+        try {
+            $reviewSituations = (new ProjectReviewSituationService())->teacherSituations($projects, $situationRelations, $db);
+        } catch (Throwable $error) {
+            error_log('Teacher assigned project situation: ' . $error->getMessage());
+            $reviewSituations = [];
+        }
         $items = [];
         foreach ($projects as $project) {
             $id = (int)$project['id'];
@@ -33,7 +45,11 @@ final class TeacherAssignedProjectService
             $names = array_map(static fn(array $row): string => (string)$row['name'], $studentRows);
             $status = (string)$project['status'];
             $labels = project_academic_labels($status);
-            $teacherSituation = $this->teacherSituation($status, $reviewSituations[$id] ?? ProjectReviewSituationService::emptySituation());
+            $teacherSituation = $reviewSituations[$id] ?? [
+                'key'=>'waiting_process', 'label'=>'En seguimiento',
+                'description'=>'No fue posible determinar una acción docente; se requiere revisión del expediente.',
+                'requires_attention'=>false, 'actor'=>'unknown', 'review_units'=>0,
+            ];
             $items[] = [
                 'id'=>$id, 'code'=>(string)$project['code'], 'title'=>(string)$project['title'],
                 'type'=>(string)$project['type_name'], 'type_code'=>(string)$project['type_code'], 'updated_at'=>(string)$project['updated_at'],
@@ -43,6 +59,8 @@ final class TeacherAssignedProjectService
                 'status'=>(string)$labels['status'], 'status_key'=>$status,
                 'teacher_situation'=>$teacherSituation['label'],
                 'teacher_situation_requires_attention'=>$teacherSituation['requires_attention'],
+                'teacher_situation_data'=>$teacherSituation,
+                'review_units'=>(int)($teacherSituation['review_units'] ?? 0),
                 'tab'=>in_array($status, self::TERMINAL_STATUSES, true) ? 'completed' : 'course',
             ];
         }

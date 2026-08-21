@@ -18,8 +18,12 @@ final class DashboardModel
         $projects = $assigned['projects'];
         $projectIds = array_values(array_unique(array_map(static fn(array $item): int => (int) $item['id'], $projects)));
         $this->addTeacherProjectContext($db, $projects, $projectIds);
-        $deliveries = $this->teacherDeliveriesToReview($db, $projectIds);
-        $deliveries = $this->teacherReviewableDeliveries($projects, $deliveries);
+        // La fuente semántica central ya determinó las unidades pendientes.
+        $deliveries = [];
+        foreach ($projects as $project) {
+            $units = (int) (($project['teacher_situation_data']['review_units'] ?? 0));
+            if ($units > 0) $deliveries[(int) $project['id']] = $units;
+        }
         $this->sortTeacherProjectsForDashboard($projects, $deliveries);
         $latestDeliveries = $this->teacherLatestDeliveries($db, $projectIds);
         $adjustments = $this->teacherPendingAdjustments($db, $projectIds);
@@ -34,20 +38,9 @@ final class DashboardModel
         $projectItems = array_map(static function (array $project) use ($deliveries, $latestDeliveries, $adjustments): array {
             $id = (int) $project['id'];
             $situation = (array) ($project['teacher_situation_data'] ?? []);
-            if ($situation === []) {
-                $status = (string)($project['status_key'] ?? '');
-                $attention = (bool)($project['teacher_situation_requires_attention'] ?? false);
-                $waitingStudent = in_array($status, ['development', 'corrections_requested', 'changes_required'], true)
-                    && (int)($project['observations_pending'] ?? 0) > 0;
-                $situation = match (true) {
-                    $status === 'under_review' => ['key'=>'review_required','label'=>'Revisión pendiente','description'=>'El proyecto requiere revisión docente.','requires_attention'=>true,'actor'=>'teacher'],
-                    $status === 'defense' => ['key'=>'defense','label'=>'En tribunal / defensa','description'=>'El proyecto se encuentra en proceso de defensa.','requires_attention'=>false,'actor'=>'unknown'],
-                    in_array($status,['tribunal_approved','published'],true) => ['key'=>'completed','label'=>'Proceso finalizado','description'=>'El proceso académico ha finalizado.','requires_attention'=>false,'actor'=>'none'],
-                    $waitingStudent => ['key'=>'waiting_student','label'=>'Esperando correcciones del estudiante','description'=>'El estudiante debe responder a las observaciones.','requires_attention'=>false,'actor'=>'student'],
-                    $attention => ['key'=>'validation_required','label'=>'Validación pendiente','description'=>'Existe una nueva actuación que requiere validación docente.','requires_attention'=>true,'actor'=>'teacher'],
-                    default => ['key'=>'waiting_process','label'=>'En seguimiento','description'=>'El proyecto continúa en seguimiento.','requires_attention'=>false,'actor'=>'none'],
-                };
-            }
+            // El servicio central siempre entrega esta estructura; si no lo hace,
+            // se conserva el contrato neutro sin volver a inferir el workflow.
+            if ($situation === []) $situation = ['key'=>'waiting_process','label'=>'En seguimiento','description'=>'No fue posible determinar una acción docente; se requiere revisión del expediente.','requires_attention'=>false,'actor'=>'unknown','review_units'=>0];
             $roleItems = (array) ($project['relationships'] ?? []);
             return [
                 'id' => $id,
@@ -63,7 +56,7 @@ final class DashboardModel
                 'teacher_situation_label' => (string)($situation['label']??'En seguimiento'),
                 'teacher_situation_requires_attention' => (bool)($situation['requires_attention']??false),
                 'latest_delivery' => $latestDeliveries[$id] ?? null,
-                'reviews_pending' => (int) ($deliveries[$id] ?? 0),
+                'reviews_pending' => (int) ($situation['review_units'] ?? 0),
                 'validation_pending' => 0,
                 'adjustments_pending' => (int) ($adjustments[$id] ?? 0),
                 'route' => route('project-detail') . '&id=' . $id,
@@ -160,7 +153,7 @@ final class DashboardModel
         foreach ($projects as $project) foreach ((array) ($project['relationships'] ?? []) as $relation) {
             $code = strtolower((string) ($relation['code'] ?? ''));
             $tribunal = $tribunal || $code === 'tribunal'; $cotutor = $cotutor || $code === 'cotutor'; $tutor = $tutor || $code === 'tutor';
-            $reviewer = $reviewer || in_array($code, ['tribunal', 'cotutor'], true);
+            $reviewer = $reviewer || in_array($code, ['tutor', 'cotutor'], true);
         }
         return ['is_tutor'=>$tutor,'is_cotutor'=>$cotutor,'is_reviewer'=>$reviewer,'is_tribunal_member'=>$tribunal,'can_manage_thesis'=>(bool)$teacher['can_manage_thesis'],'manage_thesis_process'=>(bool)$teacher['can_manage_thesis']];
     }
@@ -178,16 +171,6 @@ final class DashboardModel
             $project['observations_pending'] = (int) ($row['observations_pending'] ?? 0);
         }
         unset($project);
-    }
-
-    private function teacherDeliveriesToReview(PDO $db, array $projectIds): array
-    {
-        if (!$projectIds) return [];
-        $marks = implode(',', array_fill(0, count($projectIds), '?'));
-        $query = $db->prepare("SELECT project_id,COUNT(*) total FROM project_deliveries WHERE project_id IN ($marks) AND status IN ('submitted','under_review') GROUP BY project_id");
-        $query->execute($projectIds); $result = [];
-        foreach ($query->fetchAll(PDO::FETCH_ASSOC) as $row) $result[(int) $row['project_id']] = (int) $row['total'];
-        return $result;
     }
 
     private function teacherPendingAdjustments(PDO $db, array $projectIds): array
@@ -234,11 +217,10 @@ final class DashboardModel
         $reviewCount = 0; $reviewProjects = 0; $waitingProjects = 0;
         foreach ($projects as $project) {
             $id = (int) ($project['id'] ?? 0);
-            $waiting = $this->teacherProjectWaitsForStudent($project);
-            if ($waiting) { $waitingProjects++; continue; }
-            if ($this->teacherProjectIsTerminal($project)) continue;
-            $pending = (int) ($deliveries[$id] ?? 0);
-            if ($pending > 0) { $reviewCount += $pending; $reviewProjects++; }
+            $key = (string) (($project['teacher_situation_data']['key'] ?? 'waiting_process'));
+            if ($key === 'waiting_student') { $waitingProjects++; continue; }
+            $pending = (int) ($project['teacher_situation_data']['review_units'] ?? $deliveries[$id] ?? 0);
+            if ($key === 'review_required' && $pending > 0) { $reviewCount += $pending; $reviewProjects++; }
         }
         return [
             'review_required' => ['count'=>$reviewCount,'projects_count'=>$reviewProjects,'route'=>route('assigned-projects')],
@@ -247,32 +229,13 @@ final class DashboardModel
         ];
     }
 
-    private function teacherReviewableDeliveries(array $projects, array $deliveries): array
-    {
-        $result = [];
-        foreach ($projects as $project) {
-            $id = (int) ($project['id'] ?? 0);
-            $canReview = false;
-            foreach ((array) ($project['relationships'] ?? []) as $relation) {
-                if (in_array(strtolower((string) ($relation['code'] ?? '')), ['tutor', 'cotutor'], true)) {
-                    $canReview = true;
-                    break;
-                }
-            }
-            if ($canReview && isset($deliveries[$id])) $result[$id] = (int) $deliveries[$id];
-        }
-        return $result;
-    }
-
     private function sortTeacherProjectsForDashboard(array &$projects, array $deliveries): void
     {
         usort($projects, function (array $left, array $right) use ($deliveries): int {
             $leftId = (int) ($left['id'] ?? 0);
             $rightId = (int) ($right['id'] ?? 0);
-            $leftWaiting = $this->teacherProjectWaitsForStudent($left);
-            $rightWaiting = $this->teacherProjectWaitsForStudent($right);
-            $leftAttention = !$leftWaiting && !$this->teacherProjectIsTerminal($left) && (int) ($deliveries[$leftId] ?? 0) > 0;
-            $rightAttention = !$rightWaiting && !$this->teacherProjectIsTerminal($right) && (int) ($deliveries[$rightId] ?? 0) > 0;
+            $leftAttention = (($left['teacher_situation_data']['key'] ?? '') === 'review_required') && (int)($left['teacher_situation_data']['review_units'] ?? $deliveries[$leftId] ?? 0) > 0;
+            $rightAttention = (($right['teacher_situation_data']['key'] ?? '') === 'review_required') && (int)($right['teacher_situation_data']['review_units'] ?? $deliveries[$rightId] ?? 0) > 0;
 
             if ($leftAttention !== $rightAttention) {
                 return $leftAttention ? -1 : 1;
@@ -286,17 +249,6 @@ final class DashboardModel
 
             return $rightId <=> $leftId;
         });
-    }
-
-    private function teacherProjectWaitsForStudent(array $project): bool
-    {
-        return in_array((string) ($project['status_key'] ?? ''), ['development', 'corrections_requested', 'changes_required'], true)
-            && (int) ($project['observations_pending'] ?? 0) > 0;
-    }
-
-    private function teacherProjectIsTerminal(array $project): bool
-    {
-        return in_array((string) ($project['status_key'] ?? ''), ['completed', 'tribunal_approved', 'published'], true);
     }
 
     private function teacherNotificationItem(array $notification): array
@@ -328,6 +280,9 @@ final class DashboardModel
         if ($parts === false || isset($parts['scheme']) || isset($parts['host']) || str_starts_with($url, '//')) return null;
         $path = '/' . ltrim((string) ($parts['path'] ?? ''), '/');
         if (!preg_match('#(?:^|/)index\\.php$#', $path)) return null;
+        parse_str((string) ($parts['query'] ?? ''), $query);
+        $page = strtolower(trim((string) ($query['page'] ?? '')));
+        if (!in_array($page, ['dashboard','assigned-projects','projects','project-detail','calendar','notifications','repository','repository-detail','thesis-management'], true)) return null;
         $relative = 'index.php'
             . (isset($parts['query']) ? '?' . $parts['query'] : '')
             . (isset($parts['fragment']) ? '#' . $parts['fragment'] : '');
@@ -338,13 +293,16 @@ final class DashboardModel
     {
         $projectIds = array_values(array_unique($projectIds));
         $projectClause = $projectIds ? ' OR e.project_id IN (' . implode(',', array_fill(0, count($projectIds), '?')) . ')' : '';
-        $params = array_merge([$teacherId], $projectIds, [date('Y-m-d')]);
+        $today = date('Y-m-d');
+        $now = date('H:i:s');
+        $params = array_merge([$teacherId], $projectIds, [$today, $today, $now]);
         $query = $db->prepare("SELECT e.id,e.title,e.event_type,e.event_date,e.event_time,e.project_id,e.is_completed,p.title project_title
             FROM project_events e LEFT JOIN projects p ON p.id=e.project_id
-            WHERE (e.created_by=? $projectClause) AND e.event_date>=? AND e.is_completed=0
-            ORDER BY e.event_date,e.event_time IS NULL,e.event_time,e.id LIMIT 3");
+            WHERE (e.created_by=? $projectClause) AND e.is_completed=0
+              AND (e.event_date>? OR (e.event_date=? AND (e.event_time IS NULL OR e.event_time>=?)))
+            ORDER BY e.event_date,e.event_time IS NULL,e.event_time,e.id LIMIT 12");
         $query->execute($params);
-        return array_map(static fn(array $row): array => [
+        $items = array_map(static fn(array $row): array => [
             'id' => (int) $row['id'], 'title' => (string) $row['title'], 'type' => (string) $row['event_type'],
             'date' => (string) $row['event_date'],
             'time' => !empty($row['event_time']) ? (string) $row['event_time'] : null,
@@ -353,7 +311,38 @@ final class DashboardModel
             'project_id' => $row['project_id'] === null ? null : (int) $row['project_id'],
             'project_title' => $row['project_title'] === null ? null : (string) $row['project_title'], 'completed' => (bool) $row['is_completed'],
             'route' => $row['project_id'] === null ? route('calendar') : route('project-detail') . '&id=' . (int) $row['project_id'],
+            'action_label' => $row['project_id'] === null ? 'Abrir calendario' : 'Abrir proyecto',
         ], $query->fetchAll(PDO::FETCH_ASSOC));
+        if ($projectIds === []) return array_slice($items, 0, 3);
+        $marks = implode(',', array_fill(0, count($projectIds), '?'));
+        $defenses = $db->prepare("SELECT d.id,p.id project_id,p.title,d.defense_date,d.defense_time
+            FROM project_defenses d INNER JOIN projects p ON p.id=d.project_id
+            WHERE p.id IN ($marks) AND p.deleted_at IS NULL AND d.result IS NULL AND d.defense_date IS NOT NULL
+              AND (d.defense_date>? OR (d.defense_date=? AND (d.defense_time IS NULL OR d.defense_time>=?)))
+              AND d.attempt_number=(SELECT MAX(current_attempt.attempt_number) FROM project_defenses current_attempt WHERE current_attempt.project_id=d.project_id)
+            ORDER BY d.defense_date,d.defense_time IS NULL,d.defense_time,d.id LIMIT 12");
+        $defenses->execute(array_merge($projectIds, [$today, $today, $now]));
+        foreach ($defenses->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $items[] = ['id'=>'defense:' . (int)$row['id'],'title'=>'Defensa programada','type'=>'defense','date'=>(string)$row['defense_date'],
+                'time'=>!empty($row['defense_time']) ? substr((string)$row['defense_time'], 0, 5) : null,'context'=>(string)$row['title'],
+                'project_id'=>(int)$row['project_id'],'project_title'=>(string)$row['title'],'completed'=>false,
+                'route'=>route('project-detail').'&id='.(int)$row['project_id'],'action_label'=>'Abrir proyecto'];
+        }
+        $schedules = $db->prepare("SELECT DISTINCT s.id,s.academic_period_id,s.defense_date,s.defense_time,ap.name period_name
+            FROM academic_defense_schedules s INNER JOIN academic_periods ap ON ap.id=s.academic_period_id
+            INNER JOIN projects p ON p.academic_period_id=s.academic_period_id
+            INNER JOIN project_types pt ON pt.id=p.project_type_id AND pt.code='thesis'
+            WHERE p.id IN ($marks) AND p.status='defense' AND p.deleted_at IS NULL AND s.defense_date IS NOT NULL
+              AND (s.defense_date>? OR (s.defense_date=? AND (s.defense_time IS NULL OR s.defense_time>=?)))
+            ORDER BY s.defense_date,s.defense_time IS NULL,s.defense_time,s.id LIMIT 12");
+        $schedules->execute(array_merge($projectIds, [$today, $today, $now]));
+        foreach ($schedules->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $items[] = ['id'=>'defense-schedule:' . (int)$row['id'],'title'=>'Jornada de defensa','type'=>'defense_schedule','date'=>(string)$row['defense_date'],
+                'time'=>!empty($row['defense_time']) ? substr((string)$row['defense_time'], 0, 5) : null,'context'=>(string)$row['period_name'],
+                'project_id'=>null,'project_title'=>null,'completed'=>false,'route'=>route('calendar'),'action_label'=>'Abrir calendario'];
+        }
+        usort($items, static fn(array $left, array $right): int => [($left['date'] ?? ''), empty($left['time']) ? '23:59:59' : $left['time'], (string)($left['id'] ?? '')] <=> [($right['date'] ?? ''), empty($right['time']) ? '23:59:59' : $right['time'], (string)($right['id'] ?? '')]);
+        return array_slice($items, 0, 3);
     }
     public function getAdminDashboard(): array
     {
