@@ -44,7 +44,6 @@
             <div class="calendar-list-tools" id="calendarListTools" hidden>
                 <div class="calendar-select-wrap calendar-sort-wrap" data-select="sort" data-value="date"><i class="fa-solid fa-arrow-down-wide-short calendar-select-leading"></i><select id="calendarSort" aria-label="Ordenar eventos"><option value="date">Más próximos</option><option value="priority">Prioridad alta primero</option><option value="completed">Completados al final</option></select><i class="fa-solid fa-chevron-down calendar-select-chevron"></i></div>
             </div>
-            <div class="calendar-filter-status" id="calendarFilterStatus" hidden><i class="fa-solid fa-filter"></i><span></span><button id="calendarClearFilters" type="button">Limpiar</button></div>
         </div>
         <div class="calendar-filters" aria-label="Filtrar eventos">
             <button class="calendar-filter active" type="button" data-filter="all">Todos</button>
