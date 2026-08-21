@@ -1,5 +1,296 @@
-.assigned-projects-page .assigned-projects-shell{max-width:1360px;margin:0 auto}.assigned-projects-page .assigned-projects-catalog{overflow:visible}.assigned-projects-page .assigned-projects-tools{grid-template-columns:minmax(240px,1fr) repeat(3,minmax(145px,190px))}.assigned-projects-page .assigned-projects-panel[hidden]{display:none!important}.assigned-projects-page .assigned-project-card .ar-card-copy dl div{grid-template-columns:94px minmax(0,1fr)}.assigned-projects-page .assigned-relation-chip,.assigned-projects-page .assigned-status{display:inline-flex;align-items:center;min-height:22px;padding:3px 7px;border-radius:999px;font-size:var(--font-xs);font-weight:800;line-height:1.2}.assigned-projects-page .assigned-relation-chip{border:1px solid var(--line);background:var(--surface-soft);color:var(--text)}.assigned-projects-page .assigned-status{background:rgba(37,99,235,.1);color:#1d4ed8}.assigned-projects-page .assigned-status.is-development{background:rgba(37,99,235,.1);color:#1d4ed8}.assigned-projects-page .assigned-status.is-under_review{background:rgba(217,119,6,.12);color:#b45309}.assigned-projects-page .assigned-status.is-approved,.assigned-projects-page .assigned-status.is-published,.assigned-projects-page .assigned-status.is-tribunal_approved{background:rgba(22,163,74,.11);color:#15803d}.assigned-projects-page .assigned-status.is-defense{background:rgba(124,58,237,.11);color:#6d28d9}.assigned-projects-page .assigned-projects-pagination label{justify-self:center;display:inline-flex;align-items:center;gap:7px;font-weight:700}.assigned-projects-page .assigned-projects-pagination select{min-height:34px;padding:0 27px 0 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text);font:inherit;font-size:var(--font-sm)}@media(max-width:1000px){.assigned-projects-page .assigned-projects-tools{grid-template-columns:minmax(220px,1fr) repeat(3,minmax(130px,170px))}}@media(max-width:760px){.assigned-projects-page .assigned-projects-tools{grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr))}.assigned-projects-page .assigned-projects-pagination{grid-template-columns:1fr auto}.assigned-projects-page .assigned-projects-pagination label{justify-self:end}.assigned-projects-page .assigned-projects-pagination nav{grid-column:1/-1;justify-self:center}}@media(max-width:480px){.assigned-projects-page .assigned-project-card .ar-card-copy dl div{grid-template-columns:88px minmax(0,1fr)}.assigned-projects-page .assigned-projects-pagination{grid-template-columns:1fr}.assigned-projects-page .assigned-projects-pagination label{justify-self:start}.assigned-projects-page .assigned-projects-pagination nav{max-width:100%;overflow-x:auto;justify-self:stretch}}
-.assigned-projects-page .assigned-relation-list{display:flex;flex-wrap:wrap;gap:5px}
-.assigned-projects-page .assigned-project-actions{display:flex;align-items:center;gap:9px}.assigned-projects-page .assigned-project-actions .ar-primary-action{margin-right:auto}.assigned-projects-page .assigned-project-actions .ar-icon-action{margin-left:0}.assigned-projects-page [data-assigned-searchable] .ar-search-highlight,.assigned-projects-page .ar-search-highlight{padding:0 2px;border-radius:4px;background:rgba(245,158,11,.24);color:inherit;box-shadow:0 0 0 1px rgba(245,158,11,.22)}
-.assigned-projects-page .assigned-teacher-situation{display:inline-flex;align-items:flex-start;gap:6px;color:#2563a8;font-size:var(--font-sm);line-height:1.35}.assigned-projects-page .assigned-teacher-situation>i{font-size:.42rem;margin-top:.34rem;color:#3b82c4}.assigned-projects-page .assigned-project-card:has(.assigned-status.is-approved) .assigned-teacher-situation{color:#15803d}.assigned-projects-page .assigned-project-card:has(.assigned-status.is-approved) .assigned-teacher-situation>i{color:#22a35a}.assigned-projects-page .assigned-teacher-situation.requires-attention{color:#a16207;font-weight:700}.assigned-projects-page .assigned-teacher-situation.requires-attention>i{color:#d97706}
-.assigned-projects-page .assigned-projects-tools{grid-template-columns:minmax(260px,2fr) repeat(3,minmax(150px,1fr))}.assigned-projects-page .assigned-projects-tools .ar-filter-control,.assigned-projects-page .assigned-projects-tools .ar-fixed-filter{min-width:0}.assigned-projects-page .assigned-projects-tools select,.assigned-projects-page .assigned-projects-tools .ar-fixed-filter>div{min-width:0;overflow:hidden}.assigned-projects-page .assigned-projects-tools select{ text-overflow:ellipsis;white-space:nowrap}.assigned-projects-page .assigned-projects-tools .ar-fixed-filter strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.assigned-projects-page .assigned-projects-tools[hidden]{display:none!important}
+/* Layout Shell and Containers */
+.assigned-projects-page .assigned-projects-shell {
+    max-width: 1360px;
+    margin: 0 auto;
+}
+.assigned-projects-page .assigned-projects-catalog {
+    overflow: visible;
+}
+.assigned-projects-page .assigned-projects-panel[hidden] {
+    display: none !important;
+}
+
+/* Base Responsive Grid System (Pattern matching ?page=projects) */
+#assignedProjectsPage .assigned-projects-tools {
+    display: grid !important;
+    grid-template-columns: minmax(260px, 1fr) repeat(3, minmax(150px, 200px)) !important;
+    gap: 12px !important;
+    align-items: end !important;
+}
+.assigned-projects-page .assigned-projects-tools .ar-filter-control,
+.assigned-projects-page .assigned-projects-tools .ar-fixed-filter {
+    min-width: 0;
+}
+.assigned-projects-page .assigned-projects-tools select,
+.assigned-projects-page .assigned-projects-tools .ar-fixed-filter > div {
+    min-width: 0;
+    overflow: hidden;
+}
+.assigned-projects-page .assigned-projects-tools select {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.assigned-projects-page .assigned-projects-tools .ar-fixed-filter strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.assigned-projects-page .assigned-projects-tools[hidden] {
+    display: none !important;
+}
+
+/* Breakpoint: Intermediate Tablet/Laptop (max-width: 1000px) */
+@media(max-width:1000px) {
+    #assignedProjectsPage .assigned-projects-tools {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+    #assignedProjectsPage .assigned-projects-tools .ar-search {
+        grid-column: 1 / -1 !important;
+    }
+}
+
+/* Breakpoint: Narrower Tablet/Mobile (max-width: 760px) */
+@media(max-width:760px) {
+    #assignedProjectsPage .assigned-projects-tools {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+    #assignedProjectsPage .assigned-projects-tools .ar-search {
+        grid-column: 1 / -1 !important;
+    }
+    #assignedProjectsPage .assigned-projects-tools > :last-child {
+        grid-column: 1 / -1 !important;
+    }
+    .assigned-projects-page .assigned-projects-pagination {
+        grid-template-columns: 1fr auto;
+    }
+    .assigned-projects-page .assigned-projects-pagination label {
+        justify-self: end;
+    }
+    .assigned-projects-page .assigned-projects-pagination nav {
+        grid-column: 1 / -1;
+        justify-self: center;
+    }
+    /* Tabs layout when only one tab exists */
+    .assigned-projects-page .ar-tabs:has(> button:only-child) {
+        display: flex !important;
+        grid-template-columns: none !important;
+    }
+    .assigned-projects-page .ar-tabs:has(> button:only-child) button {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+}
+
+/* Breakpoint: Mobile Portrait (max-width: 480px) */
+@media(max-width:480px) {
+    #assignedProjectsPage .assigned-projects-tools {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+    #assignedProjectsPage .assigned-projects-tools .ar-search {
+        grid-column: auto !important;
+    }
+    #assignedProjectsPage .assigned-projects-tools > :last-child {
+        grid-column: auto !important;
+    }
+    .assigned-projects-page .assigned-project-card .ar-card-copy dl div {
+        grid-template-columns: 88px minmax(0, 1fr);
+    }
+    .assigned-projects-page .assigned-projects-pagination {
+        grid-template-columns: 1fr;
+    }
+    .assigned-projects-page .assigned-projects-pagination label {
+        justify-self: start;
+    }
+    .assigned-projects-page .assigned-projects-pagination nav {
+        max-width: 100%;
+        overflow-x: auto;
+        justify-self: stretch;
+    }
+}
+
+/* Search Bar Wrapper & Dynamic Search History styles */
+.assigned-projects-page .assigned-projects-tools .ar-search {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* Dynamic search history wrapper display flex to allow auto sizing */
+.assigned-projects-page .assigned-projects-tools .ar-search .search-history-field {
+    display: flex !important;
+    align-items: center !important;
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Input element styling - width: auto fixes Chrome's placeholder truncation bug */
+.assigned-projects-page .assigned-projects-tools .ar-search .search-history-field input {
+    display: block !important;
+    width: auto !important;
+    min-width: 0 !important;
+    flex: 1 1 0% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    outline: 0 !important;
+    background: transparent !important;
+    color: var(--text) !important;
+    font: inherit !important;
+    height: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Search History Clear Button styling */
+.assigned-projects-page .assigned-projects-tools .ar-search .search-history-clear {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 auto !important;
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    color: var(--muted) !important;
+    cursor: pointer !important;
+}
+.assigned-projects-page .assigned-projects-tools .ar-search .search-history-clear[hidden] {
+    display: none !important;
+}
+.assigned-projects-page .assigned-projects-tools .ar-search .search-history-clear:hover {
+    color: var(--primary) !important;
+}
+.assigned-projects-page .assigned-projects-tools .ar-search .search-history-clear .fa-xmark {
+    display: none !important;
+}
+.assigned-projects-page .assigned-projects-tools .ar-search .search-history-clear:hover .fa-clock-rotate-left {
+    display: none !important;
+}
+.assigned-projects-page .assigned-projects-tools .ar-search .search-history-clear:hover .fa-xmark {
+    display: inline-block !important;
+}
+
+/* Cards styles and other visual tweaks */
+.assigned-projects-page .assigned-project-card .ar-card-copy dl div {
+    grid-template-columns: 94px minmax(0, 1fr);
+}
+.assigned-projects-page .assigned-relation-chip,
+.assigned-projects-page .assigned-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    font-size: var(--font-xs);
+    font-weight: 800;
+    line-height: 1.2;
+}
+.assigned-projects-page .assigned-relation-chip {
+    border: 1px solid var(--line);
+    background: var(--surface-soft);
+    color: var(--text);
+}
+.assigned-projects-page .assigned-status {
+    background: rgba(37, 99, 235, 0.1);
+    color: #1d4ed8;
+}
+.assigned-projects-page .assigned-status.is-development {
+    background: rgba(37, 99, 235, 0.1);
+    color: #1d4ed8;
+}
+.assigned-projects-page .assigned-status.is-under_review {
+    background: rgba(217, 119, 6, 0.12);
+    color: #b45309;
+}
+.assigned-projects-page .assigned-status.is-approved,
+.assigned-projects-page .assigned-status.is-published,
+.assigned-projects-page .assigned-status.is-tribunal_approved {
+    background: rgba(22, 163, 74, 0.11);
+    color: #15803d;
+}
+.assigned-projects-page .assigned-status.is-defense {
+    background: rgba(124, 58, 237, 0.11);
+    color: #6d28d9;
+}
+.assigned-projects-page .assigned-projects-pagination label {
+    justify-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 700;
+}
+.assigned-projects-page .assigned-projects-pagination select {
+    min-height: 34px;
+    padding: 0 27px 0 9px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--font-sm);
+}
+.assigned-projects-page .assigned-relation-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+.assigned-projects-page .assigned-project-actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+.assigned-projects-page .assigned-project-actions .ar-primary-action {
+    margin-right: auto;
+}
+.assigned-projects-page .assigned-project-actions .ar-icon-action {
+    margin-left: 0;
+}
+.assigned-projects-page [data-assigned-searchable] .ar-search-highlight,
+.assigned-projects-page .ar-search-highlight {
+    padding: 0 2px;
+    border-radius: 4px;
+    background: rgba(245, 158, 11, 0.24);
+    color: inherit;
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.22);
+}
+.assigned-projects-page .assigned-teacher-situation {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #2563a8;
+    font-size: var(--font-sm);
+    line-height: 1.35;
+    max-width: 100%;
+    min-width: 0;
+}
+.assigned-projects-page .assigned-teacher-situation-text {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1 1 auto;
+}
+.assigned-projects-page .assigned-teacher-situation > i {
+    font-size: 0.42rem;
+    color: #3b82c4;
+    flex-shrink: 0;
+}
+.assigned-projects-page .assigned-project-card:has(.assigned-status.is-approved) .assigned-teacher-situation {
+    color: #15803d;
+}
+.assigned-projects-page .assigned-project-card:has(.assigned-status.is-approved) .assigned-teacher-situation > i {
+    color: #22a35a;
+}
+.assigned-projects-page .assigned-teacher-situation.requires-attention {
+    color: #a16207;
+    font-weight: 700;
+}
+.assigned-projects-page .assigned-teacher-situation.requires-attention > i {
+    color: #d97706;
+}
