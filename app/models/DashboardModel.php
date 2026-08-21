@@ -69,7 +69,7 @@ final class DashboardModel
                 'route' => route('project-detail') . '&id=' . $id,
                 'action' => ['label'=>(bool)($situation['requires_attention']??false)?'Revisar proyecto':'Ver proyecto','route'=>route('project-detail').'&id='.$id],
             ];
-        }, array_slice($projects, 0, 5));
+        }, $projects);
         $allCount = count($projects);
         try {
             $notificationModel = new NotificationModel();
@@ -99,7 +99,7 @@ final class DashboardModel
                     'route' => route('thesis-management'),
                 ],
             ],
-            'assigned_projects' => ['count'=>$allCount,'items'=>$projectItems,'has_more'=>$allCount>5,'route'=>route('assigned-projects')],
+            'assigned_projects' => ['count'=>$allCount,'items'=>$projectItems,'has_more'=>false,'route'=>route('assigned-projects')],
             'follow_up' => $followUp,
             'upcoming' => ['items' => $upcoming, 'route' => route('calendar')],
             'notifications' => ['items'=>$notificationItems,'unread'=>(int)$unread,'route'=>route('notifications')],
