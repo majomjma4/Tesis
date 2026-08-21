@@ -64,36 +64,47 @@ $projectSentence = static function (int $count, string $ending): string {
                     <h2 id="teacherProjectsTitle">Proyectos del período activo</h2>
                     <p><?= (int) ($assigned['count'] ?? count($projects)) ?> proyecto(s) bajo tu responsabilidad.</p>
                 </div>
-                <?php if (!empty($assigned['has_more'])): ?>
+                <?php if ($projects): ?>
                     <a class="teacher-inline-link" href="<?= e($assigned['route'] ?? route('assigned-projects')) ?>">Ver todos los proyectos →</a>
                 <?php endif; ?>
             </header>
             <?php if (!$projects): ?>
                 <?php $empty('Sin proyectos asignados en este período.', 'Cuando tengas participación como tutor, cotutor o tribunal, aparecerá aquí.'); ?>
             <?php else: ?>
-                <div class="teacher-projects-grid">
-                    <?php foreach ($projects as $project):
-                        $situation = is_array($project['teacher_situation'] ?? null) ? $project['teacher_situation'] : [];
-                        $students = is_array($project['students'] ?? null) ? $project['students'] : [];
-                        $names = array_values(array_filter(array_map(static fn (array $student): string => (string) ($student['name'] ?? ''), $students)));
-                        $action = is_array($project['action'] ?? null) ? $project['action'] : [];
-                    ?>
-                        <article class="teacher-project-card">
-                            <div class="teacher-project-meta">
-                                <span><?= e($project['code'] ?? '') ?></span>
-                                <span><?= e($project['type'] ?? 'Proyecto') ?></span>
-                            </div>
-                            <h3><?= e($project['title'] ?? '') ?></h3>
-                            <p class="teacher-project-students"><i class="fa-solid fa-users" aria-hidden="true"></i> <?= e(implode(' · ', array_slice($names, 0, 2)) ?: 'Sin estudiantes registrados') ?><?php if (count($names) > 2): ?> +<?= count($names) - 2 ?><?php endif; ?></p>
-                            <p class="teacher-project-role"><span>Rol docente</span><strong><?= e(implode(' · ', (array) ($project['roles'] ?? []))) ?></strong></p>
-                            <div class="teacher-project-status">
-                                <span><?= e($project['status_label'] ?? $project['status'] ?? '') ?></span>
-                                <strong><?= e($situation['label'] ?? 'En seguimiento') ?></strong>
-                                <?php if (!empty($situation['description'])): ?><small><?= e($situation['description']) ?></small><?php endif; ?>
-                            </div>
-                            <?php if (!empty($action['route'])): ?><a class="teacher-project-action" href="<?= e($action['route']) ?>"><?= e($action['label'] ?? 'Ver proyecto') ?> →</a><?php endif; ?>
-                        </article>
-                    <?php endforeach; ?>
+                <div class="teacher-projects-carousel" data-teacher-projects-carousel>
+                    <div class="teacher-projects-carousel__viewport">
+                        <div class="teacher-projects-grid" data-carousel-track>
+                        <?php foreach ($projects as $project):
+                            $situation = is_array($project['teacher_situation'] ?? null) ? $project['teacher_situation'] : [];
+                            $students = is_array($project['students'] ?? null) ? $project['students'] : [];
+                            $names = array_values(array_filter(array_map(static fn (array $student): string => (string) ($student['name'] ?? ''), $students)));
+                            $action = is_array($project['action'] ?? null) ? $project['action'] : [];
+                        ?>
+                            <article class="teacher-project-card">
+                                <div class="teacher-project-meta">
+                                    <span><?= e($project['code'] ?? '') ?></span>
+                                    <span><?= e($project['type'] ?? 'Proyecto') ?></span>
+                                </div>
+                                <h3><?= e($project['title'] ?? '') ?></h3>
+                                <p class="teacher-project-students"><i class="fa-solid fa-users" aria-hidden="true"></i> <?= e(implode(' · ', array_slice($names, 0, 2)) ?: 'Sin estudiantes registrados') ?><?php if (count($names) > 2): ?> +<?= count($names) - 2 ?><?php endif; ?></p>
+                                <p class="teacher-project-role"><span>Rol docente</span><strong><?= e(implode(' · ', (array) ($project['roles'] ?? []))) ?></strong></p>
+                                <div class="teacher-project-status">
+                                    <span><?= e($project['status_label'] ?? $project['status'] ?? '') ?></span>
+                                    <strong><?= e($situation['label'] ?? 'En seguimiento') ?></strong>
+                                    <?php if (!empty($situation['description'])): ?><small><?= e($situation['description']) ?></small><?php endif; ?>
+                                </div>
+                                <?php if (!empty($action['route'])): ?><a class="teacher-project-action" href="<?= e($action['route']) ?>"><?= e($action['label'] ?? 'Ver proyecto') ?> →</a><?php endif; ?>
+                            </article>
+                        <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php if (count($projects) > 1): ?>
+                        <div class="teacher-projects-carousel__navigation" data-carousel-navigation>
+                            <span class="teacher-projects-carousel__status" data-carousel-status aria-live="polite"></span>
+                            <button type="button" data-carousel-prev aria-label="Mostrar proyectos anteriores"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
+                            <button type="button" data-carousel-next aria-label="Mostrar proyectos siguientes"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+                        </div>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
         </section>

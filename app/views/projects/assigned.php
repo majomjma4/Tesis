@@ -5,7 +5,10 @@
 /** @var list<array{value:string,label:string}> $assignedProjectRelations */
 $courseCount = count(array_filter($assignedProjects, static fn(array $project): bool => $project['tab'] === 'course'));
 $completedCount = count($assignedProjects) - $courseCount;
-$typeLabels = ['thesis'=>'TIT','thesis_profile'=>'PFT','practice'=>'PRA','pis'=>'PIS','community'=>'VIN'];
+$typeLabels = ['thesis'=>'TIT','thesis_profile'=>'PFT','practice'=>'PRA','pis'=>'Proyecto PIS','community'=>'VIN'];
+$visibleTypeLabel = static function (string $label): string {
+    return mb_strtolower(trim($label), 'UTF-8') === 'proyecto integrador de saberes' ? 'Proyecto PIS' : $label;
+};
 $hasAssignedProjects = $assignedProjects !== [];
 ?>
 <div class="assigned-projects-page__content">
@@ -34,7 +37,7 @@ $hasAssignedProjects = $assignedProjects !== [];
                     <input id="assignedSearch" type="search" role="searchbox" placeholder="Buscar por código, título o estudiante..." autocomplete="off">
                     <button id="assignedClearSearch" type="button" aria-label="Limpiar búsqueda" hidden><i class="fa-solid fa-xmark"></i></button>
                 </label>
-                <?php if (count($assignedProjectTypes) === 1): $type = $assignedProjectTypes[0]; ?><div class="ar-filter-control ar-fixed-filter"><span>Tipo</span><div><i class="fa-solid fa-diagram-project" aria-hidden="true"></i><strong><?= e($type['label']) ?></strong></div><input id="assignedType" type="hidden" value="<?= e($type['value']) ?>"></div><?php elseif (count($assignedProjectTypes) > 1): ?><label class="ar-filter-control"><span>Tipo</span><select id="assignedType"><option value="all">Todos</option><?php foreach ($assignedProjectTypes as $type): ?><option value="<?= e($type['value']) ?>"><?= e($type['label']) ?></option><?php endforeach; ?></select></label><?php endif; ?>
+                <?php if (count($assignedProjectTypes) === 1): $type = $assignedProjectTypes[0]; ?><div class="ar-filter-control ar-fixed-filter"><span>Tipo</span><div><i class="fa-solid fa-diagram-project" aria-hidden="true"></i><strong><?= e($visibleTypeLabel((string) $type['label'])) ?></strong></div><input id="assignedType" type="hidden" value="<?= e($type['value']) ?>"></div><?php elseif (count($assignedProjectTypes) > 1): ?><label class="ar-filter-control"><span>Tipo</span><select id="assignedType"><option value="all">Todos</option><?php foreach ($assignedProjectTypes as $type): ?><option value="<?= e($type['value']) ?>"><?= e($visibleTypeLabel((string) $type['label'])) ?></option><?php endforeach; ?></select></label><?php endif; ?>
                 <?php if (count($assignedProjectPeriods) === 1): $period = $assignedProjectPeriods[0]; ?><div class="ar-filter-control ar-fixed-filter"><span>Período académico</span><div><i class="fa-regular fa-calendar" aria-hidden="true"></i><strong><?= e($period['label']) ?></strong></div><input id="assignedPeriod" type="hidden" value="<?= e($period['value']) ?>"></div><?php else: ?><label class="ar-filter-control"><span>Período académico</span><select id="assignedPeriod"><option value="all">Todos</option><?php foreach ($assignedProjectPeriods as $period): ?><option value="<?= e($period['value']) ?>"><?= e($period['label']) ?></option><?php endforeach; ?></select></label><?php endif; ?>
                 <?php if (count($assignedProjectRelations) === 1): $relation = $assignedProjectRelations[0]; ?><div class="ar-filter-control ar-fixed-filter"><span>Relación</span><div><i class="fa-solid fa-user-tie" aria-hidden="true"></i><strong><?= e($relation['label']) ?></strong></div><input id="assignedRelation" type="hidden" value="<?= e($relation['value']) ?>"></div><?php elseif (count($assignedProjectRelations) > 1): ?><label class="ar-filter-control"><span>Relación</span><select id="assignedRelation"><option value="all">Todos</option><?php foreach ($assignedProjectRelations as $relation): ?><option value="<?= e($relation['value']) ?>"><?= e($relation['label']) ?></option><?php endforeach; ?></select></label><?php endif; ?>
             </div><?php endif; ?>

@@ -46,7 +46,7 @@ final class DashboardController
                 'title' => 'Dashboard docente | Gestión Documental Académica',
                 'bodyClass' => 'teacher-dashboard-page',
                 'pageStyles' => [asset('css/teacher-dashboard.css')],
-                'pageScript' => null,
+                'pageScript' => asset('js/teacher-dashboard.js'),
                 'teacherDashboard' => $teacherDashboard,
                 'teacherDashboardError' => $error,
             ]);

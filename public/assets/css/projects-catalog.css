@@ -25,14 +25,14 @@
     color: #fff;
     display: grid;
     place-items: center;
-    font-size: 10px;
+    font-size:var(--font-xs);
     font-weight: 900;
 }
 
 .projects-people small {
     margin-left: 13px;
     color: var(--muted);
-    font-size: 10px;
+    font-size:var(--font-xs);
 }
 
 .projects-tags {
@@ -47,7 +47,7 @@
     border-radius: 999px;
     background: var(--surface-soft);
     color: var(--muted);
-    font-size: 9px;
+    font-size:var(--font-xs);
     font-weight: 800;
 }
 
@@ -87,8 +87,8 @@
 }
 /* Final de componentes contextuales del catálogo */
 .projects-pagination{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:14px;margin-top:18px;padding:13px 15px;border:1px solid var(--line);border-radius:15px;background:var(--surface)}
-.projects-pagination p{margin:0;color:var(--muted);font-size:13px}
-.projects-pagination label{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
+.projects-pagination p{margin:0;color:var(--muted);font-size:var(--font-md)}
+.projects-pagination label{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:var(--font-sm)}
 .projects-pagination select{min-height:36px;padding:0 28px 0 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface-soft);color:var(--text);font:inherit;font-weight:750}
 .projects-pagination-pages{display:flex;gap:5px}
 .projects-pagination-pages button{min-width:36px;height:36px;padding:0 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface-soft);color:var(--text);font-weight:750;cursor:pointer}
@@ -97,4 +97,4 @@
 @media(max-width:760px){.projects-pagination{grid-template-columns:1fr auto}.projects-pagination-pages{grid-column:1/-1;justify-content:center}}
 @media(max-width:480px){.projects-pagination{grid-template-columns:1fr}.projects-pagination label{justify-content:space-between}.projects-pagination-pages{grid-column:auto;justify-content:flex-start;overflow-x:auto}}
 .projects-pagination p,.projects-pagination label{white-space:nowrap}@media(max-width:480px){.projects-pagination{grid-template-columns:minmax(0,1fr) auto}.projects-pagination-pages{grid-column:1/-1}.projects-pagination label{gap:6px}}
-.projects-pagination-pages{gap:3px}.projects-pagination-pages button{min-width:32px;height:32px;padding:0 6px;border-radius:8px;font-size:12px}.projects-pagination-pages .pagination-ellipsis{display:grid;place-items:center;min-width:17px;height:32px;color:var(--muted);font-size:12px;font-weight:850;user-select:none}.projects-pagination label,.projects-pagination select{min-width:0;max-width:100%;box-sizing:border-box}@media(max-width:480px){.projects-pagination{max-width:100%;overflow:hidden}.projects-pagination label{min-width:0}.projects-pagination select{width:68px;padding-inline:8px 22px}.projects-pagination-pages{gap:2px}.projects-pagination-pages button{min-width:29px;height:29px;padding:0 5px;font-size:11px}.projects-pagination-pages .pagination-ellipsis{min-width:14px;height:29px;font-size:10px}}
+.projects-pagination-pages{gap:3px}.projects-pagination-pages button{min-width:32px;height:32px;padding:0 6px;border-radius:8px;font-size:var(--font-sm)}.projects-pagination-pages .pagination-ellipsis{display:grid;place-items:center;min-width:17px;height:32px;color:var(--muted);font-size:var(--font-sm);font-weight:850;user-select:none}.projects-pagination label,.projects-pagination select{min-width:0;max-width:100%;box-sizing:border-box}@media(max-width:480px){.projects-pagination{max-width:100%;overflow:hidden}.projects-pagination label{min-width:0}.projects-pagination select{width:68px;padding-inline:8px 22px}.projects-pagination-pages{gap:2px}.projects-pagination-pages button{min-width:29px;height:29px;padding:0 5px;font-size:var(--font-xs)}.projects-pagination-pages .pagination-ellipsis{min-width:14px;height:29px;font-size:var(--font-xs)}}
