@@ -129,11 +129,11 @@ final class ProjectsController
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') { http_response_code(405); $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]); }
         $session = new AuthSessionService();
-        if (!(new TeacherThesisCapabilityService())->canManageCurrentUser()) { http_response_code(403); $this->json(['success'=>false,'message'=>'No tienes autorización para programar defensas.','data'=>[]]); }
+        if (!(new TeacherThesisCapabilityService())->canManageCurrentUser()) { http_response_code(403); $this->json(['success'=>false,'message'=>'No tienes autorización para programar la jornada de defensa.','data'=>[]]); }
         if (!$session->validateCsrf('thesis_management', (string) ($_POST['_csrf'] ?? ''))) { http_response_code(419); $this->json(['success'=>false,'message'=>'La sesión del formulario venció.','data'=>[]]); }
         try {
             $data = (new ThesisDefenseScheduleService())->save((int) ($_POST['academic_period_id'] ?? 0), $_POST, (int) $session->userId());
-            $messages = ['created'=>'Programación global de defensa guardada.', 'updated'=>'Programación global de defensa actualizada.', 'cleared'=>'Programación global de defensa eliminada.', 'unchanged'=>'La programación no tiene cambios.'];
+            $messages = ['created'=>'Programación global de defensas guardada.', 'updated'=>'Programación global de defensas actualizada.', 'cleared'=>'Programación global de defensas eliminada.', 'unchanged'=>'La programación no tiene cambios.'];
             $this->json(['success'=>true,'message'=>$messages[$data['action']] ?? 'Programación guardada.','data'=>$data]);
         } catch (ThesisDefenseScheduleException $e) {
             http_response_code($e->httpStatus());
@@ -141,7 +141,7 @@ final class ProjectsController
         } catch (Throwable $e) {
             error_log('Thesis defense schedule: ' . $e->getMessage());
             http_response_code(500);
-            $this->json(['success'=>false,'message'=>'No fue posible guardar la programación global de defensa.','data'=>[]]);
+            $this->json(['success'=>false,'message'=>'No fue posible guardar la programación global de defensas.','data'=>[]]);
         }
     }
 
@@ -468,16 +468,16 @@ final class ProjectsController
         if ($parts === false || isset($parts['scheme']) || isset($parts['host']) || isset($parts['user']) || isset($parts['pass'])) return $fallback;
         parse_str((string) ($parts['query'] ?? ''), $query);
         $page = strtolower(trim((string) ($query['page'] ?? '')));
-        if (!in_array($page, ['projects', 'proyectos', 'mis-proyectos'], true)) return $fallback;
+        if (!in_array($page, ['projects', 'proyectos', 'mis-proyectos', 'thesis-management', 'assigned-projects'], true)) return $fallback;
 
-        $safe = ['page' => 'projects'];
+        $safe = ['page' => $page];
         foreach (['p', 'type_id', 'period_id'] as $key) {
             $value = filter_var($query[$key] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
             if ($value !== false && $value !== null) $safe[$key] = (int) $value;
         }
         $perPage = filter_var($query['per_page'] ?? null, FILTER_VALIDATE_INT);
         if (in_array($perPage, [10, 25, 50, 75, 100], true)) $safe['per_page'] = (int) $perPage;
-        foreach (['search' => 100, 'status' => 32, 'situation' => 32, 'sort' => 32, 'group' => 32] as $key => $limit) {
+        foreach (['search' => 100, 'status' => 32, 'situation' => 32, 'sort' => 32, 'group' => 32, 'tab' => 32] as $key => $limit) {
             if (!isset($query[$key]) || !is_scalar($query[$key])) continue;
             $value = mb_substr(trim((string) $query[$key]), 0, $limit);
             if ($value !== '') $safe[$key] = $value;

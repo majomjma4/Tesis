@@ -227,8 +227,26 @@ if ($project === null): ?>
     }
     if($publicContext&&!empty($projectCapabilities['view_admin_history']))$menuActions[]=['label'=>'Ver historial administrativo','icon'=>'fa-clock-rotate-left','enabled'=>true,'action'=>'admin-history','separator'=>$menuActions!==[]];
     if($publicContext&&!empty($projectCapabilities['edit_information']))$menuActions[]=['label'=>'Enviar a Papelera','icon'=>'fa-trash-can','enabled'=>true,'action'=>'trash','danger'=>true,'separator'=>$menuActions!==[]];
+    $returnPage = 'projects';
+    if (!empty($returnUrl)) {
+        $parsedReturn = parse_url($returnUrl);
+        if ($parsedReturn !== false && isset($parsedReturn['query'])) {
+            parse_str($parsedReturn['query'], $returnQuery);
+            $returnPage = strtolower(trim((string)($returnQuery['page'] ?? '')));
+        }
+    }
+    $breadcrumbLabel = 'Proyectos activos';
+    $backLabel = 'Volver a proyectos activos';
+    if ($returnPage === 'thesis-management') {
+        $breadcrumbLabel = 'Gestión de Titulación';
+        $backLabel = 'Volver a Gestión de Titulación';
+    } elseif ($returnPage === 'assigned-projects') {
+        $breadcrumbLabel = 'Proyectos asignados';
+        $backLabel = 'Volver a proyectos asignados';
+    }
+
     $breadcrumbs = $isTrackingContext ? [
-        ['label'=>'Proyectos activos','url'=>$returnUrl],
+        ['label'=>$breadcrumbLabel,'url'=>$returnUrl],
         ['label'=>(string)$project['code'],'url'=>null],
     ] : [
         ['label'=>$publicContext?'Repositorio':'Proyectos','url'=>$returnUrl],
@@ -289,7 +307,7 @@ if ($project === null): ?>
         ],
         'review_notice'=>null,
         'contextual_review_notice'=>$isAcademicManagement || $institutionalReadOnly ? null : $reviewNotice,
-        'return_label'=>$publicContext?'Volver al repositorio':($isTrackingContext?'Volver a proyectos activos':'Volver a proyectos')];
+        'return_label'=>$publicContext?'Volver al repositorio':($isTrackingContext?$backLabel:'Volver a proyectos')];
     if($publicContext||$isTrackingContext): ?><style>
     .digital-record[data-entity-type="project"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:14px;align-items:start}
     .digital-record[data-entity-type="project"] .ed-document-section{padding:19px}

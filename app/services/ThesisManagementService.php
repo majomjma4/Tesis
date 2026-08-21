@@ -23,7 +23,12 @@ final class ThesisManagementService
              WHERE p.deleted_at IS NULL AND p.status IN ('approved','defense')
              ORDER BY p.updated_at DESC,p.id DESC"
         )->fetchAll();
-        if ($rows === []) return ['projects'=>[], 'periods'=>[], 'summary'=>$this->emptySummary(), 'defenseSchedules'=>[]];
+        if ($rows === []) {
+            $periods = $db->query(
+                "SELECT id, name FROM academic_periods WHERE status IN ('active', 'closed') ORDER BY (status='active') DESC, starts_on DESC"
+            )->fetchAll(PDO::FETCH_ASSOC);
+            return ['projects'=>[], 'periods'=>$periods, 'summary'=>$this->emptySummary(), 'defenseSchedules'=>[]];
+        }
 
         $ids = array_map(static fn(array $row): int => (int) $row['id'], $rows);
         $marks = implode(',', array_fill(0, count($ids), '?'));
