@@ -50,13 +50,14 @@ final class ProjectRecordModel
                 LEFT JOIN users tutor ON tutor.id=p.tutor_id
                 WHERE p.id=:id AND p.deleted_at IS NULL";
         if ($publishedOnly) $sql .= " AND p.status='published' AND p.withdrawn_at IS NULL" . ($administrator ? '' : ' AND p.is_available=1') . "
-            AND EXISTS (SELECT 1 FROM project_files visible_file WHERE visible_file.project_id=p.id AND visible_file.deleted_at IS NULL)
+            AND EXISTS (SELECT 1 FROM project_files visible_file WHERE visible_file.project_id=p.id AND visible_file.deleted_at IS NULL AND visible_file.purged_at IS NULL)
             AND EXISTS (SELECT 1 FROM project_participants visible_student INNER JOIN student_profiles visible_profile ON visible_profile.user_id=visible_student.user_id WHERE visible_student.project_id=p.id AND visible_student.role_code='student' AND visible_student.status='active' AND visible_student.removed_at IS NULL)";
-        if (!$administrator && !$publishedOnly) $sql .= " AND (p.created_by=:viewer_creator OR EXISTS (SELECT 1 FROM project_participants access_participant WHERE access_participant.project_id=p.id AND access_participant.user_id=:viewer_participant AND access_participant.status='active' AND access_participant.removed_at IS NULL))";
+        if (!$administrator && !$publishedOnly) $sql .= " AND (p.created_by=:viewer_creator OR p.tutor_id=:viewer_tutor OR EXISTS (SELECT 1 FROM project_participants access_participant WHERE access_participant.project_id=p.id AND access_participant.user_id=:viewer_participant AND access_participant.status='active' AND access_participant.removed_at IS NULL))";
         $statement = $db->prepare($sql);
         $parameters = ['id' => $projectId];
         if (!$administrator && !$publishedOnly) {
             $parameters['viewer_creator'] = (int) $userId;
+            $parameters['viewer_tutor'] = (int) $userId;
             $parameters['viewer_participant'] = (int) $userId;
         }
         $statement->execute($parameters);

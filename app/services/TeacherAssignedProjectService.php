@@ -120,23 +120,6 @@ final class TeacherAssignedProjectService
         return match (strtolower($code)) { 'co_tutor','co-tutor'=>'cotutor', 'jury'=>'tribunal', default=>strtolower($code) };
     }
 
-    /** @param array<string,mixed> $review */
-    private function teacherSituation(string $status, array $review): array
-    {
-        if ($status === 'development') {
-            if ((int)($review['pending_observations_count'] ?? 0) > 0) {
-                return ['label'=>'En espera de ajustes por parte del estudiante', 'requires_attention'=>false];
-            }
-            if (!empty($review['has_new_delivery_after_corrections'])) {
-                return ['label'=>'Nueva versión recibida · Revisión pendiente', 'requires_attention'=>true];
-            }
-            return ['label'=>'Trabajo en preparación por el estudiante', 'requires_attention'=>false];
-        }
-        if ($status === 'under_review') return ['label'=>'Revisión docente pendiente', 'requires_attention'=>true];
-        if ($status === 'approved') return ['label'=>'Revisión académica completada', 'requires_attention'=>false];
-        return ['label'=>null, 'requires_attention'=>false];
-    }
-
     /** @param list<string> $names */
     private function compactNames(array $names): string
     {

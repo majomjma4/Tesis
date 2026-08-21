@@ -138,7 +138,7 @@ final class ProjectReviewSituationService
                 !$canReview => $this->teacherSituation('waiting_process', 'No existe capacidad docente de revisión documental para esta asignación.', false, 'none'),
                 $pendingStudent => $this->teacherSituation('waiting_student', 'El estudiante tiene una observación pendiente sin respuesta o nueva evidencia.', false, 'student'),
                 $latestDelivery !== null && in_array((string)$latestDelivery['status'], ['submitted','under_review'], true) => $this->teacherSituation('review_required', 'La entrega vigente está pendiente de revisión docente.', true, 'teacher'),
-                $status === 'under_review' => $this->teacherSituation('review_required', 'El proyecto está en revisión docente.', true, 'teacher'),
+                $status === 'under_review' => $this->teacherSituation('waiting_process', 'El proyecto figura en revisión, pero no existe una entrega vigente que demuestre una unidad docente pendiente.', false, 'process'),
                 in_array($status, ['approved'], true) => $this->teacherSituation('waiting_process', 'La revisión académica fue completada; el proyecto espera el siguiente paso del proceso.', false, 'process'),
                 default => $this->teacherSituation('waiting_process', 'No hay una acción docente demostrable en este momento.', false, 'none'),
             };

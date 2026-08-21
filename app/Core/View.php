@@ -57,10 +57,15 @@ final class View
             $context = (new AuthSessionService())->notificationContext();
             $unread = (new NotificationModel())->countUnread($userId, $context);
         } catch (Throwable $exception) {
-            if (!isset($_SESSION['notification_demo_items']) || !is_array($_SESSION['notification_demo_items'])) {
-                $_SESSION['notification_demo_items'] = (new NotificationModel())->getDemoNotifications();
+            error_log('Layout notification counter error: ' . $exception->getMessage());
+            $unread = 0;
+
+            if (self::canUseNotificationDemoFallback()) {
+                if (!isset($_SESSION['notification_demo_items']) || !is_array($_SESSION['notification_demo_items'])) {
+                    $_SESSION['notification_demo_items'] = (new NotificationModel())->getDemoNotifications();
+                }
+                $unread = (new NotificationModel())->getDemoCounters($_SESSION['notification_demo_items'])['unread'];
             }
-            $unread = (new NotificationModel())->getDemoCounters($_SESSION['notification_demo_items'])['unread'];
         }
 
         return [
@@ -83,6 +88,12 @@ final class View
             'layoutIsTemporaryPasswordDismissedToday' => (new AuthSessionService())->isTemporaryPasswordWarningDismissedToday(),
             'layoutTemporaryPasswordWarningCsrf' => $session->csrfToken('dismiss_temp_password_warning'),
         ];
+    }
+
+    private static function canUseNotificationDemoFallback(): bool
+    {
+        return !Database::isEnabled()
+            && strtolower((string) ($GLOBALS['config']['environment'] ?? 'production')) === 'development';
     }
     // Final de datos globales de notificaciones
 }

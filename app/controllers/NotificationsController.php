@@ -17,6 +17,7 @@ final class NotificationsController
         $counters = ['unread' => 0, 'today' => 0, 'week' => 0, 'total' => 0];
         $archivedCount = 0;
         $sentCount = null;
+        $pagination = ['items' => [], 'page' => 1, 'per_page' => 25, 'total' => 0, 'pages' => 1, 'from' => 0, 'to' => 0];
 
         try {
             $model = new NotificationModel();
@@ -33,13 +34,15 @@ final class NotificationsController
             }
         } catch (Throwable $exception) {
             error_log('Notifications index error: ' . $exception->getMessage());
-            $allNotifications = $this->demoNotifications();
-            $pagination = $this->demoPagination($allNotifications, 1, 25);
-            $notifications = $pagination['items'];
-            $counters = (new NotificationModel())->getDemoCounters($allNotifications);
-            $archivedCount = count(array_filter($allNotifications, static fn(array $item) => !empty($item['archived_at'])));
-            if ($isAdmin) {
-                $sentCount = 0;
+            if ($this->canUseDemoFallback()) {
+                $allNotifications = $this->demoNotifications();
+                $pagination = $this->demoPagination($allNotifications, 1, 25);
+                $notifications = $pagination['items'];
+                $counters = (new NotificationModel())->getDemoCounters($allNotifications);
+                $archivedCount = count(array_filter($allNotifications, static fn(array $item) => !empty($item['archived_at'])));
+                if ($isAdmin) $sentCount = 0;
+            } else {
+                $error = 'No fue posible consultar las notificaciones en este momento.';
             }
         }
 
@@ -150,26 +153,28 @@ final class NotificationsController
             $counters = $model->getCounters($this->currentUserId(), $context);
             $sectionCounters = $model->getVisibilityCounters($this->currentUserId(), $hidden, $trash, $context);
         } catch (Throwable $exception) {
-            error_log('Notifications list fallback: ' . $exception->getMessage());
-            $allNotifications = $this->demoNotifications();
-            $notifications = array_values(array_filter($allNotifications, static function (array $item) use ($search, $type, $status, $hidden, $trash, $projectId, $date, $dateFrom, $dateTo): bool {
-                $haystack = mb_strtolower($item['title'] . ' ' . $item['message'] . ' ' . $item['project_name']);
-                $matchesSearch = $search === '' || str_contains($haystack, $search);
-                $matchesType = $type === '' || $item['type'] === $type;
-                $matchesStatus = $status === '' || ($status === 'read' ? $item['is_read'] : !$item['is_read']);
-                $matchesVisibility = $trash
-                    ? !empty($item['deleted_at'])
-                    : ($hidden ? !empty($item['archived_at']) && empty($item['deleted_at']) : empty($item['archived_at']) && empty($item['deleted_at']));
-                $matchesProject = $projectId === 0 || $item['project_id'] === $projectId;
-                $itemDate = date('Y-m-d', strtotime($item['created_at']));
-                $matchesDate = ($date === '' || $itemDate === $date) && ($dateFrom === '' || $itemDate >= $dateFrom) && ($dateTo === '' || $itemDate <= $dateTo);
-                return $matchesSearch && $matchesType && $matchesStatus && $matchesVisibility && $matchesProject && $matchesDate;
-            }));
-            $pagination = $this->demoPagination($notifications, $page, $perPage);
-            $notifications = $pagination['items'];
-            $counters = $model->getDemoCounters($allNotifications);
-            $sectionNotifications = array_values(array_filter($allNotifications, static fn (array $item): bool => $trash ? !empty($item['deleted_at']) : ($hidden ? !empty($item['archived_at']) && empty($item['deleted_at']) : empty($item['archived_at']) && empty($item['deleted_at']))));
-            $sectionCounters = $this->sectionCounters($sectionNotifications, $counters, $hidden, $trash);
+            error_log('Notifications list error: ' . $exception->getMessage());
+            if ($this->canUseDemoFallback()) {
+                $allNotifications = $this->demoNotifications();
+                $notifications = array_values(array_filter($allNotifications, static function (array $item) use ($search, $type, $status, $hidden, $trash, $projectId, $date, $dateFrom, $dateTo): bool {
+                    $haystack = mb_strtolower($item['title'] . ' ' . $item['message'] . ' ' . $item['project_name']);
+                    $matchesSearch = $search === '' || str_contains($haystack, $search);
+                    $matchesType = $type === '' || $item['type'] === $type;
+                    $matchesStatus = $status === '' || ($status === 'read' ? $item['is_read'] : !$item['is_read']);
+                    $matchesVisibility = $trash ? !empty($item['deleted_at']) : ($hidden ? !empty($item['archived_at']) && empty($item['deleted_at']) : empty($item['archived_at']) && empty($item['deleted_at']));
+                    $matchesProject = $projectId === 0 || $item['project_id'] === $projectId;
+                    $itemDate = date('Y-m-d', strtotime($item['created_at']));
+                    $matchesDate = ($date === '' || $itemDate === $date) && ($dateFrom === '' || $itemDate >= $dateFrom) && ($dateTo === '' || $itemDate <= $dateTo);
+                    return $matchesSearch && $matchesType && $matchesStatus && $matchesVisibility && $matchesProject && $matchesDate;
+                }));
+                $pagination = $this->demoPagination($notifications, $page, $perPage);
+                $notifications = $pagination['items'];
+                $counters = $model->getDemoCounters($allNotifications);
+                $sectionNotifications = array_values(array_filter($allNotifications, static fn (array $item): bool => $trash ? !empty($item['deleted_at']) : ($hidden ? !empty($item['archived_at']) && empty($item['deleted_at']) : empty($item['archived_at']) && empty($item['deleted_at']))));
+                $sectionCounters = $this->sectionCounters($sectionNotifications, $counters, $hidden, $trash);
+            } else {
+                $this->json(false, 'No fue posible consultar las notificaciones.', [], 500);
+            }
         }
 
         $this->json(true, '✅ Notificaciones actualizadas.', [
@@ -471,7 +476,7 @@ final class NotificationsController
             $this->json(true, $message, $data);
         } catch (Throwable $exception) {
             error_log('Notifications action error: ' . $exception->getMessage());
-            if ($demoFallback !== null) {
+            if ($demoFallback !== null && $this->canUseDemoFallback()) {
                 try {
                     $this->json(true, $message, $demoFallback());
                 } catch (Throwable $fallbackException) {
@@ -480,6 +485,12 @@ final class NotificationsController
             }
             $this->json(false, 'No fue posible procesar la solicitud.', [], 500);
         }
+    }
+
+    private function canUseDemoFallback(): bool
+    {
+        return !Database::isEnabled()
+            && strtolower((string) ($GLOBALS['config']['environment'] ?? 'production')) === 'development';
     }
 
     private function demoNotifications(): array
@@ -594,8 +605,25 @@ final class NotificationsController
         if (!in_array($path, $allowedPaths, true)) {
             return null;
         }
+        parse_str((string) ($parts['query'] ?? ''), $query);
+        $page = strtolower(trim((string) ($query['page'] ?? '')));
+        if (!in_array($page, ['dashboard','assigned-projects','projects','project-detail','calendar','notifications','repository','repository-detail','thesis-management'], true)) {
+            return null;
+        }
+        foreach ((['project-detail' => ['id'], 'repository-detail' => ['id']][$page] ?? []) as $key) {
+            if (!$this->positiveUrlId($query[$key] ?? null)) return null;
+        }
+        foreach (['id', 'project_id', 'delivery_id', 'event_id'] as $key) {
+            if (array_key_exists($key, $query) && !$this->positiveUrlId($query[$key])) return null;
+        }
         $relative = 'index.php' . (isset($parts['query']) ? '?' . $parts['query'] : '') . (isset($parts['fragment']) ? '#' . $parts['fragment'] : '');
         return base_url($relative);
+    }
+
+    private function positiveUrlId(mixed $value): bool
+    {
+        if (!is_string($value) && !is_int($value)) return false;
+        return filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) !== false;
     }
 
     private function contextualNotificationUrl(array $notification): ?string

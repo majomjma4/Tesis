@@ -18,7 +18,9 @@ final class CalendarController
             'title' => 'Calendario | Gestion Documental Academica',
             'bodyClass' => 'dashboard-page calendar-page',
             'pageScript' => asset('js/calendar.js'),
-            'calendarEvents' => $calendar->getEventsForOwner((int)$session->userId()),
+            'calendarEvents' => $session->isTeacher()
+                ? $calendar->getEventsForTeacher((int)$session->userId())
+                : $calendar->getEventsForOwner((int)$session->userId()),
             'calendarCsrf' => $session->csrfToken('calendar_events'),
             'projectsUrl' => route('project-detail'),
             'projectFilterId' => $projectFilterId,
@@ -38,7 +40,9 @@ final class CalendarController
             if (!$session->isAuthenticated() || (int)($session->userId() ?? 0) < 1) { $this->json(false, 'La sesión no está activa.', null, 403); return; }
             $owner = (int)$session->userId();
             if ($method === 'GET') {
-                $this->json(true, 'Eventos cargados.', $model->getEventsForOwner($owner));
+                $this->json(true, 'Eventos cargados.', $session->isTeacher()
+                    ? $model->getEventsForTeacher($owner)
+                    : $model->getEventsForOwner($owner));
                 return;
             }
             $payload = json_decode((string) file_get_contents('php://input'), true);

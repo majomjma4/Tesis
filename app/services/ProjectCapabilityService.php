@@ -30,7 +30,50 @@ final class ProjectCapabilityService
     /** @return array<string,bool> */
     public function forProjectId(int $projectId, string $context): array
     {
-        if ($projectId < 1) return $this->none();
+        $project = $this->projectForId($projectId);
+        return $project === null ? $this->none() : $this->forCurrentUser($project, $context);
+    }
+
+    /**
+     * Authorizes access to a project resource before an endpoint reads history,
+     * files, previews or ZIP contents. Generic tracking capabilities for a
+     * teacher are intentionally broader and must not be used for this check.
+     */
+    public function canViewProjectResource(int $projectId, string $context): bool
+    {
+        if (!in_array($context, ['academic_management', 'academic', 'repository'], true)) return false;
+        $project = $this->projectForId($projectId);
+        if ($project === null) return false;
+
+        $session = new AuthSessionService();
+        $access = new ProjectAccessService();
+        $userId = (int) ($session->userId() ?? 0);
+        if ($userId < 1) return false;
+        if ($session->isAdminModeActive()) return true;
+        if ($context === 'academic_management') return false;
+        if ($context === 'repository') return !empty($this->resolve($project, $context, $userId, $access->currentRoles(), false)['view_project']);
+
+        $roles = array_map('strtolower', array_map('strval', $access->currentRoles()));
+        $participants = (array) ($project['participants'] ?? []);
+        if (in_array('teacher', $roles, true)) {
+            if ((int) ($project['tutor_id'] ?? 0) === $userId) return true;
+            foreach ($participants as $participant) {
+                if ((int) ($participant['user_id'] ?? 0) !== $userId) continue;
+                if (in_array(strtolower((string) ($participant['role_code'] ?? '')), ['tutor', 'cotutor', 'co_tutor', 'co-tutor', 'tribunal', 'jury'], true)) return true;
+            }
+            return false;
+        }
+        if (!in_array('student', $roles, true)) return false;
+        if ((int) ($project['created_by'] ?? 0) === $userId) return true;
+        foreach ($participants as $participant) {
+            if ((int) ($participant['user_id'] ?? 0) === $userId && strtolower((string) ($participant['role_code'] ?? '')) === 'student') return true;
+        }
+        return false;
+    }
+
+    private function projectForId(int $projectId): ?array
+    {
+        if ($projectId < 1) return null;
         $query = Database::connection()->prepare(
              "SELECT p.id,p.created_by,p.tutor_id,p.status,p.is_available,p.deleted_at,pt.code type_code,
              (SELECT COUNT(*) FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL) active_file_count,
@@ -39,14 +82,44 @@ final class ProjectCapabilityService
         );
         $query->execute(['id' => $projectId]);
         $project = $query->fetch();
-        if (!$project) return $this->none();
+        if (!$project || !empty($project['deleted_at'])) return null;
         $participants = Database::connection()->prepare(
             "SELECT user_id,role_code,status,removed_at FROM project_participants
              WHERE project_id=:id AND status='active' AND removed_at IS NULL"
         );
         $participants->execute(['id' => $projectId]);
         $project['participants'] = $participants->fetchAll();
-        return $this->forCurrentUser($project, $context);
+        return $project;
+    }
+
+    /** @param list<int> $projectIds @return array<int,array<string,bool>> */
+    public function forProjectIds(array $projectIds, string $context): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $projectIds), static fn(int $id): bool => $id > 0)));
+        if ($ids === []) return [];
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $db = Database::connection();
+        $projects = $db->prepare("SELECT p.id,p.created_by,p.tutor_id,p.status,p.is_available,p.deleted_at,pt.code type_code,
+            (SELECT COUNT(*) FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL) active_file_count,
+            (SELECT COUNT(*) FROM project_participants author WHERE author.project_id=p.id AND author.role_code='student' AND author.status='active' AND author.removed_at IS NULL) author_count
+            FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id IN ($marks)");
+        $projects->execute($ids);
+        $rows = [];
+        foreach ($projects->fetchAll() as $project) $rows[(int)$project['id']] = $project;
+        $participants = $db->prepare("SELECT project_id,user_id,role_code,status,removed_at FROM project_participants WHERE project_id IN ($marks) AND status='active' AND removed_at IS NULL");
+        $participants->execute($ids);
+        foreach ($participants->fetchAll() as $participant) $rows[(int)$participant['project_id']]['participants'][] = $participant;
+        $session = new AuthSessionService();
+        $access = new ProjectAccessService();
+        $userId = (int) ($session->userId() ?? 0);
+        $roles = $access->currentRoles();
+        $administrator = $session->hasAdminAccess();
+        $result = [];
+        foreach ($ids as $id) {
+            $project = $rows[$id] ?? null;
+            $result[$id] = is_array($project) ? $this->resolve($project, $context, $userId, $roles, $administrator) : $this->none();
+        }
+        return $result;
     }
 
     /** @return array<string,bool> */

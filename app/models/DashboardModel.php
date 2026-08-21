@@ -9,15 +9,38 @@ final class DashboardModel
         if ($teacherId < 1) return $this->emptyTeacherDashboard($teacherId);
 
         $db = Database::connection();
-        $teacher = $this->teacherIdentity($db, $teacherId);
-        $period = $this->teacherAcademicPeriod($db);
+        try {
+            $teacher = $this->teacherIdentity($db, $teacherId);
+        } catch (Throwable $error) {
+            error_log('Teacher dashboard identity: ' . $error->getMessage());
+            $teacher = ['id'=>$teacherId,'name'=>'Usuario','email'=>'','roles'=>['teacher'],'can_tutor'=>false,'can_manage_thesis'=>false];
+        }
+        try {
+            $period = $this->teacherAcademicPeriod($db);
+        } catch (Throwable $error) {
+            error_log('Teacher dashboard period: ' . $error->getMessage());
+            $period = null;
+        }
         $periodId = $period === null ? null : (int) $period['id'];
-        $assigned = $period === null
-            ? ['projects' => []]
-            : (new TeacherAssignedProjectService())->forTeacher($teacherId, $periodId);
+        try {
+            $assigned = $period === null
+                ? ['projects' => []]
+                : (new TeacherAssignedProjectService())->forTeacher($teacherId, $periodId);
+        } catch (Throwable $error) {
+            error_log('Teacher dashboard assignments: ' . $error->getMessage());
+            $assigned = ['projects' => []];
+        }
         $projects = $assigned['projects'];
         $projectIds = array_values(array_unique(array_map(static fn(array $item): int => (int) $item['id'], $projects)));
-        $this->addTeacherProjectContext($db, $projects, $projectIds);
+        try {
+            $this->addTeacherProjectContext($db, $projects, $projectIds);
+            $latestDeliveries = $this->teacherLatestDeliveries($db, $projectIds);
+            $adjustments = $this->teacherPendingAdjustments($db, $projectIds);
+        } catch (Throwable $error) {
+            error_log('Teacher dashboard project context: ' . $error->getMessage());
+            $latestDeliveries = [];
+            $adjustments = [];
+        }
         // La fuente semántica central ya determinó las unidades pendientes.
         $deliveries = [];
         foreach ($projects as $project) {
@@ -25,15 +48,18 @@ final class DashboardModel
             if ($units > 0) $deliveries[(int) $project['id']] = $units;
         }
         $this->sortTeacherProjectsForDashboard($projects, $deliveries);
-        $latestDeliveries = $this->teacherLatestDeliveries($db, $projectIds);
-        $adjustments = $this->teacherPendingAdjustments($db, $projectIds);
         try {
             $upcoming = $this->teacherUpcomingEvents($db, $teacherId, $projectIds);
         } catch (Throwable $error) {
             error_log('Teacher dashboard calendar: ' . $error->getMessage());
             $upcoming = [];
         }
-        $capabilities = $this->teacherCapabilities($db, $teacherId, $projects, $teacher);
+        try {
+            $capabilities = $this->teacherCapabilities($db, $teacherId, $projects, $teacher);
+        } catch (Throwable $error) {
+            error_log('Teacher dashboard capabilities: ' . $error->getMessage());
+            $capabilities = ['is_tutor'=>false,'is_cotutor'=>false,'is_reviewer'=>false,'is_tribunal_member'=>false,'can_manage_thesis'=>false,'manage_thesis_process'=>false];
+        }
         $followUp = $this->teacherFollowUp($projects, $deliveries);
         $projectItems = array_map(static function (array $project) use ($deliveries, $latestDeliveries, $adjustments): array {
             $id = (int) $project['id'];
@@ -283,66 +309,31 @@ final class DashboardModel
         parse_str((string) ($parts['query'] ?? ''), $query);
         $page = strtolower(trim((string) ($query['page'] ?? '')));
         if (!in_array($page, ['dashboard','assigned-projects','projects','project-detail','calendar','notifications','repository','repository-detail','thesis-management'], true)) return null;
+        $requiredIds = [
+            'project-detail' => ['id'],
+            'repository-detail' => ['id'],
+        ];
+        foreach ($requiredIds[$page] ?? [] as $key) {
+            if (!$this->teacherPositiveUrlId($query[$key] ?? null)) return null;
+        }
+        foreach (['id', 'project_id', 'delivery_id', 'event_id'] as $key) {
+            if (array_key_exists($key, $query) && !$this->teacherPositiveUrlId($query[$key])) return null;
+        }
         $relative = 'index.php'
             . (isset($parts['query']) ? '?' . $parts['query'] : '')
             . (isset($parts['fragment']) ? '#' . $parts['fragment'] : '');
         return base_url($relative);
     }
 
+    private function teacherPositiveUrlId(mixed $value): bool
+    {
+        if (!is_string($value) && !is_int($value)) return false;
+        return filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) !== false;
+    }
+
     private function teacherUpcomingEvents(PDO $db, int $teacherId, array $projectIds): array
     {
-        $projectIds = array_values(array_unique($projectIds));
-        $projectClause = $projectIds ? ' OR e.project_id IN (' . implode(',', array_fill(0, count($projectIds), '?')) . ')' : '';
-        $today = date('Y-m-d');
-        $now = date('H:i:s');
-        $params = array_merge([$teacherId], $projectIds, [$today, $today, $now]);
-        $query = $db->prepare("SELECT e.id,e.title,e.event_type,e.event_date,e.event_time,e.project_id,e.is_completed,p.title project_title
-            FROM project_events e LEFT JOIN projects p ON p.id=e.project_id
-            WHERE (e.created_by=? $projectClause) AND e.is_completed=0
-              AND (e.event_date>? OR (e.event_date=? AND (e.event_time IS NULL OR e.event_time>=?)))
-            ORDER BY e.event_date,e.event_time IS NULL,e.event_time,e.id LIMIT 12");
-        $query->execute($params);
-        $items = array_map(static fn(array $row): array => [
-            'id' => (int) $row['id'], 'title' => (string) $row['title'], 'type' => (string) $row['event_type'],
-            'date' => (string) $row['event_date'],
-            'time' => !empty($row['event_time']) ? (string) $row['event_time'] : null,
-            'context' => $row['project_title'] !== null && trim((string) $row['project_title']) !== ''
-                ? (string) $row['project_title'] : 'Evento personal',
-            'project_id' => $row['project_id'] === null ? null : (int) $row['project_id'],
-            'project_title' => $row['project_title'] === null ? null : (string) $row['project_title'], 'completed' => (bool) $row['is_completed'],
-            'route' => $row['project_id'] === null ? route('calendar') : route('project-detail') . '&id=' . (int) $row['project_id'],
-            'action_label' => $row['project_id'] === null ? 'Abrir calendario' : 'Abrir proyecto',
-        ], $query->fetchAll(PDO::FETCH_ASSOC));
-        if ($projectIds === []) return array_slice($items, 0, 3);
-        $marks = implode(',', array_fill(0, count($projectIds), '?'));
-        $defenses = $db->prepare("SELECT d.id,p.id project_id,p.title,d.defense_date,d.defense_time
-            FROM project_defenses d INNER JOIN projects p ON p.id=d.project_id
-            WHERE p.id IN ($marks) AND p.deleted_at IS NULL AND d.result IS NULL AND d.defense_date IS NOT NULL
-              AND (d.defense_date>? OR (d.defense_date=? AND (d.defense_time IS NULL OR d.defense_time>=?)))
-              AND d.attempt_number=(SELECT MAX(current_attempt.attempt_number) FROM project_defenses current_attempt WHERE current_attempt.project_id=d.project_id)
-            ORDER BY d.defense_date,d.defense_time IS NULL,d.defense_time,d.id LIMIT 12");
-        $defenses->execute(array_merge($projectIds, [$today, $today, $now]));
-        foreach ($defenses->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $items[] = ['id'=>'defense:' . (int)$row['id'],'title'=>'Defensa programada','type'=>'defense','date'=>(string)$row['defense_date'],
-                'time'=>!empty($row['defense_time']) ? substr((string)$row['defense_time'], 0, 5) : null,'context'=>(string)$row['title'],
-                'project_id'=>(int)$row['project_id'],'project_title'=>(string)$row['title'],'completed'=>false,
-                'route'=>route('project-detail').'&id='.(int)$row['project_id'],'action_label'=>'Abrir proyecto'];
-        }
-        $schedules = $db->prepare("SELECT DISTINCT s.id,s.academic_period_id,s.defense_date,s.defense_time,ap.name period_name
-            FROM academic_defense_schedules s INNER JOIN academic_periods ap ON ap.id=s.academic_period_id
-            INNER JOIN projects p ON p.academic_period_id=s.academic_period_id
-            INNER JOIN project_types pt ON pt.id=p.project_type_id AND pt.code='thesis'
-            WHERE p.id IN ($marks) AND p.status='defense' AND p.deleted_at IS NULL AND s.defense_date IS NOT NULL
-              AND (s.defense_date>? OR (s.defense_date=? AND (s.defense_time IS NULL OR s.defense_time>=?)))
-            ORDER BY s.defense_date,s.defense_time IS NULL,s.defense_time,s.id LIMIT 12");
-        $schedules->execute(array_merge($projectIds, [$today, $today, $now]));
-        foreach ($schedules->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $items[] = ['id'=>'defense-schedule:' . (int)$row['id'],'title'=>'Jornada de defensa','type'=>'defense_schedule','date'=>(string)$row['defense_date'],
-                'time'=>!empty($row['defense_time']) ? substr((string)$row['defense_time'], 0, 5) : null,'context'=>(string)$row['period_name'],
-                'project_id'=>null,'project_title'=>null,'completed'=>false,'route'=>route('calendar'),'action_label'=>'Abrir calendario'];
-        }
-        usort($items, static fn(array $left, array $right): int => [($left['date'] ?? ''), empty($left['time']) ? '23:59:59' : $left['time'], (string)($left['id'] ?? '')] <=> [($right['date'] ?? ''), empty($right['time']) ? '23:59:59' : $right['time'], (string)($right['id'] ?? '')]);
-        return array_slice($items, 0, 3);
+        return (new TeacherCalendarVisibilityService())->upcoming($db, $teacherId, $projectIds);
     }
     public function getAdminDashboard(): array
     {

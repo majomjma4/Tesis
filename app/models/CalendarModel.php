@@ -18,6 +18,32 @@ final class CalendarModel
         return array_map(fn(array $event): array => $this->present($event), $statement->fetchAll());
     }
 
+    /** @return list<array<string,mixed>> */
+    public function getEventsForTeacher(int $teacherId): array
+    {
+        $events = $this->getEventsForOwner($teacherId);
+        $db = Database::connection();
+        $projects = $db->prepare("SELECT p.id FROM projects p WHERE p.deleted_at IS NULL AND (p.tutor_id=:tutor OR EXISTS (
+            SELECT 1 FROM project_participants pp WHERE pp.project_id=p.id AND pp.user_id=:participant
+              AND pp.status='active' AND pp.removed_at IS NULL AND LOWER(pp.role_code) IN ('tutor','cotutor','co_tutor','co-tutor','tribunal','jury')
+        ))");
+        $projects->execute(['tutor'=>$teacherId, 'participant'=>$teacherId]);
+        $projectIds = array_map('intval', $projects->fetchAll(PDO::FETCH_COLUMN));
+        $knownIds = array_fill_keys(array_map(static fn(array $event): string => (string)$event['id'], $events), true);
+        foreach ((new TeacherCalendarVisibilityService())->upcoming($db, $teacherId, $projectIds, false) as $item) {
+            if (isset($knownIds[(string)$item['id']])) continue;
+            $events[] = [
+                'id'=>(string)$item['id'], 'projectId'=>(int)($item['project_id'] ?? 0), 'title'=>(string)$item['title'],
+                'date'=>(string)$item['date'], 'time'=>$item['time'], 'type'=>(string)$item['type'],
+                'priority'=>'medium', 'description'=>(string)($item['context'] ?? ''), 'completed'=>false,
+                'updatedAt'=>'', 'readOnly'=>true,
+            ];
+            $knownIds[(string)$item['id']] = true;
+        }
+        usort($events, static fn(array $a, array $b): int => [($a['date'] ?? ''), empty($a['time']) ? '23:59:59' : $a['time'], (string)($a['id'] ?? '')] <=> [($b['date'] ?? ''), empty($b['time']) ? '23:59:59' : $b['time'], (string)($b['id'] ?? '')]);
+        return $events;
+    }
+
     public function saveForOwner(array $data, int $ownerId): array
     {
         $owner = $this->owner($ownerId);

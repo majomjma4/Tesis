@@ -12,7 +12,7 @@ final class ProjectReviewRepresentationController
         if ($actor < 1 || !$session->validateCsrf('student_project_review_representation',(string)($_POST['_csrf']??''))) $this->json(false,'La solicitud no está autorizada.',[],419);
         $projectId=(int)($_POST['project_id']??0);$action=(string)($_POST['action']??'');
         try {
-            if (empty((new ProjectCapabilityService())->forProjectId($projectId,'academic')['view_project'])) $this->json(false,'No tienes acceso a este proyecto.',[],403);
+            if (!(new ProjectCapabilityService())->canViewProjectResource($projectId,'academic')) $this->json(false,'No tienes acceso a este proyecto.',[],403);
             if ($action==='upload') $this->json(true,'La representación PDF fue asociada correctamente.',(new ProjectReviewRepresentationService())->uploadSupplemental($projectId,(int)($_POST['file_id']??0),$_FILES['file']??[],$actor));
             if ($action==='readiness') $this->json(true,'Validación completada.',(new ProjectReviewReadinessService())->check($projectId,false));
             $this->json(false,'La operación no es válida.',[],422);

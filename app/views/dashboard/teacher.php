@@ -9,6 +9,8 @@ $follow = is_array($dashboard['follow_up'] ?? null) ? $dashboard['follow_up'] : 
 $upcoming = is_array($dashboard['upcoming'] ?? null) ? $dashboard['upcoming'] : [];
 $notifications = is_array($dashboard['notifications'] ?? null) ? $dashboard['notifications'] : [];
 $repository = is_array($dashboard['repository'] ?? null) ? $dashboard['repository'] : [];
+$showTeacherTribunalQa = strtolower((string) ($GLOBALS['config']['environment'] ?? 'production')) === 'development'
+    && (string) ($_GET['qa_teacher_tribunal'] ?? '') === '1';
 
 $empty = static function (string $title, string $detail = ''): void {
     echo '<div class="teacher-empty-state"><strong>' . e($title) . '</strong>'
@@ -27,10 +29,11 @@ $relativeTime = static function (string $value): string {
     if ($seconds < 60) return 'hace ' . max(1, $seconds) . ' s';
     if ($seconds < 3600) return 'hace ' . intdiv($seconds, 60) . ' min';
     if ($seconds < 86400) return 'hace ' . intdiv($seconds, 3600) . ' h';
-    if ($seconds < 604800) return 'hace ' . intdiv($seconds, 86400) . ' d';
-    if ($seconds < 2592000) return 'hace ' . intdiv($seconds, 604800) . ' sem';
-    $months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-    return (int) $created->format('j') . ' ' . $months[(int) $created->format('n') - 1];
+        if ($seconds < 604800) return 'hace ' . intdiv($seconds, 86400) . ' d';
+        if ($seconds < 2592000) return 'hace ' . intdiv($seconds, 604800) . ' sem';
+        $months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+        $local = $created->setTimezone(new DateTimeZone(date_default_timezone_get()));
+        return (int) $local->format('j') . ' ' . $months[(int) $local->format('n') - 1];
 };
 
 $projectSentence = static function (int $count, string $ending): string {
@@ -138,20 +141,20 @@ $projectSentence = static function (int $count, string $ending): string {
             </header>
             <div class="teacher-follow-up-grid">
                 <?php $review = is_array($follow['review_required'] ?? null) ? $follow['review_required'] : []; $reviewProjects = (int) ($review['projects_count'] ?? 0); ?>
-                <article class="teacher-follow-up-card teacher-follow-up-card--review-required">
+                <article class="teacher-follow-up-card teacher-follow-up-card--review-required<?= (int) ($review['count'] ?? 0) === 0 ? ' teacher-follow-up-card--empty' : '' ?>">
                     <i class="fa-solid fa-file-circle-check" aria-hidden="true"></i>
-                    <div><h3>Por revisar</h3><strong><?= (int) ($review['count'] ?? 0) ?></strong><p><?= e($projectSentence($reviewProjects, 'requieren revisión')) ?></p><?php if (!empty($review['route'])): ?><a class="teacher-follow-up-link" href="<?= e($review['route']) ?>">Ver pendientes →</a><?php endif; ?></div>
+                    <div><h3>Por revisar</h3><?php if ((int) ($review['count'] ?? 0) > 0): ?><strong><?= (int) $review['count'] ?></strong><p><?= e($projectSentence($reviewProjects, 'requieren revisión')) ?></p><?php if (!empty($review['route'])): ?><a class="teacher-follow-up-link" href="<?= e($review['route']) ?>">Ver pendientes →</a><?php endif; ?><?php else: ?><p>Todo al día</p><small>No tienes revisiones pendientes</small><?php endif; ?></div>
                 </article>
                 <?php $waiting = is_array($follow['waiting_student'] ?? null) ? $follow['waiting_student'] : []; $waitingProjects = (int) ($waiting['projects_count'] ?? $waiting['count'] ?? 0); ?>
-                <article class="teacher-follow-up-card teacher-follow-up-card--waiting-student">
+                <article class="teacher-follow-up-card teacher-follow-up-card--waiting-student<?= (int) ($waiting['count'] ?? 0) === 0 ? ' teacher-follow-up-card--empty' : '' ?>">
                     <i class="fa-solid fa-user-clock" aria-hidden="true"></i>
-                    <div><h3>Esperando estudiante</h3><strong><?= (int) ($waiting['count'] ?? 0) ?></strong><p><?= e($projectSentence($waitingProjects, 'en espera')) ?></p></div>
+                    <div><h3>Esperando estudiante</h3><?php if ((int) ($waiting['count'] ?? 0) > 0): ?><strong><?= (int) $waiting['count'] ?></strong><p><?= e($projectSentence($waitingProjects, 'en espera')) ?></p><?php else: ?><p>Sin proyectos en espera</p><?php endif; ?></div>
                 </article>
                 <?php $tribunal = is_array($follow['tribunal_assignment'] ?? null) ? $follow['tribunal_assignment'] : []; ?>
-                <?php if (!empty($tribunal['visible']) && (int) ($tribunal['count'] ?? 0) > 0): ?>
+                <?php if ((!empty($tribunal['visible']) && (int) ($tribunal['count'] ?? 0) > 0) || $showTeacherTribunalQa): ?>
                     <article class="teacher-follow-up-card teacher-follow-up-card--tribunal-assignment">
                         <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
-                        <div><h3>Asignación de tribunal</h3><strong><?= (int) $tribunal['count'] ?></strong><p>En espera</p></div>
+                        <div><h3>Asignación de tribunal</h3><strong><?= $showTeacherTribunalQa && empty($tribunal['visible']) ? 2 : (int) $tribunal['count'] ?></strong><p>En espera</p></div>
                     </article>
                 <?php endif; ?>
             </div>
