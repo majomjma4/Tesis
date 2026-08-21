@@ -1,4 +1,18 @@
-<?php $statusLabels = [];
+<?php
+$qaEmptyTeacherProjects = app_is_development()
+    && !is_array($_GET['qa_empty_projects'] ?? null)
+    && (string) ($_GET['qa_empty_projects'] ?? '') === '1'
+    && (string) ($currentPage ?? '') === 'projects'
+    && empty($layoutIsAdmin)
+    && in_array('teacher', (array) ($layoutUserRoles ?? []), true);
+
+if ($qaEmptyTeacherProjects) {
+    $projects = [];
+    $pagePagination = array_replace((array) ($pagePagination ?? []), ['total' => 0]);
+    $projectSummary = ['total' => 0, 'development' => 0, 'review' => 0, 'approved' => 0, 'defense' => 0];
+}
+
+$statusLabels = [];
 foreach (['development', 'under_review', 'approved', 'defense', 'tribunal_approved'] as $projectStatusCode)
     $statusLabels[$projectStatusCode] = project_academic_labels($projectStatusCode)['status'];
 $projectStageLabel = !empty($projectEditorOnly) && !empty($projectEditorPayload) ? project_academic_labels((string) ($projectEditorPayload['status'] ?? ''))['stage'] : 'Etapa no disponible'; ?>
@@ -30,6 +44,18 @@ $projectStageLabel = !empty($projectEditorOnly) && !empty($projectEditorPayload)
         <article><strong><?= $projectSummary['approved'] ?></strong><span>Aprobados</span></article>
         <article><strong><?= $projectSummary['defense'] ?></strong><span>En tribunal</span></article>
     </section>
+    <?php
+        $filteredProjectTotal = (int) ($pagePagination['total'] ?? 0);
+        $hasActiveFilters = ($filters['search'] ?? '') !== ''
+            || ($filters['status'] ?? '') !== ''
+            || ($filters['type_id'] ?? 0) > 0
+            || ($filters['review_situation'] ?? '') !== '';
+        $teacherProjectsContext = empty($layoutIsAdmin)
+            && in_array('teacher', (array) ($layoutUserRoles ?? []), true);
+        $emptyProjectsDataset = $teacherProjectsContext
+            && $filteredProjectTotal === 0
+            && !$hasActiveFilters;
+    ?>
     <form class="ap-filters admin-filter-bar" role="search">
         <input type="hidden" name="page" value="projects">
         <?php foreach (['group', 'sort', 'per_page'] as $preservedFilter): ?>
@@ -41,18 +67,19 @@ $projectStageLabel = !empty($projectEditorOnly) && !empty($projectEditorPayload)
             <span class="sr-only">Buscar proyectos activos</span>
             <span class="ap-search-field admin-filter-search"><i class="fa-solid fa-magnifying-glass"
                     aria-hidden="true"></i><input type="search" name="search" value="<?= e($filters['search']) ?>"
+                    <?= $emptyProjectsDataset ? 'disabled' : '' ?>
                     placeholder="Buscar por título, código o tutor" autocomplete="off" data-no-search-history><button
                     type="button" class="ap-search-clear" aria-label="Limpiar búsqueda" title="Limpiar búsqueda" hidden><i
                         class="fa-solid fa-xmark" aria-hidden="true"></i></button></span>
         </label>
         <label class="ap-filter-control admin-filter-control"><span>Estado</span><select name="status"
-                aria-label="Filtrar proyectos activos por estado">
+                aria-label="Filtrar proyectos activos por estado" <?= $emptyProjectsDataset ? 'disabled' : '' ?>>
                 <option value="">Todos</option><?php foreach ($statusLabels as $key => $label): ?>
                     <option value="<?= e($key) ?>" <?= $filters['status'] === $key ? 'selected' : '' ?>><?= e($label) ?></option>
                 <?php endforeach; ?>
             </select></label>
         <label class="ap-filter-control admin-filter-control"><span>Tipo</span><select name="type_id"
-                aria-label="Filtrar proyectos por tipo">
+                aria-label="Filtrar proyectos por tipo" <?= $emptyProjectsDataset ? 'disabled' : '' ?>>
                 <option value="">Todos</option><?php foreach ($catalogs['types'] as $item): ?>
                     <option value="<?= $item['id'] ?>" <?= $filters['type_id'] === $item['id'] ? 'selected' : '' ?>><?= e($item['name']) ?>
                     </option><?php endforeach; ?>
@@ -79,14 +106,6 @@ $projectStageLabel = !empty($projectEditorOnly) && !empty($projectEditorPayload)
             </div>
         <?php endif; ?>
     </form>
-    <?php
-        $filteredProjectTotal = (int) ($pagePagination['total'] ?? 0);
-        $totalProjectsExist  = (int) ($projectSummary['total'] ?? 0);
-        $hasActiveFilters     = ($filters['search'] ?? '') !== ''
-            || ($filters['status'] ?? '') !== ''
-            || ($filters['type_id'] ?? 0) > 0
-            || ($filters['review_situation'] ?? '') !== '';
-    ?>
     <p class="ap-results-count" role="status">
         <?php if ($filteredProjectTotal === 0 && $hasActiveFilters): ?>
             0 proyectos encontrados con los filtros seleccionados
@@ -103,7 +122,7 @@ $projectStageLabel = !empty($projectEditorOnly) && !empty($projectEditorPayload)
     }
     $projectListReturnUrl = base_url('index.php?' . http_build_query($projectListReturnQuery)); ?>
     <section class="ap-list"><?php if ($filteredProjectTotal === 0): ?>
-        <?php if ($totalProjectsExist === 0 || !$hasActiveFilters): ?>
+        <?php if ($emptyProjectsDataset): ?>
             <div class="ap-empty">
                 <i class="fa-regular fa-folder-open"></i>
                 <h2>No hay proyectos activos en este momento.</h2>

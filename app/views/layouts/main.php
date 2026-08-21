@@ -18,7 +18,11 @@
     <link rel="stylesheet" href="<?= e(asset('css/card-accents.css')) ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
-<?php $isAdministratorLayout = (bool) ($layoutIsAdmin ?? false); $isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen); ?>
+<?php
+$isAdministratorLayout = (bool) ($layoutIsAdmin ?? false);
+$isTeacherContext = !$isAdministratorLayout && in_array('teacher', (array) ($layoutUserRoles ?? []), true);
+$isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen);
+?>
 
 <body
     class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout' : '') . ($isStudentWorkspaceFullscreen ? ' app-student-workspace-fullscreen' : ''))) ?>">
@@ -151,7 +155,7 @@
                         </button>
                     </form>
                 <?php endif; ?>
-                <?php if (!$isAdministratorLayout): ?>
+                <?php if (!$isAdministratorLayout && !$isTeacherContext): ?>
                     <a class="topbar-action-btn" href="<?= e(route('new-project')) ?>">
                         <i class="fa-solid fa-plus"></i>
                         <span class="topbar-action-label">Nuevo proyecto</span>
