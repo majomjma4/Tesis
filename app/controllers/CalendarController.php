@@ -12,13 +12,14 @@ final class CalendarController
         if (!$session->isAuthenticated() || (int)($session->userId() ?? 0) < 1) { header('Location: ' . route('login')); exit; }
         $calendar = new CalendarModel();
         $projectFilterId = filter_var($_GET['project_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0;
+        $isTeacherContext = $this->isTeacherContext($session);
 
         View::render('calendar/index', [
             'currentPage' => 'calendar',
             'title' => 'Calendario | Gestion Documental Academica',
             'bodyClass' => 'dashboard-page calendar-page',
             'pageScript' => asset('js/calendar.js'),
-            'calendarEvents' => $session->isTeacher()
+            'calendarEvents' => $isTeacherContext
                 ? $calendar->getEventsForTeacher((int)$session->userId())
                 : $calendar->getEventsForOwner((int)$session->userId()),
             'calendarCsrf' => $session->csrfToken('calendar_events'),
@@ -40,7 +41,7 @@ final class CalendarController
             if (!$session->isAuthenticated() || (int)($session->userId() ?? 0) < 1) { $this->json(false, 'La sesión no está activa.', null, 403); return; }
             $owner = (int)$session->userId();
             if ($method === 'GET') {
-                $this->json(true, 'Eventos cargados.', $session->isTeacher()
+                $this->json(true, 'Eventos cargados.', $this->isTeacherContext($session)
                     ? $model->getEventsForTeacher($owner)
                     : $model->getEventsForOwner($owner));
                 return;
@@ -76,6 +77,11 @@ final class CalendarController
 
     // Inicio de construcción de respuestas JSON
     // Unifica el formato y el código HTTP devuelto por el endpoint del calendario.
+    private function isTeacherContext(AuthSessionService $session): bool
+    {
+        return $session->isTeacher() && !$session->isAdminModeActive();
+    }
+
     private function json(bool $success, string $message, mixed $data = null, int $status = 200): void
     {
         http_response_code($status);
