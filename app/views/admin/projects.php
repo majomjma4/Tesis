@@ -1,16 +1,4 @@
 <?php
-$qaEmptyTeacherProjects = app_is_development()
-    && !is_array($_GET['qa_empty_projects'] ?? null)
-    && (string) ($_GET['qa_empty_projects'] ?? '') === '1'
-    && (string) ($currentPage ?? '') === 'projects'
-    && empty($layoutIsAdmin)
-    && in_array('teacher', (array) ($layoutUserRoles ?? []), true);
-
-if ($qaEmptyTeacherProjects) {
-    $projects = [];
-    $pagePagination = array_replace((array) ($pagePagination ?? []), ['total' => 0]);
-    $projectSummary = ['total' => 0, 'development' => 0, 'review' => 0, 'approved' => 0, 'defense' => 0];
-}
 
 $statusLabels = [];
 foreach (['development', 'under_review', 'approved', 'defense', 'tribunal_approved'] as $projectStatusCode)
@@ -152,8 +140,11 @@ $projectStageLabel = !empty($projectEditorOnly) && !empty($projectEditorPayload)
                                     data-tooltip="Observaciones pendientes" tabindex="0"><i class="fa-solid fa-triangle-exclamation"
                                         aria-hidden="true"></i></span><?php endif; ?></div>
                     </div>
-                    <div class="ap-actions"><a
-                            href="<?= e(route('project-detail') . '&id=' . (int) $p['id'] . '&return=' . rawurlencode($projectListReturnUrl)) ?>">Abrir</a>
+                    <?php $canReviewProject = !empty($p['capabilities']['review_documents']);
+                    $projectActionUrl = route('project-detail') . '&id=' . (int) $p['id']
+                        . ($canReviewProject ? '&tab=review' : '')
+                        . '&return=' . rawurlencode($projectListReturnUrl); ?>
+                    <div class="ap-actions"><a href="<?= e($projectActionUrl) ?>"><?= $canReviewProject ? 'Revisar proyecto' : 'Abrir' ?></a>
                     </div>
                 </article>
     <?php endforeach; endif; ?>

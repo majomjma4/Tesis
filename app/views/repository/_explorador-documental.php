@@ -6,6 +6,7 @@ $recordFileOwner = $recordIsProject ? 'proyecto' : 'material';
 $archives = is_array($digitalRecord['archives'] ?? null) ? $digitalRecord['archives'] : [];
 $package = is_array($digitalRecord['package'] ?? null) ? $digitalRecord['package'] : [];
 $canManageFiles = !empty($digitalRecord['can_manage_files']) && !empty($digitalRecord['file_upload']);
+$canDownloadFiles = !empty($digitalRecord['capabilities']['download_files']);
 $restorableFiles = is_array($digitalRecord['restorable_files'] ?? null) ? $digitalRecord['restorable_files'] : [];
 $globalFileActions = is_array($digitalRecord['global_file_actions'] ?? null) ? $digitalRecord['global_file_actions'] : [];
 $documentReview = is_array($digitalRecord['document_review'] ?? null) ? $digitalRecord['document_review'] : [];
@@ -183,7 +184,7 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
                         <?php if ($showPackageDownload): ?>
                             <a data-record-package-download data-record-download download role="menuitem" href="<?= e($packageDownloadUrl) ?>"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i><span>Descargar ZIP<small><?= count($selectableFiles) ?> <?= count($selectableFiles) === 1 ? 'archivo' : 'archivos' ?></small></span><?php if (!empty($package['size'])): ?><strong class="ed-package-size"><?= e((string) $package['size']) ?></strong><?php endif; ?></a>
                         <?php endif; ?>
-                        <button type="button" role="menuitem" data-file-selection-toggle<?= $selectableFiles ? '' : ' disabled' ?>><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>Seleccionar archivos</span></button>
+                        <?php if ($canDownloadFiles): ?><button type="button" role="menuitem" data-file-selection-toggle<?= $selectableFiles ? '' : ' disabled' ?>><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>Seleccionar archivos</span></button><?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div><?php endif; ?>
@@ -196,7 +197,7 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
                 <button type="button" data-file-selection-cancel>Cancelar</button>
                 <?php if ($canManageFiles): ?>
                     <button type="button" class="is-danger" data-file-selection-remove disabled>Retirar seleccionados</button>
-                <?php else: ?>
+                <?php elseif ($canDownloadFiles): ?>
                     <button type="button" class="is-primary" data-file-selection-download disabled><i class="fa-solid fa-download" aria-hidden="true"></i> Descargar seleccionados</button>
                 <?php endif; ?>
             </div>
@@ -251,7 +252,7 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
                                     <button type="button" role="menuitem" data-file-remove-action><i class="fa-solid fa-box-archive" aria-hidden="true"></i>Retirar archivo</button><?php endif; ?>
                                 </div>
                             <?php endif; ?>
-                        <?php elseif ($available): ?>
+                        <?php elseif ($available && !empty($document['download_url'])): ?>
                             <a class="ed-file-direct-download" href="<?= e($document['download_url']) ?>" download aria-label="Descargar <?= e($document['name']) ?>" title="Descargar <?= e($document['name']) ?>">
                                 <i class="fa-solid fa-download" aria-hidden="true"></i>
                             </a>

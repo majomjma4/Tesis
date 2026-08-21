@@ -33,9 +33,10 @@ final class ProjectRecordModel
         return ['events'=>$page,'total'=>$total,'loaded'=>count($page),'has_more'=>$offset+count($page)<$total,'next_offset'=>$offset+count($page)];
     }
 
-    public function find(int $projectId, ?int $userId, bool $administrator, bool $publishedOnly = false): ?array
+    public function find(int $projectId, ?int $userId, bool $administrator, bool $publishedOnly = false, bool $institutionalTeacherReadOnly = false): ?array
     {
         $db = Database::connection();
+        $institutionalStatuses = "'" . implode("','", ProjectCapabilityService::INSTITUTIONAL_ACTIVE_STATUSES) . "'";
         $sql = "SELECT p.*, pt.code AS type_code, pt.name AS type_name, c.name AS career_name,
                        ap.name AS period_name, s.code AS subject_code, s.name AS subject_name,
                        rl.name AS research_line_name, tutor.id AS tutor_user_id,
@@ -52,10 +53,14 @@ final class ProjectRecordModel
         if ($publishedOnly) $sql .= " AND p.status='published' AND p.withdrawn_at IS NULL" . ($administrator ? '' : ' AND p.is_available=1') . "
             AND EXISTS (SELECT 1 FROM project_files visible_file WHERE visible_file.project_id=p.id AND visible_file.deleted_at IS NULL AND visible_file.purged_at IS NULL)
             AND EXISTS (SELECT 1 FROM project_participants visible_student INNER JOIN student_profiles visible_profile ON visible_profile.user_id=visible_student.user_id WHERE visible_student.project_id=p.id AND visible_student.role_code='student' AND visible_student.status='active' AND visible_student.removed_at IS NULL)";
-        if (!$administrator && !$publishedOnly) $sql .= " AND (p.created_by=:viewer_creator OR p.tutor_id=:viewer_tutor OR EXISTS (SELECT 1 FROM project_participants access_participant WHERE access_participant.project_id=p.id AND access_participant.user_id=:viewer_participant AND access_participant.status='active' AND access_participant.removed_at IS NULL))";
+        if (!$administrator && !$publishedOnly) {
+            $sql .= $institutionalTeacherReadOnly
+                ? " AND p.withdrawn_at IS NULL AND p.status IN (" . $institutionalStatuses . ")"
+                : " AND (p.created_by=:viewer_creator OR p.tutor_id=:viewer_tutor OR EXISTS (SELECT 1 FROM project_participants access_participant WHERE access_participant.project_id=p.id AND access_participant.user_id=:viewer_participant AND access_participant.status='active' AND access_participant.removed_at IS NULL))";
+        }
         $statement = $db->prepare($sql);
         $parameters = ['id' => $projectId];
-        if (!$administrator && !$publishedOnly) {
+        if (!$administrator && !$publishedOnly && !$institutionalTeacherReadOnly) {
             $parameters['viewer_creator'] = (int) $userId;
             $parameters['viewer_tutor'] = (int) $userId;
             $parameters['viewer_participant'] = (int) $userId;
@@ -134,6 +139,17 @@ final class ProjectRecordModel
     {
         $statement = Database::connection()->prepare("SELECT * FROM project_files WHERE id=:file_id AND project_id=:project_id AND deleted_at IS NULL AND purged_at IS NULL");
         $statement->execute(['file_id' => $fileId, 'project_id' => $projectId]);
+        return $statement->fetch() ?: null;
+    }
+
+    /** Resolves a current file and its real parent project from file_id. */
+    public function findFileById(int $fileId): ?array
+    {
+        $statement = Database::connection()->prepare(
+            "SELECT * FROM project_files
+             WHERE id=:file_id AND deleted_at IS NULL AND purged_at IS NULL LIMIT 1"
+        );
+        $statement->execute(['file_id' => $fileId]);
         return $statement->fetch() ?: null;
     }
 

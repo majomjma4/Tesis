@@ -207,14 +207,19 @@ final class ProjectsController
         $requestedTab = strtolower(trim((string) ($_GET['tab'] ?? 'summary')));
         $access = new ProjectAccessService();
         $isAdministrator = $session->isAdminModeActive();
+        $isTeacher = in_array('teacher', array_map('strtolower', array_map('strval', $access->currentRoles())), true);
         $resourceContext = $isAdministrator ? 'academic_management' : 'academic';
-        $canViewResource = $id !== false && $id !== null
-            && (new ProjectCapabilityService())->canViewProjectResource((int) $id, $resourceContext);
-        // La vista del expediente no se autoriza por conocer el id. Un docente
-        // normal necesita una relación académica persistida; la administración
-        // conserva su acceso amplio.
+        $policy = new ProjectCapabilityService();
+        $canViewPrivateResource = $id !== false && $id !== null
+            && $policy->canViewProjectResource((int) $id, $resourceContext);
+        $canViewInstitutionalProject = $id !== false && $id !== null
+            && $isTeacher && $policy->canViewActiveProject((int) $id, $resourceContext);
+        $canViewResource = $canViewPrivateResource || $canViewInstitutionalProject;
+        $institutionalReadOnly = $canViewInstitutionalProject && !$canViewPrivateResource;
+        // Un docente puede leer el catálogo institucional activo; la relación
+        // académica sigue siendo necesaria para revisión y recursos privados.
         $project = $id && $access->can('project.view') && $canViewResource
-            ? (new ProjectRecordModel())->find((int)$id, $access->currentUserId(), $isAdministrator)
+            ? (new ProjectRecordModel())->find((int)$id, $access->currentUserId(), $isAdministrator, false, $institutionalReadOnly)
             : null;
 
         if ($project === null) {
@@ -252,12 +257,14 @@ final class ProjectsController
         $legacyTabs = ['summary'=>'information','deliveries'=>'files','documents'=>'files','final-documents'=>'files','observations'=>'information','comments'=>'information','review'=>'information','history'=>'information','calendar'=>'information','activity'=>'information','participants'=>'information','more'=>'information'];
         $tab = $legacyTabs[$requestedTab] ?? $requestedTab;
         $tab = in_array($tab, ['information','files','evolution'], true) ? $tab : 'information';
-        $project['review_situation']=(new ProjectReviewSituationService())->forProject((int)$project['id']);
+        $project['review_situation']=$institutionalReadOnly ? [] : (new ProjectReviewSituationService())->forProject((int)$project['id']);
         $rawHistoryPerPage = (int) ($_GET['history_per_page'] ?? $this->query['history_per_page'] ?? 10);
         $historyLimit = ($rawHistoryPerPage >= 1 && $rawHistoryPerPage <= 100) ? $rawHistoryPerPage : 10;
         $historyPageNumber = max(1, (int) ($_GET['history_page'] ?? $this->query['history_page'] ?? 1));
         $historyOffset = ($historyPageNumber - 1) * $historyLimit;
-        $academicPage = (new ProjectAcademicTimelineService())->page((int) $project['id'], $historyOffset, $historyLimit);
+        $academicPage = $institutionalReadOnly
+            ? ['events'=>[],'total'=>0,'loaded'=>0,'has_more'=>false,'next_offset'=>0]
+            : (new ProjectAcademicTimelineService())->page((int) $project['id'], $historyOffset, $historyLimit);
 
         $totalEvents = (int) ($academicPage['total'] ?? 0);
         $totalPages = max(1, (int) ceil($totalEvents / $historyLimit));
@@ -265,7 +272,9 @@ final class ProjectsController
         $actualOffset = ($currentPage - 1) * $historyLimit;
 
         if ($currentPage !== $historyPageNumber) {
-            $academicPage = (new ProjectAcademicTimelineService())->page((int) $project['id'], $actualOffset, $historyLimit);
+            $academicPage = $institutionalReadOnly
+                ? ['events'=>[],'total'=>0,'loaded'=>0,'has_more'=>false,'next_offset'=>0]
+                : (new ProjectAcademicTimelineService())->page((int) $project['id'], $actualOffset, $historyLimit);
         }
 
         foreach ($academicPage['events'] as &$academicEvent) {
@@ -305,6 +314,7 @@ final class ProjectsController
             ? $descriptionService->consumePendingReminder((int) $project['id'], $access->currentUserId())
             : null;
         $projectCapabilities = (new ProjectCapabilityService())->forCurrentUser($project, $projectContext);
+        $institutionalReadOnly = !$isAdministrator && $isTeacher && empty($projectCapabilities['review_documents']);
         $adjustmentData = ['items' => [], 'summary' => ['has_pending_adjustments' => false, 'pending_count' => 0, 'latest' => null]];
         if (!empty($projectCapabilities['view_adjustment_requests'])) {
             try {
@@ -335,7 +345,7 @@ final class ProjectsController
         $studentVersions = [];
         $historicalVersion = null;
         $studentDefense = null;
-        if (!$isAdministrator) {
+        if (!$isAdministrator && !($isTeacher && $institutionalReadOnly)) {
             $correctionReadiness = (new ProjectCorrectionReadinessService())->forProject((int) $project['id']);
             $studentDocumentReview = (new ProjectDocumentReviewService())->describeCurrentFiles(
                 (int) $project['id'], (array) $project['files'], $isTeacher, $isTeacher
@@ -383,6 +393,7 @@ final class ProjectsController
             'bodyClass' => 'project-detail-page' . (!$isAdministrator ? ' student-project-workspace-page workspace-fullscreen' : ''),
             'studentWorkspaceFullscreen' => !$isAdministrator,
             'isTeacherContext' => $isTeacher,
+            'institutionalReadOnly' => $institutionalReadOnly,
             'pageStyles' => array_values(array_filter([
                 asset('css/project-simplified.css'), asset('css/project-description.css'),
                 asset('css/project-adjustments.css'), asset('css/project-academic-timeline.css'),
@@ -479,7 +490,8 @@ final class ProjectsController
         $projectId=filter_var($_GET['project_id']??null,FILTER_VALIDATE_INT);$offset=max(0,(int)($_GET['offset']??0));
         $context=(string)($_GET['context']??'academic');
         $policy = new ProjectCapabilityService();
-        if (!$projectId || !$policy->canViewProjectResource((int)$projectId, $context)) { http_response_code(403); $this->json(['success'=>false,'message'=>'No tienes autorización para consultar el historial académico de este proyecto.','data'=>[]]); }
+        $historyResource = $context === 'academic' ? 'academic_history' : 'private';
+        if (!$projectId || !$policy->canViewProjectResource((int)$projectId, $context, $historyResource)) { http_response_code(403); $this->json(['success'=>false,'message'=>'No tienes autorización para consultar el historial académico de este proyecto.','data'=>[]]); }
         $capabilities=$policy->forProjectId((int)$projectId,$context);
         if(empty($capabilities['view_academic_history'])){http_response_code(403);$this->json(['success'=>false,'message'=>'No tienes autorización para consultar el historial académico de este proyecto.','data'=>[]]);}
         $page=$context==='repository'
@@ -674,16 +686,16 @@ final class ProjectsController
 
     public function filePreview(): void
     {
-        [$project, $file, $stream, $source] = $this->resolveFile(true);
+        [$project, $file, $stream, $source, $institutionalAccess] = $this->resolveFile(true, true);
         $query='&project_id='.(int)$project['id'].'&file_id='.(int)$file['id'];
         $scope=(string)($_GET['scope']??'')==='repository'?'&scope=repository':((string)($_GET['context']??'')==='academic_management'?'&context=academic_management':'');
         $version=!empty($file['checksum_sha256'])?'&v='.rawurlencode(substr((string)$file['checksum_sha256'],0,16)):'';
         $forceRetry = !empty($_GET['retry_preview']) || !empty($_GET['retry']);
         if (session_status() === PHP_SESSION_ACTIVE) { session_write_close(); }
         if (strtolower((string)$file['extension']) === 'docx') {
-            $preview = $this->docxPreview($project, $file, $source, (string)$file['checksum_sha256'], route('project-file-preview-pdf').$query.$scope.$version, $forceRetry);
+            $preview = $this->docxPreview($project, $file, $source, (string)$file['checksum_sha256'], route('project-file-preview-pdf').$query.$scope.$version, $forceRetry, !$institutionalAccess);
         } else {
-            $preview=(new FilePreviewService())->prepare($this->previewFile($file,$stream),route('project-file-content').$query.$scope.$version,route('project-file-download').$query.$scope);
+            $preview=(new FilePreviewService())->prepare($this->previewFile($file,$stream),route('project-file-content').$query.$scope.$version,$institutionalAccess?'':route('project-file-download').$query.$scope);
         }
         fclose($stream);header('Cache-Control: private, no-store, max-age=0');$this->json(['success'=>true,'message'=>$preview['message'],'data'=>['preview'=>$preview]]);
     }
@@ -691,11 +703,11 @@ final class ProjectsController
     /** Streams only a current, authorized, private DOCX-derived PDF; physical preview paths stay hidden. */
     public function filePreviewPdf(): void
     {
-        [$project, $file, $stream] = $this->resolveFile(); fclose($stream);
+        [$project, $file, $stream, $source, $institutionalAccess] = $this->resolveFile(false, true); fclose($stream);
         $checksum = (string)$file['checksum_sha256'];
         if (!hash_equals($checksum, (string)($_GET['v'] ?? $checksum)) && !hash_equals(substr($checksum, 0, 16), (string)($_GET['v'] ?? ''))) { http_response_code(404); exit; }
         $path = strtolower((string)$file['extension']) === 'docx'
-            ? ((new ProjectReviewRepresentationService())->supplementalPath((int)$project['id'], (int)$file['id'], $checksum) ?? (new DocumentPreviewConversionService())->cachedPath((int)$project['id'], (int)$file['id'], $checksum))
+            ? ((!$institutionalAccess ? (new ProjectReviewRepresentationService())->supplementalPath((int)$project['id'], (int)$file['id'], $checksum) : null) ?? (new DocumentPreviewConversionService())->cachedPath((int)$project['id'], (int)$file['id'], $checksum))
             : (new DocumentPreviewConversionService())->cachedPath((int)$project['id'], (int)$file['id'], $checksum);
         if ($path === null) { http_response_code(404); exit('La vista previa no está disponible.'); }
         $pdf = fopen($path, 'rb'); if ($pdf === false) { http_response_code(404); exit; }
@@ -743,7 +755,7 @@ final class ProjectsController
 
     public function fileContent(): void
     {
-        [, $file, $stream] = $this->resolveFile(); $data=$this->previewFile($file,$stream);
+        [, $file, $stream] = $this->resolveFile(false, true); $data=$this->previewFile($file,$stream);
         $service=new FilePreviewService();$prepared=$service->prepare($data,'','');
         if (!$service->canStreamInline($data)) { fclose($stream); http_response_code(415); exit('Este formato debe descargarse para consultarlo.'); }
         session_write_close(); $this->stream($file,$stream,'inline',(string)$prepared['mime']);
@@ -900,17 +912,63 @@ final class ProjectsController
     }
     private function failProjectArchive(int $status,string $message,bool $json):never{http_response_code($status);if($json)$this->json(['success'=>false,'message'=>$message,'data'=>[]]);header('Content-Type: text/plain; charset=UTF-8');exit($message);}
 
-    private function resolveFile(bool $json=false): array
+    private function resolveFile(bool $json=false, bool $allowInstitutionalRead=false): array
     {
         if (session_status()!==PHP_SESSION_ACTIVE) session_start();
         if (($_SERVER['REQUEST_METHOD']??'GET')!=='GET') { http_response_code(405); exit; }
         $projectId=filter_var($_GET['project_id']??null,FILTER_VALIDATE_INT); $fileId=filter_var($_GET['file_id']??null,FILTER_VALIDATE_INT);
-        $access=new ProjectAccessService(); $admin=(new AuthSessionService())->isAdminModeActive();
+        $access=new ProjectAccessService(); $session = new AuthSessionService(); $admin=$session->isAdminModeActive();
+        $isTeacher = in_array('teacher', array_map('strtolower', array_map('strval', $access->currentRoles())), true);
+        $teacher = $isTeacher;
         $model=new ProjectRecordModel();
         $repositoryScope=(string)($_GET['scope']??'')==='repository';
         $academicManagement=(string)($_GET['context']??'')==='academic_management';
         $context=$repositoryScope?'repository':($academicManagement?'academic_management':'academic');
         $policy = new ProjectCapabilityService();
+        $resolvedFile = $fileId ? $model->findFileById((int) $fileId) : null;
+        if ($fileId && (!$resolvedFile || (int) ($resolvedFile['project_id'] ?? 0) !== (int) $projectId)) {
+            http_response_code(403);
+            if ($json) $this->json(['success'=>false,'message'=>'No tienes autorización para consultar este archivo.','data'=>[]]);
+            exit('No tienes autorización para consultar este archivo.');
+        }
+        // Institutional teacher reads resolve the parent from file_id and never
+        // fall back to a client-supplied project relationship.
+        if ($allowInstitutionalRead && $context === 'academic') {
+            $institutionalFile = $resolvedFile;
+            $institutionalProjectId = (int) ($institutionalFile['project_id'] ?? 0);
+            $privateAccess = $institutionalProjectId > 0 && $policy->canViewProjectResource($institutionalProjectId, $context);
+            if (!$privateAccess && (!$projectId || !$institutionalFile || $institutionalProjectId !== (int) $projectId || !$policy->canViewInstitutionalFile((int) $fileId, $context))) {
+                http_response_code(403);
+                if ($json) $this->json(['success'=>false,'message'=>'No tienes autorizaciÃ³n para consultar este archivo.','data'=>[]]);
+                exit('No tienes autorizaciÃ³n para consultar este archivo.');
+            }
+            if (!$privateAccess) {
+                $institutionalProject = $access->can('project.view')
+                    ? $model->find($institutionalProjectId, $access->currentUserId(), $admin, false, true)
+                    : null;
+                try {
+                    $institutionalPath = (new ProjectDocumentFileService())->resolveStoredFile($institutionalProjectId, (string) $institutionalFile['storage_name']);
+                    $institutionalStream = fopen($institutionalPath, 'rb');
+                } catch (Throwable) {
+                    $institutionalStream = false;
+                }
+                if (!$institutionalProject || $institutionalStream === false) {
+                    http_response_code(404);
+                    if ($json) $this->json(['success'=>false,'message'=>'El archivo solicitado no estÃ¡ disponible.','data'=>[]]);
+                    exit('El archivo solicitado no estÃ¡ disponible.');
+                }
+                $requestedVersionId = filter_var($_GET['version_id'] ?? null, FILTER_VALIDATE_INT);
+                $requestedV = trim((string) ($_GET['v'] ?? $_GET['checksum'] ?? ''));
+                $currentChecksum = (string) ($institutionalFile['checksum_sha256'] ?? '');
+                if ($requestedVersionId > 0 || ($requestedV !== '' && !hash_equals(substr($currentChecksum, 0, strlen($requestedV)), $requestedV))) {
+                    fclose($institutionalStream);
+                    http_response_code(403);
+                    if ($json) $this->json(['success'=>false,'message'=>'Las versiones histÃ³ricas no estÃ¡n disponibles en la lectura institucional.','data'=>[]]);
+                    exit('Las versiones histÃ³ricas no estÃ¡n disponibles en la lectura institucional.');
+                }
+                return [$institutionalProject, $institutionalFile, $institutionalStream, $institutionalPath, true];
+            }
+        }
         if(!$projectId || !$policy->canViewProjectResource((int)$projectId,$context)){http_response_code(403);if($json)$this->json(['success'=>false,'message'=>'No tienes autorización para consultar archivos de este proyecto.','data'=>[]]);exit('No tienes autorización para consultar archivos de este proyecto.');}
         $capabilities=$policy->forProjectId((int)$projectId,$context);
         if(empty($capabilities['download_files'])){http_response_code(403);if($json)$this->json(['success'=>false,'message'=>'No tienes autorización para consultar archivos de este proyecto.','data'=>[]]);exit('No tienes autorización para consultar archivos de este proyecto.');}
@@ -942,19 +1000,23 @@ final class ProjectsController
         }
         try{$fileStorage=$admin||$teacher||$repositoryScope?new ProjectDocumentFileService():new PrivateProjectFileService();$path=$fileStorage->resolveStoredFile((int)$projectId,(string)$file['storage_name']);$stream=fopen($path,'rb');}catch(Throwable){$stream=false;}
         if($stream===false){http_response_code(404);if($json)$this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);exit('El archivo solicitado no está disponible.');}
-        return [$project,$file,$stream,$path];
+        return [$project,$file,$stream,$path,false];
     }
 
-    private function docxPreview(array $project, array $file, string $source, string $identity, string $url, bool $forceRetry = false): array
+    private function docxPreview(array $project, array $file, string $source, string $identity, string $url, bool $forceRetry = false, bool $allowReviewRepresentation = true): array
     {
         try {
-            $representation = new ProjectReviewRepresentationService();
-            if ($representation->supplementalPath((int)$project['id'], (int)$file['id'], $identity) !== null) return $this->docxPdfPayload($file, $url, ['cached'=>true], 'supplemental_pdf');
+            if ($allowReviewRepresentation) {
+                $representation = new ProjectReviewRepresentationService();
+                if ($representation->supplementalPath((int)$project['id'], (int)$file['id'], $identity) !== null) return $this->docxPdfPayload($file, $url, ['cached'=>true], 'supplemental_pdf');
+            }
             $service = new DocumentPreviewConversionService();
             if ($forceRetry) { $service->clearFailure((int)$project['id'], (int)$file['id'], $identity); }
             $result = $service->convertFile($source, (int)$project['id'], (int)$file['id'], $identity);
-            (new ProjectReviewRepresentationService())->forFile($file, false);
-            return $this->docxPdfPayload($file, $url, $result, 'libreoffice_pdf');
+            if ($allowReviewRepresentation) (new ProjectReviewRepresentationService())->forFile($file, false);
+            $payload = $this->docxPdfPayload($file, $url, $result, 'libreoffice_pdf');
+            if (!$allowReviewRepresentation) $payload['review_representation'] = false;
+            return $payload;
         }
         catch (Throwable $error) {
             error_log('Project DOCX preview: project='.(int)$project['id'].' file='.(int)$file['id'].' checksum='.$identity.' error='.$error->getMessage());

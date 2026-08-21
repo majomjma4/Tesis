@@ -1066,7 +1066,7 @@ final class AdminController
     {
         $session=new AuthSessionService();
         $access=new ProjectAccessService();
-        $isAdministrator=$session->hasAdminAccess();
+        $isAdministrator=$session->isAdminModeActive();
         $isTeacher=in_array('teacher',$access->currentRoles(),true);
 
         if (!$isAdministrator && !$isTeacher) {
@@ -1087,7 +1087,7 @@ final class AdminController
             $labels=project_academic_labels((string)($project['status']??''));
             $project['status_label']=$labels['status'];
             $project['stage_label']=$labels['stage'];
-            $project['capabilities']=['change_status'=>!empty($capabilities['change_status']),'request_corrections'=>!empty($capabilities['request_corrections']),'manage_publication'=>!empty($capabilities['manage_publication'])];
+            $project['capabilities']=['change_status'=>!empty($capabilities['change_status']),'request_corrections'=>!empty($capabilities['request_corrections']),'manage_publication'=>!empty($capabilities['manage_publication']),'review_documents'=>!empty($capabilities['review_documents'])];
             $project['status_transitions']=!empty($capabilities['change_status'])?$transitionService->availableTransitions($project):[];
             $correctionAction=!empty($capabilities['request_corrections'])?(new ProjectReviewService())->availableCorrectionAction($project):null;
             $project['publication_reversion']=!empty($capabilities['manage_publication'])?$publicationReversionService->availability($project):['available'=>false,'message'=>'','action'=>null];

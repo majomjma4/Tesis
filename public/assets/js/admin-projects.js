@@ -1144,9 +1144,9 @@
         });
     };
     const applyFilters = () => { apply(); syncPaginationFilters(); };
-    typeFilter?.addEventListener('change', () => { syncFilterWorkflow(); applyFilters(); });
-    statusFilter?.addEventListener('change', applyFilters);
-    periodFilter?.addEventListener('change', applyFilters);
+    typeFilter?.addEventListener('change', () => { syncFilterWorkflow(); submitFilters(); });
+    statusFilter?.addEventListener('change', submitFilters);
+    periodFilter?.addEventListener('change', submitFilters);
     search.addEventListener('input', event => {
         event.stopPropagation();
         applyFilters();

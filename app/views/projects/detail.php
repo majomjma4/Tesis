@@ -3,7 +3,8 @@
 if ($project === null): ?>
     <section class="repository-detail-not-found"><i class="fa-solid fa-folder-open"></i><h1>Proyecto no encontrado</h1><p>El expediente solicitado no existe o no está disponible para tu cuenta.</p><a class="open-btn" href="<?= e($returnUrl) ?>">Volver</a></section>
 <?php else:
-    $useModernWorkspace = !empty($isStudentContext) || ($projectContext === 'academic' && !(new AuthSessionService())->hasAdminAccess());
+    $useModernWorkspace = !empty($isStudentContext)
+        || ($projectContext === 'academic' && empty($institutionalReadOnly) && !(new AuthSessionService())->isAdminModeActive());
     if ($useModernWorkspace) {
         require __DIR__ . '/_student-workspace.php';
         return;
@@ -16,6 +17,7 @@ if ($project === null): ?>
         'edit_information' => false,
         'manage_files' => false,
         'view_academic_history' => false,
+        'view_institutional_files' => false,
         'view_admin_history' => false,
         'manage_publication' => false,
         'change_status' => false,
@@ -78,6 +80,16 @@ if ($project === null): ?>
             'current_updated_at'=>(string)($file['current_updated_at']??$file['created_at']??''),
             'current_updated_label'=>!empty($file['current_updated_at']??$file['created_at']??null)?date('d/m/Y H:i',strtotime((string)($file['current_updated_at']??$file['created_at']))):''];
     }, $project['files']);
+    if (!empty($institutionalReadOnly)) {
+        $documents = array_values(array_filter($documents, static fn (array $file): bool => !in_array(strtolower((string) ($file['extension'] ?? '')), ProjectCapabilityService::INSTITUTIONAL_ARCHIVE_EXTENSIONS, true)));
+        foreach ($documents as &$institutionalDocument) {
+            $institutionalDocument['download_url'] = '';
+            $institutionalDocument['zip_url'] = '';
+            $institutionalDocument['zip_entry_preview_url'] = '';
+            $institutionalDocument['zip_entry_download_url'] = '';
+        }
+        unset($institutionalDocument);
+    }
     $archives = array_values(array_filter($documents, static fn(array $file): bool => $file['extension']==='zip'));
     $documents = array_values(array_filter($documents, static fn(array $file): bool => $file['extension']!=='zip'));
     // Publication and academic follow-up use intentionally separate ZIP packages.
@@ -85,7 +97,7 @@ if ($project === null): ?>
     try {
         $headerPackage = $publicContext
             ? $packageService->describe($projectId, route('repository-download') . '&id=' . $projectId)
-            : ($isTrackingContext
+            : ($isTrackingContext && !empty($projectCapabilities['download_files'])
                 ? $packageService->prepareAcademic($projectId, route('project-package-download') . '&id=' . $projectId)
                 : ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'academic']);
     } catch (Throwable $packageError) {
@@ -110,7 +122,7 @@ if ($project === null): ?>
         $versions[]=['name'=>(string)$version['original_name'],'versions_count'=>1,'updated_date'=>date('d/m/Y H:i',strtotime((string)$version['replaced_at'])),'responsible'=>(string)($version['responsible']?:'Administración institucional'),'available'=>true,'versions'=>[ ['file_id'=>(int)$version['file_id'],'id'=>(int)$version['id'],'number'=>(int)$version['version_number'],'name'=>(string)$version['original_name'],'date'=>date('d/m/Y H:i',strtotime((string)$version['replaced_at'])),'responsible'=>(string)($version['responsible']?:'Administración institucional'),'current'=>false,'available'=>true,'extension'=>$extension,'size'=>ArchiveService::formatBytes((int)$version['size_bytes']),'preview_supported'=>false] ]];
     }
     $tabs = [['id'=>'information','label'=>'Información','icon'=>'fa-file-lines']];
-    if(!empty($projectCapabilities['download_files']))$tabs[]=['id'=>'files','label'=>'Documentos','icon'=>'fa-folder-open'];
+    if(!empty($projectCapabilities['download_files']) || !empty($projectCapabilities['view_institutional_files']))$tabs[]=['id'=>'files','label'=>'Documentos','icon'=>'fa-folder-open'];
     if(!empty($projectCapabilities['view_academic_history']))$tabs[]=['id'=>'evolution','label'=>'Historial','icon'=>'fa-clock-rotate-left'];
     foreach ($tabs as &$tabItem) $tabItem['url']=$detailUrl.'&tab='.$tabItem['id']; unset($tabItem);
     $allowedTabs=array_column($tabs,'id'); $activeTab=in_array($activeTab,$allowedTabs,true)?$activeTab:'information';
@@ -276,7 +288,7 @@ if ($project === null): ?>
             'current_status'=>(string)$project['status'],'items'=>$projectStatusTransitions,
         ],
         'review_notice'=>null,
-        'contextual_review_notice'=>$isAcademicManagement?null:$reviewNotice,
+        'contextual_review_notice'=>$isAcademicManagement || $institutionalReadOnly ? null : $reviewNotice,
         'return_label'=>$publicContext?'Volver al repositorio':($isTrackingContext?'Volver a proyectos activos':'Volver a proyectos')];
     if($publicContext||$isTrackingContext): ?><style>
     .digital-record[data-entity-type="project"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:14px;align-items:start}

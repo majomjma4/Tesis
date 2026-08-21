@@ -2,7 +2,7 @@
 declare(strict_types=1);
 final class AdminProjectModel
 {
-    private const STATUSES=['development','under_review','approved','defense','tribunal_approved'];
+    private const STATUSES=ProjectCapabilityService::INSTITUTIONAL_ACTIVE_STATUSES;
     private const WRITABLE_STATUSES=['development','under_review','approved','defense','tribunal_approved','published'];
     private const PROJECT_KEYWORD_EXCLUSIONS=['reglamento','normativa','plantilla','formato','guía documental','manual','tutorial'];
     private const STATUS_LABELS=['development'=>'En desarrollo','under_review'=>'En revisión','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el Tribunal','published'=>'Publicado'];
@@ -83,9 +83,11 @@ final class AdminProjectModel
     }
     private function filteredQuery(array $filters):array
     {
+        $institutionalStatuses="'".implode("','",self::STATUSES)."'";
         $where=[
             'p.deleted_at IS NULL',
-            "p.status <> 'published'",
+            'p.withdrawn_at IS NULL',
+            "p.status IN (".$institutionalStatuses.")",
             "EXISTS (
                 SELECT 1
                 FROM project_participants student_participant
@@ -107,6 +109,10 @@ final class AdminProjectModel
         }
         $status=(string)($filters['status']??'');
         if(in_array($status,self::STATUSES,true)){$where[]='p.status=:s';$params['s']=$status;}
+        $typeId=(int)($filters['type_id']??0);
+        if($typeId>0){$where[]='p.project_type_id=:type_id';$params['type_id']=$typeId;}
+        $periodId=(int)($filters['period_id']??0);
+        if($periodId>0){$where[]='p.academic_period_id=:period_id';$params['period_id']=$periodId;}
         $reviewSituation=(string)($filters['review_situation']??'');
         if(in_array($reviewSituation,['pending','addressed','none'],true)){
             if($reviewSituation==='pending'){

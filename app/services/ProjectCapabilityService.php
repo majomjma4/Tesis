@@ -5,12 +5,15 @@ declare(strict_types=1);
 /** Resuelve capacidades efectivas del expediente sin confiar en datos enviados por el cliente. */
 final class ProjectCapabilityService
 {
+    public const INSTITUTIONAL_ACTIVE_STATUSES = ['development', 'under_review', 'approved', 'defense', 'tribunal_approved'];
+    public const INSTITUTIONAL_ARCHIVE_EXTENSIONS = ['zip', 'rar', '7z', 'tar', 'gz'];
+
     private const KEYS = [
         'view_project', 'edit_information', 'manage_files', 'view_academic_history',
         'view_admin_history', 'change_status', 'manage_participants', 'manage_tutoring',
         'manage_tribunal', 'manage_publication', 'register_delivery', 'review_delivery',
         'create_observation', 'respond_observation', 'request_corrections', 'download_files',
-        'review_documents', 'publish_project',
+        'review_documents', 'publish_project', 'view_institutional_files',
         'manage_workspace_files', 'send_for_review',
         'create_adjustment_request', 'view_adjustment_requests', 'respond_adjustment_request',
         'address_adjustment_request', 'close_adjustment_request',
@@ -23,7 +26,7 @@ final class ProjectCapabilityService
         $access = new ProjectAccessService();
         return $this->resolve(
             $project, $context, (int) ($session->userId() ?? 0),
-            $access->currentRoles(), $session->hasAdminAccess()
+            $access->currentRoles(), $session->isAdminModeActive()
         );
     }
 
@@ -39,7 +42,7 @@ final class ProjectCapabilityService
      * files, previews or ZIP contents. Generic tracking capabilities for a
      * teacher are intentionally broader and must not be used for this check.
      */
-    public function canViewProjectResource(int $projectId, string $context): bool
+    public function canViewProjectResource(int $projectId, string $context, string $resource = 'private'): bool
     {
         if (!in_array($context, ['academic_management', 'academic', 'repository'], true)) return false;
         $project = $this->projectForId($projectId);
@@ -71,11 +74,45 @@ final class ProjectCapabilityService
         return false;
     }
 
+    /** Lectura institucional del catÃ¡logo docente; no concede capacidades de gestiÃ³n. */
+    public function canViewActiveProject(int $projectId, string $context = 'academic'): bool
+    {
+        if ($context !== 'academic' || $projectId < 1) return false;
+        $session = new AuthSessionService();
+        $access = new ProjectAccessService();
+        if ($session->isAdminModeActive() || (int) ($session->userId() ?? 0) < 1) return false;
+        $roles = array_map('strtolower', array_map('strval', $access->currentRoles()));
+        if (!in_array('teacher', $roles, true)) return false;
+        $project = $this->projectForId($projectId);
+        return $project !== null && $this->isInstitutionallyVisibleActiveProject($project);
+    }
+
+    /** Authorizes only the current, institutionally visible file. */
+    public function canViewInstitutionalFile(int $fileId, string $context = 'academic'): bool
+    {
+        if ($context !== 'academic' || $fileId < 1) return false;
+        $session = new AuthSessionService();
+        $access = new ProjectAccessService();
+        if ($session->isAdminModeActive() || (int) ($session->userId() ?? 0) < 1) return false;
+        $roles = array_map('strtolower', array_map('strval', $access->currentRoles()));
+        if (!in_array('teacher', $roles, true)) return false;
+
+        $statement = Database::connection()->prepare(
+            "SELECT project_id, extension FROM project_files
+             WHERE id=:file AND deleted_at IS NULL AND purged_at IS NULL LIMIT 1"
+        );
+        $statement->execute(['file' => $fileId]);
+        $file = $statement->fetch();
+        if (!$file || in_array(strtolower((string) ($file['extension'] ?? '')), self::INSTITUTIONAL_ARCHIVE_EXTENSIONS, true)) return false;
+
+        return $this->canViewActiveProject((int) $file['project_id'], $context);
+    }
+
     private function projectForId(int $projectId): ?array
     {
         if ($projectId < 1) return null;
         $query = Database::connection()->prepare(
-             "SELECT p.id,p.created_by,p.tutor_id,p.status,p.is_available,p.deleted_at,pt.code type_code,
+             "SELECT p.id,p.created_by,p.tutor_id,p.status,p.is_available,p.withdrawn_at,p.deleted_at,pt.code type_code,
              (SELECT COUNT(*) FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL) active_file_count,
              (SELECT COUNT(*) FROM project_participants author WHERE author.project_id=p.id AND author.role_code='student' AND author.status='active' AND author.removed_at IS NULL) author_count
              FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id=:id"
@@ -99,7 +136,7 @@ final class ProjectCapabilityService
         if ($ids === []) return [];
         $marks = implode(',', array_fill(0, count($ids), '?'));
         $db = Database::connection();
-        $projects = $db->prepare("SELECT p.id,p.created_by,p.tutor_id,p.status,p.is_available,p.deleted_at,pt.code type_code,
+        $projects = $db->prepare("SELECT p.id,p.created_by,p.tutor_id,p.status,p.is_available,p.withdrawn_at,p.deleted_at,pt.code type_code,
             (SELECT COUNT(*) FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL) active_file_count,
             (SELECT COUNT(*) FROM project_participants author WHERE author.project_id=p.id AND author.role_code='student' AND author.status='active' AND author.removed_at IS NULL) author_count
             FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id IN ($marks)");
@@ -113,7 +150,7 @@ final class ProjectCapabilityService
         $access = new ProjectAccessService();
         $userId = (int) ($session->userId() ?? 0);
         $roles = $access->currentRoles();
-        $administrator = $session->hasAdminAccess();
+        $administrator = $session->isAdminModeActive();
         $result = [];
         foreach ($ids as $id) {
             $project = $rows[$id] ?? null;
@@ -139,7 +176,7 @@ final class ProjectCapabilityService
 
         if ($context === 'academic_management') {
             if (!$administrator) return $capabilities;
-            foreach (['view_project','edit_information','manage_files','view_academic_history','view_admin_history','change_status','request_corrections','manage_participants','manage_tutoring','manage_tribunal','manage_publication','download_files'] as $key) $capabilities[$key] = true;
+            foreach (['view_project','edit_information','manage_files','view_academic_history','view_admin_history','change_status','request_corrections','manage_participants','manage_tutoring','manage_tribunal','manage_publication','download_files','view_institutional_files'] as $key) $capabilities[$key] = true;
             foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request'] as $key) $capabilities[$key] = true;
             if ((string)($project['status'] ?? '') === 'development') $capabilities['manage_files'] = false;
             return $capabilities;
@@ -154,6 +191,7 @@ final class ProjectCapabilityService
             if (!$capabilities['view_project']) return $capabilities;
             $capabilities['view_academic_history'] = true;
             $capabilities['download_files'] = true;
+            $capabilities['view_institutional_files'] = true;
             $isTeacher = in_array('teacher', $roles, true);
             if ($isTeacher) {
                 $capabilities['create_adjustment_request'] = true;
@@ -171,21 +209,25 @@ final class ProjectCapabilityService
         // puede consultar cualquier expediente, sin recibir capacidades de mutación.
         // El Estudiante conserva el requisito de relación directa con el proyecto.
         if ($administrator || (!$isTeacher && (!$isStudent || !$related))) return $capabilities;
+        if ($isTeacher && !$this->isInstitutionallyVisibleActiveProject($project) && !$related) return $capabilities;
         $capabilities['view_project'] = true;
-        $capabilities['view_academic_history'] = true;
-        $capabilities['download_files'] = true;
+        $capabilities['view_academic_history'] = !$isTeacher;
+        $capabilities['view_institutional_files'] = $isTeacher || $isStudent;
+        $capabilities['download_files'] = !$isTeacher || $related;
 
         $assignedTutor = (int) ($project['tutor_id'] ?? 0) === $userId
             || count(array_filter($participants, static fn (array $participant): bool =>
                 (int) ($participant['user_id'] ?? 0) === $userId
                 && in_array(strtolower((string) ($participant['role_code'] ?? '')), ['tutor','co_tutor','cotutor','co-tutor'], true)
             )) > 0;
+        if ($isTeacher && $assignedTutor) $capabilities['view_academic_history'] = true;
+        if ($isTeacher) $capabilities['download_files'] = $assignedTutor;
         $capabilities['review_documents'] = $isTeacher && $assignedTutor;
         // El seguimiento de Proyectos activos permite a cualquier Docente solicitar
         // y consultar ajustes, sin concederle edición ni revisión formal.
         if ($isTeacher) {
-            $capabilities['create_adjustment_request'] = true;
-            $capabilities['view_adjustment_requests'] = true;
+            $capabilities['create_adjustment_request'] = (string) ($project['status'] ?? '') === 'development';
+            $capabilities['view_adjustment_requests'] = $related;
         }
         $isOwnerStudent = $isStudent && count(array_filter($participants, static fn (array $participant): bool =>
             (int) ($participant['user_id'] ?? 0) === $userId && strtolower((string) ($participant['role_code'] ?? '')) === 'student'
@@ -280,7 +322,7 @@ final class ProjectCapabilityService
         $teacher = in_array('teacher', $roles, true) && $isTutor;
         $student = in_array('student', $roles, true) && in_array('student', $projectRoles, true);
         if ($teacher || $student) $result['view_adjustment_requests'] = true;
-        if ($teacher) $result['create_adjustment_request'] = true;
+        if (in_array('teacher', $roles, true) && (string) ($project['status'] ?? '') === 'development') $result['create_adjustment_request'] = true;
         if ($student) {
             $result['respond_adjustment_request'] = true;
             $result['address_adjustment_request'] = true;
@@ -297,5 +339,12 @@ final class ProjectCapabilityService
     private function participantCount(array $participants, array $roles): int
     {
         return count(array_filter($participants, static fn (array $participant): bool => in_array((string) ($participant['role_code'] ?? ''), $roles, true)));
+    }
+
+    private function isInstitutionallyVisibleActiveProject(array $project): bool
+    {
+        return empty($project['deleted_at'])
+            && empty($project['withdrawn_at'])
+            && in_array((string) ($project['status'] ?? ''), self::INSTITUTIONAL_ACTIVE_STATUSES, true);
     }
 }

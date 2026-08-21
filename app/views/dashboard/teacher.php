@@ -9,8 +9,8 @@ $follow = is_array($dashboard['follow_up'] ?? null) ? $dashboard['follow_up'] : 
 $upcoming = is_array($dashboard['upcoming'] ?? null) ? $dashboard['upcoming'] : [];
 $notifications = is_array($dashboard['notifications'] ?? null) ? $dashboard['notifications'] : [];
 $repository = is_array($dashboard['repository'] ?? null) ? $dashboard['repository'] : [];
-$showTeacherTribunalQa = strtolower((string) ($GLOBALS['config']['environment'] ?? 'production')) === 'development'
-    && (string) ($_GET['qa_teacher_tribunal'] ?? '') === '1';
+
+
 
 $empty = static function (string $title, string $detail = ''): void {
     echo '<div class="teacher-empty-state"><strong>' . e($title) . '</strong>'
@@ -151,10 +151,10 @@ $projectSentence = static function (int $count, string $ending): string {
                     <div><h3>Esperando estudiante</h3><?php if ((int) ($waiting['count'] ?? 0) > 0): ?><strong><?= (int) $waiting['count'] ?></strong><p><?= e($projectSentence($waitingProjects, 'en espera')) ?></p><?php else: ?><p>Sin proyectos en espera</p><?php endif; ?></div>
                 </article>
                 <?php $tribunal = is_array($follow['tribunal_assignment'] ?? null) ? $follow['tribunal_assignment'] : []; ?>
-                <?php if ((!empty($tribunal['visible']) && (int) ($tribunal['count'] ?? 0) > 0) || $showTeacherTribunalQa): ?>
+                <?php if (!empty($tribunal['visible']) && (int) ($tribunal['count'] ?? 0) > 0): ?>
                     <article class="teacher-follow-up-card teacher-follow-up-card--tribunal-assignment">
                         <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
-                        <div><h3>Asignación de tribunal</h3><strong><?= $showTeacherTribunalQa && empty($tribunal['visible']) ? 2 : (int) $tribunal['count'] ?></strong><p>En espera</p></div>
+                        <div><h3>Asignación de tribunal</h3><strong><?= (int) $tribunal['count'] ?></strong><p>En espera</p></div>
                     </article>
                 <?php endif; ?>
             </div>
