@@ -14,23 +14,19 @@ final class SupportMaterialCapabilityService
     public function canEditInformation(AuthSessionService $session, ?array $material): bool
     {
         if ($material === null) return false;
-        return $session->hasAdminAccess()
-            || in_array('teacher', array_map('strtolower', $session->roles()), true);
+        return $this->isAdministrator($session) || $this->isTeacherOwner($session, $material);
     }
 
     public function canManageFiles(AuthSessionService $session, ?array $material): bool
     {
         if ($material === null) return false;
-        return $session->hasAdminAccess()
-            || in_array('teacher', array_map('strtolower', $session->roles()), true);
+        return $this->isAdministrator($session) || $this->isTeacherOwner($session, $material);
     }
 
     public function canChangeStatus(AuthSessionService $session, ?array $material): bool
     {
         if ($material === null) return false;
-        if ($session->hasAdminAccess()) return true;
-        $isTeacher = in_array('teacher', array_map('strtolower', $session->roles()), true);
-        return $isTeacher && (int) ($material['created_by'] ?? 0) === (int) ($session->userId() ?? 0);
+        return $this->isAdministrator($session) || $this->isTeacherOwner($session, $material);
     }
 
     public function canWithdraw(AuthSessionService $session, ?array $material): bool
@@ -41,9 +37,7 @@ final class SupportMaterialCapabilityService
     public function canDelete(AuthSessionService $session, ?array $material): bool
     {
         if ($material === null) return false;
-        if ($session->hasAdminAccess()) return true;
-        $isTeacher = in_array('teacher', array_map('strtolower', $session->roles()), true);
-        return $isTeacher && (int) ($material['created_by'] ?? 0) === (int) ($session->userId() ?? 0);
+        return $this->isAdministrator($session) || $this->isTeacherOwner($session, $material);
     }
 
     public function canManage(AuthSessionService $session, ?array $material): bool
@@ -61,11 +55,22 @@ final class SupportMaterialCapabilityService
     public function assertCanManage(AuthSessionService $session, ?array $material): void
     {
         if ($material === null) throw new SupportMaterialAccessException('El material solicitado no existe.', 404);
-        if ($session->hasAdminAccess()) return;
-        $isTeacher = in_array('teacher', array_map('strtolower', $session->roles()), true);
-        if (!$isTeacher || (int) ($session->userId() ?? 0) < 1) {
+        if ($this->isAdministrator($session)) return;
+        if (!$this->isTeacherOwner($session, $material)) {
             throw new SupportMaterialAccessException('No tienes autorización para gestionar este material de apoyo.');
         }
+    }
+
+    private function isAdministrator(AuthSessionService $session): bool
+    {
+        return $session->isAdminModeActive() && $session->hasAdminAccess();
+    }
+
+    private function isTeacherOwner(AuthSessionService $session, array $material): bool
+    {
+        return in_array('teacher', array_map('strtolower', $session->roles()), true)
+            && (int) ($session->userId() ?? 0) > 0
+            && (int) ($material['created_by'] ?? 0) === (int) ($session->userId() ?? 0);
     }
 
     public function assertCanEditInformation(AuthSessionService $session, ?array $material): void

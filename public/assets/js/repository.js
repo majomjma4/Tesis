@@ -16,6 +16,7 @@ const repositoryPao = document.querySelector("#repositoryPao");
 
 const repositorySupportSearch = document.querySelector("#repositorySupportSearch");
 const repositorySupportCategory = document.querySelector("#repositorySupportCategory");
+const repositoryBaseSupportCount = Number(panelSupport?.dataset.baseSupportCount || 0);
 
 const repositoryCount = document.querySelector("#repositoryCount");
 const repositoryToast = document.querySelector("#repositoryToast");
@@ -28,6 +29,7 @@ const repositorySupportPageSizeSelect = document.querySelector("#repositorySuppo
 const repositoryEmpty = document.querySelector("#repositoryEmpty");
 const repositoryEmptyTitle = document.querySelector("#repositoryEmptyTitle");
 const repositoryEmptyText = document.querySelector("#repositoryEmptyText");
+const repositoryBaseProjectCount = Number(panelProjects?.dataset.baseProjectCount || 0);
 
 const repositoryPagination = document.querySelector("#repositoryPagination");
 const repositoryPaginationSummary = document.querySelector("#repositoryPaginationSummary");
@@ -245,8 +247,13 @@ function filterRepositoryProjects(resetPage = true) {
         repositoryEmpty.hidden = matchingProjects.length !== 0;
     }
     if (repositoryEmptyTitle && repositoryEmptyText) {
-        repositoryEmptyTitle.textContent = "No se encontraron proyectos";
-        repositoryEmptyText.textContent = "Prueba con otros términos o modifica los filtros seleccionados.";
+        if (repositoryBaseProjectCount > 0) {
+            repositoryEmptyTitle.textContent = "No se encontraron proyectos";
+            repositoryEmptyText.textContent = "Prueba con otros términos o modifica los filtros seleccionados.";
+        } else {
+            repositoryEmptyTitle.textContent = "Aún no existen proyectos publicados.";
+            repositoryEmptyText.textContent = "Los proyectos aprobados aparecerán aquí después de completar su publicación.";
+        }
     }
 
     if (repositoryPagination) {
@@ -417,6 +424,12 @@ function filterRepositorySupportDocuments(resetPage = true) {
     const repositorySupportEmpty = document.querySelector("#repositorySupportEmpty");
     if (repositorySupportEmpty) {
         repositorySupportEmpty.hidden = matches.length !== 0;
+    }
+    const repositorySupportEmptyTitle = document.querySelector("#repositorySupportEmptyTitle");
+    const repositorySupportEmptyText = document.querySelector("#repositorySupportEmptyText");
+    if (repositorySupportEmptyTitle && repositorySupportEmptyText && repositoryBaseSupportCount > 0) {
+        repositorySupportEmptyTitle.textContent = "No se encontraron materiales";
+        repositorySupportEmptyText.textContent = "Prueba con otros tÃ©rminos o modifica la categorÃ­a seleccionada.";
     }
     const from = matches.length === 0 ? 0 : start + 1;
     const to = Math.min(start + repositorySupportState.size, matches.length);

@@ -122,6 +122,16 @@
     border-color: var(--blue);
     box-shadow: 0 0 0 3px rgba(37,99,235,.09);
 }
+.ar-search.is-disabled {
+    opacity: .72;
+}
+.ar-search input:disabled,
+.ar-filter-control select:disabled {
+    cursor: not-allowed;
+}
+.ar-search input:disabled::placeholder {
+    color: var(--muted);
+}
 .ar-search i {
     color: var(--muted);
 }
@@ -134,6 +144,24 @@
     background: transparent;
     color: var(--text);
     font: inherit;
+}
+
+/* Keep the search icon stable and ellipsize text only when the real input
+   width is insufficient. The placeholder value itself remains unchanged. */
+#repositoryShell .ar-search > i {
+    flex: 0 0 auto;
+}
+
+#repositoryShell .ar-search input {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#repositoryShell .ar-search input::placeholder {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .ar-search input::-webkit-search-cancel-button,
 .ar-search input::-webkit-search-decoration,
@@ -294,6 +322,7 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
     padding: 15px 16px 0;
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 9px;
 }
 .ar-code {
@@ -310,6 +339,7 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
     color: rgb(var(--card-accent));
     font-size:var(--font-xs);
     font-weight: 800;
+    white-space: nowrap;
 }
 
 .ar-card-copy {

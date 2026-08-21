@@ -30,7 +30,7 @@ final class RouteAccessService
         $expired=!empty($identity['temporary_password_expires_at'])&&strtotime((string)$identity['temporary_password_expires_at'])<=time();
         $requiresTemporaryPasswordChange=(bool)$identity['must_change_password']&&!(bool)$identity['is_admin'];
         if($requiresTemporaryPasswordChange&&$expired&&!in_array($page,['change-password','logout'],true)){header('Location: '.route('change-password'));exit;}
-        if((in_array($page,self::ADMIN_ROUTES,true)||$page==='admin-repository-trash')&&!(bool)$identity['is_admin']){
+        if((in_array($page,self::ADMIN_ROUTES,true)||$page==='admin-repository-trash')&&(!(bool)$identity['is_admin']||!$session->isAdminModeActive())){
             if($this->isAjaxOrJsonRequest($page))$this->denyJson('No tienes permiso para administrar archivos.', 403);
             header('Location: '.route('forbidden'));exit;
         }

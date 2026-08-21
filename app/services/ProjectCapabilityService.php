@@ -189,18 +189,10 @@ final class ProjectCapabilityService
                 && (int) ($project['author_count'] ?? $this->participantCount($participants, ['student'])) > 0;
             $capabilities['view_project'] = $administrator ? $published : $publiclyAvailable;
             if (!$capabilities['view_project']) return $capabilities;
-            $capabilities['view_academic_history'] = true;
+            $capabilities['view_academic_history'] = false;
             $capabilities['download_files'] = true;
             $capabilities['download_academic_package'] = true;
             $capabilities['view_institutional_files'] = true;
-            $isTeacher = in_array('teacher', $roles, true);
-            if ($isTeacher) {
-                $capabilities['create_adjustment_request'] = true;
-            }
-            if ($isTeacher || $administrator) {
-                $capabilities['view_adjustment_requests'] = true;
-            }
-            if ($administrator) foreach (['edit_information','manage_files','view_admin_history','manage_publication','close_adjustment_request','address_adjustment_request'] as $key) $capabilities[$key] = true;
             return $capabilities;
         }
 

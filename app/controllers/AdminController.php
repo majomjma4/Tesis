@@ -504,6 +504,8 @@ final class AdminController
 
     public function supportMaterialHistory():void
     {
+        $session = new AuthSessionService();
+        if (!$session->isAdminModeActive() || !$session->hasAdminAccess()) $this->json(false, 'No tienes permiso para consultar el historial administrativo.', [], 403);
         if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET')$this->json(false,'Método no permitido.',[],405);
         $id=filter_var($_GET['id']??null,FILTER_VALIDATE_INT);
         $offset=filter_var($_GET['offset']??0,FILTER_VALIDATE_INT);
@@ -512,11 +514,6 @@ final class AdminController
         try{
             $activityModel=new AdminActivityModel();
             $history=$activityModel->forEntity('support_material',(int)$id,20,$offset===false?0:(int)$offset);
-            if(($offset===false?0:(int)$offset)===0){
-                $session=new AuthSessionService();
-                $activityModel->markSupportMaterialSeen((int)$session->userId(),(int)$id,(int)($history['max_audit_id']??0));
-                $history['has_unread']=false;
-            }
             $this->json(true,'Historial administrativo cargado.',$history);
         }catch(Throwable $error){
             error_log('Support material history: '.$error->getMessage());

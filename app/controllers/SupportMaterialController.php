@@ -13,7 +13,7 @@ final class SupportMaterialController
         $this->ensureSession();
         $session = new AuthSessionService();
         $capabilities = new SupportMaterialCapabilityService();
-        $canCreate = !$session->hasAdminAccess() && $capabilities->canCreate($session);
+        $canCreate = !$session->isAdminModeActive() && $capabilities->canCreate($session);
         $downloadModel = new SupportMaterialDownloadModel();
         $materials = array_map(static function (array $material) use ($downloadModel): array {
             $material['downloads'] = $downloadModel->getTotal($material['id'], $material['downloads']);
@@ -41,7 +41,7 @@ final class SupportMaterialController
     {
         $this->ensureSession();
         $session = new AuthSessionService();
-        $isAdministrator = $session->hasAdminAccess();
+        $isAdministrator = $session->isAdminModeActive() && $session->hasAdminAccess();
         $capabilities = new SupportMaterialCapabilityService();
         $materialId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
         $materialModel = new SupportMaterialModel();
@@ -164,7 +164,8 @@ final class SupportMaterialController
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') $this->sendJson(false, 'Método no permitido.');
         $materialId = filter_var($_GET['material_id'] ?? null, FILTER_VALIDATE_INT);
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
-        $administrator = (new AuthSessionService())->hasAdminAccess();
+        $administratorSession = new AuthSessionService();
+        $administrator = $administratorSession->isAdminModeActive() && $administratorSession->hasAdminAccess();
         if (!$administrator) { http_response_code(403); $this->sendJson(false, 'No tienes autorización para consultar la evolución documental.'); }
         $model = new SupportMaterialModel();
         $material = $materialId ? $model->findById((int) $materialId, $administrator) : null;

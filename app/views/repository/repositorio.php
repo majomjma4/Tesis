@@ -52,9 +52,9 @@
 
             <!-- Toolbar de proyectos (hermano directo de ar-panel, como en Admin) -->
             <div class="ar-tools" id="toolsProjects">
-                <label class="ar-search">
+                <label class="ar-search<?= !$projects ? ' is-disabled' : '' ?>">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input id="repositorySearch" type="text" role="searchbox" placeholder="Buscar en el repositorio..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                    <input id="repositorySearch" type="text" role="searchbox" placeholder="Buscar por título, código, autor o tutor" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"<?= !$projects ? ' disabled' : '' ?>>
                     <button id="repositoryClearSearch" type="button" aria-label="Limpiar búsqueda" hidden>
                         <i class="fa-solid fa-xmark"></i>
                     </button>
@@ -62,7 +62,7 @@
 
                 <label class="ar-filter-control">
                     <span>Tipo</span>
-                    <select id="repositoryType">
+                    <select id="repositoryType"<?= !$projects ? ' disabled' : '' ?>>
                         <option value="all">Todos</option>
                         <?php foreach ($projectTypes as $type): ?>
                             <option value="<?= e($type['value']) ?>"><?= e($type['label']) ?></option>
@@ -82,7 +82,7 @@
                 <?php elseif (count($academicPeriods) > 1): ?>
                     <label class="ar-filter-control">
                         <span>Período académico</span>
-                        <select id="repositoryPao">
+                        <select id="repositoryPao"<?= !$projects ? ' disabled' : '' ?>>
                             <option value="all">Todos</option>
                             <?php foreach ($academicPeriods as $period): ?>
                                 <option value="<?= e($period['value']) ?>"><?= e($period['label']) ?></option>
@@ -103,13 +103,13 @@
 
             <!-- Toolbar de materiales (se muestra solo en pestaña de materiales) -->
             <div class="ar-tools" id="toolsSupport" hidden>
-                <label class="ar-search">
+                <label class="ar-search<?= !$supportDocuments ? ' is-disabled' : '' ?>">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input id="repositorySupportSearch" type="text" role="searchbox" placeholder="Buscar por título, tipo, PAO o palabra clave..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                    <input id="repositorySupportSearch" type="text" role="searchbox" placeholder="Buscar por título, descripción o palabra clave" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"<?= !$supportDocuments ? ' disabled' : '' ?>>
                 </label>
                 <label class="ar-filter-control">
                     <span>Categoría</span>
-                    <select id="repositorySupportCategory">
+                    <select id="repositorySupportCategory"<?= !$supportDocuments ? ' disabled' : '' ?>>
                         <option value="all">Todas</option>
                         <option value="vinculacion">Vinculación</option>
                         <option value="practicas">Prácticas</option>
@@ -128,6 +128,7 @@
                 aria-labelledby="tabProjects"
                 data-favorite-url="<?= e($favoriteActionUrl) ?>"
                 data-favorite-csrf="<?= e($favoriteCsrfToken) ?>"
+                data-base-project-count="<?= count($projects) ?>"
             >
                 <!-- Encabezado de sección exacto Admin -->
                 <header class="ar-section-head">
@@ -160,7 +161,14 @@
                             'vinculacion', 'proyecto-de-vinculacion' => 'community',
                             default => $typeSlug,
                         };
-                        $typeBadge = $typeCode === 'pis' ? 'PIS' : $project['type'];
+                        $typeLabels = [
+                            'thesis'         => 'Titulación',
+                            'thesis_profile' => 'Perfil de Titulación',
+                            'pis'            => 'Proyecto PIS',
+                            'practice'       => 'Proyecto de Prácticas',
+                            'community'      => 'Proyecto de Vinculación',
+                        ];
+                        $typeBadge = $typeLabels[$typeCode] ?? $project['type'];
                         ?>
                         <article
                             class="ar-project-card"
@@ -195,9 +203,11 @@
                                 <a class="ar-primary-action" href="<?= e($project['detail_url']) ?>">
                                     <i class="fa-solid fa-diagram-project"></i> Abrir expediente
                                 </a>
-                                <a class="ar-icon-action" href="<?= e(route('repository-download') . '&id=' . (int) $project['id']) ?>" data-tooltip="Descargar ZIP" aria-label="Descargar ZIP completo de <?= e($project['title']) ?>">
-                                    <i class="fa-solid fa-download" aria-hidden="true"></i>
-                                </a>
+                                <?php if (!empty($project['package_available']) && !empty($project['package_download_url'])): ?>
+                                    <a class="ar-icon-action" href="<?= e($project['package_download_url']) ?>" data-tooltip="Descargar ZIP" aria-label="Descargar ZIP completo de <?= e($project['title']) ?>">
+                                        <i class="fa-solid fa-download" aria-hidden="true"></i>
+                                    </a>
+                                <?php endif; ?>
                             </footer>
                         </article>
                     <?php endforeach; ?>
@@ -222,7 +232,7 @@
             </section>
 
             <!-- Panel 2: Material de apoyo -->
-            <section class="ar-panel" id="panelSupport" role="tabpanel" aria-labelledby="tabSupport" hidden>
+            <section class="ar-panel" id="panelSupport" role="tabpanel" aria-labelledby="tabSupport" data-base-support-count="<?= count($supportDocuments) ?>" hidden>
                 <header class="ar-section-head">
                     <div><span>Recursos académicos</span><h2>Material de apoyo</h2></div>
                     <div style="display:flex;align-items:center;gap:10px"><p id="repositorySupportCount" aria-live="polite"><?= count($supportDocuments) ?> <?= count($supportDocuments) === 1 ? 'resultado visible' : 'resultados visibles' ?></p><?php if (!empty($canCreateSupportMaterial)): ?><button class="ar-primary-action" type="button" data-teacher-material-create><i class="fa-solid fa-plus"></i> Nuevo material</button><?php endif; ?></div>
@@ -260,8 +270,8 @@
 
                 <div class="ar-empty" id="repositorySupportEmpty" <?= $supportDocuments ? 'hidden' : '' ?>>
                     <span><i class="fa-solid fa-folder-open"></i></span>
-                    <h2>Aún no existen materiales de apoyo.</h2>
-                    <p>Los recursos institucionales publicados aparecerán en esta sección.</p>
+                    <h2 id="repositorySupportEmptyTitle">Aún no existen materiales de apoyo.</h2>
+                    <p id="repositorySupportEmptyText">Los recursos institucionales publicados aparecerán en esta sección.</p>
                 </div>
                 <footer class="ar-pagination" id="repositorySupportPagination" hidden><span id="repositorySupportPaginationSummary">Mostrando 0 de 0</span><label>Mostrar <select id="repositorySupportPageSize"><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="75">75</option><option value="100">100</option></select></label><nav id="repositorySupportPaginationPages" aria-label="Paginación de materiales de apoyo"></nav></footer>
             </section>

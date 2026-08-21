@@ -31,10 +31,10 @@ final class SupportMaterialModel
         if ($teacherId < 1) return $this->getAll();
         $statement = Database::connection()->prepare(
             $this->baseQuery() . " WHERE sm.deleted_at IS NULL AND sm.purged_at IS NULL
-             AND sm.status IN ('published','draft')
+             AND (sm.status='published' OR (sm.status='draft' AND sm.created_by=:teacher_id))
              ORDER BY sm.publication_date DESC,sm.id DESC"
         );
-        $statement->execute();
+        $statement->execute(['teacher_id' => $teacherId]);
         return array_map([$this, 'hydrate'], $statement->fetchAll());
     }
 

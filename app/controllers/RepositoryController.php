@@ -18,13 +18,26 @@ final class RepositoryController
         $repositoryModel = new RepositoryModel();
         $favoriteModel = new FavoriteModel();
         $downloadModel = new DownloadModel();
+        $packageService = new ProjectRepositoryPackageService();
         $userId = $this->getCurrentUserId();
         $repositoryReturnUrl = (string) ($_SERVER['REQUEST_URI'] ?? route('repository'));
         $favoriteIds = $favoriteModel->getFavoriteIds($userId);
-        $projects = array_map(static function (array $project) use ($favoriteIds, $downloadModel, $repositoryReturnUrl): array {
+        $projects = array_map(static function (array $project) use ($favoriteIds, $downloadModel, $repositoryReturnUrl, $packageService): array {
             $project['is_favorite'] = in_array($project['id'], $favoriteIds, true);
             $project['downloads'] = $downloadModel->getTotal($project['id'], $project['downloads']);
             $project['detail_url'] = base_url('index.php?page=repository-detail&id=' . urlencode((string) $project['id']) . '&return=' . rawurlencode($repositoryReturnUrl));
+            try {
+                $package = $packageService->describe(
+                    (int) $project['id'],
+                    route('repository-download') . '&id=' . (int) $project['id']
+                );
+                $project['package_available'] = !empty($package['available']);
+                $project['package_download_url'] = (string) ($package['download_url'] ?? '');
+            } catch (Throwable $exception) {
+                error_log('Repository package descriptor: ' . $exception->getMessage());
+                $project['package_available'] = false;
+                $project['package_download_url'] = '';
+            }
             return $project;
         }, $repositoryModel->getPublishedProjects());
 
@@ -58,7 +71,7 @@ final class RepositoryController
 
     private function teacherMaterialUi(AuthSessionService $session): bool
     {
-        return !$session->hasAdminAccess() && (new SupportMaterialCapabilityService())->canCreate($session);
+        return !$session->isAdminModeActive() && (new SupportMaterialCapabilityService())->canCreate($session);
     }
 
     public function detail(): void
@@ -75,10 +88,13 @@ final class RepositoryController
         $projectCapabilities = $project !== null
             ? (new ProjectCapabilityService())->resolve($project, 'repository', (int) ($session->userId() ?? 0), $access->currentRoles(), $isAdministratorView)
             : (new ProjectCapabilityService())->none();
-        if ($project !== null) {
+        if ($project !== null && !empty($projectCapabilities['view_academic_history'])) {
             $academicPage = (new ProjectRecordModel())->academicHistoryPage((int)$project['id']);
             $project['academic_history'] = $academicPage['events'];
             $project['academic_history_total'] = $academicPage['total'];
+        } elseif ($project !== null) {
+            $project['academic_history'] = [];
+            $project['academic_history_total'] = 0;
         }
         $requestedTab = strtolower(trim((string)($_GET['tab'] ?? 'information')));
         $activeTab = in_array($requestedTab, ['information', 'files', 'evolution'], true) ? $requestedTab : 'information';
