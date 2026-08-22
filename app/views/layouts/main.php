@@ -25,7 +25,7 @@ $isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen);
 ?>
 
 <body
-    class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout' : '') . ($isStudentWorkspaceFullscreen ? ' app-student-workspace-fullscreen' : ''))) ?>">
+    class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout app-page-loading' : '') . ($isStudentWorkspaceFullscreen ? ' app-student-workspace-fullscreen' : ''))) ?>">
     <noscript>
         <style>
             .app-global-skeleton {
@@ -276,7 +276,7 @@ $isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen);
             </section>
         <?php endif; ?>
         <div class="app-page-content" id="appPageContent">
-            <?= $content ?><?php if (!empty($pagePagination)):
+            <?= $content ?><?php if (!empty($pagePagination) && (int) ($pagePagination['pages'] ?? 1) > 1):
                   $pagination = $pagePagination;
                   require APP_PATH . '/views/components/pagination.php'; endif; ?>
         </div>

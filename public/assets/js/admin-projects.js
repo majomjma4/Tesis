@@ -1037,7 +1037,7 @@
     let submitAuthorized = false;
     const submitFilters = () => {
         submitAuthorized = true;
-        filters.requestSubmit();
+        filters.dispatchEvent(new Event('submit', { cancelable: true }));
     };
     try {
         const pendingInteraction = JSON.parse(sessionStorage.getItem(filterInteractionKey) || 'null');
@@ -1094,23 +1094,85 @@
     const typeFilter = filters.querySelector('select[name="type_id"]');
     const statusFilter = filters.querySelector('select[name="status"]');
     const periodFilter = filters.querySelector('select[name="period_id"]');
-    filters.addEventListener('submit', event => {
-        if (!submitAuthorized) {
-            event.preventDefault();
-            return;
+    let abortController = null;
+    const fetchWorkspaceContent = async (url) => {
+        if (abortController) abortController.abort();
+        abortController = new AbortController();
+        const workspace = document.querySelector('#apWorkspaceContainer');
+        if (workspace) {
+            workspace.style.opacity = '0.5';
+            workspace.style.pointerEvents = 'none';
+            workspace.style.transition = 'opacity 0.15s ease';
         }
-        if (periodFilter && !periodFilter.value) periodFilter.disabled = true;
         try {
-            sessionStorage.setItem(filterInteractionKey, JSON.stringify({
-                scrollX: window.scrollX,
-                scrollY: window.scrollY,
-                searchFocused: document.activeElement === search,
-                selectionStart: search.selectionStart,
-            }));
-        } catch {
-            // El formulario se envía normalmente si el almacenamiento no está disponible.
+            const response = await fetch(url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                signal: abortController.signal
+            });
+            if (!response.ok) throw new Error();
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newWorkspace = doc.querySelector('#apWorkspaceContainer');
+            const currentWorkspace = document.querySelector('#apWorkspaceContainer');
+            if (newWorkspace && currentWorkspace) {
+                currentWorkspace.replaceWith(newWorkspace);
+                // Si la paginación existía o dejó de existir, volvemos a evaluar el paginador global
+                const newPagination = doc.querySelector('.data-pagination');
+                const currentPagination = document.querySelector('.data-pagination');
+                if (newPagination && currentPagination) {
+                    currentPagination.replaceWith(newPagination);
+                } else if (newPagination) {
+                    document.querySelector('#appPageContent')?.append(newPagination);
+                } else if (currentPagination) {
+                    currentPagination.remove();
+                }
+            }
+            // Volver a enlazar los listeners y re-filtrar localmente si es necesario
+            syncPaginationFilters();
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                // Fallback a recarga completa en caso de fallo crítico de red
+                window.location.assign(url);
+            }
         }
-    }, true);
+    };
+
+    filters.addEventListener('submit', event => {
+        event.preventDefault();
+        const data = new FormData(filters);
+        if (periodFilter && !periodFilter.value) data.delete('period_id');
+
+        const params = new URLSearchParams();
+        for (const [key, val] of data.entries()) {
+            if (val !== '') params.set(key, val);
+        }
+
+        const nextUrl = new URL(window.location.pathname, window.location.origin);
+        params.forEach((value, key) => nextUrl.searchParams.set(key, value));
+
+        // Mantener sincronía de la barra de búsqueda y filtros sin recargar
+        window.history.pushState({ path: nextUrl.toString() }, '', nextUrl.toString());
+        fetchWorkspaceContent(nextUrl.toString());
+    });
+
+    window.addEventListener('popstate', () => {
+        const currentUrl = window.location.href;
+        const urlParams = new URLSearchParams(window.location.search);
+
+        // Sincronizar los campos visuales nativos y selectores del filtro
+        if (search) search.value = urlParams.get('search') || '';
+        if (typeFilter) typeFilter.value = urlParams.get('type_id') || '';
+        if (statusFilter) statusFilter.value = urlParams.get('status') || '';
+        if (periodFilter) periodFilter.value = urlParams.get('period_id') || '';
+
+        // Sincronizar selectores customizados disparando evento change nativo
+        typeFilter?.dispatchEvent(new Event('change', { bubbles: false }));
+        statusFilter?.dispatchEvent(new Event('change', { bubbles: false }));
+        periodFilter?.dispatchEvent(new Event('change', { bubbles: false }));
+
+        fetchWorkspaceContent(currentUrl);
+    });
     const thesisOnlyFilters = [...(statusFilter?.options || [])].filter(option => ['defense', 'tribunal_approved'].includes(option.value));
     const syncFilterWorkflow = () => {
         if (!typeFilter || !thesisOnlyFilters.length) return;

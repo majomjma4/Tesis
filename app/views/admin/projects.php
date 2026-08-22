@@ -102,66 +102,68 @@ $typeLabels = [
             </div>
         <?php endif; ?>
     </form>
-    <p class="ap-results-count" role="status">
-        <?php if ($filteredProjectTotal === 0 && $hasActiveFilters): ?>
-            0 proyectos encontrados con los filtros seleccionados
-        <?php elseif ($filteredProjectTotal === 0): ?>
-            0 proyectos activos encontrados
-        <?php else: ?>
-            Mostrando <?= $filteredProjectTotal ?> proyecto<?= $filteredProjectTotal === 1 ? ' activo' : 's activos' ?>
-        <?php endif; ?>
-    </p>
-    <?php $projectListReturnQuery = ['page' => 'projects'];
-    foreach (['p', 'search', 'type_id', 'status', 'period_id', 'sort', 'per_page', 'group'] as $returnKey) {
-        if (isset($_GET[$returnKey]) && is_scalar($_GET[$returnKey]) && (string) $_GET[$returnKey] !== '')
-            $projectListReturnQuery[$returnKey] = (string) $_GET[$returnKey];
-    }
-    $projectListReturnUrl = base_url('index.php?' . http_build_query($projectListReturnQuery)); ?>
-    <section class="ap-list"><?php if ($filteredProjectTotal === 0): ?>
-        <?php if ($emptyProjectsDataset): ?>
-            <div class="ap-empty">
-                <i class="fa-regular fa-folder-open"></i>
-                <h2>No hay proyectos activos en este momento.</h2>
-                <p>Los proyectos publicados se encuentran disponibles en el Repositorio.</p>
-                <a href="<?= e(!empty($isAdministrator) ? route('admin-repository') : route('repository')) ?>">Ir al Repositorio</a>
-            </div>
-        <?php else: ?>
-            <div class="ap-empty ap-empty-filtered">
-                <i class="fa-solid fa-filter-circle-xmark"></i>
-                <h2>No se encontraron proyectos</h2>
-                <p>Prueba cambiando o limpiando los filtros de búsqueda.</p>
-                <a href="<?= e(route('projects')) ?>">Limpiar filtros</a>
-            </div>
-        <?php endif; ?>
-    <?php else: foreach ($projects as $p): $pending = !empty($p['review_situation']['has_pending_observations']); ?>
-                <article data-project-status="<?= e($p['status']) ?>" data-project-type-id="<?= (int) $p['project_type_id'] ?>"
-                    data-project-period-id="<?= (int) $p['academic_period_id'] ?>">
-                    <div class="ap-main"><span><?= e($p['code']) ?> · <?= e($typeLabels[(string)$p['type_code']] ?? $p['type_name']) ?></span>
-                        <h2><?= e($p['title']) ?></h2>
-                        <p><?= e($p['career_name']) ?> · <?= e($p['period_name']) ?></p>
-                    </div>
-                    <div><small>Tutor</small><strong><?= e($p['tutor_name'] ?: 'Por asignar') ?></strong></div>
-                    <div class="ap-status-column"><small>Estado</small>
-                        <div class="ap-status-stack"><span
-                                class="ap-status"><?= e($statusLabels[$p['status']] ?? $p['status']) ?></span><?php if ($pending): ?><span
-                                    class="ap-review-situation" aria-label="Observaciones pendientes"
-                                    data-tooltip="Observaciones pendientes" tabindex="0"><i class="fa-solid fa-triangle-exclamation"
-                                        aria-hidden="true"></i></span><?php endif; ?></div>
-                    </div>
-                    <?php $canReviewProject = !empty($p['capabilities']['review_documents']);
-                    $projectActionUrl = route('project-detail') . '&id=' . (int) $p['id']
-                        . ($canReviewProject ? '&tab=review' : '')
-                        . '&return=' . rawurlencode($projectListReturnUrl); ?>
-                    <div class="ap-actions"><a href="<?= e($projectActionUrl) ?>"><?= $canReviewProject ? 'Revisar proyecto' : 'Abrir' ?></a>
-                    </div>
-                </article>
-    <?php endforeach; endif; ?>
-    </section>
-    <?php if ($projectError): ?>
-        <aside class="ap-connection-notice" role="status"><i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i>
-            <div><strong>Datos temporalmente no disponibles</strong><span>Conservamos la pantalla lista para que puedas
-                    intentarlo nuevamente.</span></div><a href="<?= e(route('projects')) ?>">Reintentar</a>
-        </aside><?php endif; ?>
+    <div id="apWorkspaceContainer">
+        <p class="ap-results-count" role="status">
+            <?php if ($filteredProjectTotal === 0 && $hasActiveFilters): ?>
+                0 proyectos encontrados con los filtros seleccionados
+            <?php elseif ($filteredProjectTotal === 0): ?>
+                0 proyectos activos encontrados
+            <?php else: ?>
+                Mostrando <?= $filteredProjectTotal ?> proyecto<?= $filteredProjectTotal === 1 ? ' activo' : 's activos' ?>
+            <?php endif; ?>
+        </p>
+        <?php $projectListReturnQuery = ['page' => 'projects'];
+        foreach (['p', 'search', 'type_id', 'status', 'period_id', 'sort', 'per_page', 'group', 'review_situation'] as $returnKey) {
+            if (isset($_GET[$returnKey]) && is_scalar($_GET[$returnKey]) && (string) $_GET[$returnKey] !== '')
+                $projectListReturnQuery[$returnKey] = (string) $_GET[$returnKey];
+        }
+        $projectListReturnUrl = base_url('index.php?' . http_build_query($projectListReturnQuery)); ?>
+        <section class="ap-list"><?php if ($filteredProjectTotal === 0): ?>
+            <?php if ($emptyProjectsDataset): ?>
+                <div class="ap-empty">
+                    <i class="fa-regular fa-folder-open"></i>
+                    <h2>No hay proyectos activos en este momento.</h2>
+                    <p>Los proyectos publicados se encuentran disponibles en el Repositorio.</p>
+                    <a href="<?= e(!empty($isAdministrator) ? route('admin-repository') : route('repository')) ?>">Ir al Repositorio</a>
+                </div>
+            <?php else: ?>
+                <div class="ap-empty ap-empty-filtered">
+                    <i class="fa-solid fa-filter-circle-xmark"></i>
+                    <h2>No se encontraron proyectos</h2>
+                    <p>Prueba cambiando o limpiando los filtros de búsqueda.</p>
+                    <a href="<?= e(route('projects')) ?>">Limpiar filtros</a>
+                </div>
+            <?php endif; ?>
+        <?php else: foreach ($projects as $p): $pending = !empty($p['review_situation']['has_pending_observations']); ?>
+                    <article data-project-status="<?= e($p['status']) ?>" data-project-type-id="<?= (int) $p['project_type_id'] ?>"
+                        data-project-period-id="<?= (int) $p['academic_period_id'] ?>">
+                        <div class="ap-main"><span><?= e($p['code']) ?> · <?= e($typeLabels[(string)$p['type_code']] ?? $p['type_name']) ?></span>
+                            <h2><?= e($p['title']) ?></h2>
+                            <p><?= e($p['career_name']) ?> · <?= e($p['period_name']) ?></p>
+                        </div>
+                        <div><small>Tutor</small><strong><?= e($p['tutor_name'] ?: 'Por asignar') ?></strong></div>
+                        <div class="ap-status-column"><small>Estado</small>
+                            <div class="ap-status-stack"><span
+                                    class="ap-status state-<?= e($p['status']) ?>"><?= e($statusLabels[$p['status']] ?? $p['status']) ?></span><?php if ($pending): ?><span
+                                        class="ap-review-situation" aria-label="Observaciones pendientes"
+                                        data-tooltip="Observaciones pendientes" tabindex="0"><i class="fa-solid fa-triangle-exclamation"
+                                            aria-hidden="true"></i></span><?php endif; ?></div>
+                        </div>
+                        <?php $canReviewProject = !empty($p['capabilities']['review_documents']);
+                        $projectActionUrl = route('project-detail') . '&id=' . (int) $p['id']
+                            . ($canReviewProject ? '&tab=review' : '')
+                            . '&return=' . rawurlencode($projectListReturnUrl); ?>
+                        <div class="ap-actions"><a href="<?= e($projectActionUrl) ?>"><?= $canReviewProject ? 'Revisar proyecto' : 'Abrir' ?></a>
+                        </div>
+                    </article>
+        <?php endforeach; endif; ?>
+        </section>
+        <?php if ($projectError): ?>
+            <aside class="ap-connection-notice" role="status"><i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i>
+                <div><strong>Datos temporalmente no disponibles</strong><span>Conservamos la pantalla lista para que puedas
+                        intentarlo nuevamente.</span></div><a href="<?= e(route('projects')) ?>">Reintentar</a>
+            </aside><?php endif; ?>
+    </div>
 <?php endif; ?>
 <?php if (!empty($projectEditorOnly) && !empty($projectEditorPayload)): ?>
     <script type="application/json"

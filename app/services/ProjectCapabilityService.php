@@ -8,6 +8,73 @@ final class ProjectCapabilityService
     public const INSTITUTIONAL_ACTIVE_STATUSES = ['development', 'under_review', 'approved', 'defense', 'tribunal_approved'];
     public const INSTITUTIONAL_ARCHIVE_EXTENSIONS = ['zip', 'rar', '7z', 'tar', 'gz'];
 
+    /** SQL de elegibilidad para el listado de proyectos actualmente activos. */
+    public static function institutionalActiveProjectEligibilityWhere(string $alias = 'p'): string
+    {
+        self::assertProjectAlias($alias);
+
+        return "{$alias}.deleted_at IS NULL
+            AND {$alias}.withdrawn_at IS NULL
+            AND EXISTS (
+                SELECT 1
+                FROM project_participants active_student
+                INNER JOIN student_profiles active_student_profile
+                    ON active_student_profile.user_id=active_student.user_id
+                INNER JOIN users active_student_user
+                    ON active_student_user.id=active_student.user_id
+                WHERE active_student.project_id={$alias}.id
+                  AND active_student.role_code='student'
+                  AND active_student.status='active'
+                  AND active_student.removed_at IS NULL
+                  AND active_student_user.status='active'
+                  AND active_student_user.deleted_at IS NULL
+                  AND active_student_user.purged_at IS NULL
+            )";
+    }
+
+    /** SQL del subconjunto que sigue en flujo académico. */
+    public static function institutionalActiveProjectWhere(string $alias = 'p'): string
+    {
+        return self::institutionalActiveProjectEligibilityWhere($alias)
+            . " AND {$alias}.status IN ('development','under_review','approved','defense','tribunal_approved')";
+    }
+
+    /** SQL para registros históricos no eliminados ni retirados. */
+    public static function institutionalHistoricalProjectWhere(string $alias = 'p'): string
+    {
+        self::assertProjectAlias($alias);
+        return "{$alias}.deleted_at IS NULL AND {$alias}.withdrawn_at IS NULL";
+    }
+
+    /** SQL del universo publicado, alineado con el Repositorio administrativo. */
+    public static function institutionalPublishedProjectWhere(string $alias = 'p'): string
+    {
+        $historical = self::institutionalHistoricalProjectWhere($alias);
+        return $historical . "
+            AND {$alias}.status='published'
+            AND EXISTS (
+                SELECT 1
+                FROM project_participants published_student
+                INNER JOIN student_profiles published_student_profile
+                    ON published_student_profile.user_id=published_student.user_id
+                WHERE published_student.project_id={$alias}.id
+                  AND published_student.role_code='student'
+                  AND published_student.status='active'
+            )
+            AND EXISTS (
+                SELECT 1 FROM project_files published_file
+                WHERE published_file.project_id={$alias}.id
+                  AND published_file.deleted_at IS NULL
+            )";
+    }
+
+    private static function assertProjectAlias(string $alias): void
+    {
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $alias)) {
+            throw new InvalidArgumentException('Alias de proyecto no válido.');
+        }
+    }
+
     private const KEYS = [
         'view_project', 'edit_information', 'manage_files', 'view_academic_history',
         'view_admin_history', 'change_status', 'manage_participants', 'manage_tutoring',

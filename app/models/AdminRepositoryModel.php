@@ -48,7 +48,7 @@ final class AdminRepositoryModel
     public function listing(string $filter = '', array $pagination = []): array
     {
         $eligible = "((pt.code='thesis' AND p.status='tribunal_approved') OR (pt.code<>'thesis' AND p.status='approved'))";
-        $where = "p.deleted_at IS NULL
+        $activeParticipantWhere = "p.deleted_at IS NULL
             AND EXISTS (
                 SELECT 1
                 FROM project_participants student_participant
@@ -59,13 +59,11 @@ final class AdminRepositoryModel
                   AND student_participant.status='active'
             )
             AND p.status IN ('approved','defense','tribunal_approved','published')";
+        $where = $activeParticipantWhere;
         $params = [];
 
         if ($filter === '' || $filter === 'published') {
-            $where .= " AND p.status='published' AND p.withdrawn_at IS NULL AND EXISTS(
-                SELECT 1 FROM project_files published_file
-                WHERE published_file.project_id=p.id AND published_file.deleted_at IS NULL
-            )";
+            $where = ProjectCapabilityService::institutionalPublishedProjectWhere('p');
         } elseif ($filter === 'eligible') {
             $where .= " AND $eligible AND EXISTS(
                 SELECT 1 FROM project_files f
@@ -170,17 +168,7 @@ final class AdminRepositoryModel
             )->fetchColumn(),
             'published' => (int) $database->query(
                 "SELECT COUNT(DISTINCT p.id) FROM projects p
-                JOIN project_types pt ON pt.id=p.project_type_id
-                WHERE p.deleted_at IS NULL AND p.status='published' AND p.withdrawn_at IS NULL
-                AND EXISTS(
-                    SELECT 1 FROM project_participants pp
-                    JOIN student_profiles sp ON sp.user_id=pp.user_id
-                    WHERE pp.project_id=p.id AND pp.role_code='student' AND pp.status='active'
-                )
-                AND EXISTS(
-                    SELECT 1 FROM project_files f
-                    WHERE f.project_id=p.id AND f.deleted_at IS NULL
-                )"
+                WHERE " . ProjectCapabilityService::institutionalPublishedProjectWhere('p')
             )->fetchColumn(),
             'withdrawn' => (int) $database->query(
                 "SELECT COUNT(*) FROM projects p

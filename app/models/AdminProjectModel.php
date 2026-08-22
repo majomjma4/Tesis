@@ -14,7 +14,7 @@ final class AdminProjectModel
              (SELECT COUNT(*) FROM project_participants pp WHERE pp.project_id=p.id AND pp.status='active') participant_count,
              (SELECT COUNT(*) FROM project_participants pa WHERE pa.project_id=p.id AND pa.role_code='student' AND pa.status='active' AND pa.removed_at IS NULL) author_count,
              (SELECT COUNT(*) FROM project_participants pj WHERE pj.project_id=p.id AND pj.role_code IN ('tribunal','jury') AND pj.status='active' AND pj.removed_at IS NULL) tribunal_count,
-             (SELECT COUNT(*) FROM project_files pf WHERE pf.project_id=p.id AND pf.deleted_at IS NULL AND pf.purged_at IS NULL) active_file_count".$from.' ORDER BY p.updated_at DESC';
+             (SELECT COUNT(*) FROM project_files pf WHERE pf.project_id=p.id AND pf.deleted_at IS NULL AND pf.purged_at IS NULL) active_file_count".$from.' ORDER BY p.updated_at DESC, p.id DESC';
         $result=PaginationService::run(Database::connection(),'SELECT COUNT(*)'.$from,$sql,$x,$pagination?:PaginationService::request());
         $files=Database::connection()->prepare(
             "SELECT id,original_name name,extension,size_bytes
@@ -83,20 +83,8 @@ final class AdminProjectModel
     }
     private function filteredQuery(array $filters):array
     {
-        $institutionalStatuses="'".implode("','",self::STATUSES)."'";
         $where=[
-            'p.deleted_at IS NULL',
-            'p.withdrawn_at IS NULL',
-            "p.status IN (".$institutionalStatuses.")",
-            "EXISTS (
-                SELECT 1
-                FROM project_participants student_participant
-                JOIN student_profiles student_profile
-                  ON student_profile.user_id=student_participant.user_id
-                WHERE student_participant.project_id=p.id
-                  AND student_participant.role_code='student'
-                  AND student_participant.status='active'
-            )",
+            ProjectCapabilityService::institutionalActiveProjectWhere('p'),
         ];
         $params=[];
         $search=(string)($filters['search']??'');

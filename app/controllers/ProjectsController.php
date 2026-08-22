@@ -477,7 +477,7 @@ final class ProjectsController
         }
         $perPage = filter_var($query['per_page'] ?? null, FILTER_VALIDATE_INT);
         if (in_array($perPage, [10, 25, 50, 75, 100], true)) $safe['per_page'] = (int) $perPage;
-        foreach (['search' => 100, 'status' => 32, 'situation' => 32, 'sort' => 32, 'group' => 32, 'tab' => 32] as $key => $limit) {
+        foreach (['search' => 100, 'status' => 32, 'situation' => 32, 'review_situation' => 32, 'sort' => 32, 'group' => 32, 'tab' => 32] as $key => $limit) {
             if (!isset($query[$key]) || !is_scalar($query[$key])) continue;
             $value = mb_substr(trim((string) $query[$key]), 0, $limit);
             if ($value !== '') $safe[$key] = $value;

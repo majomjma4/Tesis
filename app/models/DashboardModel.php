@@ -696,20 +696,24 @@ final class DashboardModel
 
     private function adminProjectSummary(PDO $connection): array
     {
+        $active = ProjectCapabilityService::institutionalActiveProjectWhere('p');
+        $historical = ProjectCapabilityService::institutionalHistoricalProjectWhere('p');
+        $finalized = "({$historical} AND p.status='completed')";
+        $published = ProjectCapabilityService::institutionalPublishedProjectWhere('p');
         $statement = $connection->query(
             "SELECT
-                COUNT(*) total,
-                SUM(CASE WHEN p.status = 'published' THEN 1 ELSE 0 END) published,
+                SUM(CASE WHEN ({$active}) OR {$finalized} OR ({$published}) THEN 1 ELSE 0 END) total,
+                SUM(CASE WHEN ({$published}) THEN 1 ELSE 0 END) published,
                 SUM(CASE
-                    WHEN p.status = 'completed' THEN 1
-                    WHEN p.status = 'tribunal_approved' AND pt.code = 'thesis' THEN 1
-                    WHEN p.status = 'approved' AND pt.code != 'thesis' THEN 1
+                    WHEN {$finalized} THEN 1
+                    WHEN ({$active}) AND p.status = 'tribunal_approved' AND pt.code = 'thesis' THEN 1
+                    WHEN ({$active}) AND p.status = 'approved' AND pt.code != 'thesis' THEN 1
                     ELSE 0
                 END) approved,
                 SUM(CASE
-                    WHEN p.status IN ('development', 'under_review', 'corrections_requested', 'changes_required') THEN 1
-                    WHEN p.status = 'approved' AND pt.code = 'thesis' THEN 1
-                    WHEN p.status = 'defense' AND pt.code = 'thesis' THEN 1
+                    WHEN ({$active}) AND p.status IN ('development', 'under_review') THEN 1
+                    WHEN ({$active}) AND p.status = 'approved' AND pt.code = 'thesis' THEN 1
+                    WHEN ({$active}) AND p.status = 'defense' AND pt.code = 'thesis' THEN 1
                     ELSE 0
                 END) in_flow
              FROM projects p
@@ -719,7 +723,7 @@ final class DashboardModel
         $row = $statement->fetch(PDO::FETCH_ASSOC) ?: [];
 
         $pendingObs = (int) $connection->query(
-            "SELECT COUNT(DISTINCT p.id) FROM projects p INNER JOIN project_observations o ON o.project_id = p.id WHERE p.deleted_at IS NULL AND p.status != 'published' AND o.status = 'pending'"
+            "SELECT COUNT(DISTINCT p.id) FROM projects p INNER JOIN project_observations o ON o.project_id = p.id WHERE ({$active}) AND o.status = 'pending'"
         )->fetchColumn();
 
         return [
@@ -752,33 +756,37 @@ final class DashboardModel
          *   Publicados    → status = 'published'
          *
          * "Finalizados" eliminado del panorama: `completed` se consolida en Aprobados.
-         * El denominador es el total real de proyectos vigentes (deleted_at IS NULL).
+         * El denominador suma tres universos disjuntos: activos, finalizados y publicados.
          */
         $totalDenominator = max(1, $totalProjects);
+        $active = ProjectCapabilityService::institutionalActiveProjectWhere('p');
+        $historical = ProjectCapabilityService::institutionalHistoricalProjectWhere('p');
+        $finalized = "({$historical} AND p.status='completed')";
+        $published = ProjectCapabilityService::institutionalPublishedProjectWhere('p');
 
         $statement = $connection->query(
             "SELECT
                 SUM(CASE
-                    WHEN p.status = 'development' THEN 1
+                    WHEN ({$active}) AND p.status = 'development' THEN 1
                     ELSE 0
                 END) AS development,
                 SUM(CASE
-                    WHEN p.status = 'under_review' THEN 1
-                    WHEN p.status = 'approved' AND pt.code = 'thesis' THEN 1
+                    WHEN ({$active}) AND p.status = 'under_review' THEN 1
+                    WHEN ({$active}) AND p.status = 'approved' AND pt.code = 'thesis' THEN 1
                     ELSE 0
                 END) AS under_review,
                 SUM(CASE
-                    WHEN p.status = 'completed' THEN 1
-                    WHEN p.status = 'tribunal_approved' AND pt.code = 'thesis' THEN 1
-                    WHEN p.status = 'approved' AND pt.code != 'thesis' THEN 1
+                    WHEN {$finalized} THEN 1
+                    WHEN ({$active}) AND p.status = 'tribunal_approved' AND pt.code = 'thesis' THEN 1
+                    WHEN ({$active}) AND p.status = 'approved' AND pt.code != 'thesis' THEN 1
                     ELSE 0
                 END) AS approved,
                 SUM(CASE
-                    WHEN p.status = 'defense' AND pt.code = 'thesis' THEN 1
+                    WHEN ({$active}) AND p.status = 'defense' AND pt.code = 'thesis' THEN 1
                     ELSE 0
                 END) AS defense,
                 SUM(CASE
-                    WHEN p.status = 'published' THEN 1
+                    WHEN ({$published}) THEN 1
                     ELSE 0
                 END) AS published
              FROM projects p

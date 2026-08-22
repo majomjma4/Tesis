@@ -101,7 +101,7 @@
 
 .ap-list {
     display: grid;
-    gap: 10px
+    gap: 12px
 }
 
 .ap-list>article {
@@ -109,10 +109,17 @@
     grid-template-columns: 1fr minmax(200px, 260px) minmax(130px, 170px) auto;
     align-items: center;
     gap: 20px;
-    padding: 18px;
+    padding: 20px;
     border: 1px solid var(--line);
     border-radius: 16px;
-    background: var(--surface)
+    background: var(--surface);
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.22s ease;
+}
+
+.ap-list>article:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.08), 0 4px 12px -5px rgba(37, 99, 235, 0.05);
+    border-color: rgba(37, 99, 235, 0.22);
 }
 
 .ap-main span,
@@ -146,7 +153,9 @@
 
 .ap-main h2 {
     font-size: var(--font-lg);
-    margin: 4px 0
+    margin: 4px 0;
+    font-weight: 700;
+    line-height: 1.4;
 }
 
 .ap-main p {
@@ -159,12 +168,53 @@
 }
 
 .ap-status {
-    padding: 6px 9px;
+    padding: 6px 12px;
     border-radius: 99px;
-    background: rgba(37, 99, 235, .1);
-    color: var(--blue);
     font-size: var(--font-sm);
-    font-weight: 800
+    font-weight: 800;
+    display: inline-block;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Colores semánticos según estado académico */
+.ap-status.state-development {
+    background: rgba(37, 99, 235, 0.08) !important;
+    color: var(--blue) !important;
+    border: 1px solid rgba(37, 99, 235, 0.15) !important;
+}
+
+.ap-status.state-under_review,
+.ap-status.state-corrections_requested,
+.ap-status.state-changes_required {
+    background: rgba(217, 119, 6, 0.08) !important;
+    color: #d97706 !important;
+    border: 1px solid rgba(217, 119, 6, 0.15) !important;
+}
+
+.ap-status.state-approved,
+.ap-status.state-completed,
+.ap-status.state-tribunal_approved {
+    background: rgba(5, 150, 105, 0.08) !important;
+    color: #059669 !important;
+    border: 1px solid rgba(5, 150, 105, 0.15) !important;
+}
+
+.ap-status.state-defense {
+    background: rgba(124, 58, 237, 0.08) !important;
+    color: #7c3aed !important;
+    border: 1px solid rgba(124, 58, 237, 0.15) !important;
+}
+
+.ap-status.state-published {
+    background: rgba(13, 148, 136, 0.08) !important;
+    color: #0d9488 !important;
+    border: 1px solid rgba(13, 148, 136, 0.15) !important;
+}
+
+.ap-status.state-withdrawn {
+    background: rgba(220, 38, 38, 0.08) !important;
+    color: #dc2626 !important;
+    border: 1px solid rgba(220, 38, 38, 0.15) !important;
 }
 
 .ap-status-stack {
@@ -180,26 +230,28 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
-    background: rgba(194, 65, 12, .12);
-    color: #c2410c;
+    background: rgba(220, 38, 38, 0.08);
+    color: #dc2626;
     font-size: var(--font-sm);
     cursor: pointer;
     flex-shrink: 0;
-    transition: transform .15s ease, background-color .15s ease
+    transition: transform .15s ease, background-color .15s ease, box-shadow .15s ease;
+    border: 1px solid rgba(220, 38, 38, 0.15);
 }
 
 .ap-review-situation:hover,
 .ap-review-situation:focus-visible {
-    transform: scale(1.15);
-    background: rgba(194, 65, 12, .22);
+    transform: scale(1.1);
+    background: rgba(220, 38, 38, 0.15);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
     outline: 0
 }
 
 .ap-review-situation i {
-    color: #c2410c;
+    color: #dc2626;
     font-size: .72rem
 }
 
@@ -229,20 +281,7 @@
     transform: translateX(-50%) translateY(0)
 }
 
-.ap-actions {
-    display: flex;
-    gap: 6px
-}
-
-.ap-actions a,
-.ap-actions button {
-    padding: 8px;
-    border: 1px solid var(--line);
-    border-radius: 99px;
-    background: var(--surface-soft);
-    color: var(--text);
-    text-decoration: none
-}
+/* La definición de .ap-actions y sus hovers e interactividad premium ha sido unificada en la sección superior de este archivo. */
 
 .danger {
     color: #dc2626 !important
