@@ -47,6 +47,8 @@
     const confirmationTitle = document.querySelector("#arConfirmTitle");
     const confirmationText = document.querySelector("#arConfirmText");
     const confirmationReason = confirmation?.querySelector("[data-confirm-reason]");
+    const confirmationReasonSelect = confirmation?.querySelector("[data-confirm-reason-select]");
+    const confirmationReasonDetail = confirmation?.querySelector("[data-confirm-reason-detail]");
     const confirmationReasonInput = confirmation?.querySelector("[data-confirm-reason-input]");
     const confirmationAccept = confirmation?.querySelector("[data-confirm-accept]");
     const confirmationCancel = confirmation?.querySelector("[data-confirm-cancel]");
@@ -59,6 +61,11 @@
     if (toastStack) document.body.append(toastStack);
     if (tooltip) document.body.append(tooltip);
     let activeTab = "projects";
+    const searchPlaceholders = {
+        projects: "Buscar por título, código, autor o tutor",
+        materials: "Buscar por título, descripción o palabra clave",
+        withdrawn: "Buscar por título, descripción o palabra clave",
+    };
     const toastRegistry = new Map();
     const toastDurations = { success: 3800, info: 4000, warning: 5000, error: 5600 };
     const originalText = new WeakMap();
@@ -169,18 +176,22 @@
         confirmationTitle.textContent = options.title || "Confirmar acción";
         confirmationText.textContent = message;
         const requiresReason = options.reason === true;
-        if (confirmationReason && confirmationReasonInput) {
+        if (confirmationReason && confirmationReasonInput && confirmationReasonSelect) {
             confirmationReason.hidden = !requiresReason;
-            confirmationReasonInput.disabled = !requiresReason;
-            confirmationReasonInput.required = requiresReason;
+            confirmationReasonSelect.disabled = !requiresReason;
+            confirmationReasonSelect.value = "";
+            confirmationReasonDetail.hidden = true;
+            confirmationReasonInput.disabled = true;
+            confirmationReasonInput.required = false;
             confirmationReasonInput.value = "";
         }
         confirmationAccept.textContent = options.acceptLabel || "Confirmar";
         confirmationAccept.classList.toggle("danger", options.danger !== false);
+        confirmationAccept.classList.toggle("warning", options.warning === true);
         confirmationAccept.classList.toggle("restore-material-confirm-primary", options.variant === "restore-material");
         confirmation.hidden = false;
         document.body.classList.add("modal-open");
-        (requiresReason ? confirmationReasonInput : confirmationAccept)?.focus();
+        (requiresReason ? confirmationReasonSelect : confirmationAccept)?.focus();
         const close = (accepted) => {
             confirmation.hidden = true;
             const secondaryModalOpen = [materialEditModal, materialFilesModal, presentationModal]
@@ -190,17 +201,39 @@
             confirmationCancel.removeEventListener("click", cancel);
             confirmation.removeEventListener("click", backdrop);
             document.removeEventListener("keydown", escape);
+            if (confirmationReasonSelect) confirmationReasonSelect.removeEventListener("change", syncReasonField);
             resolve(accepted);
+        };
+        const syncReasonField = () => {
+            const isOther = confirmationReasonSelect?.value === "other";
+            if (confirmationReasonDetail) confirmationReasonDetail.hidden = !isOther;
+            if (confirmationReasonInput) {
+                confirmationReasonInput.disabled = !isOther;
+                confirmationReasonInput.required = isOther;
+                if (!isOther) confirmationReasonInput.value = "";
+            }
+            if (isOther) requestAnimationFrame(() => confirmationReasonInput?.focus());
         };
         const accept = () => {
             if (!requiresReason) return close(true);
-            const reason = confirmationReasonInput?.value.trim() || "";
-            if (reason.length < 5 || reason.length > 500) {
-                confirmationReasonInput?.focus();
-                confirmationReasonInput?.setCustomValidity("Indica un motivo entre 5 y 500 caracteres.");
-                confirmationReasonInput?.reportValidity();
+            const selectedReason = confirmationReasonSelect?.value || "";
+            if (!selectedReason) {
+                confirmationReasonSelect?.focus();
+                confirmationReasonSelect?.setCustomValidity("Selecciona un motivo.");
+                confirmationReasonSelect?.reportValidity();
                 return;
             }
+            const reason = selectedReason === "other"
+                ? confirmationReasonInput?.value.trim() || ""
+                : selectedReason;
+            if (reason.length < 5 || reason.length > 500) {
+                (selectedReason === "other" ? confirmationReasonInput : confirmationReasonSelect)?.focus();
+                const field = selectedReason === "other" ? confirmationReasonInput : confirmationReasonSelect;
+                field?.setCustomValidity("Indica un motivo entre 5 y 500 caracteres.");
+                field?.reportValidity();
+                return;
+            }
+            confirmationReasonSelect?.setCustomValidity("");
             confirmationReasonInput?.setCustomValidity("");
             close(reason);
         };
@@ -214,6 +247,7 @@
         confirmationAccept.addEventListener("click", accept);
         confirmationCancel.addEventListener("click", cancel);
         confirmation.addEventListener("click", backdrop);
+        confirmationReasonSelect?.addEventListener("change", syncReasonField);
         document.addEventListener("keydown", escape);
     });
 
@@ -560,6 +594,7 @@
                 title: available ? "Marcar como no disponible" : "Marcar como disponible",
                 acceptLabel: available ? "Marcar como no disponible" : "Marcar como disponible",
                 danger: false,
+                warning: available,
             })) return;
             button.disabled = true;
             const data = new FormData();
@@ -714,8 +749,8 @@
     };
 
     const renderPagination = (total, size, state, controls) => {
-        const totalPages = Math.max(1, Math.ceil(total / size));
-        state.page = Math.min(state.page, totalPages);
+        const pages = Math.max(1, Math.ceil(total / size));
+        state.page = Math.min(state.page, pages);
         const from = total === 0 ? 0 : ((state.page - 1) * size) + 1;
         const to = Math.min(state.page * size, total);
 
@@ -725,9 +760,9 @@
                 : `Mostrando ${from}-${to} de ${total}`;
         }
         if (!controls?.pagination || !controls.pages) return;
-        controls.pagination.hidden = total <= state.size;
+        controls.pagination.hidden = pages <= 1;
         controls.pages.replaceChildren();
-        if (total <= 10) return;
+        if (pages <= 1) return;
 
         const createButton = (label, target, options = {}) => {
             const button = document.createElement("button");
@@ -749,7 +784,7 @@
             disabled: state.page === 1,
             ariaLabel: "Página anterior",
         }));
-        pageTokens(state.page, totalPages).forEach((token) => {
+        pageTokens(state.page, pages).forEach((token) => {
             if (typeof token === "string") {
                 const ellipsis = document.createElement("span");
                 ellipsis.textContent = "…";
@@ -758,9 +793,9 @@
             }
             controls.pages.append(createButton(token, token, { active: token === state.page }));
         });
-        controls.pages.append(createButton("Siguiente", Math.min(totalPages, state.page + 1), {
+        controls.pages.append(createButton("Siguiente", Math.min(pages, state.page + 1), {
             icon: "fa-solid fa-chevron-right",
-            disabled: state.page === totalPages,
+            disabled: state.page === pages,
             ariaLabel: "Página siguiente",
         }));
     };
@@ -885,6 +920,7 @@
 
     const selectTab = (tab) => {
         activeTab = tab;
+        if (search) search.placeholder = searchPlaceholders[tab] || searchPlaceholders.projects;
         document.querySelectorAll("[data-repository-tab]").forEach((button) => {
             const selected = button.dataset.repositoryTab === tab;
             button.classList.toggle("active", selected);

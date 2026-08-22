@@ -85,8 +85,9 @@ final class RepositoryController
         $project = ($projectId !== false && $projectId !== null && $access->can('project.view'))
             ? (new ProjectRecordModel())->find((int)$projectId, $access->currentUserId(), $isAdministratorView, true) : null;
         if ($project === null) http_response_code(404);
+        $capabilityContext = $isAdministratorView ? 'academic_management' : 'repository';
         $projectCapabilities = $project !== null
-            ? (new ProjectCapabilityService())->resolve($project, 'repository', (int) ($session->userId() ?? 0), $access->currentRoles(), $isAdministratorView)
+            ? (new ProjectCapabilityService())->resolve($project, $capabilityContext, (int) ($session->userId() ?? 0), $access->currentRoles(), $isAdministratorView)
             : (new ProjectCapabilityService())->none();
         if ($project !== null && !empty($projectCapabilities['view_academic_history'])) {
             $academicPage = (new ProjectRecordModel())->academicHistoryPage((int)$project['id']);
@@ -147,6 +148,7 @@ final class RepositoryController
             'activeTab' => $activeTab,
             'isAdministrator' => $isAdministratorView,
             'publicContext' => true,
+            'institutionalReadOnly' => !$isAdministratorView,
             'canReview' => false,
             'canDeliver' => false,
             'projectContext' => 'repository',

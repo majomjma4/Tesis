@@ -24,6 +24,17 @@ $formatDate = static function (?string $date): string {
     if (!$date) return 'Sin fecha registrada';
     return (new DateTimeImmutable($date))->format('d/m/Y');
 };
+$formatProjectType = static function (array $project): string {
+    $labels = [
+        'pis' => 'Proyecto PIS',
+        'thesis' => 'Titulación',
+        'thesis_profile' => 'Perfil de tesis',
+        'community' => 'Proyecto de vinculación',
+        'practice' => 'Prácticas',
+    ];
+    $code = strtolower(trim((string) ($project['type_code'] ?? '')));
+    return $labels[$code] ?? (string) ($project['type_name'] ?? '');
+};
 ?>
 
 <div class="ar-page" id="arPage">
@@ -79,7 +90,7 @@ $formatDate = static function (?string $date): string {
         <div class="ar-tools admin-filter-bar">
             <label class="ar-search admin-filter-search admin-filter-item-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="arSearch" type="search" placeholder="Buscar en el repositorio..." autocomplete="off">
+                <input id="arSearch" type="search" placeholder="Buscar por título, código, autor o tutor" autocomplete="off">
                 <button id="arClearSearch" type="button" aria-label="Limpiar búsqueda" hidden>
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -153,11 +164,25 @@ $formatDate = static function (?string $date): string {
 
             <div class="ar-grid" id="arProjectGrid">
                 <?php foreach ($publishedProjects as $project): ?>
+                    <?php
+                    try {
+                        $package = (new ProjectRepositoryPackageService())->describe(
+                            (int) $project['id'],
+                            route('repository-download') . '&id=' . (int) $project['id']
+                        );
+                        $project['package_available'] = !empty($package['available']);
+                        $project['package_download_url'] = (string) ($package['download_url'] ?? '');
+                    } catch (Throwable $exception) {
+                        error_log('Admin repository package descriptor: ' . $exception->getMessage());
+                        $project['package_available'] = false;
+                        $project['package_download_url'] = '';
+                    }
+                    ?>
                     <?php $projectSearch = implode(' ', [
                         $project['code'], $project['type_name'], $project['title'],
                         $project['authors'] ?: '', $project['tutor_name'] ?: '',
                         $project['period_name'],
-                    ]); $projectTypeBadge = mb_strtolower((string) $project['type_name'], 'UTF-8') === 'proyecto integrador de saberes' ? 'PIS' : $project['type_name']; ?>
+                    ]); ?>
                     <article class="ar-project-card"
                         data-repository-item="projects"
                         data-project-available="<?= !empty($project['is_available']) ? '1' : '0' ?>"
@@ -167,7 +192,7 @@ $formatDate = static function (?string $date): string {
                         data-period="<?= e(mb_strtolower($project['period_name'], 'UTF-8')) ?>">
                         <header>
                             <span class="ar-code"><?= e($project['code']) ?></span>
-                            <span class="ar-project-type"><?= e($projectTypeBadge) ?></span>
+                            <span class="ar-project-type"><?= e($formatProjectType($project)) ?></span>
                         </header>
                         <div class="ar-card-copy">
                             <h3 title="<?= e($project['title']) ?>"><?= e($project['title']) ?></h3>
@@ -185,9 +210,11 @@ $formatDate = static function (?string $date): string {
                             <a class="ar-primary-action" href="<?= e(route('repository-detail') . '&id=' . (int) $project['id'] . '&tab=information&return=' . rawurlencode((string)($_SERVER['REQUEST_URI'] ?? route('admin-repository')))) ?>">
                                 <i class="fa-solid fa-diagram-project"></i> Abrir expediente
                             </a>
-                            <a class="ar-icon-action" href="<?= e(route('repository-download') . '&id=' . (int) $project['id']) ?>" data-tooltip="Descargar ZIP" aria-label="Descargar ZIP completo de <?= e($project['title']) ?>">
-                                <i class="fa-solid fa-download" aria-hidden="true"></i>
-                            </a>
+                            <?php if (!empty($project['package_available']) && !empty($project['package_download_url'])): ?>
+                                <a class="ar-icon-action" href="<?= e($project['package_download_url']) ?>" data-tooltip="Descargar ZIP" aria-label="Descargar ZIP completo de <?= e($project['title']) ?>">
+                                    <i class="fa-solid fa-download" aria-hidden="true"></i>
+                                </a>
+                            <?php endif; ?>
                             <button class="ar-icon-action ar-availability-action" data-project-availability data-id="<?= (int) $project['id'] ?>" data-available="<?= !empty($project['is_available']) ? '1' : '0' ?>" data-tooltip="<?= !empty($project['is_available']) ? 'Marcar como no disponible' : 'Marcar como disponible' ?>" type="button" aria-label="<?= !empty($project['is_available']) ? 'Marcar proyecto como no disponible' : 'Marcar proyecto como disponible' ?>">
                                 <i class="fa-solid <?= !empty($project['is_available']) ? 'fa-ban' : 'fa-circle-check' ?>"></i>
                             </button>
@@ -309,11 +336,11 @@ $formatDate = static function (?string $date): string {
                     <header class="ar-section-head"><div><span>Publicaciones académicas</span><h2>Proyectos retirados</h2></div></header>
                     <div class="ar-grid">
                         <?php foreach ($withdrawnProjects as $project): ?>
-                            <?php $projectSearch = implode(' ', [$project['code'], $project['type_name'], $project['title'], $project['authors'] ?: '', $project['tutor_name'] ?: '', $project['period_name']]); $projectTypeBadge = mb_strtolower((string) $project['type_name'], 'UTF-8') === 'proyecto integrador de saberes' ? 'PIS' : $project['type_name']; ?>
+                            <?php $projectSearch = implode(' ', [$project['code'], $project['type_name'], $project['title'], $project['authors'] ?: '', $project['tutor_name'] ?: '', $project['period_name']]); ?>
                             <article class="ar-project-card"
                                 data-repository-item="withdrawn"
                                 data-search="<?= e(mb_strtolower($projectSearch, 'UTF-8')) ?>">
-                                <header><span class="ar-code"><?= e($project['code']) ?></span><span class="ar-project-type"><?= e($projectTypeBadge) ?></span></header>
+                                <header><span class="ar-code"><?= e($project['code']) ?></span><span class="ar-project-type"><?= e($formatProjectType($project)) ?></span></header>
                                 <div class="ar-card-copy">
                                     <h3 title="<?= e($project['title']) ?>"><?= e($project['title']) ?></h3>
                                     <dl>
@@ -414,9 +441,21 @@ $formatDate = static function (?string $date): string {
             <span><i class="fa-solid fa-triangle-exclamation"></i></span>
             <h2 id="arConfirmTitle">Confirmar acción</h2>
             <p id="arConfirmText"></p>
-            <label class="ar-confirm-reason" data-confirm-reason hidden>Motivo
-                <textarea data-confirm-reason-input rows="3" minlength="5" maxlength="500" placeholder="Describe el motivo" disabled></textarea>
-            </label>
+            <div class="ar-confirm-reason" data-confirm-reason hidden>
+                <label for="arConfirmReasonSelect">Motivo</label>
+                <select id="arConfirmReasonSelect" data-confirm-reason-select disabled>
+                    <option value="">Selecciona un motivo</option>
+                    <option value="Publicación incorrecta">Publicación incorrecta</option>
+                    <option value="Contenido duplicado">Contenido duplicado</option>
+                    <option value="Información desactualizada">Información desactualizada</option>
+                    <option value="Solicitud de retiro institucional">Solicitud de retiro institucional</option>
+                    <option value="Incumplimiento de requisitos">Incumplimiento de requisitos</option>
+                    <option value="other">Otro</option>
+                </select>
+                <label class="ar-confirm-reason-detail" data-confirm-reason-detail hidden for="arConfirmReasonInput">Especifica el motivo
+                    <textarea id="arConfirmReasonInput" data-confirm-reason-input rows="3" minlength="5" maxlength="500" placeholder="Describe brevemente el motivo." disabled></textarea>
+                </label>
+            </div>
             <div>
                 <button type="button" data-confirm-cancel>Cancelar</button>
                 <button type="button" class="danger" data-confirm-accept>Retirar proyecto</button>

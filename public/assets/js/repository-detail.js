@@ -3907,15 +3907,14 @@ function positionFileMenu(menu, anchor, boundary = neutralFileList) {
     const upperLimit = Math.max(margin, boundaryRect?.top ?? margin);
     const opensUp = menuRect.bottom > lowerLimit && anchorRect.top - menuRect.height - 7 >= upperLimit;
     menu.classList.toggle("opens-up", opensUp);
-    const left = Math.max(margin, Math.min(anchorRect.right - menuRect.width, window.innerWidth - menuRect.width - margin));
-    const top = opensUp
-        ? Math.max(margin, anchorRect.top - menuRect.height - 7)
-        : Math.min(anchorRect.bottom + 7, window.innerHeight - menuRect.height - margin);
-    menu.style.position = "fixed";
-    menu.style.left = `${left}px`;
-    menu.style.right = "auto";
-    menu.style.top = `${top}px`;
-    menu.style.bottom = "auto";
+    // El menú ya está dentro de .ed-document-item, que es el ancla relativa
+    // de cada archivo. No convertirlo a fixed: las coordenadas del viewport
+    // lo separan de su botón cuando el expediente tiene paneles/scroll.
+    menu.style.position = "";
+    menu.style.left = "";
+    menu.style.right = "";
+    menu.style.top = "";
+    menu.style.bottom = "";
 }
 
 function positionGlobalFileMenu() {
