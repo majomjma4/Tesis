@@ -68,10 +68,10 @@
 </div>
 
 <section class="rp-stats">
-    <article><strong><?=$reportData['summary']['users']?></strong><span>Usuarios creados</span></article>
-    <article><strong><?=$reportData['summary']['projects']?></strong><span>Proyectos registrados</span></article>
-    <article><strong><?=$reportData['summary']['deliveries']?></strong><span>Entregas recibidas</span></article>
-    <article><strong><?=$reportData['summary']['actions']?></strong><span>Acciones relevantes</span></article>
+    <article><strong><?=$reportError ? '—' : (int)$reportData['summary']['users']?></strong><span>Usuarios creados</span></article>
+    <article><strong><?=$reportError ? '—' : (int)$reportData['summary']['projects']?></strong><span>Proyectos registrados</span></article>
+    <article><strong><?=$reportError ? '—' : (int)$reportData['summary']['deliveries']?></strong><span>Entregas recibidas</span></article>
+    <article><strong><?=$reportError ? '—' : (int)$reportData['summary']['actions']?></strong><span>Acciones relevantes</span></article>
 </section>
 
 <div class="rp-grid rp-grid-three">
@@ -89,7 +89,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach($reportData['roles'] as $row):?>
+                    <?php if ($reportError): ?><tr><td colspan="5" class="rp-empty">No disponible por un error de consulta.</td></tr>
+                    <?php else: foreach($reportData['roles'] as $row):?>
                     <tr>
                         <td><strong><?=e($row['label'])?></strong></td>
                         <td class="rp-num"><?=$row['active']?></td>
@@ -97,7 +98,7 @@
                         <td class="rp-num"><?=$row['trash']?></td>
                         <td class="rp-num"><strong><?=$row['total']?></strong></td>
                     </tr>
-                    <?php endforeach;?>
+                    <?php endforeach; endif;?>
                 </tbody>
             </table>
         </div>
@@ -106,7 +107,9 @@
     <section class="rp-card-equal">
         <h2>Proyectos por estado</h2>
         <div class="rp-equal-list">
-            <?php if(!$reportData['statuses']):?>
+            <?php if($reportError):?>
+                <p class="rp-empty">No disponible por un error de consulta.</p>
+            <?php elseif(!$reportData['statuses']):?>
                 <p class="rp-empty">No hay registros para el período seleccionado.</p>
             <?php else:foreach($reportData['statuses'] as $row):?>
                 <a class="rp-bar" href="<?=e($row['url'])?>"><span><?=e($row['label'])?></span><strong><?=$row['total']?></strong></a>
@@ -117,7 +120,9 @@
     <section class="rp-card-equal">
         <h2>Situación de revisión</h2>
         <div class="rp-equal-list">
-            <?php if(!$reportData['reviewSituations']):?>
+            <?php if($reportError):?>
+                <p class="rp-empty">No disponible por un error de consulta.</p>
+            <?php elseif(!$reportData['reviewSituations']):?>
                 <p class="rp-empty">No hay registros para el período seleccionado.</p>
             <?php else:foreach($reportData['reviewSituations'] as $row):?>
                 <a class="rp-bar is-review-situation" href="<?=e($row['url'])?>"><span><?=e($row['label'])?></span><strong><?=$row['total']?></strong></a>
@@ -131,7 +136,9 @@
         <h2>Actividad auditada</h2>
         <span>Eventos del período</span>
     </header>
-    <?php if(!$reportData['activity']):?>
+    <?php if($reportError):?>
+        <p class="rp-empty">No disponible por un error de consulta.</p>
+    <?php elseif(!$reportData['activity']):?>
         <p class="rp-empty">No se registraron acciones relevantes en este período.</p>
     <?php else:foreach($reportData['activity'] as $item):?>
         <article>
@@ -144,7 +151,7 @@
         </article>
     <?php endforeach;?>
 
-    <footer class="rp-pagination-bar">
+    <?php if ((int)($reportData['pagination']['pages'] ?? 1) > 1): ?><footer class="rp-pagination-bar">
         <?php
             $pagination = $pagePaginationData ?? $reportData['pagination'] ?? [];
             $reportCurrentPage = (int)($pagination['page'] ?? 1);
@@ -168,7 +175,7 @@
             <label class="rp-size-label">
                 Mostrar
                 <select onchange="location.href=this.value;">
-                    <?php foreach([10, 25, 50, 100] as $sz): ?>
+                    <?php foreach([10, 25, 50, 75, 100] as $sz): ?>
                         <option value="<?=e($buildUrl(1, $sz))?>" <?=$sz === $perPage ? 'selected' : ''?>><?=$sz?></option>
                     <?php endforeach; ?>
                 </select>
@@ -227,14 +234,14 @@
                 <button type="submit" class="rp-jump-btn">Ir</button>
             </form>
         </div>
-    </footer>
+    </footer><?php endif; ?>
     <?php endif;?>
 </section>
 
 <section class="rp-exports">
     <div>
         <h2>Exportar información</h2>
-        <p>Genera reportes administrativos en PDF formal o descarga datos en CSV.</p>
+        <p>Genera reportes administrativos en Word o descarga datos en CSV.</p>
     </div>
     <nav class="rp-compact-exports">
         <button type="button" class="rp-export-trigger" data-export-type="users"><i class="fa-solid fa-users"></i> Usuarios</button>
@@ -646,7 +653,6 @@ document.addEventListener('DOMContentLoaded', function() {
             url.searchParams.set('from', fromVal);
             url.searchParams.set('to', toVal);
             url.searchParams.set('format', exportForm.querySelector('input[name="format"]:checked').value);
-
             fetch(url.toString(), {
                 method: 'GET',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -657,8 +663,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 }
                 // Si la respuesta fue OK (200), se descarga mediante iframe o redirección de ventana sin cerrar si da error
-                window.location.href = url.toString();
-                setTimeout(closeModal, 600);
+                return res.blob().then(function(blob) {
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = (res.headers.get('Content-Disposition') || '').match(/filename="?([^";]+)"?/i)?.[1] || 'reporte';
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(link.href);
+                    setTimeout(closeModal, 600);
+                });
             }).catch(function(err) {
                 if (emptyBanner) {
                     const textContainer = document.getElementById('rpModalEmptyText');

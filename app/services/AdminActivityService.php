@@ -8,6 +8,11 @@ final class AdminActivityService
     public function record(int $actorId,string $action,string $actionLabel,string $module,string $entityType,?int $entityId,string $elementLabel,string $result='correct',array $details=[]):void
     {
         $connection=$this->db??Database::connection();
+        if (in_array($action, ['avatar_updated', 'avatar_removed'], true) && $actorId > 0 && $entityId !== null) {
+            $recent=$connection->prepare('SELECT id FROM admin_audit_log WHERE actor_user_id=:actor AND action=:action AND entity_type=:entity_type AND entity_id=:entity_id AND created_at>=UTC_TIMESTAMP()-INTERVAL 1 SECOND LIMIT 1');
+            $recent->execute(['actor'=>$actorId,'action'=>$action,'entity_type'=>$entityType,'entity_id'=>$entityId]);
+            if ($recent->fetchColumn() !== false) return;
+        }
         $statement=$connection->prepare('INSERT INTO admin_audit_log (actor_user_id,action,action_label,module,entity_type,entity_id,element_label,result,details,ip_address,user_agent) VALUES (:actor,:action,:label,:module,:type,:id,:element,:result,:details,:ip,:agent)');
         $statement->execute([
             'actor'=>$actorId>0?$actorId:null,'action'=>mb_substr($action,0,100),'label'=>mb_substr($actionLabel,0,180),

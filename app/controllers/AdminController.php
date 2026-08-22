@@ -8,11 +8,11 @@ final class AdminController
     public function reports():void{$periods=(new AcademicPeriodModel())->all();$selection=$this->reportPeriodSelection($periods);$base=['from'=>$selection['from'],'to'=>$selection['to']];$from=$this->reportDate('from',$base['from']);$to=$this->reportDate('to',$base['to']);$manualDates=array_key_exists('from',$_GET)||array_key_exists('to',$_GET);if($manualDates&&$selection['id']!==null&&($from!==$selection['from']||$to!==$selection['to'])&&count($periods)>1)$selection=['id'=>null,'from'=>$from,'to'=>$to];$model=new AdminReportModel();$error=null;$paginationRequest=['page'=>(int)($_GET['report_page']??PaginationService::request()['page']??1),'size'=>(int)($_GET['reports_per_page']??PaginationService::request()['size']??10)];try{$data=$model->dashboard($from,$to,$paginationRequest);}catch(Throwable $e){error_log('Admin reports: '.$e->getMessage());$error='No fue posible generar los reportes.';$data=['summary'=>['users'=>0,'projects'=>0,'deliveries'=>0,'actions'=>0],'roles'=>[],'statuses'=>[],'reviewSituations'=>[],'activity'=>[],'pagination'=>['total'=>0]];}View::render('admin/reports',['currentPage'=>'admin-reports','title'=>'Reportes | Administración','bodyClass'=>'admin-reports-page','pageStyles'=>[asset('css/admin-reports.css')],'reportData'=>$data,'pagePaginationData'=>$data['pagination'],'reportFrom'=>$from,'reportTo'=>$to,'reportBaseFrom'=>$base['from'],'reportBaseTo'=>$base['to'],'reportPeriods'=>$periods,'reportSelectedPeriodId'=>$selection['id'],'reportPeriodsAreMultiple'=>count($periods)>1,'reportError'=>$error]);}
     public function exportReport():never{
         $type=(string)($_GET['type']??'');
-        $format=(string)($_GET['format']??'pdf');
+        $format=(string)($_GET['format']??'word');
         $scope=(string)($_GET['scope']??'');
         $from=$this->reportDate('from',($this->reportBaseRange())['from']);
         $to=$this->reportDate('to',($this->reportBaseRange())['to']);
-        if(!in_array($type,['users','projects','audit'],true)){http_response_code(422);exit('Reporte no válido.');}
+        if(!in_array($type,['users','projects','audit'],true)||!in_array($format,['word','csv'],true)){http_response_code(422);header('Content-Type: application/json; charset=UTF-8');echo json_encode(['success'=>false,'message'=>'El tipo o formato de reporte no es válido.']);exit;}
         try{
             $model=new AdminReportModel();
             $report=$model->export($type,$from,$to);
@@ -294,7 +294,9 @@ final class AdminController
         }catch(Throwable $e){
             error_log('Export report: '.$e->getMessage());
             http_response_code(500);
-            exit('No fue posible generar el reporte.');
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['success'=>false,'message'=>'No fue posible generar el reporte.']);
+            exit;
         }
     }
     private function reportPeriodSelection(array $periods): array
