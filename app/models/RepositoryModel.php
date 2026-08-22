@@ -11,7 +11,6 @@ final class RepositoryModel
     {
         if (!Database::isEnabled()) return [];
 
-        try {
             $statement=Database::connection()->query("SELECT p.id,p.code,p.title,COALESCE(NULLIF(p.subtitle,''),NULLIF(p.summary,''),'Proyecto académico publicado.') AS description,
                 c.name AS career,pt.name AS type,pt.code AS type_code,ap.name AS period_name,ap.code AS period_code,
                 COALESCE(s.semester,1) AS semester,COALESCE(t.full_name,'Sin tutor asignado') AS tutor,
@@ -35,11 +34,6 @@ final class RepositoryModel
                     'pao'=>$slug((string)$row['period_code']),'pao_label'=>(string)$row['period_name'],'type'=>(string)$row['type'],'type_slug'=>$slug((string)$row['type']),'type_code'=>(string)($row['type_code']??''),
                     'published_at'=>(string)($row['published_at']??''),'downloads'=>0,'technologies'=>[],'keywords'=>[]];
             },$statement->fetchAll());
-        }
-        catch (Throwable $exception) {
-            error_log('RepositoryModel getPublishedProjects: ' . $exception->getMessage());
-            return [];
-        }
     }
 
     public function findPublishedProjectById(int $projectId): ?array
@@ -57,9 +51,8 @@ final class RepositoryModel
     {
         if (!Database::isEnabled() || $projectId < 1) return null;
 
-        try {
-            $project = $this->findPublishedProjectById($projectId);
-            if ($project === null) return null;
+        $project = $this->findPublishedProjectById($projectId);
+        if ($project === null) return null;
 
             $project['archive'] = [
                 'name' => 'Proyecto_' . $projectId . '_Final.zip',
@@ -68,11 +61,7 @@ final class RepositoryModel
                 'files_count' => 0,
                 'folders_count' => 0,
             ];
-            return $project;
-        } catch (Throwable $exception) {
-            error_log('RepositoryModel getPublishedProjectDetail: ' . $exception->getMessage());
-            return null;
-        }
+        return $project;
     }
 
     public function getSemesters(): array
@@ -99,38 +88,44 @@ final class RepositoryModel
 
     public function getCategories(): array
     {
-        return [
-            ['value' => 'proyecto-pis', 'label' => 'Proyecto PIS'],
-            ['value' => 'practicas', 'label' => 'Prácticas'],
-            ['value' => 'vinculacion', 'label' => 'Vinculación'],
-            ['value' => 'tesis', 'label' => 'Tesis'],
-            ['value' => 'perfil-de-tesis', 'label' => 'Perfil de Tesis']
-        ];
+        $statement = Database::connection()->query(
+            "SELECT DISTINCT c.slug value,c.name label
+             FROM support_material_categories c
+             LEFT JOIN support_materials sm ON sm.category_id=c.id
+                AND sm.status='published' AND sm.deleted_at IS NULL AND sm.purged_at IS NULL
+             WHERE c.is_active=1 OR sm.id IS NOT NULL
+             ORDER BY c.name,c.id"
+        );
+        return $statement->fetchAll();
+
     }
 
     public function getProjectTypes(): array
     {
-        return [
-            ['value' => 'tesis', 'label' => 'Tesis'],
-            ['value' => 'perfil-tesis', 'label' => 'Perfil de tesis'],
-            ['value' => 'practicas-preprofesionales', 'label' => 'Prácticas preprofesionales'],
-            ['value' => 'proyecto-pis', 'label' => 'Proyecto PIS'],
-            ['value' => 'vinculacion', 'label' => 'Vinculación']
-        ];
+        $statement = Database::connection()->query(
+            "SELECT DISTINCT pt.code value,pt.name label
+             FROM project_types pt
+             LEFT JOIN projects p ON p.project_type_id=pt.id
+                AND p.status='published' AND p.is_available=1
+                AND p.withdrawn_at IS NULL AND p.deleted_at IS NULL
+             WHERE pt.is_active=1 OR p.id IS NOT NULL
+             ORDER BY pt.name,pt.id"
+        );
+        return $statement->fetchAll();
+
     }
 
     public function getAcademicPeriods(): array
     {
         if (Database::isEnabled()) {
-            try {
-                $statement = Database::connection()->query(
+            $statement = Database::connection()->query(
                     "SELECT id, name, code, status
                      FROM academic_periods
                      WHERE status IN ('active', 'closed')
                      ORDER BY (status = 'active') DESC, starts_on DESC, id DESC"
-                );
-                $rows = $statement->fetchAll();
-                if (!empty($rows)) {
+            );
+            $rows = $statement->fetchAll();
+            if (!empty($rows)) {
                     $slug = static function (string $value): string {
                         $value = mb_strtolower($value, 'UTF-8');
                         if (class_exists('Normalizer')) {
@@ -139,7 +134,7 @@ final class RepositoryModel
                         }
                         return trim((string) preg_replace('/[^a-z0-9]+/', '-', $value), '-');
                     };
-                    return array_map(static function (array $row) use ($slug): array {
+                return array_map(static function (array $row) use ($slug): array {
                         return [
                             'id' => (int) $row['id'],
                             'value' => $slug((string) ($row['code'] ?? $row['name'])),
@@ -147,10 +142,7 @@ final class RepositoryModel
                             'code' => (string) ($row['code'] ?? ''),
                             'status' => (string) ($row['status'] ?? 'active'),
                         ];
-                    }, $rows);
-                }
-            } catch (Throwable $exception) {
-                error_log('RepositoryModel getAcademicPeriods: ' . $exception->getMessage());
+                }, $rows);
             }
         }
 

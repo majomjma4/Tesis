@@ -11,6 +11,13 @@ $catalogSupportMaterials = $activeSupportMaterials;
 $withdrawnProjects = array_values($withdrawnPublications);
 $withdrawnSupportMaterials = array_values($withdrawnMaterials);
 $withdrawnTotal = count($withdrawnProjects) + count($withdrawnSupportMaterials);
+$repositorySectionErrors = (array) ($repositorySectionErrors ?? []);
+$projectLoadFailed = isset($repositorySectionErrors['projects']);
+$materialLoadFailed = isset($repositorySectionErrors['materials']);
+$withdrawnLoadFailed = isset($repositorySectionErrors['withdrawn_projects']) || isset($repositorySectionErrors['withdrawn_materials']);
+$withdrawnError = $repositorySectionErrors['withdrawn_projects'] ?? $repositorySectionErrors['withdrawn_materials'] ?? null;
+$summaryLoadFailed = isset($repositorySectionErrors['summary']);
+$countOrDash = static fn (mixed $value, bool $failed = false): string => $failed || $value === null ? '—' : (string) (int) $value;
 $categoryBySlug = [];
 foreach ($materialCategories as $category) $categoryBySlug[(string)$category['slug']] = $category;
 $functionalMaterialCategories = [
@@ -53,25 +60,29 @@ $formatProjectType = static function (array $project): string {
     <section class="ar-stats" aria-label="Resumen del repositorio">
         <article class="ar-stat ar-stat-projects">
             <span class="ar-stat-icon"><i class="fa-solid fa-book-open"></i></span>
-            <div><strong><?= (int) $repositorySummary['published'] ?></strong><span>Proyectos publicados</span></div>
+            <div><strong><?= e($countOrDash($repositorySummary['published'] ?? null, $summaryLoadFailed)) ?></strong><span>Proyectos publicados</span></div>
         </article>
         <article class="ar-stat ar-stat-materials">
             <span class="ar-stat-icon"><i class="fa-solid fa-file-lines"></i></span>
-            <div><strong><?= count($catalogSupportMaterials) ?></strong><span>Materiales de apoyo</span></div>
+            <div><strong><?= e($countOrDash($materialLoadFailed ? null : count($catalogSupportMaterials), $materialLoadFailed)) ?></strong><span>Materiales de apoyo</span></div>
         </article>
         <a class="ar-stat ar-stat-pending" data-pending-publication-card data-base-url="<?= e(route('projects')) ?>" aria-disabled="true" tabindex="-1" aria-label="No hay proyectos pendientes de publicación">
             <span class="ar-stat-icon"><i class="fa-regular fa-clock"></i></span>
-            <div><strong data-pending-publication-count><?= (int) ($repositorySummary['pending'] ?? 0) ?></strong><span>Pendientes de publicación</span></div>
+            <div><strong data-pending-publication-count><?= e($countOrDash($repositorySummary['pending'] ?? null, $summaryLoadFailed)) ?></strong><span>Pendientes de publicación</span></div>
         </a>
         <script id="arPendingByPeriod" type="application/json"><?= json_encode($repositorySummary['pending_by_period'] ?? [], JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
     </section>
+
+    <?php foreach (['summary', 'catalogs', 'material_categories'] as $sectionKey): ?>
+        <?php if (isset($repositorySectionErrors[$sectionKey])): ?><p class="ar-error" role="alert"><?= e($repositorySectionErrors[$sectionKey]) ?></p><?php endif; ?>
+    <?php endforeach; ?>
 
     <section class="ar-catalog">
         <nav class="ar-tabs" aria-label="Contenido del repositorio">
             <button class="active" type="button" data-repository-tab="projects" aria-selected="true">
                 <i class="fa-solid fa-diagram-project"></i>
                 <span class="ar-tab-label">Proyectos publicados</span>
-                <span class="ar-tab-count"><?= (int) $repositorySummary['published'] ?></span>
+                <span class="ar-tab-count"><?= e($countOrDash($repositorySummary['published'] ?? null, $summaryLoadFailed)) ?></span>
             </button>
             <button type="button" data-repository-tab="materials" aria-selected="false">
                 <i class="fa-solid fa-folder-open"></i>
@@ -159,7 +170,7 @@ $formatProjectType = static function (array $project): string {
         <section class="ar-panel" data-repository-panel="projects">
             <header class="ar-section-head">
                 <div><span>Catálogo institucional</span><h2>Proyectos publicados</h2></div>
-                <p><strong id="arProjectCount"><?= count($publishedProjects) ?></strong> resultados visibles</p>
+                <p><strong id="arProjectCount"><?= e($countOrDash($projectLoadFailed ? null : count($publishedProjects), $projectLoadFailed)) ?></strong> resultados visibles</p>
             </header>
 
             <div class="ar-grid" id="arProjectGrid">
@@ -229,7 +240,8 @@ $formatProjectType = static function (array $project): string {
                 <?php endforeach; ?>
             </div>
 
-            <div class="ar-empty" id="arProjectsEmpty" <?= $publishedProjects ? 'hidden' : '' ?>>
+            <div class="ar-error" id="arProjectsError" role="alert" <?= $projectLoadFailed ? '' : 'hidden' ?>><?= e($repositorySectionErrors['projects'] ?? '') ?></div>
+            <div class="ar-empty" id="arProjectsEmpty" <?= $publishedProjects || $projectLoadFailed ? 'hidden' : '' ?>>
                 <span><i class="fa-solid fa-book-open"></i></span>
                 <h2>Aún no existen proyectos publicados.</h2>
                 <p>Los proyectos aprobados aparecerán aquí después de completar su publicación.</p>
@@ -248,7 +260,7 @@ $formatProjectType = static function (array $project): string {
         <section class="ar-panel" data-repository-panel="materials" hidden>
             <header class="ar-section-head">
                 <div><span>Recursos académicos</span><h2>Material de apoyo</h2></div>
-                <p id="arMaterialCountText"><?= count($catalogSupportMaterials) ?> <?= count($catalogSupportMaterials) === 1 ? 'resultado visible' : 'resultados visibles' ?></p>
+                <p id="arMaterialCountText"><?= e($materialLoadFailed ? '—' : count($catalogSupportMaterials) . ' ' . (count($catalogSupportMaterials) === 1 ? 'resultado visible' : 'resultados visibles')) ?></p>
             </header>
 
             <div class="ar-grid ar-material-grid" id="arMaterialGrid">
@@ -309,7 +321,8 @@ $formatProjectType = static function (array $project): string {
                 <?php endforeach; ?>
             </div>
 
-            <div class="ar-empty" id="arMaterialsEmpty" <?= $catalogSupportMaterials ? 'hidden' : '' ?>>
+            <div class="ar-error" id="arMaterialsError" role="alert" <?= $materialLoadFailed ? '' : 'hidden' ?>><?= e($repositorySectionErrors['materials'] ?? '') ?></div>
+            <div class="ar-empty" id="arMaterialsEmpty" <?= $catalogSupportMaterials || $materialLoadFailed ? 'hidden' : '' ?>>
                 <span><i class="fa-solid fa-folder-open"></i></span>
                 <h2>Aún no existen materiales de apoyo.</h2>
                 <p>Los recursos institucionales publicados aparecerán en esta sección.</p>
@@ -325,12 +338,13 @@ $formatProjectType = static function (array $project): string {
             </footer>
         </section>
 
-        <?php if ($withdrawnTotal > 0): ?>
+        <?php if ($withdrawnTotal > 0 || $withdrawnLoadFailed): ?>
             <section class="ar-panel" data-repository-panel="withdrawn" hidden>
                 <header class="ar-section-head">
                     <div><span>Contenido no visible en catálogo</span><h2>Retirados</h2></div>
-                    <p id="arWithdrawnCountText"><?= $withdrawnTotal ?> <?= $withdrawnTotal === 1 ? 'elemento retirado' : 'elementos retirados' ?></p>
+                    <p id="arWithdrawnCountText"><?= $withdrawnLoadFailed ? '—' : $withdrawnTotal . ' ' . ($withdrawnTotal === 1 ? 'elemento retirado' : 'elementos retirados') ?></p>
                 </header>
+                <?php if ($withdrawnError !== null): ?><p class="ar-error" role="alert"><?= e($withdrawnError) ?></p><?php endif; ?>
 
                 <?php if ($withdrawnProjects): ?>
                     <header class="ar-section-head"><div><span>Publicaciones académicas</span><h2>Proyectos retirados</h2></div></header>
@@ -339,6 +353,7 @@ $formatProjectType = static function (array $project): string {
                             <?php $projectSearch = implode(' ', [$project['code'], $project['type_name'], $project['title'], $project['authors'] ?: '', $project['tutor_name'] ?: '', $project['period_name']]); ?>
                             <article class="ar-project-card"
                                 data-repository-item="withdrawn"
+                                data-type-code="<?= e($project['type_code'] ?? '') ?>"
                                 data-search="<?= e(mb_strtolower($projectSearch, 'UTF-8')) ?>">
                                 <header><span class="ar-code"><?= e($project['code']) ?></span><span class="ar-project-type"><?= e($formatProjectType($project)) ?></span></header>
                                 <div class="ar-card-copy">
@@ -361,6 +376,16 @@ $formatProjectType = static function (array $project): string {
                         <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
+
+                <footer class="ar-pagination" data-pagination-for="withdrawn" hidden>
+                    <span data-pagination-summary>Mostrando 0 de 0</span>
+                    <label>Mostrar
+                        <select data-page-size>
+                            <option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="75">75</option><option value="100">100</option>
+                        </select>
+                    </label>
+                    <nav data-pagination-pages aria-label="Paginación de contenido retirado"></nav>
+                </footer>
 
                 <?php if ($withdrawnSupportMaterials): ?>
                     <header class="ar-section-head"><div><span>Recursos académicos</span><h2>Materiales retirados</h2></div></header>

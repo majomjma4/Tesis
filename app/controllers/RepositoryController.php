@@ -82,8 +82,14 @@ final class RepositoryController
         $isAdministratorView = $session->isAdminModeActive() && $hasRealAdminAccess;
         $projectId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
         $access = new ProjectAccessService();
-        $project = ($projectId !== false && $projectId !== null && $access->can('project.view'))
-            ? (new ProjectRecordModel())->find((int)$projectId, $access->currentUserId(), $isAdministratorView, true) : null;
+        try {
+            $project = ($projectId !== false && $projectId !== null && $access->can('project.view'))
+                ? (new ProjectRecordModel())->find((int)$projectId, $access->currentUserId(), $isAdministratorView, true) : null;
+        } catch (Throwable $exception) {
+            error_log('Repository detail: ' . $exception->getMessage());
+            http_response_code(500);
+            $this->renderDetailError();
+        }
         if ($project === null) http_response_code(404);
         $capabilityContext = $isAdministratorView ? 'academic_management' : 'repository';
         $projectCapabilities = $project !== null
@@ -196,9 +202,15 @@ final class RepositoryController
 
         $projectId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
         $repositoryModel = new RepositoryModel();
-        $project = $projectId === false || $projectId === null
-            ? null
-            : $repositoryModel->getPublishedProjectDetail((int) $projectId);
+        try {
+            $project = $projectId === false || $projectId === null
+                ? null
+                : $repositoryModel->getPublishedProjectDetail((int) $projectId);
+        } catch (Throwable $exception) {
+            error_log('Repository files: ' . $exception->getMessage());
+            http_response_code(500);
+            $this->sendJson(false, 'No fue posible cargar el proyecto en este momento.');
+        }
 
         if ($project === null) {
             http_response_code(404);
@@ -381,9 +393,15 @@ final class RepositoryController
         }
 
         $projectId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
-        $project = $projectId === false || $projectId === null
-            ? null
-            : (new RepositoryModel())->getPublishedProjectDetail((int) $projectId);
+        try {
+            $project = $projectId === false || $projectId === null
+                ? null
+                : (new RepositoryModel())->getPublishedProjectDetail((int) $projectId);
+        } catch (Throwable $exception) {
+            error_log('Repository project resource: ' . $exception->getMessage());
+            http_response_code(500);
+            $this->renderDownloadError('No fue posible cargar el proyecto en este momento.');
+        }
 
         if ($project === null) {
             http_response_code(404);
@@ -403,6 +421,14 @@ final class RepositoryController
         header('Cache-Control: private, no-store, max-age=0');
     }
 
+    private function renderDetailError(): never
+    {
+        $safeBackUrl = e($this->repositoryReturnUrl((string) ($_GET['return'] ?? '')));
+        header('Content-Type: text/html; charset=UTF-8');
+        echo '<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Proyecto no disponible</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f7fb;color:#17233d;font:16px system-ui,sans-serif}.card{max-width:560px;margin:24px;padding:32px;border:1px solid #dfe6f1;border-radius:18px;background:#fff;box-shadow:0 18px 45px rgba(23,35,61,.12);text-align:center}.card h1{margin:0 0 12px;font-size:1.4rem}.card p{margin:0 0 24px;color:#5c6b84;line-height:1.55}.card a{display:inline-flex;padding:11px 18px;border-radius:10px;background:#2563eb;color:#fff;text-decoration:none;font-weight:700}.card a:focus-visible{outline:3px solid #93c5fd;outline-offset:3px}</style></head><body><main class="card" role="alert"><h1>No fue posible cargar el proyecto</h1><p>Ocurrió un problema temporal. Inténtalo nuevamente o vuelve al repositorio.</p><a href="' . $safeBackUrl . '">Volver al repositorio</a></main></body></html>';
+        exit;
+    }
+
     private function closeArchiveFile(array $file): void
     {
         if (isset($file['stream']) && is_resource($file['stream'])) {
@@ -415,8 +441,19 @@ final class RepositoryController
 
     private function renderDownloadError(string $message): never
     {
-        header('Content-Type: text/plain; charset=UTF-8');
-        echo $message;
+        $candidate = (string) ($_GET['return'] ?? '');
+        $backUrl = route('repository');
+        $parts = $candidate === '' ? false : parse_url($candidate);
+        if (is_array($parts) && !isset($parts['scheme']) && !isset($parts['host'])) {
+            parse_str((string) ($parts['query'] ?? ''), $query);
+            if (in_array(strtolower((string) ($query['page'] ?? '')), ['repository', 'repositorio', 'admin-repository'], true)) {
+                $backUrl = $candidate;
+            }
+        }
+        $safeMessage = e($message);
+        $safeBackUrl = e($backUrl);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo '<!doctype html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Descarga no disponible</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f7fb;color:#17233d;font:16px system-ui,sans-serif}.card{max-width:560px;margin:24px;padding:32px;border:1px solid #dfe6f1;border-radius:18px;background:#fff;box-shadow:0 18px 45px rgba(23,35,61,.12);text-align:center}.card h1{margin:0 0 12px;font-size:1.4rem}.card p{margin:0 0 24px;color:#5c6b84;line-height:1.55}.card a{display:inline-flex;padding:11px 18px;border-radius:10px;background:#2563eb;color:#fff;text-decoration:none;font-weight:700}.card a:focus-visible{outline:3px solid #93c5fd;outline-offset:3px}</style></head><body><main class="card" role="alert"><h1>Descarga no disponible</h1><p>' . $safeMessage . '</p><a href="' . $safeBackUrl . '">Volver al repositorio</a></main></body></html>';
         exit;
     }
 

@@ -77,7 +77,7 @@ match ($page) {
     'admin-report-export' => (new AdminController())->exportReport(),
     'admin-settings-save' => (new AdminController())->saveSettings(),
     'admin-academic' => (new AdminController())->academic(),
-    'admin-repository' => (new AdminController())->repository(),
+    'admin-repository' => (new AdminController())->repositoryDashboard(),
     'admin-reports' => (new AdminController())->reports(),
     'admin-settings' => (new AdminController())->settings(),
     'admin-trash' => (new AdminController())->trash(),

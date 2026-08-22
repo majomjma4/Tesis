@@ -57,14 +57,21 @@ final class ProjectCapabilityService
                 FROM project_participants published_student
                 INNER JOIN student_profiles published_student_profile
                     ON published_student_profile.user_id=published_student.user_id
+                INNER JOIN users published_student_user
+                    ON published_student_user.id=published_student.user_id
                 WHERE published_student.project_id={$alias}.id
                   AND published_student.role_code='student'
                   AND published_student.status='active'
+                  AND published_student.removed_at IS NULL
+                  AND published_student_user.status='active'
+                  AND published_student_user.deleted_at IS NULL
+                  AND published_student_user.purged_at IS NULL
             )
             AND EXISTS (
                 SELECT 1 FROM project_files published_file
                 WHERE published_file.project_id={$alias}.id
                   AND published_file.deleted_at IS NULL
+                  AND published_file.purged_at IS NULL
             )";
     }
 

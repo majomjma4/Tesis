@@ -67,12 +67,12 @@ final class AdminRepositoryModel
         } elseif ($filter === 'eligible') {
             $where .= " AND $eligible AND EXISTS(
                 SELECT 1 FROM project_files f
-                WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL
             )";
         } elseif ($filter === 'incomplete') {
             $where .= " AND $eligible AND NOT EXISTS(
                 SELECT 1 FROM project_files f
-                WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL
             )";
         }
 
@@ -105,12 +105,12 @@ final class AdminRepositoryModel
                 ) authors,
                 (
                     SELECT COUNT(*) FROM project_files f
-                    WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                    WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL
                 ) file_count,
                 (
                     SELECT GROUP_CONCAT(DISTINCT UPPER(f.extension) ORDER BY f.extension SEPARATOR ', ')
                     FROM project_files f
-                    WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                    WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL
                 ) formats"
             . $from
             . " ORDER BY COALESCE(p.published_at,p.updated_at) DESC";
@@ -163,7 +163,7 @@ final class AdminRepositoryModel
                 )
                 AND EXISTS(
                     SELECT 1 FROM project_files f
-                    WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                    WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL
                 )"
             )->fetchColumn(),
             'published' => (int) $database->query(
@@ -187,7 +187,7 @@ final class AdminRepositoryModel
                 )
                 AND NOT EXISTS(
                     SELECT 1 FROM project_files f
-                    WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                    WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL
                 )"
             )->fetchColumn(),
         ];
@@ -214,7 +214,7 @@ final class AdminRepositoryModel
     {
         return Database::connection()->query(
             "SELECT
-                p.id,p.code,p.title,p.status,p.published_at,p.is_available,p.withdrawn_at,p.withdrawn_by,pt.name type_name,ap.name period_name,
+                p.id,p.code,p.title,p.status,p.published_at,p.is_available,p.withdrawn_at,p.withdrawn_by,pt.code type_code,pt.name type_name,ap.name period_name,
                 u.full_name tutor_name,
                 (
                     SELECT GROUP_CONCAT(participant.full_name ORDER BY pp.is_leader DESC, participant.full_name SEPARATOR ', ')
@@ -224,7 +224,7 @@ final class AdminRepositoryModel
                 ) authors,
                 (
                     SELECT COUNT(*) FROM project_files f
-                    WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                    WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL
                 ) file_count,
                 (
                     SELECT u.full_name FROM users u WHERE u.id=p.withdrawn_by
@@ -237,7 +237,7 @@ final class AdminRepositoryModel
             AND p.status='published' AND p.withdrawn_at IS NOT NULL
             AND EXISTS(
                 SELECT 1 FROM project_files f
-                WHERE f.project_id=p.id AND f.deleted_at IS NULL
+                    WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL
             )
             ORDER BY withdrawn_at DESC"
         )->fetchAll();

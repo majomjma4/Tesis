@@ -111,11 +111,9 @@
                     <span>Categoría</span>
                     <select id="repositorySupportCategory"<?= !$supportDocuments ? ' disabled' : '' ?>>
                         <option value="all">Todas</option>
-                        <option value="vinculacion">Vinculación</option>
-                        <option value="practicas">Prácticas</option>
-                        <option value="tesis">Tesis</option>
-                        <option value="perfil-tesis">Perfil de tesis</option>
-                        <option value="proyecto-pis">Proyectos PIS</option>
+                        <?php foreach ($categories as $category): ?>
+                            <option value="<?= e($category['value']) ?>"><?= e($category['label']) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </label>
             </div>
