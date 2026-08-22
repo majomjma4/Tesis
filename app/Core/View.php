@@ -52,24 +52,28 @@ final class View
             $_SESSION['notification_csrf'] = bin2hex(random_bytes(32));
         }
 
+        $notificationCounterError = false;
         try {
             $userId = (int) ($_SESSION['user_id'] ?? $_SESSION['notification_demo_user_id'] ?? 1);
             $context = (new AuthSessionService())->notificationContext();
             $unread = (new NotificationModel())->countUnread($userId, $context);
         } catch (Throwable $exception) {
             error_log('Layout notification counter error: ' . $exception->getMessage());
-            $unread = 0;
+            $unread = null;
+            $notificationCounterError = true;
 
             if (self::canUseNotificationDemoFallback()) {
                 if (!isset($_SESSION['notification_demo_items']) || !is_array($_SESSION['notification_demo_items'])) {
                     $_SESSION['notification_demo_items'] = (new NotificationModel())->getDemoNotifications();
                 }
                 $unread = (new NotificationModel())->getDemoCounters($_SESSION['notification_demo_items'])['unread'];
+                $notificationCounterError = false;
             }
         }
 
         return [
             'notificationUnreadCount' => $unread,
+            'notificationCounterError' => $notificationCounterError,
             'notificationCsrfToken' => (string) $_SESSION['notification_csrf'],
             'notificationOpenEndpoint' => route('notifications/open'),
             'layoutUserName' => (new AuthSessionService())->name(),

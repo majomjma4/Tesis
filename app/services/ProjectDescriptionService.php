@@ -23,7 +23,7 @@ final class ProjectDescriptionService
         $project->execute(['id' => $projectId]);
         $row = $project->fetch();
         if (!$row || trim((string)($row['summary'] ?? '')) !== '' || !in_array((string)$row['type_code'], self::REMINDER_TYPES, true)) return;
-        $students = $db->prepare("SELECT DISTINCT pp.user_id FROM project_participants pp INNER JOIN student_profiles sp ON sp.user_id=pp.user_id INNER JOIN users u ON u.id=pp.user_id WHERE pp.project_id=:project_id AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL AND u.status='active' AND u.deleted_at IS NULL");
+        $students = $db->prepare("SELECT DISTINCT pp.user_id FROM project_participants pp INNER JOIN student_profiles sp ON sp.user_id=pp.user_id INNER JOIN users u ON u.id=pp.user_id WHERE pp.project_id=:project_id AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL");
         $students->execute(['project_id' => $projectId]);
         $insert = $db->prepare("INSERT IGNORE INTO notifications(user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key) VALUES(:user_id,:project_id,'reminder','Descripción del proyecto pendiente','Tu proyecto aún no tiene registrada una descripción pública.',:url,'Completar descripción',:metadata,:deduplication_key)");
         $metadata = json_encode(['purpose'=>'project_description','status_audit_id'=>$auditId], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);

@@ -9,6 +9,7 @@ final class DashboardModel
         if ($teacherId < 1) return $this->emptyTeacherDashboard($teacherId);
 
         $db = Database::connection();
+        $notificationError = null;
         try {
             $teacher = $this->teacherIdentity($db, $teacherId);
         } catch (Throwable $error) {
@@ -97,7 +98,8 @@ final class DashboardModel
         } catch (Throwable $error) {
             error_log('Teacher dashboard notifications: ' . $error->getMessage());
             $notifications = [];
-            $unread = 0;
+            $unread = null;
+            $notificationError = 'No fue posible cargar las notificaciones.';
         }
         $notificationItems = array_map(fn(array $notification): array => $this->teacherNotificationItem($notification), $notifications);
         try {
@@ -121,7 +123,7 @@ final class DashboardModel
             'assigned_projects' => ['count'=>$allCount,'items'=>$projectItems,'has_more'=>false,'route'=>route('assigned-projects')],
             'follow_up' => $followUp,
             'upcoming' => ['items' => $upcoming, 'route' => route('calendar')],
-            'notifications' => ['items'=>$notificationItems,'unread'=>(int)$unread,'route'=>route('notifications')],
+            'notifications' => ['items'=>$notificationItems,'unread'=>$unread,'error'=>$notificationError,'route'=>route('notifications')],
             'repository' => ['items'=>$repositoryItems,'has_more'=>count($repository)>6,'route'=>route('repository'),'direct_add'=>['supported'=>false,'route'=>null]],
         ];
     }
@@ -138,7 +140,7 @@ final class DashboardModel
             'assigned_projects' => ['count'=>0,'items'=>[],'has_more'=>false,'route'=>route('assigned-projects')],
             'follow_up' => ['review_required'=>['count'=>0,'projects_count'=>0,'route'=>route('assigned-projects')],'waiting_student'=>['count'=>0,'projects_count'=>0,'route'=>route('assigned-projects')],'tribunal_assignment'=>['visible'=>false,'count'=>0,'route'=>null]],
             'upcoming' => ['items' => [], 'route' => route('calendar')],
-            'notifications' => ['items'=>[],'unread'=>0,'route'=>route('notifications')],
+            'notifications' => ['items'=>[],'unread'=>0,'error'=>null,'route'=>route('notifications')],
             'repository' => ['items'=>[],'has_more'=>false,'route'=>route('repository'),'direct_add'=>['supported'=>false,'route'=>null]],
         ];
     }

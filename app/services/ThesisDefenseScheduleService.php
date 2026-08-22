@@ -167,10 +167,10 @@ final class ThesisDefenseScheduleService
             'defense_date' => $state['defense_date'],
             'defense_time' => $state['defense_time'],
         ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-        $key = 'thesis-defense-schedule:' . $scheduleId . ':' . bin2hex(random_bytes(8));
+        $key = 'thesis-defense-schedule:' . $scheduleId . ':' . ($state['defense_date'] ?? 'none') . ':' . ($state['defense_time'] ?? 'none');
         $statement = $db->prepare(
-            "INSERT INTO notifications(user_id, project_id, type, title, message, action_url, action_label, metadata, deduplication_key)
-             SELECT DISTINCT pp.user_id, NULL, 'tribunal', :title, :message, :url, :label, :metadata, :deduplication
+            "INSERT IGNORE INTO notifications(user_id, project_id, type, title, message, action_url, action_label, metadata, deduplication_key)
+             SELECT DISTINCT pp.user_id, NULL, 'tribunal', :title, :message, :url, :label, :metadata, CONCAT(:deduplication, ':', pp.user_id)
              FROM projects p
              INNER JOIN project_types pt ON pt.id=p.project_type_id AND pt.code='thesis'
              INNER JOIN project_participants pp ON pp.project_id=p.id

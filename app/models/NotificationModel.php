@@ -19,15 +19,11 @@ final class NotificationModel
 
     public function getByUser(int $userId, array $filters = [], string $context = '', ?int $limit = null): array
     {
-        $search = trim((string) ($filters['search'] ?? ''));
-        $sqlFilters = $filters;
-        if ($search !== '') {
-            unset($sqlFilters['search']);
-        }
-        [$conditions, $parameters] = $this->notificationQuery($userId, $sqlFilters, $context);
+        [$conditions, $parameters] = $this->notificationQuery($userId, $filters, $context);
         $limitClause = $limit !== null ? ' LIMIT ' . max(1, min($limit, 50)) : '';
         $statement = $this->connection()->prepare(
             'SELECT n.id, n.user_id, n.project_id, n.type, n.title, n.message, n.action_url, n.action_label, n.metadata, n.is_read, n.read_at, n.created_at, n.archived_at, n.deleted_at,
+                    p.status AS project_status,
                     COALESCE(p.title, NULLIF(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.project_name")), ""), "Notificacion general") AS project_name
              FROM notifications n LEFT JOIN projects p ON p.id = n.project_id WHERE ' . implode(' AND ', $conditions) . ' ORDER BY n.created_at DESC, n.id DESC' . $limitClause
         );
@@ -35,71 +31,18 @@ final class NotificationModel
 
         $items = array_map([$this, 'hydrate'], $statement->fetchAll());
 
-        if ($search !== '') {
-            $normalizedSearch = $this->cleanAccents($search);
-            $filtered = [];
-            foreach ($items as $item) {
-                $title = $this->cleanAccents($item['title'] ?? '');
-                $message = $this->cleanAccents($item['message'] ?? '');
-                $projectName = $this->cleanAccents($item['project_name'] ?? '');
-                if (str_contains($title, $normalizedSearch)
-                    || str_contains($message, $normalizedSearch)
-                    || str_contains($projectName, $normalizedSearch)) {
-                    $filtered[] = $item;
-                }
-            }
-            return $filtered;
-        }
-
         return $items;
     }
 
     public function getByUserPaginated(int $userId, array $filters = [], array $pagination = [], string $context = ''): array
     {
-        $search = trim((string) ($filters['search'] ?? ''));
-        if ($search !== '') {
-            $sqlFilters = $filters;
-            unset($sqlFilters['search']);
-            $items = $this->getByUser($userId, $sqlFilters, $context);
-            $normalizedSearch = $this->cleanAccents($search);
-            $filtered = [];
-            foreach ($items as $item) {
-                $title = $this->cleanAccents($item['title'] ?? '');
-                $message = $this->cleanAccents($item['message'] ?? '');
-                $projectName = $this->cleanAccents($item['project_name'] ?? '');
-                if (str_contains($title, $normalizedSearch)
-                    || str_contains($message, $normalizedSearch)
-                    || str_contains($projectName, $normalizedSearch)) {
-                    $filtered[] = $item;
-                }
-            }
-            $total = count($filtered);
-            $effectiveSize = PaginationService::normalizeSize((int)($pagination['size'] ?? 10));
-            $pages = max(1, (int)ceil($total / $effectiveSize));
-            $page = min((int)($pagination['page'] ?? 1), $pages);
-            $offset = ($page - 1) * $effectiveSize;
-            $sliced = array_slice($filtered, $offset, $effectiveSize);
-            return [
-                'items' => $sliced,
-                'pagination' => [
-                    'page' => $page,
-                    'per_page' => $effectiveSize,
-                    'total' => $total,
-                    'pages' => $pages,
-                    'from' => $total ? $offset + 1 : 0,
-                    'to' => min($offset + $effectiveSize, $total),
-                    'page_key' => $pagination['pageKey'] ?? 'p',
-                    'size_key' => $pagination['sizeKey'] ?? 'per_page'
-                ]
-            ];
-        }
-
         [$conditions, $parameters] = $this->notificationQuery($userId, $filters, $context);
         $where = ' FROM notifications n LEFT JOIN projects p ON p.id = n.project_id WHERE ' . implode(' AND ', $conditions);
         $result = PaginationService::run(
             $this->connection(),
             'SELECT COUNT(*)' . $where,
             'SELECT n.id, n.user_id, n.project_id, n.type, n.title, n.message, n.action_url, n.action_label, n.metadata, n.is_read, n.read_at, n.created_at, n.archived_at, n.deleted_at,
+                    p.status AS project_status,
                     COALESCE(p.title, NULLIF(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.project_name")), ""), "Notificacion general") AS project_name' . $where . ' ORDER BY n.created_at DESC, n.id DESC',
             $parameters,
             $pagination ?: PaginationService::request('notification_page', 'notifications_per_page')
@@ -111,10 +54,13 @@ final class NotificationModel
     private function notificationQuery(int $userId, array $filters, string $context = ''): array
     {
         $visibility = !empty($filters['trash'])
-            ? 'n.deleted_at IS NOT NULL'
+            ? 'n.deleted_at IS NOT NULL AND n.deleted_at >= :trash_cutoff'
             : (!empty($filters['hidden']) ? 'n.archived_at IS NOT NULL AND n.deleted_at IS NULL' : 'n.archived_at IS NULL AND n.deleted_at IS NULL');
         $conditions = ['n.user_id = :user_id', $visibility];
         $parameters = ['user_id' => $userId];
+        if (!empty($filters['trash'])) {
+            $parameters['trash_cutoff'] = (new DateTimeImmutable('-' . max(1, min(365, (int) (new SystemSettingModel())->retentionDays('notification_trash_retention_days'))) . ' days'))->format('Y-m-d H:i:s');
+        }
 
         if ($context === 'admin') {
             $conditions[] = '(n.type = "system" OR n.action_url LIKE "%page=admin-%" OR JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.admin_sender_id")) IS NOT NULL OR JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.context")) = "admin" OR JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.scope")) = "admin")';
@@ -122,6 +68,14 @@ final class NotificationModel
             $conditions[] = '(n.type != "system" AND (n.action_url IS NULL OR n.action_url NOT LIKE "%page=admin-%") AND JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.admin_sender_id")) IS NULL AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.context")), "") != "admin" AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.scope")), "") != "admin")';
         }
 
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            $search = $this->escapeLike($search);
+            $conditions[] = '(n.title LIKE :search_title ESCAPE "!" OR n.message LIKE :search_message ESCAPE "!" OR COALESCE(p.title, NULLIF(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.project_name")), ""), "Notificacion general") LIKE :search_project ESCAPE "!")';
+            $parameters['search_title'] = '%' . $search . '%';
+            $parameters['search_message'] = '%' . $search . '%';
+            $parameters['search_project'] = '%' . $search . '%';
+        }
 
 
         $type = (string) ($filters['type'] ?? '');
@@ -161,6 +115,11 @@ final class NotificationModel
         }
 
         return [$conditions, $parameters];
+    }
+
+    private function escapeLike(string $value): string
+    {
+        return str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $value);
     }
 
     public function findForUser(int $notificationId, int $userId): ?array
@@ -240,6 +199,25 @@ final class NotificationModel
         return $statement->rowCount();
     }
 
+    /** Purga global explícita para tareas de mantenimiento, nunca para GET de lectura. */
+    public function purgeExpiredTrash(?int $days = null): int
+    {
+        if ($days === null) {
+            $days = (new SystemSettingModel())->retentionDays('notification_trash_retention_days');
+        }
+        $days = max(1, min($days, 365));
+        $statement = $this->connection()->prepare(
+            'DELETE FROM notifications
+             WHERE deleted_at IS NOT NULL
+               AND deleted_at < :cutoff'
+        );
+        $statement->execute([
+            'cutoff' => (new DateTimeImmutable())->modify("-{$days} days")->format('Y-m-d H:i:s'),
+        ]);
+
+        return $statement->rowCount();
+    }
+
     public function emptyTrash(int $userId): int
     {
         $statement = $this->connection()->prepare('DELETE FROM notifications WHERE user_id = :user_id AND deleted_at IS NOT NULL');
@@ -280,6 +258,39 @@ final class NotificationModel
     public function markAsUnread(int $id, int $userId): bool
     {
         return $this->updateReadState($id, $userId, false);
+    }
+
+    public function softDelete(int $id, int $userId): bool
+    {
+        $statement = $this->connection()->prepare(
+            'UPDATE notifications
+             SET archived_at = COALESCE(archived_at, NOW()), updated_at = NOW()
+             WHERE id = :id AND user_id = :user_id AND archived_at IS NULL AND deleted_at IS NULL'
+        );
+        $statement->execute(['id' => $id, 'user_id' => $userId]);
+        return $statement->rowCount() === 1;
+    }
+
+    public function restore(int $id, int $userId): bool
+    {
+        $statement = $this->connection()->prepare(
+            'UPDATE notifications
+             SET archived_at = NULL, deleted_at = NULL, updated_at = NOW()
+             WHERE id = :id AND user_id = :user_id AND (archived_at IS NOT NULL OR deleted_at IS NOT NULL)'
+        );
+        $statement->execute(['id' => $id, 'user_id' => $userId]);
+        return $statement->rowCount() === 1;
+    }
+
+    public function moveToTrash(int $id, int $userId): bool
+    {
+        $statement = $this->connection()->prepare(
+            'UPDATE notifications
+             SET archived_at = NULL, deleted_at = NOW(), updated_at = NOW()
+             WHERE id = :id AND user_id = :user_id AND deleted_at IS NULL'
+        );
+        $statement->execute(['id' => $id, 'user_id' => $userId]);
+        return $statement->rowCount() === 1;
     }
     // Final de cambios de estado y ciclo de eliminación
 
@@ -360,29 +371,6 @@ final class NotificationModel
 
     // Inicio de creación y normalización de registros
     // Inserta nuevas notificaciones y transforma los resultados SQL en estructuras seguras para la aplicación.
-    public function createNotification(int $userId, string $type, string $title, string $message, ?int $projectId = null, ?string $actionUrl = null, array $metadata = []): int
-    {
-        if (!in_array($type, self::TYPES, true)) {
-            throw new InvalidArgumentException('Tipo de notificacion no permitido.');
-        }
-
-        $statement = $this->connection()->prepare(
-            'INSERT INTO notifications (user_id, project_id, type, title, message, action_url, metadata)
-             VALUES (:user_id, :project_id, :type, :title, :message, :action_url, :metadata)'
-        );
-        $statement->execute([
-            'user_id' => $userId,
-            'project_id' => $projectId,
-            'type' => $type,
-            'title' => $title,
-            'message' => $message,
-            'action_url' => $actionUrl,
-            'metadata' => $metadata === [] ? null : json_encode($metadata, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
-        ]);
-
-        return (int) $this->connection()->lastInsertId();
-    }
-
     private function updateReadState(int $notificationId, int $userId, bool $isRead): bool
     {
         $statement = $this->connection()->prepare(
@@ -407,6 +395,9 @@ final class NotificationModel
         $row['project_id'] = $row['project_id'] === null ? null : (int) $row['project_id'];
         $row['is_read'] = (bool) $row['is_read'];
         $row['metadata'] = $metadata;
+        if ($row['project_id'] !== null && array_key_exists('project_status', $row) && $row['project_status'] === null) {
+            $row['action_url'] = null;
+        }
         $projectName = trim((string) ($row['project_name'] ?? ''));
         $row['project_name'] = $projectName !== '' ? $projectName : (string) ($metadata['project_name'] ?? 'Notificacion general');
 

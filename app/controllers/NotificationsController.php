@@ -46,20 +46,28 @@ final class NotificationsController
             }
         }
 
+        $retentionDays = 60;
+        try {
+            $retentionDays = (new SystemSettingModel())->retentionDays('notification_trash_retention_days');
+        } catch (Throwable $exception) {
+            error_log('Notifications retention setting error: ' . $exception->getMessage());
+        }
+
         View::render('notifications/index', [
             'currentPage' => 'notifications',
             'title' => $isAdmin ? 'Notificaciones | Administración' : 'Notificaciones | Gestion Documental Academica',
             'bodyClass' => $isAdmin ? 'admin-notifications-page notifications-page' : 'notifications-page',
             'pageScript' => asset('js/notifications.js'),
-            'summary' => $this->summaryCards($counters, $archivedCount, $sentCount),
+            'summary' => $this->summaryCards($counters, $archivedCount, $sentCount, $error !== null),
             'groups' => $this->groupNotifications($notifications),
             'notificationPagination' => $pagination,
             'statusFilters' => $this->statusFilters($isAdmin),
             'typeFilters' => $this->typeFilters(),
-            'sidebarSummary' => ['unread' => $counters['unread'], 'read' => max(0, $counters['total'] - $counters['unread']), 'updated' => date('d/m/Y H:i')],
-            'sidebarActivity' => $this->activitySummary($notifications),
-            'notificationUnreadCount' => $counters['unread'],
-            'notificationTrashRetentionDays' => (new SystemSettingModel())->retentionDays('notification_trash_retention_days'),
+            'sidebarSummary' => ['unread' => $error === null ? $counters['unread'] : null, 'read' => $error === null ? max(0, $counters['total'] - $counters['unread']) : null, 'updated' => date('d/m/Y H:i')],
+            'sidebarActivity' => $error === null ? $this->activitySummary($notifications) : [],
+            'notificationUnreadCount' => $error === null ? $counters['unread'] : null,
+            'notificationCounterError' => $error !== null,
+            'notificationTrashRetentionDays' => $retentionDays,
             'notificationCsrfToken' => $this->csrfToken(),
             'notificationEndpoints' => $this->endpoints(),
             'loadError' => $error,
@@ -116,10 +124,7 @@ final class NotificationsController
                 ];
             } catch (Throwable $e) {
                 error_log('Admin sent notifications listing error: ' . $e->getMessage());
-                $notifications = [];
-                $pagination = ['items' => [], 'page' => 1, 'per_page' => $perPage, 'total' => 0, 'pages' => 1, 'from' => 0, 'to' => 0];
-                $counters = ['unread' => 0, 'today' => 0, 'week' => 0, 'total' => 0];
-                $sectionCounters = ['total' => 0, 'unread' => 0, 'week' => 0, 'expiring' => 0];
+                $this->json(false, 'No fue posible consultar las notificaciones enviadas.', [], 500);
             }
 
             $this->json(true, '✅ Notificaciones actualizadas.', [
@@ -144,8 +149,6 @@ final class NotificationsController
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo
             ];
-            // La limpieza global programada queda pendiente como mejora posterior; aquí solo se depura la papelera del usuario actual.
-            $model->purgeExpiredTrashForUser($this->currentUserId());
             $context = (new AuthSessionService())->notificationContext();
             $result = $model->getByUserPaginated($this->currentUserId(), $filters, ['page' => $page, 'size' => $perPage, 'pageKey' => 'notification_page', 'sizeKey' => 'notifications_per_page'], $context);
             $notifications = $result['items'];
@@ -233,7 +236,9 @@ final class NotificationsController
             if ($model->findForUser($id, $userId) === null) {
                 $this->json(false, 'La notificacion no existe.', [], 404);
             }
-            $model->softDelete($id, $userId);
+            if (!$model->softDelete($id, $userId)) {
+                $this->json(false, 'La notificacion ya no esta disponible para archivar.', [], 409);
+            }
             return ['notificationId' => $id, 'counters' => $model->getCounters($userId)];
         }, 'Notificacion archivada.', function () use ($id): array {
             $notifications = $this->demoNotifications();
@@ -265,6 +270,22 @@ final class NotificationsController
             'Contadores actualizados.',
             fn (): array => ['counters' => (new NotificationModel())->getDemoCounters($this->demoNotifications())]
         );
+    }
+
+    /** Purga explícita de mantenimiento; no se invoca desde ningún GET. */
+    public function purgeExpired(): void
+    {
+        $this->requirePostAndCsrf();
+        if (!(new AuthSessionService())->hasAdminAccess()) {
+            $this->json(false, 'No tienes permiso para ejecutar el mantenimiento.', [], 403);
+        }
+        try {
+            $deleted = (new NotificationModel())->purgeExpiredTrash();
+            $this->json(true, 'Limpieza de notificaciones vencidas completada.', ['deleted' => $deleted]);
+        } catch (Throwable $exception) {
+            error_log('Notifications retention purge error: ' . $exception->getMessage());
+            $this->json(false, 'No fue posible completar la limpieza de notificaciones.', [], 500);
+        }
     }
 
     public function restore(): void
@@ -686,21 +707,23 @@ final class NotificationsController
             'reminder' => ['reminder', 'Recordatorios', 'fa-clock'], 'system' => ['system', 'Sistema', 'fa-gear'],
             'tribunal' => ['tribunal', 'Tribunal', 'fa-user-group'], 'repository' => ['system', 'Repositorio', 'fa-database'],
             'comment' => ['observation', 'Comentarios', 'fa-message'],
+            'adjustment' => ['correction', 'Solicitudes de ajuste', 'fa-pen-to-square'],
         ];
         [$typeClass, $label, $icon] = $styles[$notification['type']] ?? $styles['system'];
         $date = new DateTimeImmutable($notification['created_at']);
         return array_merge($notification, ['description' => $notification['message'], 'project' => $notification['project_name'], 'time' => $date->format('H:i'), 'date' => $date->format('d/m/Y'), 'unread' => !$notification['is_read'], 'filter' => $label, 'type_class' => $typeClass, 'icon' => $icon]);
     }
 
-    private function summaryCards(array $counters, int $archivedCount = 0, ?int $sentCount = null): array
+    private function summaryCards(array $counters, int $archivedCount = 0, ?int $sentCount = null, bool $error = false): array
     {
+        $value = static fn (string $key) => $error ? '—' : (string) $counters[$key];
         $cards = [
-            ['key' => 'unread', 'label' => 'No leídas', 'value' => (string) $counters['unread'], 'icon' => 'fa-eye-slash', 'tone' => 'blue'],
-            ['key' => 'today', 'label' => 'Recibidas hoy', 'value' => (string) $counters['today'], 'icon' => 'fa-calendar-day', 'tone' => 'green'],
-            ['key' => 'hidden', 'label' => 'Archivadas', 'value' => (string) $archivedCount, 'icon' => 'fa-box-archive', 'tone' => 'purple'],
+            ['key' => 'unread', 'label' => 'No leídas', 'value' => $value('unread'), 'icon' => 'fa-eye-slash', 'tone' => 'blue'],
+            ['key' => 'today', 'label' => 'Recibidas hoy', 'value' => $value('today'), 'icon' => 'fa-calendar-day', 'tone' => 'green'],
+            ['key' => 'hidden', 'label' => 'Archivadas', 'value' => $error ? '—' : (string) $archivedCount, 'icon' => 'fa-box-archive', 'tone' => 'purple'],
         ];
         if ($sentCount !== null) {
-            $cards[] = ['key' => 'sent', 'label' => 'Enviadas', 'value' => (string) $sentCount, 'icon' => 'fa-paper-plane', 'tone' => 'slate'];
+            $cards[] = ['key' => 'sent', 'label' => 'Enviadas', 'value' => $error ? '—' : (string) $sentCount, 'icon' => 'fa-paper-plane', 'tone' => 'slate'];
         }
         return $cards;
     }
@@ -717,7 +740,7 @@ final class NotificationsController
 
     private function typeFilters(): array
     {
-        return ['all' => 'Todos', 'delivery' => 'Entregas', 'observation' => 'Observaciones', 'status_change' => 'Cambios de estado', 'review' => 'Revision', 'reminder' => 'Recordatorios', 'system' => 'Sistema', 'tribunal' => 'Tribunal', 'repository' => 'Repositorio', 'comment' => 'Comentarios'];
+        return ['all' => 'Todos', 'delivery' => 'Entregas', 'observation' => 'Observaciones', 'status_change' => 'Cambios de estado', 'review' => 'Revision', 'reminder' => 'Recordatorios', 'system' => 'Sistema', 'tribunal' => 'Tribunal', 'repository' => 'Repositorio', 'comment' => 'Comentarios', 'adjustment' => 'Solicitudes de ajuste'];
     }
 
     private function activitySummary(array $notifications): array

@@ -307,6 +307,7 @@ function notificationIcon(type) {
         tribunal: "fa-user-group",
         repository: "fa-database",
         comment: "fa-message",
+        adjustment: "fa-pen-to-square",
         system: "fa-gear",
     }[type] || "fa-bell";
 }

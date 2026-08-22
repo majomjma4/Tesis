@@ -166,7 +166,9 @@ $projectSentence = static function (int $count, string $ending): string {
                 <a class="teacher-inline-link" href="<?= e($notifications['route'] ?? route('notifications')) ?>">Ver todas →</a>
             </header>
             <?php $items = is_array($notifications['items'] ?? null) ? $notifications['items'] : []; ?>
-            <?php if (!$items): ?>
+            <?php if (!empty($notifications['error'])): ?>
+                <?php $empty('No disponible', (string) $notifications['error']); ?>
+            <?php elseif (!$items): ?>
                 <?php $empty('Todo al día', 'No tienes notificaciones nuevas.'); ?>
             <?php else: ?>
                 <ul class="teacher-notification-list">

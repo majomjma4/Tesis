@@ -230,8 +230,9 @@ function renderPagination(pagination = {}) {
     notificationsPerPage = Number(pagination.per_page || 10);
     paginationContainer.replaceChildren();
     const total = Number(pagination.total || 0);
-    paginationContainer.hidden = total <= 10;
-    if (total <= 10) return;
+    const pageTotal = Number(pagination.pages || 1);
+    paginationContainer.hidden = pageTotal <= 1;
+    if (pageTotal <= 1) return;
 
     const summary = document.createElement("p");
     summary.innerHTML = `Mostrando <strong>${pagination.to}</strong> de <strong>${total}</strong>`;
@@ -251,7 +252,7 @@ function renderPagination(pagination = {}) {
         button.addEventListener("click", () => { currentPage = page; loadNotifications(); groupsContainer?.scrollIntoView({ behavior: "smooth", block: "start" }); }); pages.append(button);
     };
     addButton("‹", currentPage - 1, currentPage <= 1);
-    const pageCount = Number(pagination.pages || 1);
+    const pageCount = pageTotal;
     const pageItems = pageCount <= 5
         ? Array.from({ length: pageCount }, (_, index) => index + 1)
         : currentPage <= 3

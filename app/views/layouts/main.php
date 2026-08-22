@@ -168,15 +168,16 @@ $isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen);
                 </button>
                 <div class="topbar-notifications">
                     <button class="notification-icon" id="topbarNotificationsButton" type="button"
-                        aria-label="Mostrar notificaciones recientes" aria-haspopup="dialog" aria-expanded="false"
+                        aria-label="<?= !empty($notificationCounterError) ? 'Mostrar notificaciones recientes; contador no disponible' : 'Mostrar notificaciones recientes' ?>" aria-haspopup="dialog" aria-expanded="false"
                         aria-controls="topbarNotificationsPanel"
+                        <?= !empty($notificationCounterError) ? 'data-counter-error="true"' : '' ?>
                         data-list-endpoint="<?= e(route('notifications/list')) ?>"
                         data-counters-endpoint="<?= e(route('notifications/counters')) ?>"
                         data-open-endpoint="<?= e($notificationOpenEndpoint ?? route('notifications/open')) ?>"
                         data-csrf-token="<?= e($notificationCsrfToken ?? '') ?>">
                         <i class="fa-solid fa-bell"></i>
-                        <?php $topbarUnreadCount = max(0, (int) ($notificationUnreadCount ?? 0)); ?>
-                        <span class="notification-count" <?= $topbarUnreadCount === 0 ? 'hidden aria-hidden="true"' : 'aria-label="' . e($topbarUnreadCount . ($topbarUnreadCount === 1 ? ' notificación no leída' : ' notificaciones no leídas')) . '"' ?>><?= $topbarUnreadCount === 0 ? '' : e($topbarUnreadCount >= 10 ? '9+' : (string) $topbarUnreadCount) ?></span>
+                        <?php $topbarUnreadCount = !empty($notificationCounterError) ? null : max(0, (int) ($notificationUnreadCount ?? 0)); ?>
+                        <span class="notification-count" <?= $topbarUnreadCount === null || $topbarUnreadCount === 0 ? 'hidden aria-hidden="true"' : 'aria-label="' . e($topbarUnreadCount . ($topbarUnreadCount === 1 ? ' notificación no leída' : ' notificaciones no leídas')) . '"' ?>><?= $topbarUnreadCount === null || $topbarUnreadCount === 0 ? '' : e($topbarUnreadCount >= 10 ? '9+' : (string) $topbarUnreadCount) ?></span>
                     </button>
                     <section class="topbar-notifications-panel" id="topbarNotificationsPanel"
                         aria-label="Notificaciones recientes" hidden>

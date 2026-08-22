@@ -49,7 +49,7 @@ final class ProjectAdjustmentRequestService
         $insert->execute(['project'=>$projectId,'actor'=>$actorId,'type'=>$type,'message'=>$message,'section'=>$section,'field'=>$field,'file'=>$fileId]);
         $id = (int)$db->lastInsertId();
         (new ProjectAuditService($db))->record($projectId, $actorId, 'project_adjustment_request_created', 'project_adjustment_request', $id, null, ['status'=>'pending','request_type'=>$type,'file_id'=>$fileId]);
-        $students = $db->prepare("SELECT DISTINCT user_id FROM project_participants WHERE project_id=:project AND role_code='student' AND status='active' AND removed_at IS NULL");
+        $students = $db->prepare("SELECT DISTINCT pp.user_id FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL WHERE pp.project_id=:project AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL");
         $students->execute(['project'=>$projectId]);
         $notify = $db->prepare(
             "INSERT IGNORE INTO notifications(user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key)

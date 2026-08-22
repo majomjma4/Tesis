@@ -84,7 +84,7 @@
             <input id="notificationSearch" type="search" placeholder="" aria-label="Buscar por título, mensaje o proyecto" autocomplete="off" data-no-search-history>
         </label>
 
-        <label class="notification-filter-control" data-filter-control="status"><span>Mostrar</span><select id="notificationStatusFilter" aria-label="Mostrar notificaciones"><option value="all">Todas</option><option value="unread">No leídas</option><option value="hidden">Archivadas</option><?php if ($isAdmin): ?><option value="sent">Enviadas</option><?php endif; ?><option value="trash">Papelera</option></select></label>
+        <label class="notification-filter-control" data-filter-control="status"><span>Mostrar</span><select id="notificationStatusFilter" aria-label="Mostrar notificaciones"><option value="all">Todas</option><option value="unread">No leídas</option><option value="read">Leídas</option><option value="hidden">Archivadas</option><?php if ($isAdmin): ?><option value="sent">Enviadas</option><?php endif; ?><option value="trash">Papelera</option></select></label>
         <label class="notification-filter-control" data-filter-control="type"><span>Tipo</span><select id="notificationTypeFilter" data-searchable="false" aria-label="Filtrar por tipo"><?php foreach ($typeFilters as $value => $label): ?><option value="<?= e($value) ?>"><?= e($label) ?></option><?php endforeach; ?></select></label>
 
         <div class="notification-date-filter" data-filter-control="date"><button class="notification-date-trigger" id="notificationDateTrigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="notificationDatePopover"><i class="fa-regular fa-calendar"></i><span>Fecha</span><small>Filtrar por fecha</small></button><div class="notification-date-popover" id="notificationDatePopover" role="dialog" aria-label="Filtrar por rango de fechas" hidden><label>Desde<input type="date" id="notificationDateFrom"></label><label>Hasta<input type="date" id="notificationDateTo"></label><div><button class="notification-action secondary" id="clearNotificationDate" type="button">Limpiar</button><button class="notification-action primary" id="applyNotificationDate" type="button">Aplicar</button></div></div></div>
@@ -108,7 +108,7 @@
 
     <div class="notifications-layout">
         <main class="notification-groups" id="notificationGroups">
-            <header class="notification-listing-heading"><div><span>Actividad</span><h2>Bandeja de notificaciones</h2></div><button class="notification-action secondary" id="markAllNotificationsRead" type="button" <?= $sidebarSummary['unread'] === 0 ? 'hidden' : '' ?>><i class="fa-solid fa-check-double"></i><span>Marcar todas como leídas</span></button></header>
+            <header class="notification-listing-heading"><div><span>Actividad</span><h2>Bandeja de notificaciones</h2></div><button class="notification-action secondary" id="markAllNotificationsRead" type="button" <?= $loadError !== null || ($sidebarSummary['unread'] ?? 0) === 0 ? 'hidden' : '' ?>><i class="fa-solid fa-check-double"></i><span>Marcar todas como leídas</span></button></header>
             <?php foreach ($groups as $group => $notificationsList): ?>
                 <section class="notification-group" aria-labelledby="group-<?= e(strtolower(str_replace(' ', '-', $group))) ?>">
                     <div class="notification-group-heading">
@@ -164,11 +164,12 @@
         <aside class="notification-side-panel" aria-label="Resumen y accesos rapidos">
             <section>
                 <div class="side-panel-heading"><span><i class="fa-solid fa-chart-pie"></i></span><div><small>Actividad</small><h2>Resumen</h2></div></div>
-                <?php $readProgress = ($sidebarSummary['read'] + $sidebarSummary['unread']) > 0 ? (int) round(($sidebarSummary['read'] / ($sidebarSummary['read'] + $sidebarSummary['unread'])) * 100) : 0; ?>
-                <div class="side-progress-label"><span>Progreso de lectura</span><strong id="notificationReadProgressLabel"><?= e((string) $readProgress) ?>%</strong></div>
-                <div class="side-progress" id="notificationReadProgress" style="--progress: <?= e((string) $readProgress) ?>%" role="progressbar" aria-label="Porcentaje de notificaciones leidas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= e((string) $readProgress) ?>"><span></span></div>
-                <div class="side-metric" data-side-counter="unread"><span><i class="fa-solid fa-circle unread"></i>No leídas</span><strong><?= e((string) $sidebarSummary['unread']) ?></strong></div>
-                <div class="side-metric" data-side-counter="read"><span><i class="fa-solid fa-circle read"></i>Leídas</span><strong><?= e((string) $sidebarSummary['read']) ?></strong></div>
+                <?php $summaryUnavailable = $loadError !== null || $sidebarSummary['read'] === null || $sidebarSummary['unread'] === null; ?>
+                <?php $readProgress = !$summaryUnavailable && ($sidebarSummary['read'] + $sidebarSummary['unread']) > 0 ? (int) round(($sidebarSummary['read'] / ($sidebarSummary['read'] + $sidebarSummary['unread'])) * 100) : null; ?>
+                <div class="side-progress-label"><span>Progreso de lectura</span><strong id="notificationReadProgressLabel"><?= $readProgress === null ? '—' : e((string) $readProgress . '%') ?></strong></div>
+                <div class="side-progress" id="notificationReadProgress" style="--progress: <?= e((string) ($readProgress ?? 0)) ?>%" role="progressbar" aria-label="Porcentaje de notificaciones leidas" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= $readProgress === null ? '0' : e((string) $readProgress) ?>"><span></span></div>
+                <div class="side-metric" data-side-counter="unread"><span><i class="fa-solid fa-circle unread"></i>No leídas</span><strong><?= $summaryUnavailable ? '—' : e((string) $sidebarSummary['unread']) ?></strong></div>
+                <div class="side-metric" data-side-counter="read"><span><i class="fa-solid fa-circle read"></i>Leídas</span><strong><?= $summaryUnavailable ? '—' : e((string) $sidebarSummary['read']) ?></strong></div>
                 <div class="side-update"><i class="fa-solid fa-clock-rotate-left"></i><div><span>Última actualización</span><strong id="notificationLastUpdate"><?= e($sidebarSummary['updated']) ?></strong></div></div>
             </section>
             <section>

@@ -165,6 +165,7 @@ match ($page) {
     'notifications/trash-empty' => (new NotificationsController())->emptyTrash(),
     'notifications/trash-bulk' => (new NotificationsController())->trashBulk(),
     'notifications/counters' => (new NotificationsController())->counters(),
+    'notifications/purge-expired' => (new NotificationsController())->purgeExpired(),
     'notifications/open' => (new NotificationsController())->open(),
     default => (new ErrorController())->notFound(),
 };

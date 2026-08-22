@@ -236,6 +236,7 @@ final class ProjectReviewService
              (user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key)
              SELECT DISTINCT pp.user_id,:project_id,'observation','Nuevas observaciones de revisión',:message,:url,'Revisar observaciones',:metadata,:deduplication_key
              FROM project_participants pp INNER JOIN student_profiles sp ON sp.user_id=pp.user_id
+             INNER JOIN users u ON u.id=pp.user_id AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL
              WHERE pp.project_id=:participant_project AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL"
         );
         $insert->execute([
