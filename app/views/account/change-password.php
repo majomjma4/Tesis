@@ -1,7 +1,4 @@
-<main class="admin-access-shell<?= $forcedPasswordChange ? ' forced-password-shell' : ' voluntary-password-modal' ?>" data-password-change-modal data-password-forced="<?= $forcedPasswordChange ? '1' : '0' ?>" data-password-close-url="<?= e(route('dashboard')) ?>">
-    <?php if (!$forcedPasswordChange): ?>
-        <nav aria-label="Migas de pan"><a href="<?= e(route('dashboard')) ?>">Inicio</a><i class="fa-solid fa-chevron-right" aria-hidden="true"></i><span>Cambiar contraseña</span></nav>
-    <?php endif; ?>
+<main class="admin-access-shell<?= $forcedPasswordChange ? ' forced-password-shell' : ' voluntary-password-modal' ?>" data-password-change-modal data-password-forced="<?= $forcedPasswordChange ? '1' : '0' ?>" data-password-close-url="<?= e(route('profile')) ?>">
     <section class="admin-access-card" role="dialog" aria-modal="true" aria-labelledby="changePasswordTitle" tabindex="-1">
         <?php if (!$forcedPasswordChange): ?><button type="button" class="password-modal-close" data-password-modal-close aria-label="Cerrar"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button><?php endif; ?>
         <span class="admin-access-icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
@@ -71,6 +68,9 @@
 
             <div class="password-match-status" id="passwordMatchStatus" hidden aria-live="polite"></div>
 
+            <?php if (!$forcedPasswordChange): ?>
+                <button type="button" class="admin-access-secondary" data-password-modal-close>Cancelar</button>
+            <?php endif; ?>
             <button type="submit" id="submitPasswordBtn" disabled aria-disabled="true">
                 <i class="fa-solid fa-key" aria-hidden="true"></i> Actualizar contraseña
             </button>

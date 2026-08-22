@@ -6,20 +6,24 @@ final class AuthModel
 {
     public function profile(int $userId):array
     {
-        $q=Database::connection()->prepare("SELECT u.id,u.username,u.full_name,u.email,u.created_at,u.last_login_at,u.password_changed_at,u.avatar_path,u.avatar_updated_at,u.is_admin,u.is_initial_admin,sp.institutional_code student_institutional_code,tp.institutional_code teacher_institutional_code,se.semester current_semester FROM users u LEFT JOIN student_profiles sp ON sp.user_id=u.id LEFT JOIN teacher_profiles tp ON tp.user_id=u.id LEFT JOIN (SELECT id FROM academic_periods WHERE status='active' ORDER BY starts_on DESC,id DESC LIMIT 1) ap ON 1=1 LEFT JOIN student_enrollments se ON se.student_id=u.id AND se.academic_period_id=ap.id AND se.status='active' WHERE u.id=:id AND u.deleted_at IS NULL AND u.purged_at IS NULL");$q->execute(['id'=>$userId]);$profile=$q->fetch();if(!$profile)throw new RuntimeException('La cuenta no existe.');$profile['roles']=$this->effectiveRoles((int)$profile['id'],(bool)$profile['is_admin']);$profile['institutional_code']=in_array('student',$profile['roles'],true)?($profile['student_institutional_code']??null):(in_array('teacher',$profile['roles'],true)?($profile['teacher_institutional_code']??null):null);return $profile;
+        $q=Database::connection()->prepare("SELECT u.id,u.username,u.full_name,u.email,u.profile_version,u.created_at,u.last_login_at,u.password_changed_at,u.avatar_path,u.avatar_updated_at,u.is_admin,u.is_initial_admin,sp.institutional_code student_institutional_code,tp.institutional_code teacher_institutional_code,se.semester current_semester FROM users u LEFT JOIN student_profiles sp ON sp.user_id=u.id LEFT JOIN teacher_profiles tp ON tp.user_id=u.id LEFT JOIN (SELECT id FROM academic_periods WHERE status='active' ORDER BY starts_on DESC,id DESC LIMIT 1) ap ON 1=1 LEFT JOIN student_enrollments se ON se.student_id=u.id AND se.academic_period_id=ap.id AND se.status='active' WHERE u.id=:id AND u.deleted_at IS NULL AND u.purged_at IS NULL");$q->execute(['id'=>$userId]);$profile=$q->fetch();if(!$profile)throw new RuntimeException('La cuenta no existe.');$profile['roles']=$this->effectiveRoles((int)$profile['id'],(bool)$profile['is_admin']);$profile['institutional_code']=in_array('student',$profile['roles'],true)?($profile['student_institutional_code']??null):(in_array('teacher',$profile['roles'],true)?($profile['teacher_institutional_code']??null):null);return $profile;
     }
 
-    public function updateProfile(int $userId,string $name,string $email,string $username,string $password): array
+    public function updateProfile(int $userId,string $name,string $email,string $username,int $profileVersion,string $avatarAction='none',?string $avatarPath=null): array
     {
         if(mb_strlen($name)<3||mb_strlen($name)>180)throw new InvalidArgumentException('Ingresa tu nombre completo.');
         if(!filter_var($email,FILTER_VALIDATE_EMAIL))throw new InvalidArgumentException('Ingresa un correo válido.');
         $username=trim($username);
         if($username!==''&&!preg_match('/^[a-zA-Z0-9._-]{3,80}$/',$username))throw new InvalidArgumentException('El usuario debe tener entre 3 y 80 caracteres (letras, números, punto, guion o guion bajo).');
-        return Database::transaction(function(PDO $db)use($userId,$name,$email,$username,$password):array{
-            $q=$db->prepare('SELECT username,full_name,email,password_hash FROM users WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL FOR UPDATE');
+        if(!in_array($avatarAction,['none','replace','remove'],true))throw new InvalidArgumentException('La operación de fotografía no es válida.');
+        if($avatarAction==='replace'&&(!is_string($avatarPath)||!preg_match('#^avatars/[a-f0-9]{64}\.(jpg|jpeg|png)$#',$avatarPath)))throw new InvalidArgumentException('La fotografía seleccionada no es válida.');
+        return Database::transaction(function(PDO $db)use($userId,$name,$email,$username,$profileVersion,$avatarAction,$avatarPath):array{
+            $q=$db->prepare('SELECT username,full_name,email,avatar_path,profile_version,status,deleted_at,purged_at FROM users WHERE id=:id FOR UPDATE');
             $q->execute(['id'=>$userId]);
             $before=$q->fetch();
-            if(!$before||!password_verify($password,(string)$before['password_hash']))throw new InvalidArgumentException('La contraseña actual no es correcta.');
+            if(!$before)throw new InvalidArgumentException('La cuenta no está disponible.');
+            if($before['status']!=='active'||$before['deleted_at']!==null||$before['purged_at']!==null)throw new RuntimeException('ACCOUNT_UNAVAILABLE');
+            if((int)$before['profile_version']!==$profileVersion)throw new RuntimeException('PROFILE_VERSION_CONFLICT');
             $changes=[];
             if($before['full_name']!==$name)$changes['full_name']=['from'=>$before['full_name'],'to'=>$name];
             if($before['email']!==$email){
@@ -37,9 +41,16 @@ final class AuthModel
                 }
                 $changes['username']=['from'=>$currentUsername,'to'=>$username];
             }
-            if($changes===[])return [];
-            $db->prepare('UPDATE users SET full_name=:name,email=:email,username=:username,session_version=session_version+1 WHERE id=:id')
-                ->execute(['name'=>$name,'email'=>$email,'username'=>$username!==''?$username:null,'id'=>$userId]);
+            $avatarChanged=$avatarAction!=='none';
+            if($avatarAction==='remove'&&($before['avatar_path']===null||$before['avatar_path']===''))throw new InvalidArgumentException('No existe una fotografía personalizada para eliminar.');
+            if($changes===[]&&!$avatarChanged)return ['changes'=>[],'avatar_changed'=>false,'previous_avatar_path'=>null];
+
+            $sets=['full_name=:name','email=:email','username=:username','profile_version=profile_version+1'];
+            $params=['name'=>$name,'email'=>$email,'username'=>$username!==''?$username:null,'id'=>$userId];
+            if($avatarAction==='replace'){$sets[]='avatar_path=:avatar_path';$sets[]='avatar_updated_at=UTC_TIMESTAMP()';$params['avatar_path']=$avatarPath;}
+            elseif($avatarAction==='remove'){$sets[]='avatar_path=NULL';$sets[]='avatar_updated_at=NULL';}
+            if($changes!==[])$sets[]='session_version=session_version+1';
+            $db->prepare('UPDATE users SET '.implode(',',$sets).' WHERE id=:id')->execute($params);
 
             $hasName = isset($changes['full_name']);
             $hasEmail = isset($changes['email']);
@@ -56,8 +67,10 @@ final class AuthModel
                 $actionLabel = 'Perfil actualizado';
             }
 
-            (new AdminActivityService($db))->record($userId, $action, $actionLabel, 'Cuenta', 'user', $userId, 'Cuenta personal', 'correct', ['changed_fields' => array_keys($changes)]);
-            return $changes;
+            if($changes!==[])(new AdminActivityService($db))->record($userId, $action, $actionLabel, 'Cuenta', 'user', $userId, 'Cuenta personal', 'correct', ['changed_fields' => array_keys($changes)]);
+            if($avatarAction==='replace')(new AdminActivityService($db))->record($userId,'avatar_updated','Fotografía de perfil actualizada','Cuenta','user',$userId,'Cuenta personal','correct',[]);
+            if($avatarAction==='remove')(new AdminActivityService($db))->record($userId,'avatar_removed','Fotografía de perfil eliminada','Cuenta','user',$userId,'Cuenta personal','correct',[]);
+            return ['changes'=>$changes,'avatar_changed'=>$avatarChanged,'profile_version'=>(int)$before['profile_version']+1,'previous_avatar_path'=>$before['avatar_path']!==null?(string)$before['avatar_path']:null];
         });
     }
 
@@ -163,7 +176,7 @@ final class AuthModel
             $read->execute(['id' => $userId]);
             $previous = $read->fetchColumn();
             if ($previous === false) throw new RuntimeException('La cuenta no está disponible.');
-            $db->prepare('UPDATE users SET avatar_path=:path,avatar_updated_at=UTC_TIMESTAMP() WHERE id=:id')
+            $db->prepare('UPDATE users SET avatar_path=:path,avatar_updated_at=UTC_TIMESTAMP(),profile_version=profile_version+1 WHERE id=:id')
                 ->execute(['path' => $avatarPath, 'id' => $userId]);
             (new AdminActivityService($db))->record($userId, 'avatar_updated', 'Fotografía de perfil actualizada', 'Cuenta', 'user', $userId, 'Cuenta personal', 'correct', []);
             return $previous !== null ? (string) $previous : null;
@@ -178,7 +191,7 @@ final class AuthModel
             $previous = $read->fetchColumn();
             if ($previous === false) throw new RuntimeException('La cuenta no está disponible.');
             if ($previous === null || $previous === '') throw new InvalidArgumentException('No existe una fotografía personalizada para eliminar.');
-            $db->prepare('UPDATE users SET avatar_path=NULL,avatar_updated_at=NULL WHERE id=:id')->execute(['id' => $userId]);
+            $db->prepare('UPDATE users SET avatar_path=NULL,avatar_updated_at=NULL,profile_version=profile_version+1 WHERE id=:id')->execute(['id' => $userId]);
             (new AdminActivityService($db))->record($userId, 'avatar_removed', 'Fotografía de perfil eliminada', 'Cuenta', 'user', $userId, 'Cuenta personal', 'correct', []);
             return (string) $previous;
         });

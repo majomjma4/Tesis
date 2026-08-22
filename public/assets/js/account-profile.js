@@ -1,70 +1,88 @@
 (() => {
+    let pendingAvatarFile = null;
+    let pendingAvatarPreviewUrl = null;
+    let avatarAction = 'none';
+    let syncSubmitState = () => {};
+    let isProfileDirty = () => false;
+    let isLeavingProfile = false;
+    let profileSubmitInProgress = false;
+
     // -------------------------------------------------------------
     // 1. Formulario de Datos Personales (Fase 2)
     // -------------------------------------------------------------
     const form = document.querySelector('[data-profile-form]');
     const confirmModal = document.getElementById('profileConfirm');
-    const currentPasswordInput = document.getElementById('profileCurrentPassword');
+    const unsavedModal = document.getElementById('profileUnsavedModal');
     const submitButton = document.querySelector('[data-profile-submit]');
     const confirmSubmitBtn = document.querySelector('[data-profile-confirm]');
     const cancelSubmitBtn = document.querySelector('[data-profile-cancel]');
+    const unsavedCancelBtn = document.querySelector('[data-profile-unsaved-cancel]');
+    const unsavedConfirmBtn = document.querySelector('[data-profile-unsaved-confirm]');
 
     if (confirmModal && confirmModal.parentElement !== document.body) {
         document.body.appendChild(confirmModal);
     }
+    if (unsavedModal && unsavedModal.parentElement !== document.body) {
+        document.body.appendChild(unsavedModal);
+    }
 
-    if (form && confirmModal && currentPasswordInput && submitButton && confirmSubmitBtn && cancelSubmitBtn) {
-        const initial = {
+    if (form && confirmModal && submitButton && confirmSubmitBtn && cancelSubmitBtn) {
+        let confirmationAccepted = false;
+
+        const originalProfile = Object.freeze({
             fullName: String(form.elements.full_name?.value ?? '').trim(),
             email: String(form.elements.email?.value ?? '').trim().toLowerCase(),
             username: String(form.elements.username?.value ?? '').trim(),
-        };
-        let confirmationAccepted = false;
+        });
 
-        const hasChanges = () => (
-            String(form.elements.full_name?.value ?? '').trim() !== initial.fullName
-            || String(form.elements.email?.value ?? '').trim().toLowerCase() !== initial.email
-            || String(form.elements.username?.value ?? '').trim() !== initial.username
+        isProfileDirty = () => (
+            String(form.elements.full_name?.value ?? '').trim() !== originalProfile.fullName
+            || String(form.elements.email?.value ?? '').trim().toLowerCase() !== originalProfile.email
+            || String(form.elements.username?.value ?? '').trim() !== originalProfile.username
+            || pendingAvatarFile !== null
+            || avatarAction !== 'none'
         );
 
-        const syncSubmitState = () => {
-            const changed = hasChanges();
+        syncSubmitState = () => {
+            const changed = isProfileDirty();
             submitButton.disabled = !changed;
             submitButton.setAttribute('aria-disabled', String(!changed));
         };
 
         const closeConfirmModal = () => {
             confirmModal.hidden = true;
-            currentPasswordInput.value = '';
             confirmationAccepted = false;
+            profileSubmitInProgress = false;
+            confirmSubmitBtn.disabled = false;
+            cancelSubmitBtn.disabled = false;
+            confirmSubmitBtn.textContent = 'Guardar cambios';
             document.body.classList.remove('profile-modal-open');
             document.body.style.overflow = '';
         };
 
         const openConfirmModal = () => {
-            currentPasswordInput.value = '';
             confirmModal.hidden = false;
             document.body.classList.add('profile-modal-open');
             document.body.style.overflow = 'hidden';
-            window.setTimeout(() => currentPasswordInput.focus(), 0);
         };
 
         form.addEventListener('input', syncSubmitState);
         form.addEventListener('submit', (event) => {
             if (confirmationAccepted) return;
             event.preventDefault();
-            if (!hasChanges()) return;
+            if (!isProfileDirty()) return;
             if (!form.reportValidity()) return;
             openConfirmModal();
         });
 
         confirmSubmitBtn.addEventListener('click', () => {
-            if (!currentPasswordInput.value) {
-                currentPasswordInput.reportValidity();
-                currentPasswordInput.focus();
-                return;
-            }
+            if (profileSubmitInProgress) return;
+            profileSubmitInProgress = true;
             confirmationAccepted = true;
+            isLeavingProfile = true;
+            confirmSubmitBtn.disabled = true;
+            cancelSubmitBtn.disabled = true;
+            confirmSubmitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Guardando...';
             confirmModal.hidden = true;
             document.body.classList.remove('profile-modal-open');
             document.body.style.overflow = '';
@@ -88,13 +106,10 @@
     const shell = document.querySelector('.profile-shell');
     if (!shell) return;
 
-    const updateEndpoint = shell.dataset.updateEndpoint;
-    const removeEndpoint = shell.dataset.removeEndpoint;
-    const avatarCsrf = shell.dataset.avatarCsrf;
-
     const avatarFileInput = document.getElementById('profileAvatarFileInput');
     const avatarAddBtn = document.getElementById('profileAvatarAddBtn');
     const avatarRemoveBtn = document.getElementById('profileAvatarRemoveBtn');
+    const avatarRemovePendingInput = document.getElementById('profileAvatarRemovePending');
 
     const editModal = document.getElementById('profileAvatarEditModal');
     const editCloseBtn = document.getElementById('profileAvatarEditCloseBtn');
@@ -111,10 +126,80 @@
 
     const avatarAlert = document.getElementById('profileAvatarAlert');
     const avatarDisplay = document.getElementById('profileAvatarDisplay');
+    const originalAvatarUrl = avatarDisplay?.querySelector('img')?.getAttribute('src') || null;
+    const originalHasAvatar = originalAvatarUrl !== null;
+
+    let pendingNavigation = null;
+    let pendingNavigationTrigger = null;
+    const closeUnsavedModal = () => {
+        if (!unsavedModal) return;
+        unsavedModal.hidden = true;
+        document.body.classList.remove('profile-modal-open');
+        document.body.style.overflow = '';
+        pendingNavigation = null;
+        if (pendingNavigationTrigger && typeof pendingNavigationTrigger.focus === 'function') {
+            pendingNavigationTrigger.focus();
+        }
+        pendingNavigationTrigger = null;
+    };
+
+    const openUnsavedModal = (action, trigger = null) => {
+        if (!unsavedModal) return action();
+        pendingNavigation = action;
+        pendingNavigationTrigger = trigger;
+        unsavedModal.hidden = false;
+        document.body.classList.add('profile-modal-open');
+        document.body.style.overflow = 'hidden';
+        window.setTimeout(() => unsavedCancelBtn?.focus(), 0);
+    };
+
+    unsavedCancelBtn?.addEventListener('click', closeUnsavedModal);
+    unsavedModal?.addEventListener('click', event => {
+        if (event.target === unsavedModal) closeUnsavedModal();
+    });
+    unsavedConfirmBtn?.addEventListener('click', () => {
+        const action = pendingNavigation;
+        isLeavingProfile = true;
+        closeUnsavedModal();
+        action?.();
+    });
 
     // Mover modales a document.body para eliminar contextos de apilamiento limitados por el layout
     if (editModal && editModal.parentElement !== document.body) document.body.appendChild(editModal);
     if (removeModal && removeModal.parentElement !== document.body) document.body.appendChild(removeModal);
+
+    window.addEventListener('beforeunload', event => {
+        if (!isLeavingProfile && isProfileDirty()) {
+            event.preventDefault();
+            event.returnValue = '';
+        }
+    });
+
+    document.addEventListener('click', event => {
+        const link = event.target.closest?.('a[href]');
+        if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        if (link.target === '_blank' || link.hasAttribute('download')) return;
+
+        let destination;
+        try { destination = new URL(link.href, window.location.href); } catch (_) { return; }
+        if (destination.origin !== window.location.origin || !isProfileDirty()) return;
+
+        event.preventDefault();
+        openUnsavedModal(() => { window.location.href = link.href; }, link);
+    });
+
+    document.querySelectorAll('.js-logout-trigger').forEach(button => {
+        button.addEventListener('click', event => {
+            if (!isProfileDirty()) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            openUnsavedModal(() => document.querySelector('#logoutModal form')?.requestSubmit(), button);
+        });
+    });
+
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && unsavedModal && !unsavedModal.hidden) closeUnsavedModal();
+    });
 
     let previousActiveElement = null;
     let loadedRawImage = null;
@@ -206,6 +291,19 @@
 
     const openRemoveModal = () => {
         if (!removeModal) return;
+        const restoring = avatarAction !== 'none';
+        const title = document.getElementById('profileAvatarRemoveTitle');
+        const text = document.getElementById('profileAvatarRemoveText');
+        const confirm = document.getElementById('profileAvatarRemoveConfirmBtn');
+        if (restoring) {
+            if (title) title.textContent = '¿Deseas restaurar tu fotografía de perfil?';
+            if (text) text.textContent = 'Se descartará el cambio pendiente y se conservará la fotografía guardada.';
+            if (confirm) confirm.textContent = 'Restaurar fotografía';
+        } else {
+            if (title) title.textContent = '¿Deseas eliminar tu fotografía de perfil?';
+            if (text) text.textContent = 'Se volverá a mostrar la inicial de tu nombre.';
+            if (confirm) confirm.textContent = 'Eliminar fotografía';
+        }
         previousActiveElement = document.activeElement;
         removeModal.hidden = false;
         document.body.classList.add('profile-modal-open');
@@ -343,8 +441,8 @@
     });
 
     // --- Generar Recorte 1:1 (Canvas 800×800) y Guardar ---
-    editSaveBtn?.addEventListener('click', async () => {
-        if (!loadedRawImage || !updateEndpoint) return;
+    editSaveBtn?.addEventListener('click', () => {
+        if (!loadedRawImage || !avatarFileInput) return;
 
         editSaveBtn.disabled = true;
         editCancelBtn.disabled = true;
@@ -363,7 +461,7 @@
 
         ctx.drawImage(loadedRawImage, srcX, srcY, srcW, srcH, 0, 0, 800, 800);
 
-        canvas.toBlob(async (blob) => {
+        canvas.toBlob((blob) => {
             if (!blob) {
                 showAlert('No fue posible procesar la imagen.', 'error');
                 editSaveBtn.disabled = false;
@@ -372,28 +470,22 @@
                 return;
             }
 
-            const data = new FormData();
-            data.append('avatar', blob, 'avatar.jpg');
-            data.append('_csrf', avatarCsrf || '');
-
-            try {
-                const response = await fetch(updateEndpoint, { method: 'POST', body: data });
-                const result = await response.json().catch(() => ({ success: false, message: 'No se pudo actualizar la fotografía. Inténtalo nuevamente.' }));
-
-                if (!response.ok || !result.success) {
-                    throw new Error(result.message || 'No se pudo actualizar la fotografía. Inténtalo nuevamente.');
-                }
-
-                updateAvatarDOM(result.data?.avatar_url);
-                closeEditModal();
-                showAlert(result.message || 'Fotografía de perfil actualizada correctamente.', 'success');
-            } catch (error) {
-                showAlert(error.message || 'No se pudo actualizar la fotografía. Inténtalo nuevamente.', 'error');
-            } finally {
-                editSaveBtn.disabled = false;
-                editCancelBtn.disabled = false;
-                editSaveBtn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Usar fotografía';
-            }
+            pendingAvatarFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+            avatarAction = 'replace';
+            if (avatarRemovePendingInput) avatarRemovePendingInput.value = '0';
+            const transfer = new DataTransfer();
+            transfer.items.add(pendingAvatarFile);
+            avatarFileInput.files = transfer.files;
+            const previousPreviewUrl = pendingAvatarPreviewUrl;
+            pendingAvatarPreviewUrl = URL.createObjectURL(blob);
+            updateAvatarDOM(pendingAvatarPreviewUrl);
+            if (previousPreviewUrl) URL.revokeObjectURL(previousPreviewUrl);
+            syncSubmitState();
+            closeEditModal();
+            hideAlert();
+            editSaveBtn.disabled = false;
+            editCancelBtn.disabled = false;
+            editSaveBtn.innerHTML = '<i class="fa-solid fa-check" aria-hidden="true"></i> Usar fotografía';
         }, 'image/jpeg', 0.9);
     });
 
@@ -411,34 +503,38 @@
         if (e.target === removeModal) closeRemoveModal();
     });
 
-    removeConfirmBtn?.addEventListener('click', async () => {
-        if (!removeEndpoint) return;
-
-        removeConfirmBtn.disabled = true;
-        removeCancelBtn.disabled = true;
-        removeConfirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Eliminando...';
-
-        const data = new FormData();
-        data.append('_csrf', avatarCsrf || '');
-
-        try {
-            const response = await fetch(removeEndpoint, { method: 'POST', body: data });
-            const result = await response.json().catch(() => ({ success: false, message: 'No se pudo eliminar la fotografía. Inténtalo nuevamente.' }));
-
-            if (!response.ok || !result.success) {
-                throw new Error(result.message || 'No se pudo eliminar la fotografía. Inténtalo nuevamente.');
+    removeConfirmBtn?.addEventListener('click', () => {
+        if (avatarAction !== 'none') {
+            pendingAvatarFile = null;
+            avatarAction = 'none';
+            if (avatarFileInput) avatarFileInput.value = '';
+            if (avatarRemovePendingInput) avatarRemovePendingInput.value = '0';
+            updateAvatarDOM(originalAvatarUrl);
+            if (pendingAvatarPreviewUrl) {
+                URL.revokeObjectURL(pendingAvatarPreviewUrl);
+                pendingAvatarPreviewUrl = null;
             }
-
-            updateAvatarDOM(null);
+            syncSubmitState();
             closeRemoveModal();
-            showAlert(result.message || 'Fotografía de perfil eliminada correctamente.', 'success');
-        } catch (error) {
-            showAlert(error.message || 'No se pudo eliminar la fotografía. Inténtalo nuevamente.', 'error');
-        } finally {
-            removeConfirmBtn.disabled = false;
-            removeCancelBtn.disabled = false;
-            removeConfirmBtn.innerHTML = 'Eliminar fotografía';
+            hideAlert();
+            return;
         }
+        if (!originalHasAvatar) {
+            closeRemoveModal();
+            return;
+        }
+        pendingAvatarFile = null;
+        avatarAction = 'remove';
+        if (avatarFileInput) avatarFileInput.value = '';
+        if (avatarRemovePendingInput) avatarRemovePendingInput.value = '1';
+        updateAvatarDOM(null);
+        if (pendingAvatarPreviewUrl) {
+            URL.revokeObjectURL(pendingAvatarPreviewUrl);
+            pendingAvatarPreviewUrl = null;
+        }
+        syncSubmitState();
+        closeRemoveModal();
+        hideAlert();
     });
 
     // --- Manejo Tecla Escape ---
@@ -452,7 +548,11 @@
     // --- Actualización Dinámica del DOM y Cache-Busting ---
     const updateAvatarDOM = (rawAvatarUrl) => {
         const timestamp = Date.now();
-        const avatarUrl = rawAvatarUrl ? `${rawAvatarUrl}${rawAvatarUrl.includes('?') ? '&' : '?'}t=${timestamp}` : null;
+        const avatarUrl = rawAvatarUrl
+            ? (rawAvatarUrl.startsWith('blob:')
+                ? rawAvatarUrl
+                : `${rawAvatarUrl}${rawAvatarUrl.includes('?') ? '&' : '?'}t=${timestamp}`)
+            : null;
 
         // 1. Actualizar perfil principal
         if (avatarDisplay) {
@@ -473,7 +573,12 @@
         }
 
         // 2. Conmutar botón de eliminación
-        if (avatarRemoveBtn) avatarRemoveBtn.hidden = !Boolean(avatarUrl);
+        if (avatarRemoveBtn) {
+            avatarRemoveBtn.hidden = !originalHasAvatar && avatarAction === 'none';
+            avatarRemoveBtn.innerHTML = avatarAction === 'none'
+                ? '<i class="fa-solid fa-trash-can" aria-hidden="true"></i> Eliminar foto'
+                : '<i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Restaurar foto';
+        }
 
         // 3. Actualizar avatar del header / menú superior (si existen en el layout)
         const userAvatarBtn = document.getElementById('avatarButton');

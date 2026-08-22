@@ -1,0 +1,2 @@
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS profile_version INT UNSIGNED NOT NULL DEFAULT 1 AFTER session_version;

@@ -57,7 +57,9 @@ final class AdminUserModel
                 if($initialAdmin)$data['is_admin']=1;
                 $willRemainActiveAdmin=(bool)$data['is_admin']&&$data['status']==='active';
                 if($previousAdmin&&$previous['status']==='active'&&!$willRemainActiveAdmin)$this->assertAnotherActiveAdministrator($db,$id);
-                $statement=$db->prepare('UPDATE users SET username=:username,full_name=:name,email=:email,status=:status,is_admin=:admin,session_version=session_version+1 WHERE id=:id');
+                $profileChanged=(string)($previous['username']??'')!==($data['username']?:'')||(string)$previous['full_name']!==$data['full_name']||(string)$previous['email']!==$data['email'];
+                $profileVersionSql=$profileChanged?',profile_version=profile_version+1':'';
+                $statement=$db->prepare('UPDATE users SET username=:username,full_name=:name,email=:email,status=:status,is_admin=:admin,session_version=session_version+1'.$profileVersionSql.' WHERE id=:id');
                 $statement->execute(['username'=>$data['username']?:null,'name'=>$data['full_name'],'email'=>$data['email'],'status'=>$data['status'],'admin'=>$data['is_admin'],'id'=>$id]);
                 $userId=$id;$action='user_updated';
             }else{

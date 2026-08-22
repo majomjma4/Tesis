@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
 $roleLabels=['administrator'=>'Acceso administrativo','teacher'=>'Docente','student'=>'Estudiante'];
-$formatDate=static function(?string $date,string $fallback='No registrado'):string{if(!$date||str_starts_with($date,'0000-00-00'))return $fallback;$timestamp=strtotime($date);return $timestamp===false?$fallback:date('d/m/Y H:i',$timestamp);};
+$formatDate=static function(?string $date,string $fallback='No registrado'):string{if(!$date||str_starts_with($date,'0000-00-00'))return $fallback;try{$value=DateTimeImmutable::createFromFormat('Y-m-d H:i:s',$date,new DateTimeZone('UTC'));return $value===false?$fallback:$value->setTimezone(new DateTimeZone(date_default_timezone_get()))->format('d/m/Y H:i');}catch(Throwable){return $fallback;}};
 $hasAvatar = !empty($profile['avatar_path']);
 $initialLetter = mb_strtoupper(mb_substr($profile['full_name'],0,1,'UTF-8'),'UTF-8');
 $avatarUrl = $hasAvatar ? (route('profile-avatar') . '&v=' . rawurlencode((string) ($profile['avatar_updated_at'] ?? ''))) : '';
 ?>
-<main class="profile-shell" data-update-endpoint="<?= e(route('profile-avatar-update')) ?>" data-remove-endpoint="<?= e(route('profile-avatar-remove')) ?>" data-get-endpoint="<?= e(route('profile-avatar')) ?>" data-avatar-csrf="<?= e($profileAvatarCsrf ?? '') ?>">
+<main class="profile-shell">
     <nav><a href="<?= e(route('dashboard')) ?>">Inicio</a><i class="fa-solid fa-chevron-right"></i><span>Mi perfil</span></nav>
     <header class="profile-header">
         <div class="profile-avatar-wrapper" id="profileAvatarContainer">
@@ -17,7 +17,8 @@ $avatarUrl = $hasAvatar ? (route('profile-avatar') . '&v=' . rawurlencode((strin
                     <span id="profileHeaderAvatarInitial" class="profile-initial"><?= e($initialLetter) ?></span>
                 <?php endif; ?>
             </span>
-            <input type="file" id="profileAvatarFileInput" accept="image/jpeg,image/png,image/jpg" hidden>
+            <input type="file" id="profileAvatarFileInput" name="avatar" form="profileForm" accept="image/jpeg,image/png,image/jpg" hidden>
+            <input type="hidden" id="profileAvatarRemovePending" name="avatar_remove" form="profileForm" value="0">
         </div>
         <div class="profile-header-info">
             <small>Cuenta institucional</small>
@@ -36,11 +37,12 @@ $avatarUrl = $hasAvatar ? (route('profile-avatar') . '&v=' . rawurlencode((strin
             <?php if($profileError): ?><div class="profile-message error" role="alert"><?= e($profileError) ?></div><?php endif; ?>
             <?php if($profileSuccess): ?><div class="profile-message success" role="status"><?= e($profileSuccess) ?></div><?php endif; ?>
             <div class="profile-message" id="profileAvatarAlert" hidden role="status" aria-live="polite"></div>
-            <form id="profileForm" method="post" data-profile-form>
+            <form id="profileForm" action="<?= e(route('profile')) ?>" method="post" enctype="multipart/form-data" data-profile-form>
                 <input type="hidden" name="_csrf" value="<?= e($profileCsrf) ?>">
+                <input type="hidden" name="profile_version" value="<?= e((string) ($profile['profile_version'] ?? 1)) ?>">
                 <label>Nombre completo<input name="full_name" value="<?= e($profile['full_name']) ?>" maxlength="180" required></label>
                 <label>Usuario (Opcional)<input name="username" value="<?= e($profile['username'] ?? '') ?>" maxlength="80" placeholder="Nombre de usuario"></label>
-                <label>Correo institucional<input type="email" name="email" value="<?= e($profile['email']) ?>" maxlength="190" required></label>
+                <label>Correo electrónico<input type="email" name="email" value="<?= e($profile['email']) ?>" maxlength="190" required></label>
                 <label>Cédula<input type="text" value="<?= e($profile['institutional_code'] ?: 'No registrada') ?>" readonly tabindex="-1" class="profile-readonly-input" aria-readonly="true"></label>
                 <div class="profile-form-actions">
                     <button type="submit" class="profile-submit-btn" data-profile-submit disabled aria-disabled="true">Guardar cambios</button>
@@ -55,8 +57,14 @@ $avatarUrl = $hasAvatar ? (route('profile-avatar') . '&v=' . rawurlencode((strin
                 <?php if (in_array('student', $profile['roles'], true)): ?><div><dt>Semestre actual</dt><dd><?= !empty($profile['current_semester']) ? e((string) $profile['current_semester'] . '.º semestre') : 'No disponible' ?></dd></div><?php endif; ?>
                 <div><dt>Cuenta creada</dt><dd><?= e($formatDate($profile['created_at'])) ?></dd></div>
                 <div><dt>Último acceso</dt><dd><?= e($formatDate($profile['last_login_at'],'Aún no disponible')) ?></dd></div>
-                <div><dt>Último cambio de contraseña</dt><dd><?= e($formatDate($profile['password_changed_at'],'Aún no disponible')) ?></dd></div>
+                <div><dt>Último cambio de contraseña</dt><dd><?= e($formatDate($profile['password_changed_at'],'Sin cambios registrados')) ?></dd></div>
             </dl>
+            <?php if (!empty($layoutHasTemporaryPassword) && empty($layoutIsAdmin)): ?>
+                <div class="profile-message" role="alert" style="display:flex;align-items:flex-start;gap:8px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:#92400e;">
+                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                    <span>Tu cuenta todavía utiliza una contraseña temporal. Cámbiala para mantener el acceso seguro a la plataforma.</span>
+                </div>
+            <?php endif; ?>
             <a href="<?= e(route('change-password')) ?>" class="profile-password-btn"><i class="fa-solid fa-key" aria-hidden="true"></i> Cambiar contraseña</a>
         </aside>
     </div>
@@ -112,9 +120,20 @@ $avatarUrl = $hasAvatar ? (route('profile-avatar') . '&v=' . rawurlencode((strin
 <div class="profile-confirm" id="profileConfirm" hidden>
     <section role="dialog" aria-modal="true" aria-labelledby="profileConfirmTitle" aria-describedby="profileConfirmText">
         <span><i class="fa-solid fa-shield-halved"></i></span><h2 id="profileConfirmTitle">Confirmar cambios</h2>
-        <p id="profileConfirmText">Confirma tu contraseña actual para guardar los cambios en tu perfil.</p>
-        <label>Contraseña actual<input form="profileForm" id="profileCurrentPassword" type="password" name="current_password" autocomplete="current-password" required></label>
+        <p id="profileConfirmText">Se actualizará la información de tu perfil.</p>
         <div><button type="button" data-profile-cancel>Cancelar</button><button type="button" data-profile-confirm>Guardar cambios</button></div>
+    </section>
+</div>
+
+<div class="profile-confirm" id="profileUnsavedModal" hidden>
+    <section role="dialog" aria-modal="true" aria-labelledby="profileUnsavedTitle" aria-describedby="profileUnsavedText">
+        <span><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>
+        <h2 id="profileUnsavedTitle">Cambios sin guardar</h2>
+        <p id="profileUnsavedText">Tienes cambios pendientes. Si sales ahora, se perderán.</p>
+        <div>
+            <button type="button" data-profile-unsaved-cancel>Seguir editando</button>
+            <button type="button" data-profile-unsaved-confirm>Salir sin guardar</button>
+        </div>
     </section>
 </div>
 

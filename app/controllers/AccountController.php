@@ -6,20 +6,68 @@ final class AccountController
     public function profile(): void
     {
         $session = new AuthSessionService(); $model = new AuthModel(); $error = null; $success = null;
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+            $session->start();
+            $success = (string) ($_SESSION['profile_success_flash'] ?? '');
+            unset($_SESSION['profile_success_flash']);
+            if ($success === '') $success = null;
+        }
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             if (!$session->validateCsrf('profile', (string) ($_POST['_csrf'] ?? ''))) $error = 'La sesión del formulario venció.';
             else try {
-                $changes = $model->updateProfile((int) $session->userId(), trim((string) ($_POST['full_name'] ?? '')), mb_strtolower(trim((string) ($_POST['email'] ?? ''))), trim((string) ($_POST['username'] ?? '')), (string) ($_POST['current_password'] ?? ''));
+                $hasAvatarUpload = isset($_FILES['avatar']) && (int) ($_FILES['avatar']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+                $removeAvatar = (string) ($_POST['avatar_remove'] ?? '') === '1';
+                $avatarAction = $hasAvatarUpload ? 'replace' : ($removeAvatar ? 'remove' : 'none');
+                $storage = new ProfileAvatarStorageService();
+                $stored = null;
+                $persisted = false;
+                if ($hasAvatarUpload) {
+                    $stored = $storage->store((array) $_FILES['avatar']);
+                }
+                try {
+                    $result = $model->updateProfile(
+                        (int) $session->userId(),
+                        trim((string) ($_POST['full_name'] ?? '')),
+                        mb_strtolower(trim((string) ($_POST['email'] ?? ''))),
+                        trim((string) ($_POST['username'] ?? '')),
+                        (int) ($_POST['profile_version'] ?? 0),
+                        $avatarAction,
+                        $stored['path'] ?? null
+                    );
+                    $persisted = true;
+                } catch (Throwable $exception) {
+                    if (!$persisted && is_array($stored)) $storage->discard($stored);
+                    throw $exception;
+                }
+
                 $identity = $model->sessionIdentity((int) $session->userId());
                 if (!$identity) throw new RuntimeException('La cuenta dejó de estar disponible.');
                 $session->refresh($identity);
-                $success = $changes === [] ? 'No se detectaron cambios en el perfil.' : 'Perfil actualizado correctamente.';
+
+                $previousAvatar = $result['previous_avatar_path'] ?? null;
+                if (is_string($previousAvatar) && $previousAvatar !== '' && !$storage->delete($previousAvatar)) {
+                    error_log('Previous profile avatar cleanup failed for user ' . (int) $session->userId());
+                }
+
+                $changes = (array) ($result['changes'] ?? []);
+                $avatarChanged = (bool) ($result['avatar_changed'] ?? false);
+                $success = $changes === [] && !$avatarChanged ? 'No se detectaron cambios en el perfil.' : 'Cambios guardados correctamente.';
+                $session->start();
+                $_SESSION['profile_success_flash'] = $success;
+                session_write_close();
+                header('Location: ' . route('profile'), true, 303);
+                exit;
             } catch (InvalidArgumentException $exception) { $error = $exception->getMessage(); }
+            catch (RuntimeException $exception) {
+                if ($exception->getMessage() === 'ACCOUNT_UNAVAILABLE') $error = 'Tu cuenta ya no se encuentra habilitada para realizar cambios.';
+                elseif ($exception->getMessage() === 'PROFILE_VERSION_CONFLICT') $error = 'Tu perfil fue actualizado desde otra pestaña o sesión. Recarga la página antes de guardar tus cambios.';
+                else { error_log('Profile update: '.$exception->getMessage()); $error = 'No fue posible actualizar el perfil.'; }
+            }
             catch (Throwable $exception) { error_log('Profile update: '.$exception->getMessage()); $error = 'No fue posible actualizar el perfil.'; }
         }
         try { $profile = $model->profile((int) $session->userId()); }
         catch (Throwable) { $profile = ['full_name'=>$session->name(),'email'=>$session->email(),'created_at'=>null,'last_login_at'=>null,'password_changed_at'=>null,'roles'=>$session->roles()]; $error ??= 'No fue posible consultar todos los datos del perfil.'; }
-        View::render('account/profile',['currentPage'=>'profile','title'=>$session->isAdminModeActive() ? 'Mi perfil | Administración' : 'Mi perfil | Gestión Documental Académica','bodyClass'=>'account-profile-page','pageStyles'=>[asset('css/account-profile.css')],'profile'=>$profile,'profileError'=>$error,'profileSuccess'=>$success,'profileCsrf'=>$session->csrfToken('profile'),'profileAvatarCsrf'=>$session->csrfToken('profile_avatar')]);
+        View::render('account/profile',['currentPage'=>'profile','title'=>$session->isAdminModeActive() ? 'Mi perfil | Administración' : 'Mi perfil | Gestión Documental Académica','bodyClass'=>'account-profile-page','pageStyles'=>[asset('css/account-profile.css')],'profile'=>$profile,'profileError'=>$error,'profileSuccess'=>$success,'profileCsrf'=>$session->csrfToken('profile')]);
     }
 
     public function changePassword(): void
