@@ -10,8 +10,8 @@ final class ProjectDraftService
         'thesis' => ['prefix' => 'TIT', 'additional' => ['research_line'], 'semesters' => [4], 'availability' => 'Disponible para 4.º semestre.'],
         'thesis_profile' => ['prefix' => 'PFT', 'additional' => ['research_line'], 'semesters' => [4], 'availability' => 'Disponible para 4.º semestre.'],
         'pis' => ['prefix' => 'PIS', 'additional' => [], 'semesters' => null, 'availability' => 'Disponible para todos los semestres.'],
-        'practice' => ['prefix' => 'PRA', 'additional' => [], 'semesters' => [3, 4], 'availability' => 'Disponible para 3.er y 4.º semestre.', 'default_title' => 'Prácticas preprofesionales', 'default_description' => 'Desarrollo de prácticas preprofesionales orientadas a fortalecer competencias profesionales mediante actividades planificadas, supervisadas y vinculadas con el perfil de formación.'],
-        'community' => ['prefix' => 'VIN', 'additional' => [], 'semesters' => [2], 'availability' => 'Disponible para 2.º semestre.', 'default_title' => 'Proyecto de vinculación', 'default_description' => 'Desarrollo de un proyecto de vinculación orientado a responder necesidades de la comunidad mediante actividades planificadas, participativas y relacionadas con la formación académica.'],
+        'practice' => ['prefix' => 'PRA', 'additional' => [], 'semesters' => [3, 4], 'availability' => 'Disponible para 3.er y 4.º semestre.', 'default_title' => 'Prácticas preprofesionales'],
+        'community' => ['prefix' => 'VIN', 'additional' => [], 'semesters' => [2], 'availability' => 'Disponible para 2.º semestre.', 'default_title' => 'Proyecto de vinculación'],
     ];
 
     public function catalogs(int $userId, array $policy): array
@@ -46,7 +46,7 @@ final class ProjectDraftService
                 'additional' => $type['additional'],
                 'uses_description' => true,
                 'default_title' => $type['default_title'] ?? '',
-                'default_description' => $type['default_description'] ?? '',
+                'registration_description' => (string) ($type['registration_description'] ?? ''),
                 'allows_cross_semester_members' => in_array($code, ['thesis', 'thesis_profile', 'community'], true),
                 'allows_additional_members' => !in_array($code, self::INDIVIDUAL_ONLY_TYPES, true),
             ];
@@ -173,14 +173,14 @@ final class ProjectDraftService
 
     private function types(PDO $db, ?array $student): array
     {
-        $rows = $db->query("SELECT id,code,name FROM project_types WHERE is_active=1 ORDER BY id")->fetchAll();
+        $rows = $db->query("SELECT id,code,name,registration_description FROM project_types WHERE is_active=1 ORDER BY id")->fetchAll();
         $rowsByCode = [];
         foreach ($rows as $row) $rowsByCode[(string) $row['code']] = $row;
         $types = [];
         foreach (self::TYPE_RULES as $code => $rule) {
             $row = $rowsByCode[$code] ?? null; if ($row === null) continue;
             $allowed = $rule['semesters'] === null || ($student !== null && in_array((int) $student['semester'], $rule['semesters'], true));
-            $types[$code] = ['id' => (int) $row['id'], 'label' => (string) $row['name'], 'prefix' => $rule['prefix'], 'additional' => $rule['additional'], 'enabled' => $allowed, 'availability' => $rule['availability'], 'default_title' => $rule['default_title'] ?? '', 'default_description' => $rule['default_description'] ?? ''];
+            $types[$code] = ['id' => (int) $row['id'], 'label' => (string) $row['name'], 'prefix' => $rule['prefix'], 'additional' => $rule['additional'], 'enabled' => $allowed, 'availability' => $rule['availability'], 'default_title' => $rule['default_title'] ?? '', 'registration_description' => (string) ($row['registration_description'] ?? '')];
         }
         return $types;
     }

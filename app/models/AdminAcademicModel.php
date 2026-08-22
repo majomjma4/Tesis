@@ -112,7 +112,7 @@ final class AdminAcademicModel
         return [
             'periods' => $periods,
             'types' => $db->query(
-                "SELECT pt.*,
+                "SELECT pt.*, pt.registration_description AS description,
                         (
                             SELECT COUNT(DISTINCT p.id)
                             FROM projects p
@@ -145,7 +145,7 @@ final class AdminAcademicModel
 
     public function save(string $entity, array $values, int $actor): void
     {
-        if (!in_array($entity, ['period', 'type', 'material_type', 'keyword'], true)) {
+        if (!in_array($entity, ['period', 'type', 'type_description', 'material_type', 'keyword'], true)) {
             throw new InvalidArgumentException('La opción académica seleccionada no es válida.');
         }
 
@@ -156,6 +156,10 @@ final class AdminAcademicModel
             }
             if ($entity === 'type') {
                 $this->saveType($db, $values, $actor);
+                return;
+            }
+            if ($entity === 'type_description') {
+                $this->saveTypeDescription($db, $values, $actor);
                 return;
             }
             $this->saveMaterialCatalog($db, $entity, $values, $actor);
@@ -458,6 +462,31 @@ final class AdminAcademicModel
         $this->audit($db, $actor, $created ? 'academic_type_created' : 'academic_type_updated', 'type', $id, ['name' => $name]);
     }
 
+    private function saveTypeDescription(PDO $db, array $values, int $actor): void
+    {
+        $id = (int) ($values['id'] ?? 0);
+        $current = $this->catalogRecord($db, 'project_types', $id, 'El tipo de proyecto no es válido.');
+        if (!$current) throw new InvalidArgumentException('El tipo de proyecto no es válido.');
+
+        $action = (string) ($values['action'] ?? 'save');
+        if ($action === 'delete') {
+            $db->prepare('UPDATE project_types SET registration_description=NULL WHERE id=:id')->execute(['id' => $id]);
+            $this->audit($db, $actor, 'academic_type_description_removed', 'type', $id, ['name' => (string) $current['name']]);
+            return;
+        }
+        if ($action !== 'save') throw new InvalidArgumentException('La acción de descripción no es válida.');
+
+        $description = trim((string) ($values['description'] ?? ''));
+        if ($description === '') throw new InvalidArgumentException('Ingresa una descripción para el registro.');
+        if (mb_strlen($description) > 2000) throw new InvalidArgumentException('La descripción no puede superar 2000 caracteres.');
+        $db->prepare('UPDATE project_types SET registration_description=:description WHERE id=:id')
+            ->execute(['description' => $description, 'id' => $id]);
+        $event = $current['registration_description'] === null
+            ? 'academic_type_description_added'
+            : 'academic_type_description_updated';
+        $this->audit($db, $actor, $event, 'type', $id, ['name' => (string) $current['name']]);
+    }
+
     private function saveMaterialCatalog(PDO $db, string $entity, array $values, int $actor): void
     {
         $action = (string) ($values['action'] ?? 'save');
@@ -589,6 +618,9 @@ final class AdminAcademicModel
             'academic_type_activated' => 'Activó el tipo de proyecto ' . $element,
             'academic_type_deactivated' => 'Desactivó el tipo de proyecto ' . $element,
             'academic_type_deleted' => 'Eliminó el tipo de proyecto ' . $element,
+            'academic_type_description_added' => 'Añadió la descripción de registro de ' . $element,
+            'academic_type_description_updated' => 'Editó la descripción de registro de ' . $element,
+            'academic_type_description_removed' => 'Eliminó la descripción de registro de ' . $element,
             'academic_material_type_created' => 'Creó el tipo de material ' . $element,
             'academic_material_type_updated' => 'Editó el tipo de material ' . $element,
             'academic_material_type_activated' => 'Activó el tipo de material ' . $element,

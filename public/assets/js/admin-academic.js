@@ -13,10 +13,19 @@
     const confirmCancel = confirmBox?.querySelector('[data-cancel-confirm]');
     const toast = document.querySelector('#aaToast');
     const tooltip = document.querySelector('#aaTooltip');
-    if (!modal || !confirmBox || !form || !config) return;
+    const descriptionField = form?.querySelector('[data-fields="type_description"] textarea');
+    const descriptionCounter = form?.querySelector('[data-description-counter]');
+    const descriptionLimit = 2000;
+    let modalReturnFocus = null;
+    let descriptionSubmitLabel = 'Guardar descripción';
 
-    const restoredCatalog = sessionStorage.getItem('academicOpenCatalog');
-    sessionStorage.removeItem('academicOpenCatalog');
+    let restoredCatalog = null;
+    try {
+        restoredCatalog = sessionStorage.getItem('academicOpenCatalog');
+        sessionStorage.removeItem('academicOpenCatalog');
+    } catch (error) {
+        restoredCatalog = null;
+    }
     const setAccordionOpen = (accordion, open) => {
         const toggle = accordion.querySelector('[data-aa-accordion-toggle]');
         const panel = accordion.querySelector('[data-aa-accordion-panel]');
@@ -35,6 +44,8 @@
     document.querySelectorAll('[data-aa-accordion]').forEach(accordion => {
         bindAccordion(accordion, accordion.dataset.catalog === restoredCatalog);
     });
+
+    if (!modal || !confirmBox || !form || !config) return;
 
     let tooltipTimer = null;
     let tooltipTarget = null;
@@ -191,15 +202,34 @@
         closeDatePicker();
         modal.hidden = true;
         message.hidden = true;
+        const submit = form.querySelector('[type="submit"]');
+        submit.disabled = false;
+        submit.textContent = 'Guardar';
+        descriptionSubmitLabel = 'Guardar descripción';
+        delete form.dataset.descriptionMode;
         syncDialogState();
+        const returnFocus = modalReturnFocus;
+        modalReturnFocus = null;
+        requestAnimationFrame(() => {
+            if (returnFocus?.isConnected) returnFocus.focus();
+        });
+    };
+    const syncDescriptionCounter = () => {
+        if (descriptionCounter) descriptionCounter.textContent = `${descriptionField?.value.length || 0} / ${descriptionLimit}`;
     };
     const closeConfirm = () => {
         confirmBox.hidden = true;
         pendingAction = null;
+        if (confirmAccept) {
+            confirmAccept.disabled = false;
+            confirmAccept.hidden = false;
+        }
         syncDialogState();
     };
     const openModal = (entity, values = {}) => {
+        modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         form.reset();
+        delete form.dataset.descriptionMode;
         message.hidden = true;
         setValue('entity', entity);
         setValue('id', values.id || '');
@@ -216,18 +246,31 @@
         } else {
             const labels = {
                 type: ['tipo de proyecto', 'Catálogo de proyectos'],
+                type_description: ['descripción para el registro', 'Catálogo de proyectos'],
                 material_type: ['tipo de material', 'Materiales de apoyo'],
                 keyword: ['palabra clave', 'Materiales de apoyo'],
             };
             const [label, eyebrow] = labels[entity] || labels.type;
-            document.querySelector('#aaTitle').textContent = `${values.id ? 'Editar' : 'Agregar'} ${label}`;
+            document.querySelector('#aaTitle').textContent = entity === 'type_description'
+                ? `${values.action === 'add' ? 'Añadir' : 'Editar'} ${label}`
+                : `${values.id ? 'Editar' : 'Agregar'} ${label}`;
             document.querySelector('#aaModalEyebrow').textContent = eyebrow;
-            setValue('name', values.name || '');
-            document.querySelector('#aaSubmit').textContent = 'Guardar';
+            if (entity === 'type_description') {
+                const context = document.querySelector('[data-description-type-name]');
+                if (context) context.textContent = values.name || 'Tipo de proyecto';
+                form.dataset.descriptionMode = values.action === 'add' ? 'add' : 'edit';
+                setValue('description', values.description || '');
+                descriptionSubmitLabel = values.action === 'add' ? 'Guardar descripción' : 'Guardar cambios';
+                document.querySelector('#aaSubmit').textContent = descriptionSubmitLabel;
+                syncDescriptionCounter();
+            } else {
+                setValue('name', values.name || '');
+                document.querySelector('#aaSubmit').textContent = 'Guardar';
+            }
         }
         modal.hidden = false;
         syncDialogState();
-        requestAnimationFrame(() => form.querySelector('[data-fields]:not([hidden]) input, [data-fields]:not([hidden]) select')?.focus());
+        requestAnimationFrame(() => form.querySelector('[data-fields]:not([hidden]) input, [data-fields]:not([hidden]) select, [data-fields]:not([hidden]) textarea')?.focus());
     };
     const openConfirm = (title, text, action, confirmLabel = 'Confirmar', variant = 'warning') => {
         pendingAction = action;
@@ -352,11 +395,30 @@
     const entityLabels = { type: 'tipo de proyecto', material_type: 'tipo de material', keyword: 'palabra clave' };
     document.querySelector('.aa-workspace')?.addEventListener('click', event => {
         const button = event.target instanceof Element
-            ? event.target.closest('[data-form="type"],[data-form="material_type"],[data-form="keyword"],[data-catalog-edit],[data-catalog-state],[data-catalog-delete]')
+            ? event.target.closest('[data-form="type"],[data-form="material_type"],[data-form="keyword"],[data-description-action],[data-catalog-edit],[data-catalog-state],[data-catalog-delete]')
             : null;
         if (!button) return;
         if (button.matches('[data-form]')) {
             openModal(button.dataset.form);
+            return;
+        }
+        if (button.matches('[data-description-action]')) {
+            if (button.dataset.descriptionAction === 'delete') {
+                openConfirm(
+                    `Eliminar la descripción para el registro de ${button.dataset.name || 'este tipo'}`,
+                    'El tipo de proyecto no se eliminará. Solo dejará de mostrarse esta descripción durante el registro.',
+                    { kind: 'catalog', entity: 'type_description', action: 'delete', id: button.dataset.projectTypeId, name: button.dataset.name, refreshEntity: 'type' },
+                    'Eliminar descripción',
+                    'danger'
+                );
+            } else {
+                openModal('type_description', {
+                    id: button.dataset.projectTypeId,
+                    name: button.dataset.name,
+                    action: button.dataset.descriptionAction,
+                    description: button.dataset.description || '',
+                });
+            }
             return;
         }
         if (button.matches('[data-catalog-edit]')) {
@@ -414,7 +476,37 @@
     form.addEventListener('submit', async event => {
         event.preventDefault();
         const submit = form.querySelector('[type="submit"]');
-        if (form.elements.namedItem('entity')?.value === 'period' && (!valueField('starts_on')?.value || !valueField('ends_on')?.value)) {
+        const entity = form.elements.namedItem('entity')?.value || '';
+        if (entity === 'type_description') {
+            const description = descriptionField?.value || '';
+            if (!description.trim()) {
+                message.textContent = 'Ingresa una descripción para el registro.';
+                message.hidden = false;
+                descriptionField?.focus();
+                return;
+            }
+            if (description.length > descriptionLimit) {
+                message.textContent = 'La descripción no puede superar 2000 caracteres.';
+                message.hidden = false;
+                descriptionField?.focus();
+                return;
+            }
+            const typeName = document.querySelector('[data-description-type-name]')?.textContent?.trim() || 'este tipo de proyecto';
+            const mode = form.dataset.descriptionMode === 'add' ? 'add' : 'edit';
+            const confirmationTitle = mode === 'add' ? 'Confirmar descripción' : 'Confirmar cambios';
+            const confirmationText = mode === 'add'
+                ? `¿Deseas guardar esta descripción para el registro de "${typeName}"?\n\nEsta descripción se mostrará al estudiante cuando seleccione este tipo al registrar un proyecto.`
+                : `¿Deseas guardar los cambios en la descripción para el registro de "${typeName}"?\n\nLa nueva descripción reemplazará la actual y será la que se muestre durante el registro de proyectos.`;
+            openConfirm(
+                confirmationTitle,
+                confirmationText,
+                { kind: 'save-type-description', id: form.elements.namedItem('id')?.value || '', name: typeName, description, mode },
+                mode === 'add' ? 'Guardar descripción' : 'Guardar cambios',
+                'primary'
+            );
+            return;
+        }
+        if (entity === 'period' && (!valueField('starts_on')?.value || !valueField('ends_on')?.value)) {
             message.textContent = 'Selecciona la fecha de inicio y la fecha de finalización.';
             message.hidden = false;
             return;
@@ -422,7 +514,7 @@
         submit.disabled = true;
         message.hidden = true;
         try {
-            const entity = form.elements.namedItem('entity')?.value || '';
+            if (entity === 'type_description') submit.textContent = 'Guardando…';
             const result = await send(config.dataset.save, new FormData(form));
             if (entity === 'period') {
                 sessionStorage.setItem('academicToast', result.message || 'Información académica guardada correctamente.');
@@ -430,14 +522,17 @@
                 return;
             }
             closeModal();
-            await refreshCatalog(entity);
-            showToast(result.message || 'Catálogo actualizado correctamente.');
+            await refreshCatalog(entity === 'type_description' ? 'type' : entity);
+            showToast(result.message || (entity === 'type_description' ? 'Descripción guardada correctamente.' : 'Catálogo actualizado correctamente.'));
         } catch (error) {
             message.textContent = error.message;
             message.hidden = false;
             submit.disabled = false;
+            if (entity === 'type_description') submit.textContent = descriptionSubmitLabel;
         }
     });
+
+    descriptionField?.addEventListener('input', syncDescriptionCounter);
 
     confirmBox.querySelector('[data-accept-confirm]')?.addEventListener('click', async event => {
         if (!pendingAction) return;
@@ -462,6 +557,19 @@
                 data.set('id', action.id);
                 const result = await send(config.dataset.save, data);
                 sessionStorage.setItem('academicToast', result.message || 'Planificación eliminada correctamente.');
+            } else if (action.kind === 'save-type-description') {
+                data.set('entity', 'type_description');
+                data.set('action', 'save');
+                data.set('id', action.id);
+                data.set('description', action.description);
+                button.textContent = 'Guardando…';
+                const result = await send(config.dataset.save, data);
+                closeConfirm();
+                closeModal();
+                await refreshCatalog('type');
+                showToast(result.message || 'Descripción guardada correctamente.');
+                button.disabled = false;
+                return;
             } else if (action.kind === 'catalog') {
                 data.set('entity', action.entity);
                 data.set('action', action.action);
@@ -469,14 +577,20 @@
                 data.set('name', action.name || '');
                 const result = await send(config.dataset.save, data);
                 closeConfirm();
-                await refreshCatalog(action.entity);
-                showToast(result.message || 'Catálogo actualizado correctamente.');
+                await refreshCatalog(action.refreshEntity || action.entity);
+                showToast(result.message || (action.entity === 'type_description' ? 'Descripción eliminada correctamente.' : 'Catálogo actualizado correctamente.'));
                 button.disabled = false;
                 return;
             }
             location.reload();
         } catch (error) {
-            if (action.kind === 'close-period' && error.data?.reason === 'unfinished_projects') {
+            if (action.kind === 'save-type-description') {
+                closeConfirm();
+                message.textContent = error.message;
+                message.hidden = false;
+                descriptionField?.focus();
+                button.textContent = action.mode === 'add' ? 'Guardar descripción' : 'Guardar cambios';
+            } else if (action.kind === 'close-period' && error.data?.reason === 'unfinished_projects') {
                 showClosurePending(Array.isArray(error.data.pending_projects) ? error.data.pending_projects : []);
             } else {
                 closeConfirm();

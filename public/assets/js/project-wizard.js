@@ -60,8 +60,9 @@
     }
     const scheduleSave = () => { dirty = true; window.clearTimeout(form._draftTimer); form._draftTimer = window.setTimeout(() => void saveDraft(), 500); };
 
-    function applyDefaults() { const type = typeData(); if (type.default_title && !form.elements.title.value.trim()) form.elements.title.value = type.default_title; if (type.default_description && !form.elements.description.value.trim()) form.elements.description.value = type.default_description; }
-    function typeDefaults(type) { const data = config.types?.[type] || {}; return [String(data.default_title || '').trim(), String(data.default_description || '').trim()]; }
+    function updateRegistrationDescription() { const box = document.querySelector('[data-type-registration-description]'); const text = document.querySelector('[data-type-registration-description-text]'); const description = String(typeData().registration_description || '').trim(); if (!box || !text) return; text.textContent = description; box.hidden = description === ''; }
+    function applyDefaults() { const type = typeData(); const description = String(type.registration_description || '').trim(); if (type.default_title && !form.elements.title.value.trim()) form.elements.title.value = type.default_title; if (description && !form.elements.description.value.trim()) form.elements.description.value = description; }
+    function typeDefaults(type) { const data = config.types?.[type] || {}; return [String(data.default_title || '').trim(), String(data.registration_description || '').trim()]; }
     function hasManualTypeContent(type) { const [title, description] = typeDefaults(type); const currentTitle = form.elements.title.value.trim(), currentDescription = form.elements.description.value.trim(); return (currentTitle !== '' && currentTitle !== title) || (currentDescription !== '' && currentDescription !== description); }
     function selectType(type) { const option = form.querySelector(`[name="type"][value="${CSS.escape(type)}"]`); if (option) option.checked = true; }
     function applyTypeChange(nextType) { const [nextTitle, nextDescription] = typeDefaults(nextType); form.elements.title.value = nextTitle; form.elements.description.value = nextDescription; if (nextType !== 'thesis') form.elements.modality.value = ''; if (!(config.contract?.[nextType]?.additional || []).includes('research_line')) form.elements.research_line.value = ''; previousType = nextType; previousModality = form.elements.modality?.value || ''; updateConditionalFields(); updatePreview(); scheduleSave(); syncResetVisibility(); }
@@ -69,7 +70,7 @@
         const type = selectedType(); const contract = config.contract?.[type] || {};
         document.querySelectorAll('[data-conditional]').forEach((node) => { const active = (contract.additional || []).includes(node.dataset.conditional); node.hidden = !active; node.querySelector('select')?.toggleAttribute('required', active); });
         document.querySelectorAll('[data-thesis-only]').forEach((node) => { const active = type === 'thesis'; node.hidden = !active; node.querySelector('select')?.toggleAttribute('required', active); });
-        applyDefaults(); renderQuickTags(); updateTeamPolicy(); filterStudents(); renderMembers();
+        applyDefaults(); updateRegistrationDescription(); renderQuickTags(); updateTeamPolicy(); filterStudents(); renderMembers();
     }
     function updateTeamPolicy() {
         const type = selectedType(); const individual = config.contract?.[type]?.allows_additional_members === false || (type === 'thesis' && form.elements.modality?.value === 'individual');

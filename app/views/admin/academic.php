@@ -231,6 +231,29 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
                             </div>
                             <span class="aa-status <?= (int) $type['is_active'] === 1 ? 'active' : 'closed' ?>"><?= (int) $type['is_active'] === 1 ? 'Activo' : 'Inactivo' ?></span>
                             <?php $catalogActions('type', $type); ?>
+                            <?php $typeDescription = trim((string) ($type['description'] ?? '')); ?>
+                            <div class="aa-type-description" data-project-type-description data-project-type-id="<?= (int) $type['id'] ?>">
+                                <div class="aa-type-description-copy">
+                                    <span>Descripción para el registro</span>
+                                    <p class="<?= $typeDescription === '' ? 'is-empty' : '' ?>">
+                                        <?= $typeDescription !== '' ? e($typeDescription) : 'No se ha definido una descripción.' ?>
+                                    </p>
+                                </div>
+                                <div class="aa-type-description-actions" aria-label="Acciones de descripción para <?= e($type['name']) ?>">
+                                    <?php if ($typeDescription !== ''): ?>
+                                        <button type="button" class="aa-description-action" data-description-action="edit" data-project-type-id="<?= (int) $type['id'] ?>" data-name="<?= e($type['name']) ?>" data-description="<?= e($typeDescription) ?>">
+                                            <i class="fa-solid fa-pencil" aria-hidden="true"></i> Editar
+                                        </button>
+                                        <button type="button" class="aa-description-action is-danger" data-description-action="delete" data-project-type-id="<?= (int) $type['id'] ?>" data-name="<?= e($type['name']) ?>">
+                                            <i class="fa-regular fa-trash-can" aria-hidden="true"></i> Eliminar
+                                        </button>
+                                    <?php else: ?>
+                                        <button type="button" class="aa-description-action" data-description-action="add" data-project-type-id="<?= (int) $type['id'] ?>" data-name="<?= e($type['name']) ?>">
+                                            <i class="fa-solid fa-plus" aria-hidden="true"></i> Añadir descripción
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
                         </article>
                     <?php endforeach; ?>
                 </div>
@@ -330,6 +353,12 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
 
         <div data-fields="type">
             <label>Nombre del tipo de proyecto<input name="name" maxlength="120" required></label>
+        </div>
+        <div data-fields="type_description">
+            <p class="aa-form-context">Tipo de proyecto: <strong data-description-type-name></strong></p>
+            <label>Descripción para el registro<textarea name="description" rows="6" maxlength="2000" required></textarea></label>
+            <div class="aa-description-counter" data-description-counter aria-live="polite">0 / 2000</div>
+            <p class="aa-form-help">Este texto se mostrará al estudiante cuando seleccione este tipo al registrar un proyecto.</p>
         </div>
         <div data-fields="keyword">
             <label>Nombre de la palabra clave<input name="name" maxlength="120" required></label>

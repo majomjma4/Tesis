@@ -1036,7 +1036,7 @@ final class AdminController
         $entity=(string)($_POST['entity']??'');
         $id=(int)($_POST['id']??0);
         $action=(string)($_POST['action']??'save');
-        $names=['type'=>'tipo de proyecto','material_type'=>'tipo de material','keyword'=>'palabra clave'];
+        $names=['type'=>'tipo de proyecto','type_description'=>'descripción para el registro','material_type'=>'tipo de material','keyword'=>'palabra clave'];
         $entityName=$names[$entity]??'información académica';
         $verb=['activate'=>'activar','deactivate'=>'desactivar','delete'=>'eliminar'][$action]??($id?'editar':'crear');
         $element=$entity==='period'?'Período académico':(string)($_POST['name']??ucfirst($entityName));
@@ -1046,6 +1046,7 @@ final class AdminController
                 'material_type'=>['save'=>$id?'Tipo de material actualizado correctamente.':'Tipo de material creado correctamente.','activate'=>'Tipo de material activado correctamente.','deactivate'=>'Tipo de material desactivado correctamente.','delete'=>'Tipo de material eliminado correctamente.'],
                 'keyword'=>['save'=>$id?'Palabra clave actualizada correctamente.':'Palabra clave creada correctamente.','activate'=>'Palabra clave activada correctamente.','deactivate'=>'Palabra clave desactivada correctamente.','delete'=>'Palabra clave eliminada correctamente.'],
                 'type'=>['save'=>$id?'Tipo de proyecto actualizado correctamente.':'Tipo de proyecto creado correctamente.','activate'=>'Tipo de proyecto activado correctamente.','deactivate'=>'Tipo de proyecto desactivado correctamente.','delete'=>'Tipo de proyecto eliminado correctamente.'],
+                'type_description'=>['save'=>'Descripción guardada correctamente.','delete'=>'Descripción eliminada correctamente.'],
             ];
             $this->json(true,$messages[$entity][$action]??'Información académica guardada correctamente.');
         }catch(InvalidArgumentException $e){

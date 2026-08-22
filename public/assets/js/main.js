@@ -25,6 +25,44 @@ const resetReloadedPage = () => {
     window.scrollTo(0, 0);
 };
 resetReloadedPage();
+
+// Evita cerrar un modal cuando una selección/arrastre empieza dentro de él
+// y termina sobre el overlay. Un cierre por backdrop sólo debe responder a
+// un gesto que comenzó y terminó realmente en el propio overlay.
+let modalGestureStart = null;
+let modalGesturePointerId = null;
+let suppressModalBackdropClick = false;
+const modalContainerFor = target => target instanceof Element
+    ? target.closest('[class*="modal"],[class*="overlay"],[id*="Modal"],[id*="modal"]')
+    : null;
+const beginModalGesture = event => {
+    modalGestureStart = modalContainerFor(event.target);
+    modalGesturePointerId = event.pointerId ?? 'mouse';
+    suppressModalBackdropClick = false;
+};
+const endModalGesture = event => {
+    if (modalGesturePointerId !== (event.pointerId ?? 'mouse')) return;
+    if (!modalGestureStart) return;
+    suppressModalBackdropClick = !(event.target instanceof Node && modalGestureStart.contains(event.target));
+};
+const cancelModalGesture = () => {
+    modalGestureStart = null;
+    modalGesturePointerId = null;
+    suppressModalBackdropClick = false;
+};
+document.addEventListener('pointerdown', beginModalGesture, true);
+document.addEventListener('pointerup', endModalGesture, true);
+document.addEventListener('pointercancel', cancelModalGesture, true);
+document.addEventListener('lostpointercapture', cancelModalGesture, true);
+document.addEventListener('mousedown', beginModalGesture, true);
+document.addEventListener('mouseup', endModalGesture, true);
+window.addEventListener('blur', cancelModalGesture, true);
+document.addEventListener('click', event => {
+    if (!suppressModalBackdropClick) return;
+    cancelModalGesture();
+    event.preventDefault();
+    event.stopImmediatePropagation();
+}, true);
 if (isFullPageReload) {
     requestAnimationFrame(() => window.scrollTo(0, 0));
     window.addEventListener("load", () => window.scrollTo(0, 0), { once: true });
