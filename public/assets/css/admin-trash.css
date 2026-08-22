@@ -361,6 +361,13 @@
 .at-error {
     color: #b42318;
 }
+.at-retention-label {
+    color: var(--muted) !important;
+    font-weight: 750;
+}
+.at-retention-label.is-expired {
+    color: #b42318 !important;
+}
 
 /* Bloqueo de Scroll de la página al abrir modal */
 body.at-modal-open {

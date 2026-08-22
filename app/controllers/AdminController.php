@@ -330,7 +330,7 @@ final class AdminController
             $data['materials']=$data['materials']??[];
         }catch(Throwable $e){
             error_log('Admin trash: '.$e->getMessage());$error='No fue posible consultar la Papelera.';
-            $data=['users'=>[],'projects'=>[],'materials'=>[],'pagination'=>['total'=>0],'active_type'=>'users','summary'=>['users'=>0,'projects'=>0,'materials'=>0,'expired'=>0,'total'=>0]];
+            $data=['loaded'=>false,'users'=>null,'projects'=>null,'materials'=>null,'pagination'=>['total'=>null,'pages'=>null],'active_type'=>$type==='materials'?'materials':($type==='projects'?'projects':'users'),'summary'=>null,'retention'=>[]];
         }
         $s=new AuthSessionService();
         $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') || !empty($_GET['ajax']);
@@ -342,6 +342,9 @@ final class AdminController
             $trashEndpoints = $this->trashEndpoints();
             include __DIR__ . '/../views/admin/trash.php';
             $html = ob_get_clean();
+            if ($error !== null) {
+                $this->json(false, $error, ['active_type' => $type], 503);
+            }
             $this->json(true, '', [
                 'ok' => true,
                 'active_type' => $type,
@@ -362,12 +365,12 @@ final class AdminController
     private function trashOperation(string $operation):void
     {
         $this->requirePost();$s=$this->trashSession();$entity=(string)($_POST['entity']??'');$ids=$operation==='restore_batch'||$operation==='delete_batch'?(array)($_POST['ids']??[]):[(string)($_POST['id']??'')];
-        try{$trash=new AdminTrashModel();$category=$this->trashCategory($entity);$actor=(int)$s->userId();$count=match($operation){'restore'=>$trash->restoreBatch($category,$ids,$actor),'restore_batch'=>$trash->restoreBatch($category,$ids,$actor),'restore_all'=>$trash->restoreAll($category,$actor),'delete'=>$trash->deletePermanentlyBatch($category,$ids,$actor),'delete_batch'=>$trash->deletePermanentlyBatch($category,$ids,$actor),'empty'=>$trash->emptyCategory($category,$actor)};$message=match($operation){'restore'=>'Elemento restaurado correctamente.','restore_batch'=>'Elementos restaurados correctamente.','restore_all'=>'Categoría restaurada correctamente.','delete'=>'Elemento eliminado definitivamente.','delete_batch'=>'Elementos eliminados definitivamente.','empty'=>'Categoría vaciada correctamente.'};$this->json(true,$message,['count'=>$count,'summary'=>$trash->summary()]);}
+        try{$trash=new AdminTrashModel();$category=$this->trashCategory($entity);$actor=(int)$s->userId();$count=match($operation){'restore'=>$trash->restoreBatch($category,$ids,$actor),'restore_batch'=>$trash->restoreBatch($category,$ids,$actor),'restore_all'=>$trash->restoreAll($category,$actor),'delete'=>$trash->deletePermanentlyBatch($category,$ids,$actor),'delete_batch'=>$trash->deletePermanentlyBatch($category,$ids,$actor),'empty'=>$trash->emptyCategory($category,$actor)};$pending=$trash->consumePhysicalCleanupPending();$message=match($operation){'restore'=>'Elemento restaurado correctamente.','restore_batch'=>'Elementos restaurados correctamente.','restore_all'=>'Categoría restaurada correctamente.','delete'=>'Elemento eliminado definitivamente.','delete_batch'=>'Elementos eliminados definitivamente.','empty'=>'Categoría vaciada correctamente.'};if($pending)$message.=' Los registros se procesaron, pero algunos archivos requieren una limpieza posterior.';$this->json(true,$message,['count'=>$count,'summary'=>$trash->summary(),'filesystem_cleanup_pending'=>count($pending)]);}
         catch(InvalidArgumentException $e){$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){error_log('Trash operation: '.$e->getMessage());$this->json(false,'No fue posible completar la operación.',[],500);}
     }
     private function trashCategory(string $entity):string{return match($entity){'user','users'=>'users','project','projects'=>'projects','support_material','materials'=>'materials',default=>throw new InvalidArgumentException('La categoría solicitada no es válida.')};}
     private function trashEndpoints():array{return ['user'=>route('admin-trash-user'),'restore'=>route('admin-trash-restore'),'restoreBatch'=>route('admin-trash-restore-batch'),'restoreAll'=>route('admin-trash-restore-all'),'delete'=>route('admin-trash-delete'),'deleteBatch'=>route('admin-trash-delete-batch'),'emptyCategory'=>route('admin-trash-empty-category'),'purge'=>route('admin-trash-purge')];}
-    public function purgeTrash():void{$this->requirePost();$s=$this->trashSession();try{$r=(new AdminTrashModel())->purgeExpired((int)$s->userId());$this->json(true,'Se procesaron '.$r['users'].' usuarios y '.$r['projects'].' proyectos vencidos.',$r);}catch(Throwable $e){$this->activityFailure($s,'trash_purged','Intentó ejecutar la eliminación definitiva','Papelera','trash',null,'Elementos vencidos',$e);error_log('Purge trash: '.$e->getMessage());$this->json(false,'No fue posible procesar los elementos vencidos.',[],500);}}
+    public function purgeTrash():void{$this->requirePost();$s=$this->trashSession();try{$r=(new AdminTrashModel())->purgeExpired((int)$s->userId());$total=(int)$r['users']+(int)$r['projects']+(int)$r['materials'];$message='Se procesaron '.$total.' elementos vencidos.';if(!empty($r['filesystem_cleanup_pending']))$message.=' Los registros se procesaron, pero algunos archivos requieren una limpieza posterior.';if(!empty($r['failed']))$message.=' Algunas entidades no pudieron procesarse.';$this->json(true,$message,$r);}catch(Throwable $e){$this->activityFailure($s,'trash_purged','Intentó ejecutar la eliminación definitiva','Papelera','trash',null,'Elementos vencidos',$e);error_log('Purge trash: '.$e->getMessage());$this->json(false,'No fue posible procesar los elementos vencidos.',[],500);}}
     private function trashSession():AuthSessionService{$s=new AuthSessionService();if(!$s->validateCsrf('admin_trash',(string)($_POST['_csrf']??'')))$this->json(false,'No fue posible validar la solicitud. Recarga la página e inténtalo nuevamente.',[],419);return $s;}
     public function notifications(): void
     {
@@ -1217,7 +1220,7 @@ final class AdminController
 
     public function module(string $section): void
     {
-        $modules=['academic'=>['Gestión académica','fa-graduation-cap','Periodos, matrículas y catálogos se habilitarán en la Fase 4.'],'reports'=>['Reportes','fa-chart-column','Los reportes administrativos se habilitarán al completar los módulos de datos.'],'settings'=>['Configuración','fa-gear','Los parámetros institucionales se incorporarán en la Fase 6.'],'trash'=>['Papelera','fa-trash-can','La restauración y purga a 60 días se incorporará en la Fase 7.']];
+        $modules=['academic'=>['Gestión académica','fa-graduation-cap','Periodos, matrículas y catálogos se habilitarán en la Fase 4.'],'reports'=>['Reportes','fa-chart-column','Los reportes administrativos se habilitarán al completar los módulos de datos.'],'settings'=>['Configuración','fa-gear','Los parámetros institucionales se incorporarán en la Fase 6.'],'trash'=>['Papelera','fa-trash-can','La restauración y purga se rigen por la política de retención configurada.']];
         if(!isset($modules[$section])){$this->users();return;}$item=$modules[$section];
         View::render('admin/module-pending',['currentPage'=>'admin-'.$section,'title'=>$item[0].' | Administración','bodyClass'=>'admin-page','pageStyles'=>[asset('css/admin-access.css')],'moduleTitle'=>$item[0],'moduleIcon'=>$item[1],'moduleMessage'=>$item[2]]);
     }

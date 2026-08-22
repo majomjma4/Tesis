@@ -19,7 +19,12 @@ final class TrashStoragePurgeService
         if (!rename($source, $staged)) throw new RuntimeException('No fue posible aislar los archivos para su eliminación.');
         return ['source'=>$source, 'staged'=>$staged, 'missing'=>false];
     }
-    public function restore(array $stage): void { if (!empty($stage['staged']) && is_dir((string)$stage['staged']) && !is_dir((string)$stage['source'])) @rename((string)$stage['staged'], (string)$stage['source']); }
+    public function restore(array $stage): void
+    {
+        if (empty($stage['staged']) || !is_dir((string)$stage['staged'])) return;
+        if (is_dir((string)$stage['source'])) throw new RuntimeException('La ubicación original del almacenamiento ya existe.');
+        if (!@rename((string)$stage['staged'], (string)$stage['source'])) throw new RuntimeException('No fue posible restaurar el almacenamiento después del fallo.');
+    }
     public function destroy(array $stage): void
     {
         $path=(string)($stage['staged']??'');if($path===''||!is_dir($path))return;$root=realpath(ROOT_PATH.'/storage');$real=realpath($path);
