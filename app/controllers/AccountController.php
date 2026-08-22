@@ -45,7 +45,7 @@ final class AccountController
                 $session->refresh($identity);
 
                 $previousAvatar = $result['previous_avatar_path'] ?? null;
-                if (is_string($previousAvatar) && $previousAvatar !== '' && !$storage->delete($previousAvatar)) {
+                if ($avatarAction !== 'none' && is_string($previousAvatar) && $previousAvatar !== '' && !$storage->delete($previousAvatar)) {
                     error_log('Previous profile avatar cleanup failed for user ' . (int) $session->userId());
                 }
 
