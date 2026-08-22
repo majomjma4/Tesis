@@ -1158,6 +1158,16 @@ html.theme-dark .search-highlight {
     box-shadow: 0 0 0 1px rgba(245, 158, 11, .22)
 }
 
+/* Eliminar flecha/desplegable nativa de Chromium en inputs de tipo search */
+#notificationSearch::-webkit-search-results-button,
+#notificationSearch::-webkit-search-results-decoration,
+#notificationSearch::-webkit-search-decoration,
+#notificationSearch::-webkit-calendar-picker-indicator {
+    display: none !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+}
+
 .notification-stat.tone-blue {
     border-top: 5px solid var(--blue)
 }
