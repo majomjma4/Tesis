@@ -661,7 +661,7 @@ function fillDetail(item, destinationUrl = null) {
     const metadata = item.metadata || {};
     const validProjectName = Number(item.project_id) > 0 && item.project_name && item.project_name !== "Notificacion general" && item.project_name !== "General" ? item.project_name : null;
     const resourceContext = validProjectName
-        ? { title: `${item.project_code ? `${item.project_code} · ` : ""}${validProjectName}`, sub: item.project_status ? `Estado: ${item.project_status}` : "" }
+        ? { title: validProjectName, sub: item.project_status ? `Estado: ${item.project_status}` : "" }
         : [["document_title", "Documento"], ["document_name", "Documento"], ["review_title", "Revisión"], ["delivery_title", "Entrega"], ["event_title", "Evento"], ["tribunal_name", "Tribunal"], ["repository_name", "Repositorio"], ["observation_title", "Observación"], ["resource_title", "Recurso"]]
             .map(([key, label]) => metadata[key] ? { title: String(metadata[key]), sub: label } : null)
             .find(Boolean);

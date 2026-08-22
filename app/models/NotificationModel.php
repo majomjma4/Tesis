@@ -19,7 +19,12 @@ final class NotificationModel
 
     public function getByUser(int $userId, array $filters = [], string $context = '', ?int $limit = null): array
     {
-        [$conditions, $parameters] = $this->notificationQuery($userId, $filters, $context);
+        $search = trim((string) ($filters['search'] ?? ''));
+        $sqlFilters = $filters;
+        if ($search !== '') {
+            unset($sqlFilters['search']);
+        }
+        [$conditions, $parameters] = $this->notificationQuery($userId, $sqlFilters, $context);
         $limitClause = $limit !== null ? ' LIMIT ' . max(1, min($limit, 50)) : '';
         $statement = $this->connection()->prepare(
             'SELECT n.id, n.user_id, n.project_id, n.type, n.title, n.message, n.action_url, n.action_label, n.metadata, n.is_read, n.read_at, n.created_at, n.archived_at, n.deleted_at,
@@ -28,11 +33,67 @@ final class NotificationModel
         );
         $statement->execute($parameters);
 
-        return array_map([$this, 'hydrate'], $statement->fetchAll());
+        $items = array_map([$this, 'hydrate'], $statement->fetchAll());
+
+        if ($search !== '') {
+            $normalizedSearch = $this->cleanAccents($search);
+            $filtered = [];
+            foreach ($items as $item) {
+                $title = $this->cleanAccents($item['title'] ?? '');
+                $message = $this->cleanAccents($item['message'] ?? '');
+                $projectName = $this->cleanAccents($item['project_name'] ?? '');
+                if (str_contains($title, $normalizedSearch)
+                    || str_contains($message, $normalizedSearch)
+                    || str_contains($projectName, $normalizedSearch)) {
+                    $filtered[] = $item;
+                }
+            }
+            return $filtered;
+        }
+
+        return $items;
     }
 
     public function getByUserPaginated(int $userId, array $filters = [], array $pagination = [], string $context = ''): array
     {
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            $sqlFilters = $filters;
+            unset($sqlFilters['search']);
+            $items = $this->getByUser($userId, $sqlFilters, $context);
+            $normalizedSearch = $this->cleanAccents($search);
+            $filtered = [];
+            foreach ($items as $item) {
+                $title = $this->cleanAccents($item['title'] ?? '');
+                $message = $this->cleanAccents($item['message'] ?? '');
+                $projectName = $this->cleanAccents($item['project_name'] ?? '');
+                if (str_contains($title, $normalizedSearch)
+                    || str_contains($message, $normalizedSearch)
+                    || str_contains($projectName, $normalizedSearch)) {
+                    $filtered[] = $item;
+                }
+            }
+            $total = count($filtered);
+            $effectiveSize = max(10, min(100, (int)($pagination['size'] ?? 10)));
+            $pages = max(1, (int)ceil($total / $effectiveSize));
+            $page = min((int)($pagination['page'] ?? 1), $pages);
+            $offset = ($page - 1) * $effectiveSize;
+            $sliced = array_slice($filtered, $offset, $effectiveSize);
+            return [
+                'items' => $sliced,
+                'pagination' => [
+                    'page' => $page,
+                    'per_page' => $effectiveSize,
+                    'total' => $total,
+                    'pages' => $pages,
+                    'from' => $total ? $offset + 1 : 0,
+                    'to' => min($offset + $effectiveSize, $total),
+                    'page_key' => $pagination['pageKey'] ?? 'p',
+                    'size_key' => $pagination['sizeKey'] ?? 'per_page'
+                ]
+            ];
+        }
+
         [$conditions, $parameters] = $this->notificationQuery($userId, $filters, $context);
         $where = ' FROM notifications n LEFT JOIN projects p ON p.id = n.project_id WHERE ' . implode(' AND ', $conditions);
         $result = PaginationService::run(
@@ -61,13 +122,7 @@ final class NotificationModel
             $conditions[] = '(n.type != "system" AND (n.action_url IS NULL OR n.action_url NOT LIKE "%page=admin-%") AND JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.admin_sender_id")) IS NULL AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.context")), "") != "admin" AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.scope")), "") != "admin")';
         }
 
-        $search = trim((string) ($filters['search'] ?? ''));
-        if ($search !== '') {
-            $conditions[] = '(n.title LIKE :search_title OR n.message LIKE :search_message OR p.title LIKE :search_project OR JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.project_name")) LIKE :search_project)';
-            $parameters['search_title'] = '%' . $search . '%';
-            $parameters['search_message'] = '%' . $search . '%';
-            $parameters['search_project'] = '%' . $search . '%';
-        }
+
 
         $type = (string) ($filters['type'] ?? '');
         if (in_array($type, self::TYPES, true)) {
@@ -155,12 +210,12 @@ final class NotificationModel
         $settings = (new SystemSettingModel())->all();
         $retentionDays = max(1, (int)($settings['notification_trash_retention_days'] ?? 60));
         $expiringCutoff = max(0, $retentionDays - 7);
-        $parameters['exp_cutoff'] = $expiringCutoff;
+        $parameters['expiration_cutoff'] = (new DateTimeImmutable())->modify("-{$expiringCutoff} days")->format('Y-m-d H:i:s');
         $statement = $this->connection()->prepare(
             "SELECT COUNT(*) total,
                     COALESCE(SUM(n.is_read = 0), 0) unread,
                     COALESCE(SUM(YEARWEEK(n.created_at, 1) = YEARWEEK(CURRENT_DATE(), 1)), 0) week,
-                    COALESCE(SUM(n.deleted_at IS NOT NULL AND n.deleted_at <= DATE_SUB(NOW(), INTERVAL :exp_cutoff DAY)), 0) expiring
+                    COALESCE(SUM(n.deleted_at IS NOT NULL AND n.deleted_at <= :expiration_cutoff), 0) expiring
              FROM notifications n WHERE " . implode(' AND ', $conditions)
         );
         $statement->execute($parameters);
@@ -215,6 +270,16 @@ final class NotificationModel
         $statement = $this->connection()->prepare($sql);
         $statement->execute(array_merge([$userId], $ids));
         return $statement->rowCount();
+    }
+
+    public function markAsRead(int $id, int $userId): bool
+    {
+        return $this->updateReadState($id, $userId, true);
+    }
+
+    public function markAsUnread(int $id, int $userId): bool
+    {
+        return $this->updateReadState($id, $userId, false);
     }
     // Final de cambios de estado y ciclo de eliminación
 
@@ -345,7 +410,86 @@ final class NotificationModel
         $projectName = trim((string) ($row['project_name'] ?? ''));
         $row['project_name'] = $projectName !== '' ? $projectName : (string) ($metadata['project_name'] ?? 'Notificacion general');
 
+        if (isset($row['project_status'])) {
+            $row['project_status'] = project_academic_labels((string) $row['project_status'])['status'];
+        }
+
+        // Clean historical titles and messages for presentation (Backward Compatibility)
+        if (!empty($row['message']) && !empty($row['project_name'])) {
+            $code = !empty($row['project_code']) ? (string)$row['project_code'] : (!empty($metadata['project_code']) ? (string)$metadata['project_code'] : '');
+            $projectLabel = $code !== '' ? $code . ' · ' . $row['project_name'] : $row['project_name'];
+
+            $search = [
+                'El proyecto ' . $projectLabel . ' fue enviado para tu revisión.' => 'Se ha registrado el proyecto para tu revisión.',
+                'El proyecto ' . $projectLabel . ' fue enviado a Tribunal para su defensa.' => 'El proyecto ha sido derivado al Tribunal para la sustentación de la defensa.',
+                'El proyecto ' . $projectLabel . ' inició la etapa de defensa.' => 'Se ha dado inicio a la etapa de defensa del proyecto para tu evaluación.',
+                'El proyecto ' . $projectLabel . ' alcanzó el estado “' => 'El proyecto ha alcanzado el estado de “',
+                'El proyecto ' . $projectLabel . ' fue publicado correctamente en el Repositorio Académico.' => 'El documento final ha sido publicado correctamente en el Repositorio Académico.',
+                'El proyecto ' . $projectLabel . ' ha sido publicado en el Repositorio institucional.' => 'El trabajo de titulación ha sido publicado en el Repositorio institucional.',
+                'El proyecto ' . $projectLabel . ' no fue aprobado por el Tribunal.' => 'El Tribunal ha registrado la calificación. El proyecto no ha sido aprobado.',
+                'El Tribunal aprobó el proyecto ' . $projectLabel . '. El proceso continuará hacia publicación.' => 'El Tribunal ha aprobado tu proyecto de titulación. El trámite continuará con la fase de publicación.',
+                'El Tribunal aprobó el proyecto ' . $code . '. El proceso continuará hacia publicación.' => 'El Tribunal ha aprobado tu proyecto de titulación. El trámite continuará con la fase de publicación.',
+                'El proyecto ' . $code . ' ha sido publicado en el Repositorio institucional.' => 'El trabajo de titulación ha sido publicado en el Repositorio institucional.',
+                'El proyecto ' . $code . ' no fue aprobado por el Tribunal.' => 'El Tribunal ha registrado la calificación. El proyecto no ha sido aprobado.',
+            ];
+
+            // Reemplazo del patrón de entregas
+            $deliveryPattern = '/El proyecto ' . preg_quote($projectLabel, '/') . ' envió la entrega (\d+) con (\d+) documento\(s\) para tu revisión\./u';
+            if (preg_match($deliveryPattern, $row['message'], $matches)) {
+                $fileCount = (int)$matches[2];
+                $row['message'] = "Se ha enviado una nueva entrega para tu revisión. Incluye " . $fileCount . " " . ($fileCount === 1 ? "documento pendiente" : "documentos pendientes") . " de revisar.";
+            } else {
+                foreach ($search as $target => $replacement) {
+                    if (str_contains($row['message'], $target)) {
+                        $row['message'] = str_replace($target, $replacement, $row['message']);
+                    }
+                }
+            }
+
+            // Asignación de tutor y tribunal
+            $tutorPattern = '/Has sido asignado como tutor del proyecto ' . preg_quote($projectLabel, '/') . '/u';
+            if (preg_match($tutorPattern, $row['message'])) {
+                $row['message'] = 'Has sido asignado como tutor de este proyecto.';
+            }
+            $tribunalPattern = '/Has sido asignado al Tribunal del proyecto ' . preg_quote($projectLabel, '/') . '/u';
+            if (preg_match($tribunalPattern, $row['message'])) {
+                $row['message'] = 'Has sido asignado como evaluador en el Tribunal de este proyecto.';
+            }
+            $tribunalConfPattern = '/El Tribunal del proyecto ' . preg_quote($projectLabel, '/') . ' fue conformado y el proyecto avanzó a la etapa de defensa\./u';
+            if (preg_match($tribunalConfPattern, $row['message'])) {
+                $row['message'] = 'El Tribunal evaluador ha sido conformado. El proyecto avanza a la etapa de defensa.';
+            }
+            $tribunalConfTutorPattern = '/El Tribunal del proyecto ' . preg_quote($projectLabel, '/') . ' fue conformado\./u';
+            if (preg_match($tribunalConfTutorPattern, $row['message'])) {
+                $row['message'] = 'El Tribunal evaluador del proyecto ha sido conformado.';
+            }
+        }
+
+        // Clean historical titles if any match technical names
+        if (!empty($row['title'])) {
+            $titleReplacements = [
+                'Proyecto enviado a revisión' => 'Nueva entrega para revisión',
+                'Has sido asignado como tutor' => 'Asignación como tutor',
+                'Asignación a tribunal' => 'Asignación a tribunal',
+                'Etapa de defensa iniciada' => 'Defensa de proyecto iniciada',
+            ];
+            if (isset($titleReplacements[$row['title']])) {
+                $row['title'] = $titleReplacements[$row['title']];
+            }
+            if (str_starts_with($row['title'], 'Proyecto aprobado')) {
+                $row['title'] = str_replace('Proyecto aprobado', 'Estado de proyecto aprobado', $row['title']);
+            }
+        }
+
         return $row;
+    }
+    private function cleanAccents(string $str): string
+    {
+        return str_ireplace(
+            ['á','é','í','ó','ú','ñ','Á','É','Í','Ó','Ú','Ñ'],
+            ['a','e','i','o','u','n','a','e','i','o','u','n'],
+            mb_strtolower($str, 'UTF-8')
+        );
     }
     // Final de creación y normalización de registros
 }

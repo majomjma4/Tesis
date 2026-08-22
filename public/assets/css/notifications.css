@@ -1145,16 +1145,17 @@ html.theme-dark .notification-type-icon {
 /* Resaltado seguro de coincidencias del buscador */
 .search-highlight {
     padding: 0 2px;
-    color: #0f3d91;
-    background: rgba(37, 99, 235, .14);
     border-radius: 4px;
-    font-weight: 600;
+    background: rgba(245, 158, 11, .24);
+    color: inherit;
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, .22);
     transition: background-color .15s ease, color .15s ease
 }
 
 html.theme-dark .search-highlight {
-    color: #eff6ff;
-    background: rgba(59, 130, 246, .38)
+    background: rgba(245, 158, 11, .24);
+    color: inherit;
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, .22)
 }
 
 .notification-stat.tone-blue {

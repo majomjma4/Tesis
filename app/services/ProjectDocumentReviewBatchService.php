@@ -255,15 +255,15 @@ final class ProjectDocumentReviewBatchService
     private function notifyStudents(PDO $db, int $projectId, int $documentCount, int $auditId): void
     {
         $message = $documentCount === 1
-            ? 'Un documento requiere correcciones. Revisa las observaciones registradas antes de enviar una nueva versión.'
-            : $documentCount . ' documentos requieren correcciones. Revisa las observaciones registradas antes de enviar nuevas versiones.';
+            ? 'Un documento requiere correcciones. Por favor, revisa las observaciones antes de enviar una nueva versión.'
+            : $documentCount . ' documentos requieren correcciones. Por favor, revisa las observaciones antes de enviar nuevas versiones.';
         $metadata = json_encode([
             'purpose'=>'project_document_review', 'context'=>'academic', 'documents_requiring_attention'=>$documentCount,
         ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $insert = $db->prepare(
             "INSERT IGNORE INTO notifications
              (user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key)
-             SELECT DISTINCT pp.user_id,:project,'observation','Correcciones documentales solicitadas',:message,:url,'Abrir documentos',:metadata,:dedup
+             SELECT DISTINCT pp.user_id,:project,'observation','Correcciones solicitadas',:message,:url,'Abrir documentos',:metadata,:dedup
              FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id
              WHERE pp.project_id=:participants AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL
                AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL"

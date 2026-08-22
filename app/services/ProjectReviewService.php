@@ -229,12 +229,12 @@ final class ProjectReviewService
             'observation_count' => $count,
         ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $message = $count === 1
-            ? 'Se registró una observación académica. Revisa la corrección solicitada antes de enviar una nueva versión.'
-            : "Se registraron {$count} observaciones académicas. Revísalas antes de enviar una nueva versión.";
+            ? 'Se ha registrado una observación en la revisión. Por favor, revísala antes de subir una nueva versión.'
+            : "Se han registrado {$count} observaciones en la revisión. Por favor, revísalas antes de subir una nueva versión.";
         $insert = $db->prepare(
             "INSERT IGNORE INTO notifications
              (user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key)
-             SELECT DISTINCT pp.user_id,:project_id,'observation','Correcciones solicitadas',:message,:url,'Revisar observaciones',:metadata,:deduplication_key
+             SELECT DISTINCT pp.user_id,:project_id,'observation','Nuevas observaciones de revisión',:message,:url,'Revisar observaciones',:metadata,:deduplication_key
              FROM project_participants pp INNER JOIN student_profiles sp ON sp.user_id=pp.user_id
              WHERE pp.project_id=:participant_project AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL"
         );

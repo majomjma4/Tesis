@@ -53,10 +53,10 @@ final class ProjectAdjustmentRequestService
         $students->execute(['project'=>$projectId]);
         $notify = $db->prepare(
             "INSERT IGNORE INTO notifications(user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key)
-             VALUES(:user,:project,'adjustment','Solicitud de ajuste',:message,:url,'Abrir proyecto',:metadata,:dedup)"
+             VALUES(:user,:project,'adjustment','Solicitud de ajuste de información',:message,:url,'Abrir proyecto',:metadata,:dedup)"
         );
         foreach ($students->fetchAll(PDO::FETCH_COLUMN) as $recipient) {
-            $notify->execute(['user'=>(int)$recipient,'project'=>$projectId,'message'=>'Se ha solicitado un ajuste en la información del proyecto.','url'=>route('project-detail').'&id='.$projectId,
+            $notify->execute(['user'=>(int)$recipient,'project'=>$projectId,'message'=>'Se ha registrado una solicitud de ajuste para corregir información del proyecto.','url'=>route('project-detail').'&id='.$projectId,
                 'metadata'=>json_encode(['request_id'=>$id,'project_id'=>$projectId], JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR), 'dedup'=>'adjustment:'.$id.':'.(int)$recipient]);
         }
         return $this->result($db, $projectId, $id, 'Solicitud de ajuste creada correctamente.');
