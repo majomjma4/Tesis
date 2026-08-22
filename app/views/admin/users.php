@@ -127,7 +127,7 @@ $highlight = static function(string $text, string $search): string {
             </div>
             <div class="role-fields teacher-fields wide" data-for="teacher"><label class="permission-card"><input type="checkbox" name="can_manage_thesis" value="1"><span><strong>Gestión de Titulación</strong><small>Permite gestionar procesos de tribunal y titulación.</small></span></label><label class="permission-card"><input type="checkbox" name="is_admin" value="1"><span><strong>Acceso administrativo</strong><small>Permite acceder a funciones administrativas del sistema.</small></span></label></div>
         </div>
-        <div class="form-note" id="temporaryPasswordNote"><i class="fa-solid fa-key"></i><span>La cuenta se creará con la contraseña temporal <strong>Istel2026+</strong> y deberá cambiarla.</span></div><div class="users-message" id="userFormMessage" hidden></div>
+        <div class="form-note" id="temporaryPasswordNote"><i class="fa-solid fa-key"></i><span>La cuenta se creará con la contraseña temporal institucional y deberá cambiarla.</span></div><div class="users-message" id="userFormMessage" hidden></div>
         <footer><button type="button" class="secondary" data-close-modal>Cancelar</button><button type="submit" class="primary">Guardar usuario</button></footer>
     </form>
 </div></div>

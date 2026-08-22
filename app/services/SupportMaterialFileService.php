@@ -5,8 +5,6 @@ declare(strict_types=1);
 final class SupportMaterialFileService
 {
     private const MAX_OPERATION_FILES = 5;
-    private const MAX_FILE_BYTES = 26214400;
-    private const MAX_OPERATION_BYTES = 36700160;
     private const MAX_NAME_LENGTH = 200;
     private const MIME_BY_EXTENSION = [
         'pdf' => ['application/pdf'],

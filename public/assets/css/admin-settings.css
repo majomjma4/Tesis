@@ -219,6 +219,12 @@
     font-size: .7rem;
 }
 
+.as-status-badge.is-warning {
+    background: rgba(245, 158, 11, .12);
+    color: #b45309;
+    border-color: rgba(245, 158, 11, .3);
+}
+
 .as-input {
     min-height: 44px;
     padding: 0 13px;
@@ -229,12 +235,16 @@
     font: inherit;
     font-size:var(--font-md);
     transition: border-color .15s ease, box-shadow .15s ease;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .as-input:focus {
     outline: 0;
     border-color: var(--blue);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    text-overflow: clip;
 }
 
 .as-input.as-uppercase {

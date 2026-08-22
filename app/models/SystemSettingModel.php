@@ -86,6 +86,16 @@ final class SystemSettingModel
         return $value >= 1 && $value <= 1440 ? $value : 30;
     }
 
+    public function temporaryPasswordConfigured(): bool
+    {
+        try {
+            $secret = $this->secretValue('temporary_password_secret');
+            return $secret !== '' && $this->decryptSecret($secret) !== '';
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
     public function save(array $input,int $actor):array
     {
         $currentSettings=$this->all();
@@ -95,6 +105,7 @@ final class SystemSettingModel
         $temporaryPassword=trim((string)($input['temporary_password']??''));
         $temporaryDays=(int)($input['temporary_password_days']??0);
         $forceChange=isset($input['temporary_password_force_change'])?1:0;
+        $sessionInactivityMinutes=(int)($input['session_inactivity_minutes']??0);
         $retentions=[
             'retention_users_days'=>(int)($input['retention_users_days']??0),
             'retention_projects_days'=>(int)($input['retention_projects_days']??0),
@@ -146,6 +157,7 @@ final class SystemSettingModel
         if($retentions['academic_period_reversal_hours']<1||$retentions['academic_period_reversal_hours']>72)throw new InvalidArgumentException('La ventana de reversión de período debe estar entre 1 y 72 horas.');
         if($retentions['academic_period_reminder_days']<1||$retentions['academic_period_reminder_days']>30)throw new InvalidArgumentException('El aviso de período académico debe estar entre 1 y 30 días.');
         if($retentions['calendar_reminder_days']<0||$retentions['calendar_reminder_days']>30)throw new InvalidArgumentException('Los recordatorios de calendario deben estar entre 0 y 30 días.');
+        if($sessionInactivityMinutes<1||$sessionInactivityMinutes>1440)throw new InvalidArgumentException('El tiempo de inactividad de sesión debe estar entre 1 y 1440 minutos.');
 
         if($temporaryPassword!==''&&(mb_strlen($temporaryPassword)<10||mb_strlen($temporaryPassword)>128))throw new InvalidArgumentException('La contraseña temporal debe tener entre 10 y 128 caracteres.');
         foreach($prefixes as $prefix)if(!preg_match('/^[A-Z]{2,6}$/',$prefix))throw new InvalidArgumentException('Cada prefijo debe contener entre 2 y 6 letras mayúsculas.');
@@ -162,7 +174,8 @@ final class SystemSettingModel
             'project_code_prefixes'=>json_encode($prefixes,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
             'project_code_digits'=>(string)$digits,
             'temporary_password_days'=>(string)$temporaryDays,
-            'temporary_password_force_change'=>(string)$forceChange
+            'temporary_password_force_change'=>(string)$forceChange,
+            'session_inactivity_minutes'=>(string)$sessionInactivityMinutes
         ]+array_map('strval',$retentions);
 
         if($temporaryPassword!=='')$submitted['temporary_password_secret']=$this->encryptSecret($temporaryPassword);
@@ -198,7 +211,7 @@ final class SystemSettingModel
                     }
                     continue;
                 }
-                $unit = str_contains($key, 'hours') ? 'horas' : 'días';
+                $unit = $key === 'session_inactivity_minutes' ? 'minutos' : (str_contains($key, 'hours') ? 'horas' : 'días');
                 $formattedOld = $secret ? 'sensible' : $values['old'] . ' ' . $unit;
                 $formattedNew = $secret ? 'sensible' : $values['new'] . ' ' . $unit;
                 $message = $secret ? 'Política de contraseña temporal actualizada' : $this->label($key) . ': ' . $values['old'] . ' → ' . $values['new'];
@@ -211,7 +224,19 @@ final class SystemSettingModel
         return $changed;
     }
 
-    public function temporaryPasswordPolicy():array{try{$secret=$this->secretValue('temporary_password_secret');$password=$secret===''?'Istel2026+':$this->decryptSecret($secret);$settings=$this->all();return ['password'=>$password,'days'=>(int)$settings['temporary_password_days'],'force_change'=>(bool)$settings['temporary_password_force_change']];}catch(Throwable){return ['password'=>'Istel2026+','days'=>7,'force_change'=>true];}}
+    public function temporaryPasswordPolicy():array
+    {
+        try {
+            $secret=$this->secretValue('temporary_password_secret');
+            if($secret==='')throw new RuntimeException('Temporary password secret is not configured.');
+            $password=$this->decryptSecret($secret);
+            $settings=$this->all();
+            return ['password'=>$password,'days'=>(int)$settings['temporary_password_days'],'force_change'=>(bool)$settings['temporary_password_force_change']];
+        } catch (Throwable $exception) {
+            error_log('Temporary password policy unavailable: '.$exception->getMessage());
+            throw new TemporaryPasswordPolicyException('No fue posible obtener la política de contraseña temporal.',0,$exception);
+        }
+    }
     public function fileUploadPolicy():array
     {
         $settings=$this->all();$fileCeiling=$this->fileUploadCeilingMb();$operationCeiling=$this->operationUploadCeilingMb();
@@ -244,7 +269,7 @@ final class SystemSettingModel
     private function encryptionKey():string{$raw=(string)($GLOBALS['config']['settings_encryption_key']??'');$key=base64_decode($raw,true);if($key===false||strlen($key)!==32)throw new RuntimeException('Configura APP_SETTINGS_ENCRYPTION_KEY con una clave Base64 de 32 bytes para actualizar la contraseña temporal.');return $key;}
     private function encryptSecret(string $value):string{$iv=random_bytes(12);$tag='';$cipher=openssl_encrypt($value,'aes-256-gcm',$this->encryptionKey(),OPENSSL_RAW_DATA,$iv,$tag);if($cipher===false)throw new RuntimeException('No fue posible proteger la contraseña temporal.');return base64_encode($iv.$tag.$cipher);}
     private function decryptSecret(string $value):string{$raw=base64_decode($value,true);if($raw===false||strlen($raw)<29)throw new RuntimeException('La contraseña temporal almacenada no es válida.');$plain=openssl_decrypt(substr($raw,28),'aes-256-gcm',$this->encryptionKey(),OPENSSL_RAW_DATA,substr($raw,0,12),substr($raw,12,16));if(!is_string($plain)||$plain==='')throw new RuntimeException('No fue posible leer la contraseña temporal.');return $plain;}
-    private function label(string $key):string{return ['institution_name'=>'Nombre de la institución','file_max_mb'=>'Límite por archivo','file_total_max_mb'=>'Límite total por operación','file_extensions'=>'Formatos permitidos (Borrador)','file_extensions_private'=>'Formatos permitidos en Borrador','file_extensions_project'=>'Formatos permitidos en Proyecto','file_extensions_support'=>'Formatos permitidos en Materiales de apoyo','project_code_prefixes'=>'Prefijos de proyectos','project_code_digits'=>'Dígitos de códigos de proyectos','temporary_password_days'=>'Vigencia de contraseña temporal','temporary_password_force_change'=>'Cambio obligatorio de contraseña temporal','retention_users_days'=>'Retención de usuarios','retention_projects_days'=>'Retención de proyectos','retention_materials_days'=>'Retención de materiales','notification_trash_retention_days'=>'Retención de notificaciones','withdrawn_file_restore_hours'=>'Recuperación de archivos retirados','academic_period_reversal_hours'=>'Reversión de cierre de período','academic_period_reminder_days'=>'Aviso de período académico','calendar_reminder_days'=>'Recordatorios de calendario'][$key]??$key;}
+    private function label(string $key):string{return ['institution_name'=>'Nombre de la institución','file_max_mb'=>'Límite por archivo','file_total_max_mb'=>'Límite total por operación','file_extensions'=>'Formatos permitidos (Borrador)','file_extensions_private'=>'Formatos permitidos en Borrador','file_extensions_project'=>'Formatos permitidos en Proyecto','file_extensions_support'=>'Formatos permitidos en Materiales de apoyo','project_code_prefixes'=>'Prefijos de proyectos','project_code_digits'=>'Dígitos de códigos de proyectos','temporary_password_days'=>'Vigencia de contraseña temporal','temporary_password_force_change'=>'Cambio obligatorio de contraseña temporal','retention_users_days'=>'Retención de usuarios','retention_projects_days'=>'Retención de proyectos','retention_materials_days'=>'Retención de materiales','notification_trash_retention_days'=>'Retención de notificaciones','withdrawn_file_restore_hours'=>'Recuperación de archivos retirados','academic_period_reversal_hours'=>'Reversión de cierre de período','academic_period_reminder_days'=>'Aviso de período académico','calendar_reminder_days'=>'Recordatorios de calendario','session_inactivity_minutes'=>'Tiempo de inactividad de sesión'][$key]??$key;}
     private function formatChanges(string $key,string $old,string $new):array
     {
         $oldValues=json_decode($old,true);$newValues=json_decode($new,true);

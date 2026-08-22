@@ -28,6 +28,7 @@ if (($config['environment'] ?? 'production') === 'production') {
 // Inicio del enrutamiento principal
 // Resuelve los alias de cada pantalla y dirige la solicitud al controlador correspondiente.
 $page = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
+RequestSizeGuard::rejectIfExceeded($page);
 (new RouteAccessService())->enforce($page);
 
 match ($page) {

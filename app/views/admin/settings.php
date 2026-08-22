@@ -152,7 +152,7 @@
                     <div class="as-field-group">
                         <label for="input_temporary_password">
                             <span>Nueva contraseña temporal (opcional)</span>
-                            <span class="as-status-badge is-active" title="Hay una contraseña temporal activa almacenada de forma segura."><i class="fa-solid fa-shield-halved"></i> Configurada</span>
+                            <span class="as-status-badge <?= !empty($temporaryPasswordConfigured) ? 'is-active' : 'is-warning' ?>" title="<?= !empty($temporaryPasswordConfigured) ? 'Hay una contraseña temporal activa almacenada de forma segura.' : 'Configura una contraseña temporal para habilitar nuevas altas y restablecimientos.' ?>"><i class="fa-solid <?= !empty($temporaryPasswordConfigured) ? 'fa-shield-halved' : 'fa-triangle-exclamation' ?>"></i> <?= !empty($temporaryPasswordConfigured) ? 'Configurada' : 'Requiere configuración' ?></span>
                         </label>
                         <input type="text" id="input_temporary_password" name="temporary_password" minlength="10" maxlength="128" autocomplete="off" placeholder="Escribe una nueva contraseña para reemplazar la actual" class="as-input">
                         <span class="as-field-help">Si no deseas cambiarla, deja este campo vacío.</span>
@@ -220,6 +220,23 @@
                                 </button>
                             </label>
                             <input type="number" id="input_retention_materials_days" name="retention_materials_days" min="1" max="365" value="<?= (int)$settings['retention_materials_days'] ?>" class="as-input" required>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="as-retention-group">
+                    <div class="as-retention-header">
+                        <h3><i class="fa-solid fa-user-clock"></i> Sesión</h3>
+                        <p>Controla cuándo una sesión sin actividad debe volver a validarse.</p>
+                    </div>
+                    <div class="as-grid">
+                        <div class="as-field-group">
+                            <label for="input_session_inactivity_minutes">
+                                <span>Tiempo de inactividad de sesión</span>
+                            </label>
+                            <input type="number" id="input_session_inactivity_minutes" name="session_inactivity_minutes" min="1" max="1440" step="1" value="<?= (int)($settings['session_inactivity_minutes'] ?? 30) ?>" class="as-input" required>
+                            <span class="as-field-help">Minutos de inactividad antes de cerrar la sesión.</span>
+                            <span class="as-field-error" id="error_session_inactivity_minutes" hidden></span>
                         </div>
                     </div>
                 </div>

@@ -53,7 +53,7 @@ final class AdminUserModel
         if($id<1)$data['status']='active';
         if($id<1&&$data['role']==='teacher')$data['can_tutor']=1;
         $this->validate($data,$id);
-        $temporary=$this->temporaryPolicy();
+        $temporary=$id<1?$this->temporaryPolicy():null;
         $operation=function()use($data,$id,$actorId,$temporary):array{return Database::transaction(function(PDO $db)use($data,$id,$actorId,$temporary):array{
             if(in_array($data['role'],['student','teacher'],true)&&$this->institutionalCodeExists((string)$data['institutional_code'],$id>0?$id:null))throw new InvalidArgumentException('La cédula ya está registrada en otra cuenta.');
             $previous=[];$previousRole=null;$previousAdmin=false;$initialAdmin=false;

@@ -126,7 +126,7 @@
         pending={kind:'action',url:targetUrl,data:targetData};
         openConfirmation(
             isPassword?'Restablecer contraseña':(isTrash?'Enviar usuario a Papelera':(restoring?'Restablecer acceso':'Bloquear usuario')),
-            isPassword?`La contraseña de ${user.full_name} volverá a ser Istel2026+ y sus sesiones se cerrarán.`:
+            isPassword?`La contraseña de ${user.full_name} volverá a la política temporal institucional y sus sesiones se cerrarán.`:
             (isTrash?`¿Estás seguro de enviar la cuenta de ${user.full_name} a la Papelera?`:
             (restoring?`¿Estás seguro de restablecer el acceso de ${user.full_name}?`:`¿Estás seguro de bloquear a ${user.full_name}? Sus sesiones activas se cerrarán.`)),
             {isTrash:isTrash,confirmText:isPassword?'Restablecer':(isTrash?'Enviar a Papelera':(restoring?'Restablecer':'Bloquear'))}

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 final class AdminController
 {
-    public function settings():void{$model=new SystemSettingModel();$error=null;try{$settings=$model->all();$uploadPolicy=$model->fileUploadPolicy();}catch(Throwable $e){error_log('Admin settings: '.$e->getMessage());$error='No fue posible consultar la configuración.';$settings=$model->defaults();$uploadPolicy=['max_mb'=>20,'total_max_mb'=>35,'file_ceiling_mb'=>20,'operation_ceiling_mb'=>35,'application_file_ceiling_mb'=>500,'application_operation_ceiling_mb'=>1024];}$s=new AuthSessionService();View::render('admin/settings',['currentPage'=>'admin-settings','title'=>'Configuración | Administración','bodyClass'=>'admin-settings-page','pageStyles'=>[asset('css/admin-settings.css')],'pageScript'=>asset('js/admin-settings.js'),'settings'=>$settings,'uploadPolicy'=>$uploadPolicy,'settingsError'=>$error,'settingsCsrf'=>$s->csrfToken('admin_settings'),'settingsSaveEndpoint'=>route('admin-settings-save')]);}
+    public function settings():void{$model=new SystemSettingModel();$error=null;$temporaryPasswordConfigured=false;try{$settings=$model->all();$uploadPolicy=$model->fileUploadPolicy();$temporaryPasswordConfigured=$model->temporaryPasswordConfigured();}catch(Throwable $e){error_log('Admin settings: '.$e->getMessage());$error='No fue posible consultar la configuración.';$settings=$model->defaults();$uploadPolicy=['max_mb'=>20,'total_max_mb'=>35,'file_ceiling_mb'=>20,'operation_ceiling_mb'=>35,'application_file_ceiling_mb'=>500,'application_operation_ceiling_mb'=>1024];}$s=new AuthSessionService();View::render('admin/settings',['currentPage'=>'admin-settings','title'=>'Configuración | Administración','bodyClass'=>'admin-settings-page','pageStyles'=>[asset('css/admin-settings.css')],'pageScript'=>asset('js/admin-settings.js'),'settings'=>$settings,'uploadPolicy'=>$uploadPolicy,'temporaryPasswordConfigured'=>$temporaryPasswordConfigured,'settingsError'=>$error,'settingsCsrf'=>$s->csrfToken('admin_settings'),'settingsSaveEndpoint'=>route('admin-settings-save')]);}
     public function saveSettings():void{$this->requirePost();$s=new AuthSessionService();if(!$s->validateCsrf('admin_settings',(string)($_POST['_csrf']??'')))$this->json(false,'La solicitud ya no es válida. Recarga la página e inténtalo nuevamente.',[],403);try{(new SystemSettingModel())->save($_POST,(int)$s->userId());$this->json(true,'Configuración guardada y aplicada.');}catch(InvalidArgumentException $e){$this->activityFailure($s,'settings_updated','Intentó actualizar la configuración institucional','Configuración','settings',null,'Configuración del sistema',$e);$this->json(false,$e->getMessage(),[],422);}catch(Throwable $e){$this->activityFailure($s,'settings_updated','Intentó actualizar la configuración institucional','Configuración','settings',null,'Configuración del sistema',$e);error_log('Save settings: '.$e->getMessage());$this->json(false,'No fue posible guardar la configuración.',[],500);}}
     public function reports():void{$periods=(new AcademicPeriodModel())->all();$selection=$this->reportPeriodSelection($periods);$base=['from'=>$selection['from'],'to'=>$selection['to']];$from=$this->reportDate('from',$base['from']);$to=$this->reportDate('to',$base['to']);$manualDates=array_key_exists('from',$_GET)||array_key_exists('to',$_GET);if($manualDates&&$selection['id']!==null&&($from!==$selection['from']||$to!==$selection['to'])&&count($periods)>1)$selection=['id'=>null,'from'=>$from,'to'=>$to];$model=new AdminReportModel();$error=null;$paginationRequest=['page'=>(int)($_GET['report_page']??PaginationService::request()['page']??1),'size'=>(int)($_GET['reports_per_page']??PaginationService::request()['size']??10)];try{$data=$model->dashboard($from,$to,$paginationRequest);}catch(Throwable $e){error_log('Admin reports: '.$e->getMessage());$error='No fue posible generar los reportes.';$data=['summary'=>['users'=>0,'projects'=>0,'deliveries'=>0,'actions'=>0],'roles'=>[],'statuses'=>[],'reviewSituations'=>[],'activity'=>[],'pagination'=>['total'=>0]];}View::render('admin/reports',['currentPage'=>'admin-reports','title'=>'Reportes | Administración','bodyClass'=>'admin-reports-page','pageStyles'=>[asset('css/admin-reports.css')],'reportData'=>$data,'pagePaginationData'=>$data['pagination'],'reportFrom'=>$from,'reportTo'=>$to,'reportBaseFrom'=>$base['from'],'reportBaseTo'=>$base['to'],'reportPeriods'=>$periods,'reportSelectedPeriodId'=>$selection['id'],'reportPeriodsAreMultiple'=>count($periods)>1,'reportError'=>$error]);}
     public function exportReport():never{
@@ -416,10 +416,7 @@ final class AdminController
     public function saveSupportMaterial():void
     {
         $this->requirePost();$session=new AuthSessionService();
-        if($_POST===[]&&$_FILES===[]&&(int)($_SERVER['CONTENT_LENGTH']??0)>0){
-            error_log('Support material file upload rejected before parsing: request body exceeded PHP limits or was malformed.');
-            $this->json(false,'La carga supera los límites permitidos por el servidor.',[],422);
-        }
+        // RequestSizeGuard handles oversized multipart bodies before this controller runs.
         if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La solicitud contiene un token CSRF inválido.',[],419);
         $id=(int)($_POST['id']??0);$title=$this->normalizeAuditText($_POST['title']??'');
         if($id===0&&!$session->hasAdminAccess()){
@@ -1186,7 +1183,8 @@ final class AdminController
             $payload=$this->userPayload();
             $saved=(new AdminUserModel())->save($payload,$id,(int)$session->userId());
             $this->json(true,$id>0?'Usuario actualizado correctamente.':'Usuario creado correctamente.',['user'=>$saved]);
-        } catch(InvalidArgumentException $exception){$this->activityFailure($session,$id?'user_updated':'user_created',$id?'Intentó editar un usuario':'Intentó crear un usuario','Usuarios','user',$id?:null,$name?:'Usuario',$exception);$this->json(false,$exception->getMessage(),[],422);}
+        } catch(TemporaryPasswordPolicyException $exception){$this->activityFailure($session,$id?'user_updated':'user_created',$id?'Intentó editar un usuario':'Intentó crear un usuario','Usuarios','user',$id?:null,$name?:'Usuario',$exception);$this->json(false,$exception->getMessage(),[],503);}
+        catch(InvalidArgumentException $exception){$this->activityFailure($session,$id?'user_updated':'user_created',$id?'Intentó editar un usuario':'Intentó crear un usuario','Usuarios','user',$id?:null,$name?:'Usuario',$exception);$this->json(false,$exception->getMessage(),[],422);}
         catch(Throwable $exception){$this->activityFailure($session,$id?'user_updated':'user_created',$id?'Intentó editar un usuario':'Intentó crear un usuario','Usuarios','user',$id?:null,$name?:'Usuario',$exception);error_log('Save admin user: '.$exception->getMessage());$this->json(false,'No fue posible guardar el usuario.',[],500);}
     }
 
@@ -1202,6 +1200,7 @@ final class AdminController
     {
         $this->requirePost();$session=$this->sessionAndCsrf();$id=(int)($_POST['id']??0);
         try{(new AdminUserModel())->resetPassword($id,(int)$session->userId());$this->json(true,'Contraseña temporal restablecida según la política vigente.');}
+        catch(TemporaryPasswordPolicyException $exception){$this->json(false,$exception->getMessage(),[],503);}
         catch(InvalidArgumentException $exception){$this->json(false,$exception->getMessage(),[],422);}
         catch(Throwable $exception){error_log('Admin password reset: '.$exception->getMessage());$this->json(false,'No fue posible restablecer la contraseña.',[],500);}
     }
@@ -1211,6 +1210,7 @@ final class AdminController
         $this->requirePost();$session=$this->sessionAndCsrf();$content=trim((string)($_POST['content']??''));
         if(isset($_FILES['file'])&&($_FILES['file']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_NO_FILE){$file=$_FILES['file'];if(($file['error']??UPLOAD_ERR_OK)!==UPLOAD_ERR_OK)$this->json(false,'No fue posible leer el archivo.',[],422);$extension=mb_strtolower(pathinfo((string)$file['name'],PATHINFO_EXTENSION));if(!in_array($extension,['csv','txt'],true))$this->json(false,'Utiliza un archivo CSV o TXT.',[],422);if((int)$file['size']>1048576)$this->json(false,'El archivo no puede superar 1 MB.',[],422);$content=(string)file_get_contents((string)$file['tmp_name']);}
         try{$model=new AdminUserModel();$config=['role'=>(string)($_POST['role']??''),'career_id'=>(int)($_POST['career_id']??0),'academic_period_id'=>(int)($_POST['academic_period_id']??0),'semester'=>(int)($_POST['semester']??0)];$preview=$model->previewImport($content,$config);if(($_POST['mode']??'preview')==='import'){$result=$model->bulkImport($content,$config,(int)$session->userId());$this->json(true,$result['created'].' usuarios fueron creados correctamente.',$result);} $this->json(true,'Vista previa generada.',$preview);}
+        catch(TemporaryPasswordPolicyException $exception){$this->json(false,$exception->getMessage(),[],503);}
         catch(InvalidArgumentException $exception){$this->json(false,$exception->getMessage(),[],422);}
         catch(Throwable $exception){error_log('Admin bulk import: '.$exception->getMessage());$this->json(false,'No fue posible procesar la lista.',[],500);}
     }

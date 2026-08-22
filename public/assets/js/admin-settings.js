@@ -207,7 +207,7 @@
             retention_users_days: 'Retención de usuarios', retention_projects_days: 'Retención de proyectos', retention_materials_days: 'Retención de materiales',
             notification_trash_retention_days: 'Retención de notificaciones', withdrawn_file_restore_hours: 'Recuperación de archivos retirados',
             academic_period_reversal_hours: 'Reversión de cierre de período', academic_period_reminder_days: 'Aviso de período académico',
-            calendar_reminder_days: 'Recordatorios de calendario', temporary_password: 'Política de contraseña temporal'
+            calendar_reminder_days: 'Recordatorios de calendario', session_inactivity_minutes: 'Tiempo de inactividad de sesión', temporary_password: 'Política de contraseña temporal'
         };
 
         const normalizeText = (val) => String(val || '').trim().replace(/\s+/g, ' ');
@@ -233,7 +233,8 @@
             withdrawn_file_restore_hours: normalizeNumber(form?.elements.withdrawn_file_restore_hours?.value),
             academic_period_reversal_hours: normalizeNumber(form?.elements.academic_period_reversal_hours?.value),
             academic_period_reminder_days: normalizeNumber(form?.elements.academic_period_reminder_days?.value),
-            calendar_reminder_days: normalizeNumber(form?.elements.calendar_reminder_days?.value)
+            calendar_reminder_days: normalizeNumber(form?.elements.calendar_reminder_days?.value),
+            session_inactivity_minutes: normalizeNumber(form?.elements.session_inactivity_minutes?.value)
         });
 
         let initialSettings = settingSnapshot();
