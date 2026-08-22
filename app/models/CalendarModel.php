@@ -11,8 +11,11 @@ final class CalendarModel
     public function getEventsForOwner(int $ownerId): array
     {
         $statement = Database::connection()->prepare(
-            'SELECT id,project_id,title,event_type,priority,event_date,event_time,description,is_completed,created_at,updated_at
-             FROM project_events WHERE created_by=:owner ORDER BY event_date,event_time IS NULL,event_time,id'
+            'SELECT e.id,CASE WHEN p.id IS NULL THEN NULL ELSE e.project_id END project_id,
+                    e.title,e.event_type,e.priority,e.event_date,e.event_time,e.description,e.is_completed,e.created_at,e.updated_at
+             FROM project_events e
+             LEFT JOIN projects p ON p.id=e.project_id
+             WHERE e.created_by=:owner ORDER BY e.event_date,e.event_time IS NULL,e.event_time,e.id'
         );
         $statement->execute(['owner'=>$this->owner($ownerId)]);
         return array_map(fn(array $event): array => $this->present($event), $statement->fetchAll());
@@ -108,7 +111,10 @@ final class CalendarModel
         $creator = $exists->fetchColumn();
         if ($creator === false) throw new CalendarEventException('El evento no existe.', 404);
         if ((int)$creator !== $owner) throw new CalendarEventException('No tienes permiso para modificar este evento.', 403);
-        $query = $db->prepare('SELECT id,project_id,title,event_type,priority,event_date,event_time,description,is_completed,created_at,updated_at FROM project_events WHERE id=:id AND created_by=:owner');
+        $query = $db->prepare('SELECT e.id,CASE WHEN p.id IS NULL THEN NULL ELSE e.project_id END project_id,
+                                      e.title,e.event_type,e.priority,e.event_date,e.event_time,e.description,e.is_completed,e.created_at,e.updated_at
+                               FROM project_events e LEFT JOIN projects p ON p.id=e.project_id
+                               WHERE e.id=:id AND e.created_by=:owner');
         $query->execute(['id'=>$id,'owner'=>$owner]);
         return $this->present((array)$query->fetch());
     }

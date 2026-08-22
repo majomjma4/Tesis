@@ -4,6 +4,7 @@ if (calendarRoot) {
     const $ = (selector) => document.querySelector(selector);
     const $$ = (selector) => [...document.querySelectorAll(selector)];
     const endpoint = calendarRoot.dataset.eventsUrl;
+    const calendarError = calendarRoot.dataset.calendarError || '';
     const csrfToken = calendarRoot.dataset.csrf || '';
     const projectUrl = calendarRoot.dataset.projectUrl || '';
     const projectFilterId = Number(calendarRoot.dataset.projectFilter || 0);
@@ -297,6 +298,11 @@ if (calendarRoot) {
     initCustomSelects();
     $$('.calendar-view-switcher button').forEach((button) => { const selected = button.dataset.view === activeView; button.classList.toggle('active', selected); button.setAttribute('aria-selected', String(selected)); });
     renderAll();
-    request('GET').then((result) => { if (Array.isArray(result.data)) { events = result.data; renderAll(); } }).catch(() => {});
+    if (calendarError) {
+        ['#calendarNewEventBtn', '#calendarAgendaAdd'].forEach((selector) => {
+            const button = $(selector);
+            if (button) button.disabled = true;
+        });
+    }
     // Final de eventos de interacción
 }

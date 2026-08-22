@@ -1,4 +1,13 @@
 <?php $eventPayload = json_encode($calendarEvents, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
+<?php if (!empty($calendarError)): ?>
+    <div class="calendar-load-error" role="alert">
+        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+        <div>
+            <strong>No fue posible cargar el calendario</strong>
+            <p><?= e((string) $calendarError) ?></p>
+        </div>
+    </div>
+<?php endif; ?>
 <!-- Inicio de presentación del calendario -->
 <!-- Introduce el propósito de la pantalla y reúne sus acciones principales. -->
 <section class="calendar-hero" aria-labelledby="calendarPageTitle">
@@ -25,7 +34,7 @@
 
 <!-- Inicio del espacio de trabajo del calendario -->
 <!-- Contiene navegación, filtros, vistas intercambiables y agenda contextual. -->
-<div class="calendar-workspace" data-calendar-events='<?= e($eventPayload ?: '[]') ?>' data-events-url="<?= e(route('calendar-events')) ?>" data-csrf="<?= e($calendarCsrf ?? '') ?>" data-project-url="<?= e($projectsUrl) ?>" data-project-filter="<?= (int) ($projectFilterId ?? 0) ?>">
+<div class="calendar-workspace" data-calendar-events='<?= e($eventPayload ?: '[]') ?>' data-calendar-error="<?= e((string) ($calendarError ?? '')) ?>" data-events-url="<?= e(route('calendar-events')) ?>" data-csrf="<?= e($calendarCsrf ?? '') ?>" data-project-url="<?= e($projectsUrl) ?>" data-project-filter="<?= (int) ($projectFilterId ?? 0) ?>">
     <section class="calendar-board" aria-label="Calendario mensual">
         <header class="calendar-toolbar">
             <div class="calendar-navigation">

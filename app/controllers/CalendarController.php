@@ -13,15 +13,25 @@ final class CalendarController
         $calendar = new CalendarModel();
         $projectFilterId = filter_var($_GET['project_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0;
         $isTeacherContext = $this->isTeacherContext($session);
+        $calendarEvents = [];
+        $calendarError = null;
+
+        try {
+            $calendarEvents = $isTeacherContext
+                ? $calendar->getEventsForTeacher((int) $session->userId())
+                : $calendar->getEventsForOwner((int) $session->userId());
+        } catch (Throwable $error) {
+            error_log('Calendar initial load: ' . $error->getMessage());
+            $calendarError = 'No fue posible cargar los eventos del calendario. Inténtalo nuevamente.';
+        }
 
         View::render('calendar/index', [
             'currentPage' => 'calendar',
             'title' => 'Calendario | Gestion Documental Academica',
             'bodyClass' => 'dashboard-page calendar-page',
             'pageScript' => asset('js/calendar.js'),
-            'calendarEvents' => $isTeacherContext
-                ? $calendar->getEventsForTeacher((int)$session->userId())
-                : $calendar->getEventsForOwner((int)$session->userId()),
+            'calendarEvents' => $calendarEvents,
+            'calendarError' => $calendarError,
             'calendarCsrf' => $session->csrfToken('calendar_events'),
             'projectsUrl' => route('project-detail'),
             'projectFilterId' => $projectFilterId,

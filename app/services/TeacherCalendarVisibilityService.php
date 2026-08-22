@@ -15,7 +15,8 @@ final class TeacherCalendarVisibilityService
         $items = [];
         $projectClause = $projectIds ? ' OR e.project_id IN (' . implode(',', array_fill(0, count($projectIds), '?')) . ')' : '';
         $creatorClause = $includePersonal ? 'e.created_by=?' : '0=1';
-        $events = $db->prepare("SELECT e.id,e.title,e.event_type,e.event_date,e.event_time,e.project_id,e.is_completed,p.title project_title
+        $events = $db->prepare("SELECT e.id,e.title,e.event_type,e.event_date,e.event_time,
+                CASE WHEN p.id IS NULL THEN NULL ELSE e.project_id END project_id,e.is_completed,p.title project_title
             FROM project_events e LEFT JOIN projects p ON p.id=e.project_id
             WHERE ({$creatorClause}{$projectClause}) AND e.is_completed=0
               AND (e.event_date>? OR (e.event_date=? AND (e.event_time IS NULL OR e.event_time>=?)))
