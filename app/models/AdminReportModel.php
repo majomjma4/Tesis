@@ -45,7 +45,7 @@ final class AdminReportModel
 
         
         $page = (int)($pagination['page'] ?? PaginationService::request()['page'] ?? 1);
-        $perPage = (int)($pagination['size'] ?? PaginationService::request()['size'] ?? 10);
+        $perPage = PaginationService::normalizeSize((int)($pagination['size'] ?? PaginationService::request()['size'] ?? 10));
         $total = count($processed);
         $pages = (int)ceil($total / max(1, $perPage));
         $offset = ($page - 1) * $perPage;

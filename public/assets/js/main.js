@@ -469,7 +469,8 @@ if (temporaryPasswordWarning) {
         const rect = button.getBoundingClientRect(), margin = 8, gap = 6;
         const viewportHeight = window.visualViewport?.height || window.innerHeight;
         const opensAbove = button.closest(".custom-select")?.querySelector("select")?.dataset.dropdownPlacement === "top";
-        panel.style.width = `${Math.min(Math.max(rect.width, 220), window.innerWidth - margin * 2)}px`;
+        const minWidth = button.closest('.data-pagination-size') ? rect.width : 220;
+        panel.style.width = `${Math.min(Math.max(rect.width, minWidth), window.innerWidth - margin * 2)}px`;
         panel.style.left = `${Math.min(Math.max(margin, rect.left), window.innerWidth - panel.offsetWidth - margin)}px`;
         const availableBelow = Math.max(40, opensAbove ? rect.top - gap - margin : viewportHeight - rect.bottom - gap - margin);
         const visibleOptions = [...panel.querySelectorAll(".custom-select-option:not([hidden])")];
@@ -489,7 +490,10 @@ if (temporaryPasswordWarning) {
         if (hasEmbeddedCustom) panel.style.overflowY = panel.scrollHeight > availableBelow ? "auto" : "hidden";
         panel.style.top = `${opensAbove ? Math.max(margin, rect.top - gap - Math.min(completeHeight, availableBelow)) : rect.bottom + gap}px`;
     };
-    document.querySelectorAll(".app-shell select:not([multiple]):not([data-native-select])").forEach((select, index) => {
+    let nextSelectId = 0;
+    const enhanceSelect = (select) => {
+        if (!(select instanceof HTMLSelectElement) || select.multiple || select.hasAttribute("data-native-select") || select.dataset.enhanced === "true") return;
+        const index = nextSelectId++;
         if (select.closest(".calendar-select-wrap")) return;
         const wrapper = document.createElement("span"); wrapper.className = "custom-select"; select.parentNode.insertBefore(wrapper, select); wrapper.append(select); select.classList.add("custom-select-native"); select.dataset.enhanced = "true";
         const button = document.createElement("button"); button.type = "button"; button.className = "custom-select-trigger"; button.setAttribute("aria-haspopup", "listbox"); button.setAttribute("aria-expanded", "false"); button.setAttribute("aria-controls", `customSelectPanel${index}`); button.innerHTML = '<span></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>'; wrapper.append(button);
@@ -540,7 +544,8 @@ if (temporaryPasswordWarning) {
         button.addEventListener("click", open);
         button.addEventListener("keydown", event => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); open(); return; } if (["ArrowDown", "ArrowUp"].includes(event.key)) { event.preventDefault(); if (active?.select !== select) open(); const options = [...(active?.panel.querySelectorAll(".custom-select-option:not(:disabled):not([hidden])") || [])]; options[Math.max(0, options.findIndex(option => option.getAttribute("aria-selected") === "true"))]?.focus(); } });
         select.addEventListener("change", sync); select.form?.addEventListener("reset", () => setTimeout(sync)); sync(); instances.push({ select, sync });
-    });
+    };
+    document.querySelectorAll(".app-shell select:not([multiple]):not([data-native-select])").forEach(enhanceSelect);
     document.addEventListener("click", event => { if (active && !event.target.closest(".custom-select-panel") && !event.target.closest(".custom-select-trigger")) close(); });
     document.addEventListener("app:dropdown-open", event => { if (active && active.button !== event.detail?.trigger) close(); });
     document.addEventListener("keydown", event => { if (!active) return; if (event.key === "Escape") { event.preventDefault(); close(true); } if (["ArrowDown", "ArrowUp"].includes(event.key) && event.target.closest(".custom-select-panel") && !event.target.matches("input")) { event.preventDefault(); const options = [...active.panel.querySelectorAll(".custom-select-option:not(:disabled):not([hidden])")], current = options.indexOf(document.activeElement), next = event.key === "ArrowDown" ? Math.min(options.length - 1, current + 1) : Math.max(0, current - 1); options[next]?.focus(); } });
@@ -552,6 +557,11 @@ if (temporaryPasswordWarning) {
     new MutationObserver(records => {
         const changedSelects = new Set();
         records.forEach(record => {
+            record.addedNodes.forEach(node => {
+                if (!(node instanceof Element)) return;
+                if (node.matches("select:not([multiple]):not([data-native-select])")) enhanceSelect(node);
+                node.querySelectorAll?.("select:not([multiple]):not([data-native-select])").forEach(enhanceSelect);
+            });
             const target = record.target;
             const select = target instanceof HTMLSelectElement
                 ? target
@@ -560,7 +570,7 @@ if (temporaryPasswordWarning) {
         });
         if (!changedSelects.size) return;
         instances.forEach(instance => { if (changedSelects.has(instance.select)) instance.sync(); });
-    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden", "disabled", "selected"] });
+    }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden", "disabled", "selected"] });
 })();
 
 // Mantiene los diálogos fuera de contenedores animados o desplazables.

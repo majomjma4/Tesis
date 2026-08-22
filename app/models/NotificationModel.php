@@ -74,7 +74,7 @@ final class NotificationModel
                 }
             }
             $total = count($filtered);
-            $effectiveSize = max(10, min(100, (int)($pagination['size'] ?? 10)));
+            $effectiveSize = PaginationService::normalizeSize((int)($pagination['size'] ?? 10));
             $pages = max(1, (int)ceil($total / $effectiveSize));
             $page = min((int)($pagination['page'] ?? 1), $pages);
             $offset = ($page - 1) * $effectiveSize;
