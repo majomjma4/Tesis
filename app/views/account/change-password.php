@@ -16,7 +16,10 @@
             <div class="admin-access-alert is-success" role="status">
                 <p><?= e($passwordSuccess) ?></p>
                 <div class="admin-access-success-action">
-                    <a href="<?= e(route('logout')) ?>" class="admin-access-primary"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Iniciar sesión de nuevo</a>
+                    <form method="post" action="<?= e(route('logout')) ?>">
+                        <input type="hidden" name="_csrf" value="<?= e($logoutCsrfToken ?? '') ?>">
+                        <button type="submit" class="admin-access-primary"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Iniciar sesión de nuevo</button>
+                    </form>
                 </div>
             </div>
         <?php endif; ?>

@@ -93,7 +93,17 @@ final class AuthController
 
     public function logout(): void
     {
-        (new AuthSessionService())->logout();
+        $session = new AuthSessionService();
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            header('Allow: POST');
+            exit('Método no permitido.');
+        }
+        if (!$session->validateCsrf('logout', (string) ($_POST['_csrf'] ?? ''))) {
+            http_response_code(403);
+            exit('Solicitud no válida.');
+        }
+        $session->logout();
         header('Location: ' . route('login')); exit;
     }
 
@@ -131,9 +141,30 @@ final class AuthController
                 } else {
                     $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
                     try {
-                        (new PasswordResetService())->requestReset($code, $ip);
-                        // Respuesta genérica anti-enumeración de usuarios
-                        $success = 'Si los datos corresponden a una cuenta habilitada con un correo registrado, recibirás instrucciones para restablecer tu contraseña.';
+                        $result = (new PasswordResetService())->requestReset($code, $ip);
+                        $messages = [
+                            'not_found' => 'No encontramos una cuenta asociada a esta cédula. Verifica el número ingresado o comunícate con el administrador del sistema.',
+                            'duplicate' => 'No fue posible identificar una cuenta única con esta cédula. Comunícate con el administrador del sistema.',
+                            'no_email' => 'Tu cuenta no tiene un correo electrónico registrado para recuperación. Comunícate con el administrador del sistema.',
+                            'unavailable' => 'No es posible recuperar esta cuenta por este medio. Comunícate con el administrador del sistema.',
+                            'smtp_failed' => 'Encontramos tu cuenta, pero no pudimos enviar el correo de recuperación en este momento. Inténtalo nuevamente más tarde o comunícate con el administrador.',
+                            'sent' => 'Encontramos tu cuenta y enviamos las instrucciones al correo registrado.',
+                        ];
+                        if (isset($messages[$result])) {
+                            if ($result === 'smtp_failed') {
+                                $error = $messages[$result];
+                            } else {
+                                $success = $messages[$result];
+                            }
+                        } elseif ($result === 'rate_limited_hour') {
+                            $error = 'Has realizado varias solicitudes de recuperación. Inténtalo nuevamente más tarde.';
+                        } elseif (str_starts_with($result, 'rate_limited:')) {
+                            $remainingSeconds = max(1, (int) substr($result, strlen('rate_limited:')));
+                            $unit = $remainingSeconds === 1 ? 'segundo' : 'segundos';
+                            $error = "Ya existe una solicitud reciente. Inténtalo nuevamente en {$remainingSeconds} {$unit}.";
+                        } else {
+                            $error = 'La cédula debe contener exactamente 10 dígitos.';
+                        }
                     } catch (Throwable $e) {
                         error_log('ForgotPassword Error: ' . $e->getMessage());
                         $error = 'Ocurrió un error al procesar tu solicitud. Inténtalo de nuevo más tarde.';
@@ -187,14 +218,17 @@ final class AuthController
                 } else {
                     try {
                         // Consumir el token de forma segura previniendo condiciones de carrera
-                        $consumed = $model->consumeToken((int)$tokenData['id']);
-                        if (!$consumed) {
+                        $resetResult = (new AuthModel())->resetPasswordWithRecoveryToken((int) $tokenData['id'], $password);
+                        if ($resetResult === 'invalid_token') {
                             $tokenError = 'El enlace de recuperación ya ha sido utilizado o ha expirado.';
                         } else {
                             // Actualizar contraseña e invalidar sesiones concurrentes
-                            (new AuthModel())->resetPasswordWithoutCurrent((int)$tokenData['user_id'], $password);
+                            if ($resetResult === 'account_unavailable') {
+                                $error = 'Esta cuenta no se encuentra habilitada para restablecer la contraseña. Comunícate con el administrador del sistema.';
+                            } else {
                             $success = 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.';
                         }
+                            }
                     } catch (InvalidArgumentException $e) {
                         $error = $e->getMessage();
                     } catch (Throwable $e) {
@@ -208,6 +242,8 @@ final class AuthController
         View::render('auth/reset-password', [
             'title' => 'Establecer nueva contraseña | Gestión Documental Académica',
             'bodyClass' => 'login-page',
+            'pageStyles' => [asset('css/admin-access.css')],
+            'pageScript' => asset('js/account-change-password.js'),
             'resetCsrfToken' => $session->csrfToken('reset_password'),
             'tokenValue' => $token,
             'tokenError' => $tokenError,

@@ -5,6 +5,77 @@ final class PasswordResetModel
 {
     private const COOLDOWN_SECONDS = 60;
 
+    public function consumeIpRateLimit(string $ip): array
+    {
+        $ip = mb_substr(trim($ip), 0, 45);
+        if ($ip === '') {
+            $ip = 'unknown';
+        }
+
+        return Database::transaction(function (PDO $db) use ($ip): array {
+            $db->exec("DELETE FROM password_recovery_rate_limits WHERE last_requested_at < UTC_TIMESTAMP() - INTERVAL 1 HOUR");
+
+            $insert = $db->prepare(
+                'INSERT IGNORE INTO password_recovery_rate_limits
+                 (ip_address, window_started_at, last_requested_at, request_count)
+                 VALUES (:ip, UTC_TIMESTAMP(), UTC_TIMESTAMP(), 1)'
+            );
+            $insert->execute(['ip' => $ip]);
+            $inserted = $insert->rowCount() === 1;
+
+            $read = $db->prepare(
+                'SELECT window_started_at, last_requested_at, request_count
+                 FROM password_recovery_rate_limits
+                 WHERE ip_address = :ip
+                 FOR UPDATE'
+            );
+            $read->execute(['ip' => $ip]);
+            $row = $read->fetch(PDO::FETCH_ASSOC);
+            if (!$row) {
+                throw new RuntimeException('No fue posible registrar el límite de recuperación.');
+            }
+
+            if ($inserted) {
+                return ['allowed' => true, 'reason' => null, 'remaining_seconds' => 0];
+            }
+
+            $now = time();
+            $lastRequestedAt = strtotime((string) $row['last_requested_at'] . ' UTC');
+            $windowStartedAt = strtotime((string) $row['window_started_at'] . ' UTC');
+            $elapsedSinceLastRequest = max(0, $now - $lastRequestedAt);
+
+            if ($elapsedSinceLastRequest < self::COOLDOWN_SECONDS) {
+                return [
+                    'allowed' => false,
+                    'reason' => 'cooldown',
+                    'remaining_seconds' => max(1, self::COOLDOWN_SECONDS - $elapsedSinceLastRequest),
+                ];
+            }
+
+            if (($now - $windowStartedAt) >= 3600) {
+                $db->prepare(
+                    'UPDATE password_recovery_rate_limits
+                     SET window_started_at = UTC_TIMESTAMP(), last_requested_at = UTC_TIMESTAMP(), request_count = 1
+                     WHERE ip_address = :ip'
+                )->execute(['ip' => $ip]);
+
+                return ['allowed' => true, 'reason' => null, 'remaining_seconds' => 0];
+            }
+
+            if ((int) $row['request_count'] >= 5) {
+                return ['allowed' => false, 'reason' => 'hourly', 'remaining_seconds' => 0];
+            }
+
+            $db->prepare(
+                'UPDATE password_recovery_rate_limits
+                 SET last_requested_at = UTC_TIMESTAMP(), request_count = request_count + 1
+                 WHERE ip_address = :ip'
+            )->execute(['ip' => $ip]);
+
+            return ['allowed' => true, 'reason' => null, 'remaining_seconds' => 0];
+        });
+    }
+
     public function isRateLimited(?int $userId, string $ip): bool
     {
         $db = Database::connection();
@@ -125,12 +196,12 @@ final class PasswordResetModel
         }
 
         $sql = "
-            SELECT u.id as user_id, u.email, u.status, u.deleted_at, u.full_name
+            SELECT u.id as user_id, u.email, u.status, u.deleted_at, u.purged_at, u.full_name
             FROM student_profiles sp
             INNER JOIN users u ON u.id = sp.user_id
             WHERE sp.institutional_code = :code1
             UNION
-            SELECT u.id as user_id, u.email, u.status, u.deleted_at, u.full_name
+            SELECT u.id as user_id, u.email, u.status, u.deleted_at, u.purged_at, u.full_name
             FROM teacher_profiles tp
             INNER JOIN users u ON u.id = tp.user_id
             WHERE tp.institutional_code = :code2

@@ -216,6 +216,63 @@ final class AuthModel
         });
     }
 
+    public function resetPasswordWithRecoveryToken(int $tokenId, string $newPassword): string
+    {
+        $this->assertPasswordPolicy($newPassword);
+
+        return Database::transaction(function (PDO $db) use ($tokenId, $newPassword): string {
+            $read = $db->prepare(
+                'SELECT pr.user_id, pr.expires_at, pr.used_at, u.status, u.deleted_at, u.purged_at
+                 FROM password_reset_tokens pr
+                 INNER JOIN users u ON u.id = pr.user_id
+                 WHERE pr.id = :token_id
+                 LIMIT 1
+                 FOR UPDATE'
+            );
+            $read->execute(['token_id' => $tokenId]);
+            $row = $read->fetch();
+
+            if (!$row || $row['used_at'] !== null || strtotime((string) $row['expires_at'] . ' UTC') <= time()) {
+                return 'invalid_token';
+            }
+
+            if ($row['status'] !== 'active' || $row['deleted_at'] !== null || $row['purged_at'] !== null) {
+                $db->prepare('DELETE FROM password_reset_tokens WHERE id = :token_id')->execute(['token_id' => $tokenId]);
+                return 'account_unavailable';
+            }
+
+            $update = $db->prepare(
+                'UPDATE users
+                 SET password_hash = :hash,
+                     must_change_password = 0,
+                     password_warning_count = 0,
+                     temporary_password_expires_at = NULL,
+                     temporary_password_last_warning_at = NULL,
+                     password_changed_at = CURRENT_TIMESTAMP,
+                     session_version = session_version + 1
+                 WHERE id = :user_id
+                   AND status = \'active\'
+                   AND deleted_at IS NULL
+                   AND purged_at IS NULL'
+            );
+            $update->execute([
+                'hash' => password_hash($newPassword, PASSWORD_DEFAULT),
+                'user_id' => (int) $row['user_id'],
+            ]);
+
+            if ($update->rowCount() !== 1) {
+                $db->prepare('DELETE FROM password_reset_tokens WHERE id = :token_id')->execute(['token_id' => $tokenId]);
+                return 'account_unavailable';
+            }
+
+            $db->prepare('UPDATE password_reset_tokens SET used_at = UTC_TIMESTAMP() WHERE id = :token_id')
+                ->execute(['token_id' => $tokenId]);
+            (new AdminActivityService($db))->record((int) $row['user_id'], 'password_reset', 'Contraseña restablecida', 'Cuenta', 'user', (int) $row['user_id'], 'Cuenta personal', 'correct', []);
+
+            return 'success';
+        });
+    }
+
     public function assertPasswordPolicy(string $password): void
     {
         if(mb_strlen($password,'UTF-8')<8||!preg_match('/[A-Z]/',$password)||!preg_match('/[a-z]/',$password)||!preg_match('/\d/',$password)||!preg_match('/[^A-Za-z0-9]/',$password))throw new InvalidArgumentException('La nueva contraseña debe tener al menos 8 caracteres e incluir mayúscula, minúscula, número y símbolo.');

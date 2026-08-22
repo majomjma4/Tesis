@@ -25,7 +25,9 @@
         <?php endif; ?>
 
         <?php if (!empty($forgotSuccess)): ?>
-            <div class="login-alert show" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: #047857;" role="status" aria-live="polite">
+            <div class="login-alert show"
+                style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: #047857;"
+                role="status" aria-live="polite">
                 <i class="fa-solid fa-circle-check" style="color: #10b981;"></i>
                 <span><?= e($forgotSuccess) ?></span>
             </div>
@@ -38,7 +40,9 @@
                 <label for="institutional_code">Cédula</label>
                 <div class="input-wrap">
                     <i class="fa-solid fa-id-card"></i>
-                    <input type="text" id="institutional_code" name="institutional_code" inputmode="numeric" minlength="10" maxlength="10" pattern="[0-9]{10}" placeholder="10 dígitos" value="<?= e($codeValue ?? '') ?>" required>
+                    <input type="text" id="institutional_code" name="institutional_code" inputmode="numeric"
+                        minlength="10" maxlength="10" pattern="[0-9]{10}" placeholder="Ingresa tu cédula"
+                        value="<?= e($codeValue ?? '') ?>" required>
                 </div>
             </div>
 
@@ -54,7 +58,8 @@
 
         <p class="access-note">
             <i class="fa-solid fa-shield-halved"></i>
-            <span>Si tienes problemas para recibir el enlace, por favor ponte en contacto con el administrador de la plataforma.</span>
+            <span>Si tienes problemas para recibir el enlace, por favor ponte en contacto con el administrador de la
+                plataforma.</span>
         </p>
     </section>
 </main>

@@ -12,13 +12,21 @@ final class PasswordResetService
         $this->mailer = new MailService();
     }
 
-    public function requestReset(string $institutionalCode, string $ip): void
+    public function requestReset(string $institutionalCode, string $ip): string
     {
+        $ipLimit = $this->model->consumeIpRateLimit($ip);
+        if (!$ipLimit['allowed']) {
+            if ($ipLimit['reason'] === 'hourly') {
+                return 'rate_limited_hour';
+            }
+
+            return 'rate_limited:' . max(1, (int) $ipLimit['remaining_seconds']);
+        }
+
         $normalizedCode = trim($institutionalCode);
         if ($normalizedCode === '' || !preg_match('/^\d{10}$/', $normalizedCode)) {
             // Aplicar rate limit por IP para evitar fuerza bruta en inputs inválidos
-            $this->model->isRateLimited(null, $ip);
-            return;
+            return 'invalid';
         }
 
         // 1. Resolver usuario(s) por cédula
@@ -27,15 +35,13 @@ final class PasswordResetService
         // 2. Regla 0 / 1 / >1
         if (count($users) === 0) {
             // No existe la cédula: aplicar rate limit por IP
-            $this->model->isRateLimited(null, $ip);
-            return;
+            return 'not_found';
         }
 
         if (count($users) > 1) {
             // Inconsistencia de datos en perfiles legacy: abortar de forma segura y registrar log
-            error_log("PasswordResetService: Cédula duplicada QA/Legacy detectada: {$normalizedCode}. Solicitud abortada por ambigüedad.");
-            $this->model->isRateLimited(null, $ip);
-            return;
+            error_log('PasswordResetService: cédula duplicada detectada; solicitud abortada por ambigüedad.');
+            return 'duplicate';
         }
 
         $user = $users[0];
@@ -44,16 +50,20 @@ final class PasswordResetService
 
         // 3. Control de Rate Limiting
         if ($this->model->isRateLimited($userId, $ip)) {
-            return;
+            return 'rate_limited:' . $this->rateLimitRemainingSeconds($userId, $ip);
         }
 
         // 4. Validaciones de estado de cuenta
         $status = (string)$user['status'];
         $deletedAt = $user['deleted_at'] ?? null;
+        $purgedAt = $user['purged_at'] ?? null;
 
-        if ($status !== 'active' || $deletedAt !== null || $email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            // Evitar continuar (manteniendo la respuesta genérica para evitar enumeración)
-            return;
+        if ($status !== 'active' || $deletedAt !== null || $purgedAt !== null) {
+            return 'unavailable';
+        }
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return 'no_email';
         }
 
         // 5. Generar y persistir el nuevo token
@@ -70,9 +80,29 @@ final class PasswordResetService
 
         if (!$sent) {
             $this->model->revokeToken($tokenData['id']);
-            error_log("PasswordResetService: No se pudo enviar el correo a {$email}, token revocado.");
+            error_log('PasswordResetService: envío SMTP fallido; token revocado.');
+            return 'smtp_failed';
         } else {
             $this->model->invalidatePreviousTokens($userId, $tokenData['id']);
+            return 'sent';
         }
+    }
+
+    private function rateLimitRemainingSeconds(int $userId, string $ip): int
+    {
+        $db = Database::connection();
+        $statement = $db->prepare('SELECT MAX(created_at) FROM password_reset_tokens WHERE requested_ip = :ip OR user_id = :user_id');
+        $statement->execute(['ip' => $ip, 'user_id' => $userId]);
+        $createdAt = $statement->fetchColumn();
+        if (!$createdAt) {
+            return 1;
+        }
+
+        $cooldown = (int) (new ReflectionClass(PasswordResetModel::class))
+            ->getReflectionConstant('COOLDOWN_SECONDS')
+            ->getValue();
+        $elapsed = time() - (int) strtotime((string) $createdAt . ' UTC');
+
+        return max(1, $cooldown - $elapsed);
     }
 }

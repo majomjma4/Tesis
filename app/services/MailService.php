@@ -27,6 +27,7 @@ final class MailService
 
         try {
             $mail->isSMTP();
+            $mail->SMTPDebug = 0;
             $mail->Host = $host;
             $mail->SMTPAuth = true;
             $mail->Username = $username;
@@ -74,8 +75,18 @@ final class MailService
 
             $mail->send();
             return true;
-        } catch (Exception $e) {
-            error_log('MailService Delivery Error: ' . $e->getMessage());
+        } catch (Throwable $e) {
+            $message = strtolower($e->getMessage());
+            $cause = str_contains($message, 'authentication') || str_contains($message, 'auth')
+                ? 'auth failed'
+                : (str_contains($message, 'starttls') || str_contains($message, 'tls')
+                    ? 'STARTTLS failed'
+                    : (str_contains($message, 'timed out') || str_contains($message, 'timeout')
+                        ? 'timeout'
+                        : (str_contains($message, 'getaddrinfo') || str_contains($message, 'dns')
+                            ? 'DNS'
+                            : 'SMTP delivery failure')));
+            error_log('MailService Delivery Error: ' . $cause);
             return false;
         }
     }

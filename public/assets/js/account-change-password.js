@@ -11,11 +11,11 @@
         document.addEventListener('keydown', event => { if (event.key === 'Escape' && !modal.hidden) closeVoluntary(); });
         dialog?.focus();
     }
-    const form = document.getElementById('changePasswordForm');
+    const form = document.getElementById('changePasswordForm') || document.getElementById('resetForm');
     const currentInput = document.getElementById('currentPassword');
-    const newPassInput = document.getElementById('newPassword');
-    const confirmPassInput = document.getElementById('confirmPassword');
-    const submitBtn = document.getElementById('submitPasswordBtn');
+    const newPassInput = document.getElementById('newPassword') || document.getElementById('password');
+    const confirmPassInput = document.getElementById('confirmPassword') || document.getElementById('confirm_password');
+    const submitBtn = document.getElementById('submitPasswordBtn') || form?.querySelector('button[type="submit"]');
     const reqList = document.querySelectorAll('.password-req-list li');
     const matchStatus = document.getElementById('passwordMatchStatus');
 
@@ -96,7 +96,7 @@
 
     // 4. Sincronización del Estado del Botón Principal
     const syncSubmitButton = () => {
-        const hasCurrent = Boolean(currentInput && currentInput.value.length > 0);
+        const hasCurrent = !currentInput || currentInput.value.length > 0;
         const reqsOk = checkRequirements(newPassInput.value);
         const matchOk = checkMatch();
 

@@ -44,7 +44,7 @@ $avatarUrl = $hasAvatar ? (route('profile-avatar') . '&v=' . rawurlencode((strin
                 <label>Cédula<input type="text" value="<?= e($profile['institutional_code'] ?: 'No registrada') ?>" readonly tabindex="-1" class="profile-readonly-input" aria-readonly="true"></label>
                 <div class="profile-form-actions">
                     <button type="submit" class="profile-submit-btn" data-profile-submit disabled aria-disabled="true">Guardar cambios</button>
-                    <a href="<?= e(route('logout')) ?>" class="profile-logout-btn js-logout-trigger"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Cerrar sesión</a>
+                    <button type="button" class="profile-logout-btn js-logout-trigger"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Cerrar sesión</button>
                 </div>
             </form>
         </section>

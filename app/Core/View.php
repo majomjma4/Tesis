@@ -87,6 +87,7 @@ final class View
             'layoutTemporaryPasswordRemainingDays' => (new AuthSessionService())->temporaryPasswordRemainingDays(),
             'layoutIsTemporaryPasswordDismissedToday' => (new AuthSessionService())->isTemporaryPasswordWarningDismissedToday(),
             'layoutTemporaryPasswordWarningCsrf' => $session->csrfToken('dismiss_temp_password_warning'),
+            'logoutCsrfToken' => $session->csrfToken('logout'),
         ];
     }
 

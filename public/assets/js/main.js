@@ -219,8 +219,9 @@ logoutModal?.addEventListener("click", (event) => {
     }
 });
 
-logoutAcceptBtn?.addEventListener("click", () => {
-    window.location.href = logoutAcceptBtn.dataset.logoutUrl || "index.php?page=logout";
+logoutAcceptBtn?.addEventListener("click", (event) => {
+    event.preventDefault();
+    logoutAcceptBtn.closest("form")?.requestSubmit();
 });
 // Final de confirmación de Cierre de Sesión
 

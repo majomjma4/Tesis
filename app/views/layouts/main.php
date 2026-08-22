@@ -294,8 +294,10 @@ $isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen);
             <p id="logoutModalText">¿Estás seguro de que deseas cerrar la sesión actual?</p>
             <div class="logout-modal-actions">
                 <button class="modal-cancel-btn" id="logoutCancelBtn" type="button">Cancelar</button>
-                <button class="modal-accept-btn" id="logoutAcceptBtn" type="button"
-                    data-logout-url="<?= e(route('logout')) ?>">Aceptar</button>
+                <form method="post" action="<?= e(route('logout')) ?>">
+                    <input type="hidden" name="_csrf" value="<?= e($logoutCsrfToken ?? '') ?>">
+                    <button class="modal-accept-btn" id="logoutAcceptBtn" type="submit">Aceptar</button>
+                </form>
             </div>
         </div>
     </div>
