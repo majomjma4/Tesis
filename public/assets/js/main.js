@@ -360,27 +360,15 @@ function updateTopbarNotificationCount(unread) {
 }
 
 async function openRecentNotification(item) {
-    const endpoint = topbarNotificationsButton?.dataset.openEndpoint;
-    const token = topbarNotificationsButton?.dataset.csrfToken;
     const notificationId = item.dataset.notificationId;
     const fallbackUrl = safeRecentNotificationUrl(item.href);
-    if (!endpoint || !token || !notificationId) {
+    if (!notificationId) {
         window.location.assign(fallbackUrl);
         return;
     }
 
-    const body = new URLSearchParams({ notification_id: notificationId });
-    const response = await fetch(endpoint, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8", "X-CSRF-Token": token, "X-Requested-With": "XMLHttpRequest" },
-        body,
-    });
-    const payload = await response.json();
-    if (!response.ok || !payload.success) throw new Error(payload.message || "No fue posible abrir la notificacion.");
-    updateTopbarNotificationCount(payload.data.counters.unread);
-    // Navegar al módulo Notificaciones con el ID real de la notificación seleccionada.
-    // notifications.js lo captura en openNotificationFromQuery() y abre el modal de detalle.
+    // Navegar directamente al módulo de notificaciones usando el deep-link.
+    // notifications.js lo capturará en openNotificationFromQuery() y llamará al endpoint open.
     const notificationsPageUrl = safeRecentNotificationUrl("index.php?page=notifications") || fallbackUrl;
     const deepLinkUrl = new URL(notificationsPageUrl, window.location.href);
     deepLinkUrl.searchParams.set("page", "notifications");

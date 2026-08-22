@@ -636,13 +636,14 @@ final class DashboardModel
             foreach ($rows as $r) {
                 $actionLabel = (string) ($r['action_label'] ?? '');
                 $resource = !empty($r['element_label']) ? (string) $r['element_label'] : (string) ($r['entity_label'] ?? 'Sistema');
+                $actor = !empty($r['actor']) ? (string) $r['actor'] : 'Administración';
                 $activity[] = [
                     'action' => $actionLabel,
                     'label' => $actionLabel,
-                    'actor' => 'Administración',
+                    'actor' => $actor,
                     'resource' => $resource,
-                    'occurred_at' => (string) ($r['created_at'] ?? ''),
-                    'date' => (string) ($r['created_at'] ?? ''),
+                    'occurred_at' => (string) ($r['created_at_local'] ?? $r['created_at'] ?? ''),
+                    'date' => (string) ($r['created_at_local'] ?? $r['created_at'] ?? ''),
                     'route' => route('admin-reports'),
                 ];
             }
