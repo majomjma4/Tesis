@@ -13,4 +13,13 @@ return [
     // Linux: /usr/bin/libreoffice or /usr/bin/soffice
     'libreoffice_path' => '',
     'libreoffice_timeout_seconds' => 45,
+    // Configuración de correo Gmail SMTP
+    'app_url' => 'http://localhost/TESIS',
+    'mail_host' => 'smtp.gmail.com',
+    'mail_port' => 587,
+    'mail_encryption' => 'tls',
+    'mail_username' => '',
+    'mail_password' => '', // Gmail App Password
+    'mail_from_address' => '',
+    'mail_from_name' => 'Gestión Documental Académica',
 ];

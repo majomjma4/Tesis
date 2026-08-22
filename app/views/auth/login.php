@@ -72,7 +72,7 @@
             <!-- Final de campo de contrasena -->
 
             <div class="form-options">
-                <a class="forgot-link" href="#">Olvidaste tu contraseña?</a>
+                <a class="forgot-link" href="<?= e(route('forgot-password')) ?>">¿Olvidaste tu contraseña?</a>
             </div>
 
             <button class="login-submit" type="submit">

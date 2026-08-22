@@ -116,7 +116,6 @@ final class AdminUserModel
         $rows=$this->parseImportRows($content);$emails=[];$codes=[];$usernames=[];$result=[];$valid=0;$db=Database::connection();
         $emailCheck=$db->prepare('SELECT COUNT(*) FROM users WHERE email=:email');
         $usernameCheck=$db->prepare('SELECT COUNT(*) FROM users WHERE username=:username');
-        $codeCheck=$db->prepare('SELECT (SELECT COUNT(*) FROM student_profiles WHERE institutional_code=:student)+(SELECT COUNT(*) FROM teacher_profiles WHERE institutional_code=:teacher)');
         foreach($rows as $index=>$row){
             $errors=[];$name=trim((string)($row[0]??''));$email=mb_strtolower(trim((string)($row[1]??'')));$code=trim((string)($row[2]??''));$extra=trim((string)($row[3]??''));
             $username=$config['role']==='student'?$extra:'';$title=$config['role']==='teacher'?$extra:'';
@@ -129,7 +128,7 @@ final class AdminUserModel
             if($username!==''&&isset($usernames[mb_strtolower($username)]))$errors[]='Usuario repetido en la lista';
             if(!$errors&&$email!==''){$emailCheck->execute(['email'=>$email]);if((int)$emailCheck->fetchColumn()>0)$errors[]='El correo ya está registrado';}
             if(!$errors&&$username!==''){$usernameCheck->execute(['username'=>$username]);if((int)$usernameCheck->fetchColumn()>0)$errors[]='El usuario ya está registrado';}
-            if(!$errors&&$code!==''){$codeCheck->execute(['student'=>$code,'teacher'=>$code]);if((int)$codeCheck->fetchColumn()>0)$errors[]='La identificación ya está registrada';}
+            if(!$errors&&$code!==''){if($this->institutionalCodeExists($code))$errors[]='La identificación ya está registrada';}
             $emails[$email]=true;$codes[$code]=true;if($username!=='')$usernames[mb_strtolower($username)]=true;if(!$errors)$valid++;
             $result[]=['line'=>$index+1,'name'=>$name,'email'=>$email,'code'=>$code,'username'=>$username,'academic_title'=>$title,'valid'=>!$errors,'error'=>implode('. ',$errors)];
         }
@@ -189,7 +188,12 @@ final class AdminUserModel
         if($check->fetch())throw new InvalidArgumentException('Ya existe una cuenta con ese correo.');
         if($data['username']!==''&&!preg_match('/^[a-zA-Z0-9._-]{3,80}$/',$data['username']))throw new InvalidArgumentException('El usuario debe tener entre 3 y 80 caracteres y usar solo letras, números, punto, guion o guion bajo.');
         if($data['username']!==''){$check=Database::connection()->prepare('SELECT id FROM users WHERE username=:username AND id<>:id LIMIT 1');$check->execute(['username'=>$data['username'],'id'=>$id]);if($check->fetch())throw new InvalidArgumentException('Ese nombre de usuario ya está registrado.');}
-        if(in_array($data['role'],['student','teacher'],true)&&!preg_match('/^\d{10}$/',$data['institutional_code']))throw new InvalidArgumentException('La cédula debe contener exactamente 10 dígitos.');
+        if(in_array($data['role'],['student','teacher'],true)){
+            if(!preg_match('/^\d{10}$/',$data['institutional_code']))throw new InvalidArgumentException('La cédula debe contener exactamente 10 dígitos.');
+            if($this->institutionalCodeExists($data['institutional_code'],$id > 0 ? $id : null)){
+                throw new InvalidArgumentException('La cédula ingresada ya está asociada a otra cuenta.');
+            }
+        }
         if($data['role']==='student'&&($data['career_id']<1||$data['academic_period_id']<1||$data['semester']<1||$data['semester']>4))throw new InvalidArgumentException('Completa el semestre del estudiante entre primero y cuarto.');
     }
 
@@ -206,6 +210,29 @@ final class AdminUserModel
         $statement=$db->prepare("SELECT COUNT(*) FROM users WHERE is_admin=1 AND status='active' AND deleted_at IS NULL AND purged_at IS NULL AND id<>:id");
         $statement->execute(['id'=>$excludedId]);
         if((int)$statement->fetchColumn()<1)throw new InvalidArgumentException(self::LAST_ADMIN_MESSAGE);
+    }
+
+    public function institutionalCodeExists(string $code, ?int $excludeUserId = null): bool
+    {
+        $db = Database::connection();
+        $code = trim($code);
+        if ($code === '') {
+            return false;
+        }
+        $stmt = $db->prepare('
+            SELECT user_id FROM student_profiles WHERE institutional_code = :code1
+            UNION
+            SELECT user_id FROM teacher_profiles WHERE institutional_code = :code2
+        ');
+        $stmt->execute(['code1' => $code, 'code2' => $code]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as $row) {
+            $uId = (int)$row['user_id'];
+            if ($excludeUserId === null || $uId !== $excludeUserId) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function ensureUser(PDO $db,int $id):void{$statement=$db->prepare('SELECT id FROM users WHERE id=:id');$statement->execute(['id'=>$id]);if(!$statement->fetchColumn())throw new InvalidArgumentException('El usuario ya no existe.');}

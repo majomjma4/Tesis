@@ -15,6 +15,9 @@ date_default_timezone_set($timezone);
 require APP_PATH . '/helpers.php';
 require APP_PATH . '/Core/Autoloader.php';
 Autoloader::register();
+if (is_file(ROOT_PATH . '/vendor/autoload.php')) {
+    require_once ROOT_PATH . '/vendor/autoload.php';
+}
 
 if (($config['environment'] ?? 'production') === 'production') {
     ini_set('display_errors', '0');
@@ -31,6 +34,8 @@ match ($page) {
     'login' => (new AuthController())->login(),
     'login-session-replace' => (new AuthController())->replaceActiveSession(),
     'login-session-replace-cancel' => (new AuthController())->cancelSessionReplacement(),
+    'forgot-password' => (new AuthController())->forgotPassword(),
+    'reset-password' => (new AuthController())->resetPassword(),
     'logout' => (new AuthController())->logout(),
     'change-password' => (new AccountController())->changePassword(),
     'dismiss-temp-password-warning' => (new AccountController())->dismissTemporaryPasswordWarning(),

@@ -17,6 +17,15 @@ $config = [
     // Server dependency for private DOCX review previews. Never expose this path to browsers.
     'libreoffice_path' => getenv('LIBREOFFICE_PATH') ?: '',
     'libreoffice_timeout_seconds' => (int) (getenv('LIBREOFFICE_TIMEOUT_SECONDS') ?: 45),
+    'app_url' => getenv('APP_URL') ?: 'http://localhost/TESIS',
+    'mail_host' => getenv('MAIL_HOST') ?: 'smtp.gmail.com',
+    'mail_port' => (int) (getenv('MAIL_PORT') ?: 587),
+    'mail_encryption' => getenv('MAIL_ENCRYPTION') ?: 'tls',
+    'mail_username' => getenv('MAIL_USERNAME') ?: '',
+    'mail_password' => getenv('MAIL_PASSWORD') ?: '',
+    'mail_from_address' => getenv('MAIL_FROM_ADDRESS') ?: '',
+    'mail_from_name' => getenv('MAIL_FROM_NAME') ?: 'Gestión Documental Académica',
+    'password_reset_ttl_minutes' => (int) (getenv('PASSWORD_RESET_TTL_MINUTES') ?: 60),
 ];
 
 $localFile = __DIR__ . '/app.local.php';

@@ -206,6 +206,16 @@ final class AuthModel
         return Database::transaction(function(PDO $db)use($userId,$current,$new):bool{$read=$db->prepare('SELECT password_hash FROM users WHERE id=:id AND status=\'active\' AND deleted_at IS NULL AND purged_at IS NULL FOR UPDATE');$read->execute(['id'=>$userId]);$hash=$read->fetchColumn();if(!$hash||!password_verify($current,(string)$hash))return false;$update=$db->prepare('UPDATE users SET password_hash=:hash,must_change_password=0,password_warning_count=0,temporary_password_expires_at=NULL,temporary_password_last_warning_at=NULL,password_changed_at=CURRENT_TIMESTAMP,session_version=session_version+1 WHERE id=:id');$update->execute(['hash'=>password_hash($new,PASSWORD_DEFAULT),'id'=>$userId]);(new AdminActivityService($db))->record($userId,'password_changed','Contraseña actualizada','Cuenta','user',$userId,'Cuenta personal','correct',[]);return true;});
     }
 
+    public function resetPasswordWithoutCurrent(int $userId, string $newPassword): void
+    {
+        $this->assertPasswordPolicy($newPassword);
+        Database::transaction(function(PDO $db) use ($userId, $newPassword): void {
+            $update = $db->prepare('UPDATE users SET password_hash=:hash,must_change_password=0,password_warning_count=0,temporary_password_expires_at=NULL,temporary_password_last_warning_at=NULL,password_changed_at=CURRENT_TIMESTAMP,session_version=session_version+1 WHERE id=:id');
+            $update->execute(['hash' => password_hash($newPassword, PASSWORD_DEFAULT), 'id' => $userId]);
+            (new AdminActivityService($db))->record($userId, 'password_reset', 'Contraseña restablecida', 'Cuenta', 'user', $userId, 'Cuenta personal', 'correct', []);
+        });
+    }
+
     public function assertPasswordPolicy(string $password): void
     {
         if(mb_strlen($password,'UTF-8')<8||!preg_match('/[A-Z]/',$password)||!preg_match('/[a-z]/',$password)||!preg_match('/\d/',$password)||!preg_match('/[^A-Za-z0-9]/',$password))throw new InvalidArgumentException('La nueva contraseña debe tener al menos 8 caracteres e incluir mayúscula, minúscula, número y símbolo.');

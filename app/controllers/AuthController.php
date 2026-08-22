@@ -110,6 +110,112 @@ final class AuthController
         header('Location: ' . route('login')); exit;
     }
 
+    public function forgotPassword(): void
+    {
+        $session = new AuthSessionService();
+        if ($session->isAuthenticated()) { header('Location: ' . route('dashboard')); exit; }
+
+        header('Referrer-Policy: no-referrer');
+
+        $error = null;
+        $success = null;
+        $code = '';
+
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+            if (!$session->validateCsrf('forgot_password', (string)($_POST['_csrf'] ?? ''))) {
+                $error = 'La sesión del formulario venció. Inténtalo nuevamente.';
+            } else {
+                $code = trim((string)($_POST['institutional_code'] ?? ''));
+                if (!preg_match('/^\d{10}$/', $code)) {
+                    $error = 'La cédula debe contener exactamente 10 dígitos.';
+                } else {
+                    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+                    try {
+                        (new PasswordResetService())->requestReset($code, $ip);
+                        // Respuesta genérica anti-enumeración de usuarios
+                        $success = 'Si los datos corresponden a una cuenta habilitada con un correo registrado, recibirás instrucciones para restablecer tu contraseña.';
+                    } catch (Throwable $e) {
+                        error_log('ForgotPassword Error: ' . $e->getMessage());
+                        $error = 'Ocurrió un error al procesar tu solicitud. Inténtalo de nuevo más tarde.';
+                    }
+                }
+            }
+        }
+
+        View::render('auth/forgot-password', [
+            'title' => 'Recuperar contraseña | Gestión Documental Académica',
+            'bodyClass' => 'login-page',
+            'forgotCsrfToken' => $session->csrfToken('forgot_password'),
+            'forgotError' => $error,
+            'forgotSuccess' => $success,
+            'codeValue' => $code
+        ], 'auth');
+    }
+
+    public function resetPassword(): void
+    {
+        $session = new AuthSessionService();
+        if ($session->isAuthenticated()) { header('Location: ' . route('dashboard')); exit; }
+
+        header('Referrer-Policy: no-referrer');
+
+        $token = (string)($_GET['token'] ?? ($_POST['token'] ?? ''));
+        $model = new PasswordResetModel();
+
+        // Validar token
+        $tokenData = $model->findValidToken($token);
+        $tokenError = null;
+
+        if (!$tokenData) {
+            $tokenError = 'El enlace de recuperación es inválido o ha expirado.';
+        }
+
+        $error = null;
+        $success = null;
+
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && !$tokenError) {
+            if (!$session->validateCsrf('reset_password', (string)($_POST['_csrf'] ?? ''))) {
+                $error = 'La sesión del formulario venció. Inténtalo nuevamente.';
+            } else {
+                $password = (string)($_POST['password'] ?? '');
+                $confirm = (string)($_POST['confirm_password'] ?? '');
+
+                if ($password === '' || $confirm === '') {
+                    $error = 'Completa todos los campos.';
+                } elseif ($password !== $confirm) {
+                    $error = 'Las contraseñas no coinciden.';
+                } else {
+                    try {
+                        // Consumir el token de forma segura previniendo condiciones de carrera
+                        $consumed = $model->consumeToken((int)$tokenData['id']);
+                        if (!$consumed) {
+                            $tokenError = 'El enlace de recuperación ya ha sido utilizado o ha expirado.';
+                        } else {
+                            // Actualizar contraseña e invalidar sesiones concurrentes
+                            (new AuthModel())->resetPasswordWithoutCurrent((int)$tokenData['user_id'], $password);
+                            $success = 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.';
+                        }
+                    } catch (InvalidArgumentException $e) {
+                        $error = $e->getMessage();
+                    } catch (Throwable $e) {
+                        error_log('ResetPassword Error: ' . $e->getMessage());
+                        $error = 'Ocurrió un error al restablecer la contraseña. Inténtalo de nuevo.';
+                    }
+                }
+            }
+        }
+
+        View::render('auth/reset-password', [
+            'title' => 'Establecer nueva contraseña | Gestión Documental Académica',
+            'bodyClass' => 'login-page',
+            'resetCsrfToken' => $session->csrfToken('reset_password'),
+            'tokenValue' => $token,
+            'tokenError' => $tokenError,
+            'resetError' => $error,
+            'resetSuccess' => $success
+        ], 'auth');
+    }
+
     private function isAjaxOrJsonRequest(): bool
     {
         $requestedWith = strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''));
