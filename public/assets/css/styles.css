@@ -54,12 +54,13 @@
 }
 html.dashboard-root{
     font-size:var(--app-root-font-size);
+    min-height:100%;
 }
 body{
     background:linear-gradient(90deg, #143E83 0 var(--app-shell-gutter), var(--bg) var(--app-shell-gutter) 100%);
     color:var(--text);
     display:flex;
-    min-height:100vh;
+    min-height:100dvh;
     overflow-x:hidden;
 }
 body.app-shell{
@@ -78,10 +79,14 @@ body.dark-mode{
     --shadow:0 14px 35px rgba(0,0,0,.24);
 }
 button,
-a{
-    font:inherit;
-}
-button{
+input,
+optgroup,
+select,
+textarea{
+    font-family:inherit;
+    font-size:100%;
+    line-height:1.15;
+    margin:0;
     border:none;
 }
 a{
@@ -102,8 +107,7 @@ a{
     gap:24px;
     position:fixed;
     inset:0 auto 0 0;
-    height:100vh;
-    min-height:100dvh;
+    height:100dvh;
     overflow-y:auto;
     z-index:40;
     box-shadow:4px 0 20px rgba(0,0,0,.08);

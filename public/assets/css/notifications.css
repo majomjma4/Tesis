@@ -2415,7 +2415,7 @@ html.theme-dark .notification-date-input {
 
 /* Patrón de filtros alineado con Proyectos activos, aislado al módulo. */
 .notification-projects-pattern {
-    grid-template-columns: minmax(360px, 1fr) 200px 200px 210px;
+    grid-template-columns: minmax(200px, 1fr) minmax(140px, 200px) minmax(140px, 200px) minmax(160px, 210px);
     align-items: end;
     padding: 15px 18px
 }
@@ -2428,7 +2428,9 @@ html.theme-dark .notification-date-input {
 
 .notification-filter-search {
     position: relative;
-    display: flex;
+    display: grid !important;
+    grid-template-columns: auto 1fr !important;
+    column-gap: 11px !important;
     align-items: center;
     width: 100%;
     min-width: 0;
@@ -2465,12 +2467,11 @@ html.theme-dark .notification-date-input {
 
 .notification-filter-search > input {
     display: block;
-    flex: 1 1 auto;
-    width: 100%;
-    min-width: 0;
-    max-width: none;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
     box-sizing: border-box;
-    padding: 0;
+    padding: 0 10px 0 0;
     font-family: inherit;
     font-size: inherit;
     font-weight: 400;
@@ -2621,9 +2622,9 @@ html.theme-dark .notification-date-input {
     font-size:var(--font-sm)
 }
 
-@media(max-width:1180px) {
+@media(max-width:1250px) {
     .notification-projects-pattern {
-        grid-template-columns: repeat(2, minmax(0, 1fr))
+        grid-template-columns: repeat(3, minmax(0, 1fr))
     }
 
     .notification-filter-search {
@@ -2652,8 +2653,8 @@ html.theme-dark .notification-date-input {
     }
 
     .notification-date-popover {
-        left: 0;
-        right: auto
+        right: 0;
+        left: auto
     }
 }
 
