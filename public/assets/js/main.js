@@ -379,7 +379,13 @@ async function openRecentNotification(item) {
     const payload = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || "No fue posible abrir la notificacion.");
     updateTopbarNotificationCount(payload.data.counters.unread);
-    window.location.assign(safeRecentNotificationUrl(payload.data?.url) || fallbackUrl);
+    // Navegar al módulo Notificaciones con el ID real de la notificación seleccionada.
+    // notifications.js lo captura en openNotificationFromQuery() y abre el modal de detalle.
+    const notificationsPageUrl = safeRecentNotificationUrl("index.php?page=notifications") || fallbackUrl;
+    const deepLinkUrl = new URL(notificationsPageUrl, window.location.href);
+    deepLinkUrl.searchParams.set("page", "notifications");
+    deepLinkUrl.searchParams.set("notification_id", String(notificationId));
+    window.location.assign(deepLinkUrl.toString());
 }
 
 async function loadRecentNotifications() {
