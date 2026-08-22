@@ -56,9 +56,12 @@ final class ThesisDefenseScheduleService
     private function saveTx(PDO $db, int $periodId, array $input, int $actorId): array
     {
         if ($periodId < 1) throw new ThesisDefenseScheduleException('Selecciona un período académico válido.');
-        $periodStatement = $db->prepare('SELECT id, name FROM academic_periods WHERE id=:id FOR UPDATE');
+        $periodStatement = $db->prepare('SELECT id, name, status FROM academic_periods WHERE id=:id FOR UPDATE');
         $periodStatement->execute(['id' => $periodId]);
         $period = $periodStatement->fetch();
+        if ($period && !in_array((string) $period['status'], ['active', 'closed'], true)) {
+            throw new ThesisDefenseScheduleException('El periodo academico seleccionado ya no esta disponible para esta operacion.');
+        }
         if (!$period) throw new ThesisDefenseScheduleException('El período académico seleccionado no está disponible.', 404);
 
         $currentStatement = $db->prepare(

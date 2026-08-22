@@ -239,7 +239,9 @@
             document.querySelector('#aaTitle').textContent = values.id
                 ? 'Editar planificación'
                 : (config.dataset.currentPeriod ? `Planificar ${config.dataset.suggestedName}` : 'Configurar primer período');
-            document.querySelector('#aaModalEyebrow').textContent = 'Continuidad académica';
+            document.querySelector('#aaModalEyebrow').textContent = values.id || config.dataset.currentPeriod
+                ? 'Continuidad académica'
+                : 'Configuración inicial';
             setValue('starts_on', values.start || '');
             setValue('ends_on', values.end || '');
             document.querySelector('#aaSubmit').textContent = 'Guardar planificación';

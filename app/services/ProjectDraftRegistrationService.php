@@ -48,8 +48,10 @@ final class ProjectDraftRegistrationService
 
     private function lockActivePeriod(PDO $db):void
     {
-        $q=$db->query("SELECT id FROM academic_periods WHERE status='active' ORDER BY starts_on DESC,id DESC LIMIT 1 FOR UPDATE");
-        if(!$q->fetchColumn())throw new ProjectDraftRegistrationException('No existe un período académico activo.',['period'=>'No existe un período académico activo.']);
+        $q=$db->query("SELECT id FROM academic_periods WHERE status='active' ORDER BY starts_on DESC,id DESC FOR UPDATE");
+        $rows=$q->fetchAll(PDO::FETCH_COLUMN);
+        if(count($rows)>1)throw new ProjectDraftRegistrationException('La configuracion academica tiene mas de un periodo activo.',['period'=>'La configuracion academica tiene mas de un periodo activo.']);
+        if(!$rows)throw new ProjectDraftRegistrationException('No existe un periodo academico activo.',['period'=>'No existe un periodo academico activo.']);
     }
 
     private function payload(string $json):array

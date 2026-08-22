@@ -14,6 +14,13 @@ final class ProjectDraftService
         'community' => ['prefix' => 'VIN', 'additional' => [], 'semesters' => [2], 'availability' => 'Disponible para 2.º semestre.', 'default_title' => 'Proyecto de vinculación'],
     ];
 
+    private const DEFAULT_TYPE_RULE = [
+        'prefix' => 'PRY',
+        'additional' => [],
+        'semesters' => null,
+        'availability' => 'Disponible para todos los semestres.',
+    ];
+
     public function catalogs(int $userId, array $policy): array
     {
         $db = Database::connection();
@@ -157,8 +164,12 @@ final class ProjectDraftService
 
     private function activePeriod(PDO $db): ?array
     {
-        $q = $db->query("SELECT id,code,name,starts_on,ends_on FROM academic_periods WHERE status='active' ORDER BY starts_on DESC,id DESC LIMIT 1");
-        return $q->fetch() ?: null;
+        $q = $db->query("SELECT id,code,name,starts_on,ends_on FROM academic_periods WHERE status='active' ORDER BY starts_on DESC,id DESC");
+        $rows = $q->fetchAll();
+        if (count($rows) > 1) {
+            throw new RuntimeException('La configuracion academica tiene mas de un periodo activo.');
+        }
+        return $rows[0] ?? null;
     }
 
     private function studentContext(PDO $db, int $userId, int $periodId): ?array
@@ -174,11 +185,10 @@ final class ProjectDraftService
     private function types(PDO $db, ?array $student): array
     {
         $rows = $db->query("SELECT id,code,name,registration_description FROM project_types WHERE is_active=1 ORDER BY id")->fetchAll();
-        $rowsByCode = [];
-        foreach ($rows as $row) $rowsByCode[(string) $row['code']] = $row;
         $types = [];
-        foreach (self::TYPE_RULES as $code => $rule) {
-            $row = $rowsByCode[$code] ?? null; if ($row === null) continue;
+        foreach ($rows as $row) {
+            $code = (string) $row['code'];
+            $rule = self::TYPE_RULES[$code] ?? self::DEFAULT_TYPE_RULE;
             $allowed = $rule['semesters'] === null || ($student !== null && in_array((int) $student['semester'], $rule['semesters'], true));
             $types[$code] = ['id' => (int) $row['id'], 'label' => (string) $row['name'], 'prefix' => $rule['prefix'], 'additional' => $rule['additional'], 'enabled' => $allowed, 'availability' => $rule['availability'], 'default_title' => $rule['default_title'] ?? '', 'registration_description' => (string) ($row['registration_description'] ?? '')];
         }

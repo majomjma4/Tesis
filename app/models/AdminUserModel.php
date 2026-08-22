@@ -41,7 +41,9 @@ final class AdminUserModel
     {
         $db=Database::connection();
         $career=$db->query("SELECT id,'Desarrollo de Software' name FROM careers WHERE is_active=1 AND (code='TDS' OR name LIKE '%Desarrollo de Software%') ORDER BY (code='TDS') DESC,id LIMIT 1")->fetch()?:null;
-        $period=$db->query("SELECT id,name FROM academic_periods WHERE status='active' ORDER BY starts_on DESC,id DESC LIMIT 1")->fetch()?:null;
+        $periodRows=$db->query("SELECT id,name FROM academic_periods WHERE status='active' ORDER BY starts_on DESC,id DESC")->fetchAll();
+        if(count($periodRows)>1)throw new RuntimeException('La configuracion academica tiene mas de un periodo activo.');
+        $period=$periodRows[0]??null;
         return ['career'=>$career,'period'=>$period];
     }
 

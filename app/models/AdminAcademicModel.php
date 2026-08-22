@@ -15,8 +15,10 @@ final class AdminAcademicModel
     public function dashboard(?int $actor = null): array
     {
         $db = Database::connection();
+        $sectionErrors = [];
         // El período vigente siempre proviene de MariaDB; nunca se deduce del mes calendario.
-        $periods = $db->query(
+        try {
+            $periods = $db->query(
             "SELECT ap.*,
                     (
                         SELECT COUNT(DISTINCT p.id)
@@ -57,8 +59,14 @@ final class AdminAcademicModel
                     ) published_projects
              FROM academic_periods ap
              ORDER BY ap.starts_on DESC"
-        )->fetchAll();
-        $projectRows = $db->query(
+            )->fetchAll();
+        } catch (Throwable $exception) {
+            $this->dashboardSectionFailure('periods', $exception);
+            $sectionErrors['periods'] = 'No fue posible cargar los periodos academicos.';
+            $periods = [];
+        }
+        try {
+            $projectRows = $db->query(
             "SELECT academic_period_id,id,title
              FROM (
                  SELECT p.academic_period_id,p.id,p.title,
@@ -86,7 +94,12 @@ final class AdminAcademicModel
              ) period_projects
              WHERE position<=5
              ORDER BY academic_period_id,position"
-        )->fetchAll();
+            )->fetchAll();
+        } catch (Throwable $exception) {
+            $this->dashboardSectionFailure('period_previews', $exception);
+            $sectionErrors['period_previews'] = 'No fue posible cargar el resumen de proyectos historicos.';
+            $projectRows = [];
+        }
         $projectsByPeriod = [];
         foreach ($projectRows as $project) {
             $projectsByPeriod[(int) $project['academic_period_id']][] = [
@@ -109,9 +122,9 @@ final class AdminAcademicModel
             if ($period['status'] === 'planned' && $planned === null) $planned = $period;
         }
 
-        return [
-            'periods' => $periods,
-            'types' => $db->query(
+        $types = [];
+        try {
+            $types = $db->query(
                 "SELECT pt.*, pt.registration_description AS description,
                         (
                             SELECT COUNT(DISTINCT p.id)
@@ -130,17 +143,82 @@ final class AdminAcademicModel
                         ,(SELECT COUNT(*) FROM projects reference_project WHERE reference_project.project_type_id=pt.id) references_count
                  FROM project_types pt
                  ORDER BY pt.is_active DESC, pt.name"
-            )->fetchAll(),
-            'material_types' => (new SupportMaterialModel())->administrativeCatalog('material_type', $db),
-            'keywords' => (new SupportMaterialModel())->administrativeCatalog('keyword', $db),
+            )->fetchAll();
+        } catch (Throwable $exception) {
+            $this->dashboardSectionFailure('types', $exception);
+            $sectionErrors['types'] = 'No fue posible cargar los tipos de proyecto.';
+        }
+
+        $materialTypes = [];
+        try {
+            $materialTypes = (new SupportMaterialModel())->administrativeCatalog('material_type', $db);
+        } catch (Throwable $exception) {
+            $this->dashboardSectionFailure('material_types', $exception);
+            $sectionErrors['material_types'] = 'No fue posible cargar los tipos de material.';
+        }
+
+        $keywords = [];
+        try {
+            $keywords = (new SupportMaterialModel())->administrativeCatalog('keyword', $db);
+        } catch (Throwable $exception) {
+            $this->dashboardSectionFailure('keywords', $exception);
+            $sectionErrors['keywords'] = 'No fue posible cargar las palabras clave.';
+        }
+
+        $suggested = null;
+        try {
+            $suggested = $this->nextPeriod($active);
+        } catch (Throwable $exception) {
+            $this->dashboardSectionFailure('period_promotion', $exception);
+            $sectionErrors['periods'] ??= 'No fue posible cargar completamente la configuracion de periodos.';
+        }
+        $reversal = null;
+        if ($actor) {
+            try {
+                $reversal = $this->reversalAvailability($db, $actor);
+            } catch (Throwable $exception) {
+                $this->dashboardSectionFailure('period_reversal', $exception);
+                $sectionErrors['periods'] ??= 'No fue posible cargar completamente la configuracion de periodos.';
+            }
+        }
+
+        return [
+            'periods' => $periods,
+            'types' => $types,
+            'material_types' => $materialTypes,
+            'keywords' => $keywords,
+            'section_errors' => $sectionErrors,
             'promotion' => [
                 'source' => $active,
                 'target' => $planned,
                 'projects' => $active ? (int) $active['projects'] : 0,
-                'suggested' => $this->nextPeriod($active),
+                'suggested' => $suggested,
             ],
-            'reversal' => $actor ? $this->reversalAvailability($db, $actor) : null,
+            'reversal' => $reversal,
         ];
+    }
+
+    private function dashboardSectionFailure(string $section, Throwable $exception): void
+    {
+        error_log('Admin academic section [' . $section . ']: ' . $exception->getMessage());
+    }
+
+    /**
+     * Locks and resolves the institutional active period without hiding a
+     * corrupted state with an arbitrary LIMIT 1 choice.
+     */
+    private function lockedActivePeriod(PDO $db): ?array
+    {
+        $rows = $db->query(
+            "SELECT * FROM academic_periods
+             WHERE status='active'
+             ORDER BY starts_on DESC,id DESC
+             FOR UPDATE"
+        )->fetchAll();
+        if (count($rows) > 1) {
+            throw new InvalidArgumentException('Existe mas de un periodo academico activo. Corrige la configuracion antes de continuar.');
+        }
+        return $rows[0] ?? null;
     }
 
     public function save(string $entity, array $values, int $actor): void
@@ -171,7 +249,7 @@ final class AdminAcademicModel
         if ($target < 1) throw new InvalidArgumentException('Primero planifica el siguiente período.');
 
         return Database::transaction(function (PDO $db) use ($target, $actor, $confirmEarlyClose): array {
-            $active = $db->query("SELECT * FROM academic_periods WHERE status='active' LIMIT 1 FOR UPDATE")->fetch();
+            $active = $this->lockedActivePeriod($db);
             if (!$active) throw new InvalidArgumentException('No existe un período activo.');
             if ((string) $active['ends_on'] > date('Y-m-d') && !$confirmEarlyClose) {
                 throw new InvalidArgumentException('El período aún no alcanza su fecha final. Confirma expresamente el cierre anticipado.');
@@ -301,10 +379,10 @@ final class AdminAcademicModel
                 throw new InvalidArgumentException('No es posible revertir el cierre porque ya existe actividad académica en el período actual. ' . $activity);
             }
 
-            $reopen = $db->prepare("UPDATE academic_periods SET status='active' WHERE id=:id AND status='closed'");
-            $reopen->execute(['id' => $closed['id']]);
             $replan = $db->prepare("UPDATE academic_periods SET status='planned' WHERE id=:id AND status='active'");
             $replan->execute(['id' => $activated['id']]);
+            $reopen = $db->prepare("UPDATE academic_periods SET status='active' WHERE id=:id AND status='closed'");
+            $reopen->execute(['id' => $closed['id']]);
             if ($reopen->rowCount() !== 1 || $replan->rowCount() !== 1) {
                 throw new RuntimeException('No fue posible restaurar de forma íntegra los estados de los períodos.');
             }
@@ -363,9 +441,58 @@ final class AdminAcademicModel
             }
         }
 
-        $active = $db->query("SELECT * FROM academic_periods WHERE status='active' LIMIT 1 FOR UPDATE")->fetch();
+        $active = $this->lockedActivePeriod($db);
         if (!$active) {
-            throw new InvalidArgumentException('No existe un período activo desde el cual calcular la planificación.');
+            if ($id > 0) {
+                throw new InvalidArgumentException('Configura el primer período antes de editar una planificación.');
+            }
+            if (!$this->validDate($start) || !$this->validDate($end)) {
+                throw new InvalidArgumentException('Ingresa fechas válidas para configurar el primer período.');
+            }
+            if ($end <= $start) {
+                throw new InvalidArgumentException('La fecha de finalización debe ser posterior a la fecha de inicio.');
+            }
+
+            $startYear = (int) substr($start, 0, 4);
+            $startMonth = (int) substr($start, 5, 2);
+            $term = $startMonth <= 6 ? 'I' : 'II';
+            $name = $term . ' PAO ' . $startYear;
+            $code = $startYear . '-' . $term;
+
+            $sameCode = $db->prepare('SELECT id FROM academic_periods WHERE code=:code FOR UPDATE');
+            $sameCode->execute(['code' => $code]);
+            if ($sameCode->fetchColumn() !== false) {
+                throw new InvalidArgumentException('Ya existe un período académico con ese código.');
+            }
+
+            $overlap = $db->prepare('SELECT name FROM academic_periods WHERE starts_on<=:end AND ends_on>=:start LIMIT 1 FOR UPDATE');
+            $overlap->execute(['start' => $start, 'end' => $end]);
+            $overlappingPeriod = $overlap->fetchColumn();
+            if ($overlappingPeriod !== false) {
+                throw new InvalidArgumentException('Las fechas se superponen con ' . $overlappingPeriod . '.');
+            }
+
+            try {
+                $statement = $db->prepare(
+                    "INSERT INTO academic_periods(code,name,starts_on,ends_on,status)
+                     VALUES(:code,:name,:start,:end,'active')"
+                );
+                $statement->execute(['code' => $code, 'name' => $name, 'start' => $start, 'end' => $end]);
+            } catch (PDOException $exception) {
+                $errorInfo = $exception->errorInfo ?? [];
+                if ((int) ($errorInfo[1] ?? 0) === 1062 && str_contains((string) ($errorInfo[2] ?? ''), 'uq_academic_periods_single_active')) {
+                    throw new InvalidArgumentException('Ya existe un período académico activo. Recarga la página e inténtalo nuevamente.');
+                }
+                throw $exception;
+            }
+
+            $this->audit($db, $actor, 'academic_period_started', 'period', (int) $db->lastInsertId(), [
+                'name' => $name,
+                'code' => $code,
+                'starts_on' => $start,
+                'ends_on' => $end,
+            ]);
+            return;
         }
         if (!$this->validDate($start) || !$this->validDate($end)) {
             throw new InvalidArgumentException('Ingresa fechas válidas para la planificación.');

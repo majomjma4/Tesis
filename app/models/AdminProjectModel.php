@@ -125,11 +125,14 @@ final class AdminProjectModel
             $type->execute(['id'=>$v['project_type_id']]);
             $typeCode=(string)$type->fetchColumn();
             if($typeCode==='')throw new InvalidArgumentException('El tipo de proyecto ya no está disponible.');
+            $currentPeriodId=null;
             if($id){
                 $q=$d->prepare('SELECT id,code,title,subtitle,summary,status,project_type_id,career_id,academic_period_id,tutor_id,presentation_file_id,approved_at,created_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE');
                 $q->execute(['id'=>$id]);$before=$q->fetch();
                 if(!$before)throw new InvalidArgumentException('El proyecto ya no existe.');
+                $currentPeriodId=(int)$before['academic_period_id'];
                 if(!$allowStatusChange)$v['status']=(string)$before['status'];
+                $this->lockAndValidateAcademicPeriod($d,(int)$v['academic_period_id'],$currentPeriodId);
                 if(!empty($v['tutoring_managed'])){
                     $tutoringChange=(new ProjectTutoringService())->sync($d,$id,(array)($v['tutoring_user_ids']??[]),(int)($v['tutoring_primary_id']??0),$before['tutor_id']===null?null:(int)$before['tutor_id']);
                     $tutor=(int)$tutoringChange['after_primary'];
@@ -230,6 +233,7 @@ final class AdminProjectModel
                 }
                 return $id;
             }
+            $this->lockAndValidateAcademicPeriod($d,(int)$v['academic_period_id'],null);
             $code=(new ProjectCodeService())->next($d,$v['project_type_id'],$typeCode,(int)date('Y'));
             $q=$d->prepare("INSERT INTO projects(code,project_type_id,career_id,academic_period_id,title,subtitle,tutor_id,status,current_stage,created_by) VALUES(:code,:type,:career,:period,:title,:subtitle,:tutor,:status,'registration',:creator)");
             $q->execute(['code'=>$code,'type'=>$v['project_type_id'],'career'=>$v['career_id'],'period'=>$v['academic_period_id'],'title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'tutor'=>$tutor,'status'=>$v['status'],'creator'=>$actor]);
@@ -239,6 +243,17 @@ final class AdminProjectModel
             return $id;
         });
     }
+    private function lockAndValidateAcademicPeriod(PDO $db,int $periodId,?int $currentPeriodId):void
+    {
+        $period=$db->prepare('SELECT id,status FROM academic_periods WHERE id=:id FOR UPDATE');
+        $period->execute(['id'=>$periodId]);
+        $row=$period->fetch();
+        if(!$row)throw new InvalidArgumentException('El periodo academico seleccionado no existe.');
+        $status=(string)$row['status'];
+        if($currentPeriodId!==null&&$periodId===$currentPeriodId&&in_array($status,['active','closed'],true))return;
+        if($status!=='active')throw new InvalidArgumentException('El periodo academico seleccionado ya no esta disponible para esta operacion.');
+    }
+
     private function describeChanges(PDO $db,array $changes):array
     {
         $labels=['title'=>'Título','subtitle'=>'Descripción breve','summary'=>'Descripción','project_type_id'=>'Tipo','career_id'=>'Carrera','academic_period_id'=>'Periodo','tutor_id'=>'Tutor','status'=>'Estado','code'=>'Código'];

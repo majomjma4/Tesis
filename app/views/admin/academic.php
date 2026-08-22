@@ -6,9 +6,15 @@ $closedPeriods = array_values(array_filter($periods, static fn(array $period): b
 $suggestedPeriod = $academic['promotion']['suggested'] ?? null;
 $reversal = $academic['reversal'] ?? null;
 $academicReversalHours = max(1, (int) (new SystemSettingModel())->retentionDays('academic_period_reversal_hours'));
-$typeCount = count($academic['types'] ?? []);
-$materialTypeCount = count($academic['material_types'] ?? []);
-$keywordCount = count($academic['keywords'] ?? []);
+$academicErrors = (array) ($academic['section_errors'] ?? []);
+if (trim((string) ($academicError ?? '')) !== '') {
+    foreach (['periods', 'types', 'material_types', 'keywords'] as $section) {
+        $academicErrors[$section] ??= (string) $academicError;
+    }
+}
+$typeCount = array_key_exists('types', $academicErrors) ? '-' : count($academic['types'] ?? []);
+$materialTypeCount = array_key_exists('material_types', $academicErrors) ? '-' : count($academic['material_types'] ?? []);
+$keywordCount = array_key_exists('keywords', $academicErrors) ? '-' : count($academic['keywords'] ?? []);
 $catalogActions = static function (string $entity, array $item): void {
     $active = (int) ($item['is_active'] ?? 0) === 1;
     $associated = (int) ($item['references_count'] ?? $item['materials'] ?? $item['projects'] ?? 0);
@@ -32,7 +38,7 @@ $catalogHeader = static function (
     string $category,
     string $title,
     string $description,
-    int $count
+    int|string $count
 ): void {
     ?>
     <header class="aa-accordion-header">
@@ -44,7 +50,7 @@ $catalogHeader = static function (
                 <span><?= e($description) ?></span>
             </span>
             <span class="aa-accordion-meta">
-                <span class="aa-accordion-count" aria-label="<?= $count ?> registros"><?= $count ?></span>
+            <span class="aa-accordion-count" aria-label="<?= e((string) $count) ?> registros"><?= e((string) $count) ?></span>
                 <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
             </span>
         </button>
@@ -94,7 +100,9 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
             </div>
         </header>
 
-        <?php if (!$activePeriod): ?>
+        <?php if (isset($academicErrors['periods'])): ?>
+            <div class="aa-error" role="alert"><?= e((string) $academicErrors['periods']) ?></div>
+        <?php elseif (!$activePeriod): ?>
             <div class="aa-empty-state">
                 <i class="fa-regular fa-calendar-xmark" aria-hidden="true"></i>
                 <strong>No existe un período activo</strong>
@@ -214,6 +222,9 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
                 </div>
             </div>
         <?php endif; ?>
+        <?php if (isset($academicErrors['period_previews'])): ?>
+            <div class="aa-error" role="alert"><?= e((string) $academicErrors['period_previews']) ?></div>
+        <?php endif; ?>
     </section>
 
     <section class="aa-section aa-catalog-accordion" data-aa-accordion data-catalog="type">
@@ -221,6 +232,9 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
         <div class="aa-accordion-panel" id="aaProjectTypesPanel" data-aa-accordion-panel aria-hidden="true" inert>
             <div class="aa-accordion-inner">
                 <div class="aa-catalog-toolbar"><button type="button" data-form="type"><i class="fa-solid fa-plus" aria-hidden="true"></i> Agregar tipo</button></div>
+                <?php if (isset($academicErrors['types'])): ?>
+                    <div class="aa-error" role="alert"><?= e((string) $academicErrors['types']) ?></div>
+                <?php else: ?>
                 <div class="aa-type-list">
                     <?php foreach ($academic['types'] as $type): ?>
                         <article class="<?= (int) $type['is_active'] === 1 ? '' : 'is-inactive' ?>">
@@ -257,6 +271,7 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
                         </article>
                     <?php endforeach; ?>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
     </section>
@@ -266,7 +281,9 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
         <div class="aa-accordion-panel" id="aaMaterialTypesPanel" data-aa-accordion-panel aria-hidden="true" inert>
             <div class="aa-accordion-inner">
                 <div class="aa-catalog-toolbar"><button type="button" data-form="material_type"><i class="fa-solid fa-plus" aria-hidden="true"></i> Agregar tipo de material</button></div>
-                <?php if (empty($academic['material_types'])): ?>
+                <?php if (isset($academicErrors['material_types'])): ?>
+                    <div class="aa-error" role="alert"><?= e((string) $academicErrors['material_types']) ?></div>
+                <?php elseif (empty($academic['material_types'])): ?>
                     <div class="aa-empty-state"><i class="fa-regular fa-file-lines" aria-hidden="true"></i><strong>No existen tipos de material registrados.</strong></div>
                 <?php else: ?>
                     <div class="aa-type-list">
@@ -292,7 +309,9 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
         <div class="aa-accordion-panel" id="aaKeywordsPanel" data-aa-accordion-panel aria-hidden="true" inert>
             <div class="aa-accordion-inner">
                 <div class="aa-catalog-toolbar"><button type="button" data-form="keyword"><i class="fa-solid fa-plus" aria-hidden="true"></i> Agregar palabra clave</button></div>
-                <?php if (empty($academic['keywords'])): ?>
+                <?php if (isset($academicErrors['keywords'])): ?>
+                    <div class="aa-error" role="alert"><?= e((string) $academicErrors['keywords']) ?></div>
+                <?php elseif (empty($academic['keywords'])): ?>
                     <div class="aa-empty-state"><i class="fa-solid fa-tags" aria-hidden="true"></i><strong>No existen palabras clave registradas.</strong></div>
                 <?php else: ?>
                     <div class="aa-type-list">
@@ -326,9 +345,15 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
             <div class="aa-form-note">
                 <i class="fa-regular fa-calendar-check" aria-hidden="true"></i>
                 <div>
-                    <small>Siguiente período</small>
-                    <strong><?= e($suggestedPeriod['name'] ?? 'Período consecutivo') ?></strong>
-                    <span>Se genera automáticamente como continuación del período actual.</span>
+                    <?php if ($activePeriod): ?>
+                        <small>Siguiente período</small>
+                        <strong><?= e($suggestedPeriod['name'] ?? 'Período consecutivo') ?></strong>
+                        <span>Se genera automáticamente como continuación del período actual.</span>
+                    <?php else: ?>
+                        <small>Primer período</small>
+                        <strong>Se establecerá como período activo</strong>
+                        <span>Define las fechas del primer período académico de la institución.</span>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="aa-form-grid">
