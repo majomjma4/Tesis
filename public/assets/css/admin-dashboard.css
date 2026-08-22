@@ -20,7 +20,7 @@
 
 .hero-main {
     display: flex;
-    align-items: center;
+    align-items: flex-start; /* flex-start evita stretching cuando hace wrap */
     justify-content: space-between;
     gap: 20px;
     margin-bottom: 16px;
@@ -28,7 +28,7 @@
 
 .hero-identity {
     flex: 1;
-    min-width: 260px;
+    min-width: 0; /* era 260px — permitir colapso real */
 }
 
 .hero-badge {
@@ -47,23 +47,26 @@
 }
 
 .hero-title {
-    font-size: clamp(1.6rem, 2.6vw, 2.1rem);
+    font-size: clamp(1.25rem, 2.6vw, 2.1rem);
     font-weight: 850;
     color: var(--text);
     line-height: 1.15;
     margin-bottom: 4px;
+    overflow-wrap: break-word;
 }
 
 .hero-subtitle {
     color: var(--muted);
     font-size:var(--font-md);
     line-height: 1.4;
+    overflow-wrap: break-word;
 }
 
 .hero-side {
     display: flex;
-    align-items: center;
+    align-items: flex-start; /* flex-start: hijos no se estiran al alto del más alto */
     gap: 14px;
+    min-width: 0;
 }
 
 .hero-countdown {
@@ -76,7 +79,9 @@
     border-radius: 14px;
     background: var(--surface);
     text-align: center;
-    min-width: 120px;
+    min-width: 90px;
+    height: auto;       /* nunca hereda altura del contenedor */
+    align-self: flex-start; /* no estirar al alto del milestone */
 }
 
 .countdown-num {
@@ -104,7 +109,17 @@
     color: var(--text);
     text-decoration: none;
     transition: border-color 0.16s ease, transform 0.16s ease;
-    min-width: 220px;
+    min-width: 0;
+    height: auto;        /* altura siempre definida por contenido */
+    align-self: flex-start; /* no estirar al alto del countdown */
+}
+
+a.hero-milestone:focus-visible,
+.v4-header-link:focus-visible,
+.v4-row-cta:focus-visible,
+a.timeline-v4-item:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 3px;
 }
 
 a.hero-milestone:hover {
@@ -125,6 +140,7 @@ a.hero-milestone:hover {
     font-weight: 800;
     color: var(--text);
     line-height: 1.25;
+    overflow-wrap: break-word;
 }
 
 .milestone-date {
@@ -156,6 +172,7 @@ a.hero-milestone:hover .milestone-date i {
     border-radius: 999px;
     background: color-mix(in srgb, var(--line) 80%, var(--surface-soft));
     overflow: hidden;
+    min-width: 0; /* flexbox shrink */
 }
 
 .hero-progress-fill {
@@ -170,6 +187,7 @@ a.hero-milestone:hover .milestone-date i {
     font-weight: 700;
     color: var(--muted);
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* Banner de Alerta */
@@ -227,12 +245,15 @@ a.hero-milestone:hover .milestone-date i {
     transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
     box-sizing: border-box;
     min-width: 0;
+    position: relative;
+    border-top: 3px solid var(--dashboard-accent, var(--line));
 }
 
 a.strip-card:hover {
-    border-color: var(--blue);
+    border-color: var(--dashboard-accent, var(--blue));
     background-color: var(--surface-soft);
-    transform: translateY(-1px);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--dashboard-accent, var(--blue)) 14%, transparent);
+    transform: translateY(-2px);
 }
 
 a.strip-card:focus-visible {
@@ -275,6 +296,12 @@ a.strip-card:focus-visible {
     color: #0284c7;
 }
 
+.strip-card.is-total { --dashboard-accent: #2563eb; }
+.strip-card.is-active { --dashboard-accent: #d97706; }
+.strip-card.is-approved { --dashboard-accent: #059669; }
+.strip-card.is-published { --dashboard-accent: #7c3aed; }
+.strip-card.is-users { --dashboard-accent: #0284c7; }
+
 .strip-card-body {
     display: flex;
     flex-direction: column;
@@ -302,6 +329,7 @@ a.strip-card:focus-visible {
     margin-top: 2px;
     line-height: 1.25;
     white-space: normal;
+    overflow-wrap: break-word;
 }
 
 .strip-card-sub {
@@ -310,6 +338,7 @@ a.strip-card:focus-visible {
     line-height: 1.25;
     margin-top: 2px;
     white-space: normal;
+    overflow-wrap: break-word;
 }
 
 .strip-card-divider {
@@ -330,6 +359,7 @@ a.strip-card:focus-visible {
     justify-content: space-between;
     gap: 14px;
     margin-bottom: 16px;
+    flex-wrap: wrap; /* permite que el CTA baje en pantallas estrechas */
 }
 
 .v4-tag {
@@ -347,6 +377,7 @@ a.strip-card:focus-visible {
     font-weight: 850;
     color: var(--text);
     line-height: 1.25;
+    overflow-wrap: break-word;
 }
 
 .v4-header-link {
@@ -355,6 +386,8 @@ a.strip-card:focus-visible {
     font-weight: 800;
     text-decoration: none;
     white-space: nowrap;
+    /* Permitir ir a nueva línea via flex-wrap del section-v4-header */
+    flex-shrink: 0;
 }
 
 .v4-header-actions {
@@ -363,6 +396,7 @@ a.strip-card:focus-visible {
     justify-content: flex-end;
     gap: 12px;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
 .v4-header-count {
@@ -375,6 +409,11 @@ a.strip-card:focus-visible {
 .v4-header-link:hover {
     color: var(--primary);
     text-decoration: underline;
+}
+
+.v4-header-link,
+.v4-row-cta {
+    transition: color 0.16s ease, text-decoration-color 0.16s ease;
 }
 
 .v4-meta-time {
@@ -450,6 +489,7 @@ a.attention-v4-row:focus-visible {
     font-weight: 800;
     color: var(--text);
     line-height: 1.3;
+    overflow-wrap: break-word;
 }
 
 .v4-row-desc {
@@ -458,6 +498,7 @@ a.attention-v4-row:focus-visible {
     font-size:var(--font-sm);
     line-height: 1.35;
     margin-top: 2px;
+    overflow-wrap: break-word;
 }
 
 .v4-row-cta {
@@ -471,6 +512,14 @@ a.attention-v4-row:focus-visible {
         margin-left: 3px;
         transition: transform 0.15s ease;
     }
+}
+
+.platform-v4-card.is-access {
+    border-left: 3px solid #059669;
+}
+
+.platform-v4-card.is-retention {
+    border-left: 3px solid #d97706;
 }
 
 a.attention-v4-row:hover .v4-row-cta i {
@@ -510,12 +559,22 @@ a.attention-v4-row:hover .v4-row-cta i {
     color: var(--text);
     text-decoration: none;
     transition: background-color 0.15s ease, border-color 0.15s ease;
+    border-top: 3px solid var(--status-accent, var(--line));
+    min-width: 0; /* asegurar flex/grid shrink */
 }
 
 a.status-v4-node:hover {
     background-color: var(--surface);
-    border-color: color-mix(in srgb, var(--blue) 35%, transparent);
+    border-color: color-mix(in srgb, var(--status-accent, var(--blue)) 45%, transparent);
+    box-shadow: 0 5px 14px color-mix(in srgb, var(--status-accent, var(--blue)) 12%, transparent);
 }
+
+.status-v4-node.is-development { --status-accent: #2563eb; }
+.status-v4-node.is-review { --status-accent: #d97706; }
+.status-v4-node.is-approved { --status-accent: #059669; }
+.status-v4-node.is-defense { --status-accent: #7c3aed; }
+.status-v4-node.is-published { --status-accent: #0891b2; }
+.status-v4-node.is-neutral { --status-accent: var(--line); }
 
 .node-head {
     display: flex;
@@ -523,21 +582,24 @@ a.status-v4-node:hover {
     justify-content: space-between;
     gap: 8px;
     margin-bottom: 6px;
+    min-width: 0;
 }
 
 .node-label {
     font-size:var(--font-md);
     font-weight: 750;
     color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* Quitamos nowrap+ellipsis del base: se controla solo en desktop via min-width suficiente */
+    white-space: normal;
+    overflow-wrap: break-word;
+    min-width: 0;
 }
 
 .node-count {
     font-size:var(--font-md);
     font-weight: 850;
     color: var(--text);
+    flex-shrink: 0;
 }
 
 .node-track {
@@ -551,7 +613,7 @@ a.status-v4-node:hover {
 .node-fill {
     height: 100%;
     border-radius: inherit;
-    background: var(--blue);
+    background: var(--status-accent, var(--blue));
 }
 
 .node-pct {
@@ -559,13 +621,15 @@ a.status-v4-node:hover {
     font-size:var(--font-sm);
     font-weight: 600;
     color: var(--muted);
+    white-space: normal;
+    overflow-wrap: break-word;
 }
 
 /* E. Trazabilidad Administrativa */
 .activity-v4-timeline {
     list-style: none;
     margin: 0;
-    padding: 0 0 0 20px;   /* mayor respiración izquierda */
+    padding: 0 0 0 20px;
     position: relative;
 }
 
@@ -574,14 +638,14 @@ a.status-v4-node:hover {
     position: absolute;
     top: 6px;
     bottom: 6px;
-    left: 23px;            /* alineado al centro del bullet ampliado */
+    left: 23px;
     width: 2px;
     background: var(--line);
 }
 
 .timeline-v4-item {
     position: relative;
-    padding-left: 0;    /* más espacio entre línea vertical y contenido */
+    padding-left: 0;
     padding-bottom: 0;
     color: var(--text);
     text-decoration: none;
@@ -598,7 +662,7 @@ a.status-v4-node:hover {
     width: 9px;
     height: 9px;
     border-radius: 50%;
-    background: var(--blue);
+    background: var(--muted);
     box-shadow: 0 0 0 3px var(--surface);
 }
 
@@ -609,6 +673,7 @@ a.status-v4-node:hover {
     align-items: flex-end;
     gap: 12px;
     width: calc(100% - 40px);
+    min-width: 0;
 }
 
 .v4-timeline-body {
@@ -627,10 +692,15 @@ a.status-v4-node:hover {
     color: var(--text);
     line-height: 1.3;
     transition: color 0.14s ease;
+    overflow-wrap: break-word;
 }
 
 a.timeline-v4-item:hover .v4-act-title {
     color: var(--blue);
+}
+
+a.timeline-v4-item:hover .v4-bullet {
+    background: var(--blue);
 }
 
 .v4-act-resource {
@@ -638,9 +708,10 @@ a.timeline-v4-item:hover .v4-act-title {
     font-size:var(--font-sm);
     line-height: 1.35;
     margin: 2px 0 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* removemos nowrap — en pantallas estrechas debe hacer wrap */
+    white-space: normal;
+    overflow-wrap: break-word;
+    min-width: 0;
 }
 
 /* Timestamp a la derecha */
@@ -650,7 +721,7 @@ a.timeline-v4-item:hover .v4-act-title {
     font-size:var(--font-sm);
     font-weight: 500;
     white-space: nowrap;
-    padding-bottom: 13px; /* alineado con el border-bottom de .v4-timeline-body */
+    padding-bottom: 13px;
     border-bottom: 1px solid var(--line);
     margin-bottom: 1px;
     letter-spacing: 0.01em;
@@ -678,7 +749,50 @@ a.timeline-v4-item:hover .v4-act-title {
     color: #059669;
 }
 
-/* Responsividad */
+/* ============================================================
+   RESPONSIVIDAD PROGRESIVA
+   ============================================================ */
+
+/* 1100px — hero flex-wrap cuando empieza a comprimir */
+@media (max-width: 1100px) {
+    .admin-institutional-hero,
+    .hero-main,
+    .hero-identity,
+    .hero-side {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .hero-main {
+        flex-wrap: wrap;
+        align-items: flex-start; /* reforzar: no stretch en filas wrapped */
+    }
+
+    .hero-identity {
+        flex: 1 1 240px;
+    }
+
+    .hero-side {
+        flex: 1 1 320px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .hero-countdown {
+        flex: 0 0 auto;   /* no crecer, tomar solo su contenido */
+        align-self: flex-start;
+        height: auto;
+    }
+
+    .hero-milestone {
+        min-width: 0;
+        flex: 1 1 160px;
+        align-self: flex-start;
+        height: auto;
+    }
+}
+
+/* 950px — KPIs y panorama pasan a 2 columnas */
 @media (max-width: 950px) {
     .v4-summary-strip,
     .status-v4-compact-grid {
@@ -709,7 +823,90 @@ a.timeline-v4-item:hover .v4-act-title {
     }
 }
 
+/* 850px — plataforma a 1 columna */
+@media (max-width: 850px) {
+    .platform-v4-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 768px — ajustes tablet estrechas */
+@media (max-width: 768px) {
+    .admin-dashboard-v4 {
+        padding: 16px 16px 28px;
+        gap: 16px;
+    }
+
+    .admin-institutional-hero {
+        padding: 18px 20px;
+    }
+
+    .v4-section {
+        padding: 16px 18px;
+    }
+
+    .v4-summary-strip {
+        padding: 14px 16px;
+    }
+
+    /* Auditoría: si hay poco espacio, el timestamp puede quedarse a la derecha
+       pero el recurso ya envuelve (white-space:normal garantizado arriba) */
+}
+
+/* 650px — hero: identity arriba, hero-side en fila compacta debajo */
 @media (max-width: 650px) {
+    .admin-dashboard-v4 {
+        padding: 16px 14px 28px;
+        gap: 14px;
+    }
+
+    .hero-main {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .hero-identity {
+        flex: none;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    /* hero-side: fila compacta — countdown + milestone lado a lado si caben */
+    .hero-side {
+        flex: none;           /* anula flex:1 1 320px de 1100px — sin crecimiento vertical */
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: flex-start;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        gap: 10px;
+    }
+
+    .hero-countdown {
+        flex: 0 0 auto;      /* solo su contenido, no crece */
+        min-width: 80px;
+        height: auto;
+        align-self: flex-start;
+    }
+
+    .hero-milestone {
+        flex: 1 1 0;         /* ocupa el resto de la fila */
+        min-width: 0;
+        max-width: 100%;
+        height: auto;
+        align-self: flex-start;
+    }
+
+    .hero-progress-wrapper {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    /* KPIs: 1 columna */
     .v4-summary-strip,
     .status-v4-compact-grid {
         grid-template-columns: 1fr;
@@ -721,38 +918,6 @@ a.timeline-v4-item:hover .v4-act-title {
         width: 100%;
         justify-self: stretch;
     }
-}
-
-@media (max-width: 650px) {
-    .admin-dashboard-v4 {
-        padding: 16px 14px 28px;
-    }
-
-    .hero-main {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-
-    .hero-countdown,
-    .hero-milestone {
-        width: 100%;
-        min-width: auto;
-        max-width: 100%;
-    }
-
-    .hero-identity,
-    .hero-side,
-    .hero-progress-wrapper {
-        min-width: 0;
-        max-width: 100%;
-    }
-
-    .status-row.row-top,
-    .status-row.row-bottom {
-        grid-template-columns: 1fr;
-        max-width: 100%;
-    }
 
     .attention-v4-row {
         grid-template-columns: 28px minmax(0, 1fr);
@@ -761,43 +926,376 @@ a.timeline-v4-item:hover .v4-act-title {
     .v4-row-cta {
         display: none;
     }
-}
 
-@media (max-width: 1100px) {
-    .admin-institutional-hero,
-    .hero-main,
-    .hero-identity,
-    .hero-side {
-        min-width: 0;
+    /* Panorama: 1 columna */
+    .status-row.row-top,
+    .status-row.row-bottom {
+        grid-template-columns: 1fr;
         max-width: 100%;
     }
-
-    .hero-main {
-        flex-wrap: wrap;
-    }
-
-    .hero-identity {
-        flex: 1 1 260px;
-    }
-
-    .hero-side {
-        flex: 1 1 360px;
-        flex-wrap: wrap;
-    }
-
-    .hero-countdown {
-        flex: 0 1 120px;
-    }
-
-    .hero-milestone {
-        min-width: 0;
-        flex: 1 1 180px;
-    }
 }
 
+/* 500px — forzar 1 columna KPIs (redundante pero seguro) */
 @media (max-width: 500px) {
     .v4-summary-strip {
         grid-template-columns: 1fr;
+    }
+}
+
+/* 480px — hero-side pasa a columna; auditoría en columna; paddings compactos */
+@media (max-width: 480px) {
+    .admin-dashboard-v4 {
+        padding: 12px 12px 24px;
+        gap: 12px;
+    }
+
+    .admin-institutional-hero {
+        padding: 14px 16px;
+        border-radius: 14px;
+    }
+
+    .v4-section {
+        padding: 14px 14px;
+        border-radius: 12px;
+    }
+
+    .v4-summary-strip {
+        padding: 12px 14px;
+        border-radius: 14px;
+    }
+
+    /* Auditoría: timestamp debajo del texto */
+    .timeline-v4-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .v4-act-ts {
+        padding-bottom: 0;
+        border-bottom: none;
+        margin-bottom: 0;
+        font-size: 0.72rem;
+    }
+
+    .v4-timeline-body {
+        padding-bottom: 10px;
+    }
+
+    /* Hero side: stack vertical compacto */
+    .hero-side {
+        flex: none;           /* blindar: no crecer verticalmente */
+        flex-direction: column;
+        align-items: flex-start;
+        flex-wrap: nowrap;
+        gap: 8px;
+    }
+
+    .hero-countdown {
+        flex: none;
+        width: auto;
+        height: auto;
+        align-self: auto;
+        align-items: flex-start;
+        text-align: left;
+        padding: 8px 14px;
+        min-width: 0;
+    }
+
+    .hero-milestone {
+        width: 100%;
+        height: auto;
+        align-self: auto;
+        padding: 10px 14px;
+    }
+
+    /* Header de sección — count y CTA en bloque propio */
+    .v4-header-actions {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .v4-header-count {
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+
+    /* Panorama */
+    .node-label {
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+
+    .node-pct {
+        font-size: 0.72rem;
+    }
+}
+
+/* 390px — móviles estándar */
+@media (max-width: 390px) {
+    .admin-dashboard-v4 {
+        padding: 10px 10px 20px;
+        gap: 10px;
+    }
+
+    .admin-institutional-hero {
+        padding: 12px 14px;
+        border-radius: 12px;
+    }
+
+    .v4-section {
+        padding: 12px 12px;
+        border-radius: 10px;
+    }
+
+    .v4-summary-strip {
+        padding: 10px 12px;
+        border-radius: 12px;
+        gap: 10px;
+    }
+
+    .strip-card {
+        padding: 12px 12px;
+        gap: 10px;
+    }
+
+    .strip-card-icon {
+        width: 34px;
+        height: 34px;
+        font-size: 1rem;
+    }
+
+    .hero-title {
+        font-size: clamp(1.1rem, 4.5vw, 1.5rem);
+    }
+
+    /* Política de retención: puede hacer wrap */
+    .platform-policy-meta span {
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+}
+
+/* 325px — móviles muy pequeños */
+@media (max-width: 325px) {
+    .admin-dashboard-v4 {
+        padding: 8px 8px 18px;
+        gap: 8px;
+    }
+
+    .admin-institutional-hero {
+        padding: 10px 12px;
+        border-radius: 10px;
+    }
+
+    .v4-section {
+        padding: 10px 10px;
+    }
+
+    .v4-summary-strip {
+        padding: 8px 10px;
+        gap: 8px;
+    }
+
+    .strip-card {
+        padding: 10px 10px;
+        gap: 8px;
+    }
+
+    .strip-card-icon {
+        width: 30px;
+        height: 30px;
+        font-size: 0.9rem;
+    }
+
+    /* Auditoría: asegurar layout columna */
+    .timeline-v4-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 3px;
+    }
+
+    /* Section header: siempre en columna */
+    .section-v4-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .v4-header-link {
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+
+    /* Panorama: nodo en 1 col completa ya garantizado */
+    .node-pct {
+        font-size: 0.68rem;
+    }
+
+    .hero-badge {
+        font-size: 0.62rem;
+        padding: 3px 8px;
+    }
+
+    .hero-title {
+        font-size: clamp(1rem, 5vw, 1.4rem);
+    }
+}
+
+/* 298px y 288px — mínimo absoluto */
+@media (max-width: 298px) {
+    .admin-dashboard-v4 {
+        padding: 6px 6px 16px;
+        gap: 8px;
+    }
+
+    .admin-institutional-hero {
+        padding: 8px 10px;
+        border-radius: 8px;
+    }
+
+    .v4-section {
+        padding: 8px 8px;
+        border-radius: 8px;
+    }
+
+    .v4-summary-strip {
+        padding: 6px 8px;
+        gap: 7px;
+        border-radius: 10px;
+    }
+
+    .strip-card {
+        padding: 9px 9px;
+        gap: 7px;
+    }
+
+    .strip-card-icon {
+        width: 28px;
+        height: 28px;
+        font-size: 0.85rem;
+    }
+
+    /* Sección header siempre en stack vertical */
+    .section-v4-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+
+    /* v4-header-actions siempre en columna */
+    .v4-header-actions {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 3px;
+        width: 100%;
+    }
+
+    .v4-header-count,
+    .v4-header-link {
+        white-space: normal;
+        overflow-wrap: break-word;
+        font-size: 0.72rem;
+    }
+
+    /* Timeline: columna siempre */
+    .timeline-v4-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+
+    .v4-act-title {
+        font-size: 0.78rem;
+    }
+
+    .v4-act-resource {
+        font-size: 0.70rem;
+    }
+
+    .v4-act-ts {
+        font-size: 0.68rem;
+    }
+
+    /* Hero: compacto */
+    .hero-main {
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .hero-countdown {
+        padding: 6px 10px;
+    }
+
+    .countdown-num {
+        font-size: 1.4rem;
+    }
+
+    .hero-milestone {
+        padding: 8px 10px;
+    }
+
+    .hero-progress-wrapper {
+        gap: 8px;
+    }
+
+    .hero-progress-meta {
+        font-size: 0.68rem;
+    }
+
+    /* Nodos panorama */
+    .node-head {
+        gap: 6px;
+    }
+
+    .node-label {
+        font-size: 0.78rem;
+    }
+
+    .node-count {
+        font-size: 0.78rem;
+    }
+
+    .node-pct {
+        font-size: 0.64rem;
+    }
+
+    /* Platform cards */
+    .platform-v4-card {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .platform-card-icon {
+        width: 30px;
+        height: 30px;
+        font-size: 0.9rem;
+    }
+
+    .platform-policy-meta span {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        font-size: 0.68rem;
+    }
+
+    /* Breakdown items */
+    .breakdown-items {
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+
+    /* Strip card sub en 298px: más compacto */
+    .strip-card-sub {
+        font-size: 0.68rem;
+    }
+
+    .strip-card-label {
+        font-size: 0.78rem;
+    }
+
+    .strip-card-val {
+        font-size: 1rem;
     }
 }
 
@@ -849,6 +1347,7 @@ a.timeline-v4-item:hover .v4-act-title {
     justify-content: space-between;
     gap: 16px;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    min-width: 0; /* permite shrink en grid */
 }
 
 .platform-v4-card:hover {
@@ -859,6 +1358,7 @@ a.timeline-v4-item:hover .v4-act-title {
     display: flex;
     align-items: flex-start;
     gap: 12px;
+    min-width: 0;
 }
 
 .platform-card-icon {
@@ -873,13 +1373,18 @@ a.timeline-v4-item:hover .v4-act-title {
 }
 
 .platform-card-icon.is-access {
-    background-color: rgba(59, 130, 246, 0.1);
-    color: #2563eb;
+    background-color: rgba(16, 185, 129, 0.12);
+    color: #059669;
 }
 
 .platform-card-icon.is-retention {
-    background-color: rgba(107, 114, 128, 0.1);
-    color: #4b5563;
+    background-color: rgba(245, 158, 11, 0.14);
+    color: #b45309;
+}
+
+.platform-card-title {
+    min-width: 0;
+    flex: 1;
 }
 
 .platform-card-title h3 {
@@ -887,6 +1392,7 @@ a.timeline-v4-item:hover .v4-act-title {
     font-size:var(--font-lg);
     font-weight: 600;
     color: var(--text, #0f172a);
+    overflow-wrap: break-word;
 }
 
 .platform-card-sub {
@@ -894,6 +1400,7 @@ a.timeline-v4-item:hover .v4-act-title {
     font-size:var(--font-md);
     color: var(--muted, #64748b);
     margin-top: 2px;
+    overflow-wrap: break-word;
 }
 
 .platform-card-body {
@@ -901,6 +1408,7 @@ a.timeline-v4-item:hover .v4-act-title {
     flex-direction: column;
     gap: 10px;
     flex: 1;
+    min-width: 0;
 }
 
 .platform-status-list {
@@ -914,10 +1422,11 @@ a.timeline-v4-item:hover .v4-act-title {
 
 .platform-status-list .status-item {
     display: flex;
-    align-items: center;
+    align-items: flex-start; /* era center — permite wrap en texto largo */
     gap: 10px;
     font-size:var(--font-md);
     color: var(--text, #1e293b);
+    overflow-wrap: break-word;
 }
 
 .status-item .item-badge {
@@ -930,6 +1439,7 @@ a.timeline-v4-item:hover .v4-act-title {
     border-radius: 6px;
     font-size:var(--font-sm);
     font-weight: 700;
+    flex-shrink: 0;
 }
 
 .status-item.is-warning .item-badge {
@@ -944,19 +1454,21 @@ a.timeline-v4-item:hover .v4-act-title {
 
 .platform-status-healthy {
     display: flex;
-    align-items: center;
+    align-items: flex-start; /* era center */
     gap: 10px;
     font-size:var(--font-md);
     color: #059669;
     background-color: rgba(16, 185, 129, 0.08);
     padding: 10px 12px;
     border-radius: 8px;
+    min-width: 0;
 }
 
 .platform-status-healthy strong {
     display: block;
     font-weight: 600;
     line-height: 1.2;
+    overflow-wrap: break-word;
 }
 
 .platform-status-healthy .healthy-sub {
@@ -965,21 +1477,28 @@ a.timeline-v4-item:hover .v4-act-title {
     color: var(--muted, #64748b);
     font-weight: 400;
     margin-top: 2px;
+    overflow-wrap: break-word;
 }
 
 .platform-retention-breakdown {
     font-size:var(--font-md);
     font-weight: 600;
     color: var(--text, #0f172a);
+    overflow-wrap: break-word;
 }
 
 .platform-policy-meta {
     display: flex;
-    align-items: center;
+    align-items: flex-start; /* era center — permite wrap */
     gap: 6px;
     font-size:var(--font-sm);
     color: var(--muted, #64748b);
     margin-top: auto;
+}
+
+.platform-policy-meta span {
+    overflow-wrap: break-word;
+    min-width: 0;
 }
 
 .platform-card-footer {
@@ -987,6 +1506,19 @@ a.timeline-v4-item:hover .v4-act-title {
     justify-content: flex-end;
     padding-top: 8px;
     border-top: 1px dashed var(--line, #e2e8f0);
+}
+
+.platform-v4-card.is-access .v4-row-cta,
+.platform-v4-card.is-access .platform-policy-meta {
+    color: #059669;
+}
+
+.platform-v4-card.is-retention .v4-row-cta {
+    color: #b45309;
+}
+
+.platform-v4-card .v4-row-cta:hover {
+    text-decoration: underline;
 }
 
 @media (max-width: 850px) {

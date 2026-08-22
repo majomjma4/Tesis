@@ -110,7 +110,7 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
     <div class="v4-summary-strip" aria-label="Resumen operativo">
         <div class="summary-row row-top">
             <!-- 1. TOTAL DE PROYECTOS -->
-            <a class="strip-card" href="<?= e((string) $totalProjects['route']) ?>">
+            <a class="strip-card is-total" href="<?= e((string) $totalProjects['route']) ?>">
                 <div class="strip-card-icon is-total">
                     <i class="fa-solid fa-list-check" aria-hidden="true"></i>
                 </div>
@@ -122,7 +122,7 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
             </a>
 
             <!-- 2. PROYECTOS EN FLUJO -->
-            <a class="strip-card" href="<?= e((string) $activeProjects['route']) ?>">
+            <a class="strip-card is-active" href="<?= e((string) $activeProjects['route']) ?>">
                 <div class="strip-card-icon is-active">
                     <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
                 </div>
@@ -134,7 +134,7 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
             </a>
 
             <!-- 3. PROYECTOS APROBADOS -->
-            <a class="strip-card" href="<?= e((string) $approvedProjects['route']) ?>">
+            <a class="strip-card is-approved" href="<?= e((string) $approvedProjects['route']) ?>">
                 <div class="strip-card-icon is-approved">
                     <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
                 </div>
@@ -148,7 +148,7 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
 
         <div class="summary-row row-bottom">
             <!-- 4. PROYECTOS PUBLICADOS -->
-            <a class="strip-card" href="<?= e((string) $publishedProjects['route']) ?>">
+            <a class="strip-card is-published" href="<?= e((string) $publishedProjects['route']) ?>">
                 <div class="strip-card-icon is-published">
                     <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
                 </div>
@@ -160,7 +160,7 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
             </a>
 
             <!-- 5. USUARIOS ACTIVOS -->
-            <a class="strip-card" href="<?= e((string) $activeUsers['route']) ?>">
+            <a class="strip-card is-users" href="<?= e((string) $activeUsers['route']) ?>">
                 <div class="strip-card-icon is-users">
                     <i class="fa-solid fa-users" aria-hidden="true"></i>
                 </div>
@@ -203,7 +203,7 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
 
         <div class="platform-v4-grid">
             <!-- COMPONENTE 1: ACCESOS Y SEGURIDAD -->
-            <div class="platform-v4-card">
+            <div class="platform-v4-card is-access">
                 <div class="platform-card-header">
                     <div class="platform-card-icon is-access">
                         <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
@@ -247,7 +247,7 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
             </div>
 
             <!-- COMPONENTE 2: RETENCIÓN Y PAPELERA -->
-            <div class="platform-v4-card">
+            <div class="platform-v4-card is-retention">
                 <div class="platform-card-header">
                     <div class="platform-card-icon is-retention">
                         <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
@@ -325,6 +325,13 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
         <?php
         // Total vigente: denominador dinámico para el texto "X de N · Y% del total"
         $panoramaTotal = (int) ($totalProjects['count'] ?? 0);
+        $statusToneClasses = [
+            'development' => 'is-development',
+            'under_review' => 'is-review',
+            'approved' => 'is-approved',
+            'defense' => 'is-defense',
+            'published' => 'is-published',
+        ];
         // Dividir las 5 categorías en fila superior (3) e inferior (2)
         $panoramaTop    = array_slice($statusDistribution, 0, 3);
         $panoramaBottom = array_slice($statusDistribution, 3);
@@ -336,8 +343,9 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
                     $percentage = (float) ($statusItem['percentage'] ?? 0.0);
                     $count      = (int) ($statusItem['count'] ?? 0);
                     $tagElement = $itemRoute !== null ? 'a' : 'div';
+                    $statusClass = $statusToneClasses[(string) ($statusItem['status'] ?? '')] ?? 'is-neutral';
                 ?>
-                    <<?= $tagElement ?> class="status-v4-node" <?= $itemRoute !== null ? 'href="' . e($itemRoute) . '"' : '' ?>>
+                    <<?= $tagElement ?> class="status-v4-node <?= e($statusClass) ?>" <?= $itemRoute !== null ? 'href="' . e($itemRoute) . '"' : '' ?>>
                         <div class="node-head">
                             <span class="node-label"><?= e((string) ($statusItem['label'] ?? '')) ?></span>
                             <strong class="node-count"><?= $count ?></strong>
@@ -357,8 +365,9 @@ $updatedAt = !empty($dashboard['updated_at']) ? (string) $dashboard['updated_at'
                     $percentage = (float) ($statusItem['percentage'] ?? 0.0);
                     $count      = (int) ($statusItem['count'] ?? 0);
                     $tagElement = $itemRoute !== null ? 'a' : 'div';
+                    $statusClass = $statusToneClasses[(string) ($statusItem['status'] ?? '')] ?? 'is-neutral';
                 ?>
-                    <<?= $tagElement ?> class="status-v4-node" <?= $itemRoute !== null ? 'href="' . e($itemRoute) . '"' : '' ?>>
+                    <<?= $tagElement ?> class="status-v4-node <?= e($statusClass) ?>" <?= $itemRoute !== null ? 'href="' . e($itemRoute) . '"' : '' ?>>
                         <div class="node-head">
                             <span class="node-label"><?= e((string) ($statusItem['label'] ?? '')) ?></span>
                             <strong class="node-count"><?= $count ?></strong>
