@@ -81,6 +81,7 @@
 
     document.querySelectorAll('[data-student-project-carousel]').forEach(initProjectCarousel);
 
+    // 1. Carrusel de Recursos / Biblioteca
     document.querySelectorAll('[data-student-carousel]').forEach(function (carousel) {
         var track = carousel.querySelector('.student-carousel__track');
         var previous = carousel.querySelector('[data-carousel-prev]');
@@ -118,4 +119,5 @@
         window.addEventListener('resize', updateControls);
         updateControls();
     });
+
 }());
