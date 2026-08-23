@@ -1056,7 +1056,7 @@ document.addEventListener('DOMContentLoaded', () => {
     printButton?.addEventListener('click',printPreview);
     let projectActions=manager.querySelector('.sw-project-actions');
     if (!projectActions) {
-        projectActions=document.createElement('div'); projectActions.className='sw-project-actions'; const packageUrl=manager.dataset.packageUrl||''; const packageAction=packageUrl?`<a class="sw-viewer-action" href="${packageUrl}"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</a>`:'<span class="sw-viewer-action is-disabled" aria-disabled="true"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</span>'; projectActions.innerHTML=`<div class="sw-project-actions-group">${packageAction}</div><div class="sw-project-actions-file"><a class="sw-viewer-action is-file-download" data-sw-viewer-download hidden><i class="fa-solid fa-download" aria-hidden="true"></i> Descargar</a><button type="button" class="sw-viewer-action" data-sw-print disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Imprimir</button></div>`; manager.querySelector('.sw-viewer-panel')?.prepend(projectActions);
+        projectActions=document.createElement('div'); projectActions.className='sw-project-actions'; const packageUrl=manager.dataset.packageUrl||''; const packageAction=packageUrl?`<a class="sw-viewer-action" data-sw-original-download data-sw-download-kind="package" href="${packageUrl}"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</a>`:'<span class="sw-viewer-action is-disabled" aria-disabled="true"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</span>'; projectActions.innerHTML=`<div class="sw-project-actions-group">${packageAction}</div><div class="sw-project-actions-file"><a class="sw-viewer-action is-file-download" data-sw-viewer-download aria-label="Descargar documento original" hidden><i class="fa-solid fa-download" aria-hidden="true"></i> Descargar original</a><button type="button" class="sw-viewer-action" data-sw-print disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Imprimir</button></div>`; manager.querySelector('.sw-viewer-panel')?.prepend(projectActions);
     }
     const modal=manager.querySelector('[data-sw-operation-modal]'), modalTitle=manager.querySelector('[data-sw-modal-title]'), modalMessage=manager.querySelector('[data-sw-modal-message]'), modalSummary=manager.querySelector('[data-sw-modal-summary]'), modalConfirm=manager.querySelector('[data-sw-modal-confirm]'); let modalAction=null;
     const closeMenus=()=>{
@@ -1073,9 +1073,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModal=()=>{ modal.hidden=true; modalAction=null; };
     manager.querySelectorAll('[data-sw-modal-cancel]').forEach((button)=>button.addEventListener('click',closeModal));
     modal?.addEventListener('click',(event)=>{if(event.target===modal)closeModal();});
-    document.addEventListener('keydown',(event)=>{if(event.key==='Escape'){closeModal();closeMenus();}});
+    document.addEventListener('keydown',(event)=>{if(event.key==='Escape'){closeModal();closeDownloadConfirm?.();closeMenus();}});
     const confirm=(title,message,summary,destructive,callback)=>{modalTitle.textContent=title;modalMessage.textContent=message;modalSummary.hidden=!summary;modalSummary.textContent=summary||'';modalConfirm.textContent=destructive?'Quitar':'Reemplazar';modalConfirm.classList.toggle('is-danger',destructive);modalAction=callback;modal.hidden=false;modalConfirm.focus();};
     modalConfirm?.addEventListener('click',async()=>{if(!modalAction)return;const action=modalAction;modalConfirm.disabled=true;try{await action();}finally{modalConfirm.disabled=false;}});
+    const downloadConfirmModal=manager.querySelector('[data-sw-download-confirm-modal]');
+    const downloadConfirmTitle=downloadConfirmModal?.querySelector('[data-sw-download-title]');
+    const downloadConfirmMessage=downloadConfirmModal?.querySelector('[data-sw-download-message]');
+    const downloadConfirmButton=downloadConfirmModal?.querySelector('[data-sw-download-confirm]');
+    const downloadCopy={
+        file:{title:'Descargar documento original',message:'Las observaciones y correcciones de la revisión no se incorporan al archivo descargado. Se descargará el documento original que fue enviado.',confirm:'Descargar original'},
+        package:{title:'Descargar paquete de archivos originales',message:'Las observaciones y correcciones de la revisión no se incorporan a los archivos descargados. El paquete contiene los archivos originales actualmente disponibles del proyecto.',confirm:'Descargar paquete'},
+        representation:{title:'Descargar vista previa de la versión',message:'Esta versión histórica no tiene un endpoint de descarga del binario original. Se descargará la representación disponible para vista previa.',confirm:'Descargar vista previa'}
+    };
+    let pendingDownloadUrl='';
+    let downloadReturnFocus=null;
+    const closeDownloadConfirm=()=>{if(!downloadConfirmModal)return;downloadConfirmModal.hidden=true;pendingDownloadUrl='';if(downloadReturnFocus&&typeof downloadReturnFocus.focus==='function')downloadReturnFocus.focus();downloadReturnFocus=null;};
+    const startOriginalDownload=(url)=>{if(!url)return;const link=document.createElement('a');link.href=url;link.download='';link.hidden=true;document.body.appendChild(link);link.click();link.remove();};
+    const requestOriginalDownload=(url,trigger=null,kind='file')=>{if(!url)return;if(!downloadConfirmModal){startOriginalDownload(url);return;}const copy=downloadCopy[kind]||downloadCopy.file;downloadConfirmTitle.textContent=copy.title;downloadConfirmMessage.textContent=copy.message;downloadConfirmButton.textContent=copy.confirm;pendingDownloadUrl=url;downloadReturnFocus=trigger;downloadConfirmModal.hidden=false;downloadConfirmButton?.focus();};
+    manager.querySelectorAll('[data-sw-download-cancel]').forEach((button)=>button.addEventListener('click',closeDownloadConfirm));
+    downloadConfirmModal?.addEventListener('click',(event)=>{if(event.target===downloadConfirmModal)closeDownloadConfirm();});
+    downloadConfirmButton?.addEventListener('click',()=>{const url=pendingDownloadUrl;closeDownloadConfirm();startOriginalDownload(url);});
+    manager.querySelectorAll('[data-sw-original-download]').forEach((link)=>link.addEventListener('click',(event)=>{event.preventDefault();requestOriginalDownload(link.href,link,link.dataset.swDownloadKind||'file');}));
     const request=async(action,file,extra={})=>{const body=new FormData();body.set('_csrf',csrf);body.set('project_id',projectId);body.set('action',action);Object.entries(extra).forEach(([key,value])=>body.set(key,value));if(file)body.set('file',file);const response=await fetch(endpoint,jsonRequestInit({method:'POST',body}));const payload=await readJsonResponse(response);if(!payload.success){const error=new Error(payload.message||'No fue posible completar la operación.');error.status=response.status;throw error;}return payload;};
     const reloadDocuments=()=>{const url=new URL(workspace.dataset.projectUrl,window.location.origin);url.searchParams.set('tab','documents');window.location.assign(url);};
     const existingByName=(name)=>[...manager.querySelectorAll('[data-sw-file]')].find((item)=>item.dataset.fileName===name);
@@ -2021,6 +2039,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (viewerDownload) {
             viewerDownload.hidden = false;
             viewerDownload.disabled = !downloadUrl;
+            viewerDownload.dataset.downloadKind = 'file';
+            viewerDownload.setAttribute('aria-label', 'Descargar documento original');
+            viewerDownload.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Descargar original';
             if (downloadUrl) {
                 viewerDownload.dataset.downloadUrl = downloadUrl;
             } else {
@@ -2032,7 +2053,7 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         const url = viewerDownload.dataset.downloadUrl;
         if (!url || viewerDownload.disabled) return;
-        window.location.href = url;
+        requestOriginalDownload(url, viewerDownload, viewerDownload.dataset.downloadKind || 'file');
     });
     let zipCanvasContext = null;
     const measureZipTextWidth = (text, font) => {
@@ -3091,10 +3112,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedObservationFileId = Number(preview.file_id || 0);
 
                 if (viewerDownload) {
-                    viewerDownload.disabled = false;
-                    viewerDownload.onclick = () => {
-                        window.location.href = preview.content_url || route('project-file-version-download') + `&project_id=${projectId}&version_id=${preview.version_id}`;
-                    };
+                    const historicalDownloadUrl = String(preview.content_url || '');
+                    viewerDownload.disabled = !historicalDownloadUrl;
+                    if (historicalDownloadUrl) {
+                        viewerDownload.dataset.downloadUrl = historicalDownloadUrl;
+                        viewerDownload.dataset.downloadKind = 'representation';
+                        viewerDownload.setAttribute('aria-label', 'Descargar vista previa de la versión');
+                        viewerDownload.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Descargar vista previa';
+                    } else {
+                        delete viewerDownload.dataset.downloadUrl;
+                        delete viewerDownload.dataset.downloadKind;
+                    }
                 }
 
                 if (isZip) {
