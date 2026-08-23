@@ -6,13 +6,8 @@ const tabProjects = document.querySelector("#tabProjects");
 const tabSupport = document.querySelector("#tabSupport");
 const panelProjects = document.querySelector("#panelProjects");
 const panelSupport = document.querySelector("#panelSupport");
-const toolsProjects = document.querySelector("#toolsProjects");
+const repositoryProjectFilters = document.querySelector("#repositoryProjectFilters");
 const toolsSupport = document.querySelector("#toolsSupport");
-
-const repositorySearch = document.querySelector("#repositorySearch");
-const repositoryClearSearch = document.querySelector("#repositoryClearSearch");
-const repositoryType = document.querySelector("#repositoryType");
-const repositoryPao = document.querySelector("#repositoryPao");
 
 const repositorySupportSearch = document.querySelector("#repositorySupportSearch");
 const repositorySupportCategory = document.querySelector("#repositorySupportCategory");
@@ -26,21 +21,8 @@ const repositorySupportPaginationSummary = document.querySelector("#repositorySu
 const repositorySupportPaginationPages = document.querySelector("#repositorySupportPaginationPages");
 const repositorySupportPageSizeSelect = document.querySelector("#repositorySupportPageSize");
 
-const repositoryEmpty = document.querySelector("#repositoryEmpty");
-const repositoryEmptyTitle = document.querySelector("#repositoryEmptyTitle");
-const repositoryEmptyText = document.querySelector("#repositoryEmptyText");
-const repositoryBaseProjectCount = Number(panelProjects?.dataset.baseProjectCount || 0);
-
-const repositoryPagination = document.querySelector("#repositoryPagination");
-const repositoryPaginationSummary = document.querySelector("#repositoryPaginationSummary");
-const repositoryPagePrevious = document.querySelector("#repositoryPagePrevious");
-const repositoryPageNext = document.querySelector("#repositoryPageNext");
-const repositoryPageInfo = document.querySelector("#repositoryPageInfo");
-
 const repositorySupportState = { page: 1, size: 10 };
 let repositoryToastTimer = null;
-const repositoryProjectsPerPage = 10;
-let repositoryCurrentPage = 1;
 const originalTextMap = new WeakMap();
 
 // Manejo de pestañas unificadas (Proyectos / Material de apoyo)
@@ -52,7 +34,7 @@ if (tabProjects && tabSupport && panelProjects && panelSupport) {
         tabSupport.setAttribute("aria-selected", "false");
         panelProjects.hidden = false;
         panelSupport.hidden = true;
-        if (toolsProjects) toolsProjects.hidden = false;
+        if (repositoryProjectFilters) repositoryProjectFilters.hidden = false;
         if (toolsSupport) toolsSupport.hidden = true;
     });
     tabSupport.addEventListener("click", () => {
@@ -62,7 +44,7 @@ if (tabProjects && tabSupport && panelProjects && panelSupport) {
         tabProjects.setAttribute("aria-selected", "false");
         panelSupport.hidden = false;
         panelProjects.hidden = true;
-        if (toolsProjects) toolsProjects.hidden = true;
+        if (repositoryProjectFilters) repositoryProjectFilters.hidden = true;
         if (toolsSupport) toolsSupport.hidden = false;
     });
 }
@@ -179,6 +161,7 @@ function normalizeCategorySlug(value) {
     return slug;
 }
 
+/* Legacy client-side project filtering is intentionally disabled; the catalog is server-side paginated.
 function filterRepositoryProjects(resetPage = true) {
     const rawSearchValue = repositorySearch?.value ?? "";
     const searchValue = normalizeRepositoryText(rawSearchValue);
@@ -272,6 +255,7 @@ function filterRepositoryProjects(resetPage = true) {
         repositoryPageNext.disabled = repositoryCurrentPage >= totalPages;
     }
 }
+*/
 
 function showRepositoryToast(message) {
     if (!repositoryToast) return;
@@ -360,26 +344,6 @@ function bindProjectCardEvents() {
     });
 }
 
-repositoryClearSearch?.addEventListener("click", () => {
-    if (repositorySearch) {
-        repositorySearch.value = "";
-        repositorySearch.focus();
-    }
-    filterRepositoryProjects();
-});
-
-repositoryPagePrevious?.addEventListener("click", () => {
-    repositoryCurrentPage = Math.max(1, repositoryCurrentPage - 1);
-    filterRepositoryProjects(false);
-    document.querySelector("#readerProjectGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
-});
-
-repositoryPageNext?.addEventListener("click", () => {
-    repositoryCurrentPage += 1;
-    filterRepositoryProjects(false);
-    document.querySelector("#readerProjectGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
-});
-
 function supportPageTokens(page, total) {
     if (total <= 5) return Array.from({ length: total }, (_, index) => index + 1);
     if (page <= 3) return [1, 2, 3, "…", total];
@@ -452,15 +416,10 @@ function getRepositorySupportMatches() {
 
 repositorySupportPageSizeSelect?.addEventListener("change", () => { repositorySupportState.size = Number(repositorySupportPageSizeSelect.value || 10); repositorySupportState.page = 1; filterRepositorySupportDocuments(false); });
 
-repositorySearch?.addEventListener("input", filterRepositoryProjects);
-repositorySearch?.addEventListener("keyup", filterRepositoryProjects);
 repositorySupportSearch?.addEventListener("input", filterRepositorySupportDocuments);
 repositorySupportSearch?.addEventListener("keyup", filterRepositorySupportDocuments);
 repositorySupportCategory?.addEventListener("change", filterRepositorySupportDocuments);
-repositoryType?.addEventListener("change", filterRepositoryProjects);
-repositoryPao?.addEventListener("change", filterRepositoryProjects);
 
 bindProjectCardEvents();
-filterRepositoryProjects();
 filterRepositorySupportDocuments();
 // Final de filtros del repositorio lector

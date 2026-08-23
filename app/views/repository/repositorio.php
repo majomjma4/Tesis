@@ -41,7 +41,7 @@
                 <button type="button" class="active" id="tabProjects" role="tab" aria-selected="true" aria-controls="panelProjects">
                     <i class="fa-solid fa-diagram-project"></i>
                     <span class="ar-tab-label">Proyectos publicados</span>
-                    <span class="ar-tab-count" id="badgeProjectsCount"><?= count($projects) ?></span>
+                    <span class="ar-tab-count" id="badgeProjectsCount"><?= (int) (($repositoryPagination ?? [])['total'] ?? count($projects)) ?></span>
                 </button>
                 <button type="button" id="tabSupport" role="tab" aria-selected="false" aria-controls="panelSupport">
                     <i class="fa-solid fa-folder-open"></i>
@@ -51,7 +51,25 @@
             </nav>
 
             <!-- Toolbar de proyectos (hermano directo de ar-panel, como en Admin) -->
-            <div class="ar-tools" id="toolsProjects">
+            <?php
+            $repositoryFilters = (array) ($repositoryFilters ?? []);
+            $repositoryPagination = (array) ($repositoryPagination ?? []);
+            $repositoryPage = max(1, (int) ($repositoryPagination['page'] ?? 1));
+            $repositoryPageSize = (int) ($repositoryPagination['per_page'] ?? $repositoryPagination['page_size'] ?? 10);
+            $repositoryTotal = (int) ($repositoryPagination['total'] ?? count($projects));
+            $repositoryPages = max(1, (int) ($repositoryPagination['pages'] ?? 1));
+            $repositoryStatus = (string) ($repositoryStatus ?? 'loaded');
+            $repositorySearchValue = (string) ($repositoryFilters['search'] ?? '');
+            $repositoryTypeValue = (string) ($repositoryFilters['type'] ?? 'all');
+            $repositoryPeriodValue = (string) ($repositoryFilters['period'] ?? 'all');
+            $repositoryUrl = route('repository');
+            $repositoryQuery = static function (int $page) use ($repositorySearchValue, $repositoryTypeValue, $repositoryPeriodValue, $repositoryPageSize, $repositoryUrl): string {
+                return $repositoryUrl . '&' . http_build_query(['search'=>$repositorySearchValue,'type'=>$repositoryTypeValue,'period'=>$repositoryPeriodValue,'page_size'=>$repositoryPageSize,'repository_page'=>$page], '', '&', PHP_QUERY_RFC3986);
+            };
+            ?>
+            <form method="get" action="<?= e(base_url('index.php')) ?>" class="ar-tools" id="toolsProjects" hidden>
+                <input type="hidden" name="page" value="repository">
+                <input type="hidden" name="page" value="1">
                 <label class="ar-search<?= !$projects ? ' is-disabled' : '' ?>">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <input id="repositorySearch" type="text" role="searchbox" placeholder="Buscar por título, código, autor o tutor" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"<?= !$projects ? ' disabled' : '' ?>>
@@ -99,7 +117,7 @@
                         <input id="repositoryPao" type="hidden" value="all">
                     </div>
                 <?php endif; ?>
-            </div>
+            </form>
 
             <!-- Toolbar de materiales (se muestra solo en pestaña de materiales) -->
             <div class="ar-tools" id="toolsSupport" hidden>
@@ -118,6 +136,18 @@
                 </label>
             </div>
 
+            <form method="get" action="<?= e(base_url('index.php')) ?>" class="ar-tools" id="repositoryProjectFilters">
+                <input type="hidden" name="page" value="repository">
+                <input type="hidden" name="repository_page" value="1">
+                <label class="ar-search<?= $repositoryStatus === 'error' ? ' is-disabled' : '' ?>">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input name="search" value="<?= e($repositorySearchValue) ?>" type="search" role="searchbox" placeholder="Buscar por título, código, autor o tutor" aria-label="Buscar proyectos publicados"<?= $repositoryStatus === 'error' ? ' disabled' : '' ?>>
+                </label>
+                <label class="ar-filter-control"><span>Tipo</span><select name="type" onchange="this.form.elements.repository_page.value='1';this.form.submit();"<?= $repositoryStatus === 'error' ? ' disabled' : '' ?>><option value="all">Todos</option><?php foreach ($projectTypes as $type): ?><option value="<?= e($type['value']) ?>"<?= $repositoryTypeValue === (string)$type['value'] ? ' selected' : '' ?>><?= e($type['label']) ?></option><?php endforeach; ?></select></label>
+                <label class="ar-filter-control"><span>Período académico</span><select name="period" onchange="this.form.elements.repository_page.value='1';this.form.submit();"<?= $repositoryStatus === 'error' ? ' disabled' : '' ?>><option value="all">Todos</option><?php foreach ($academicPeriods as $period): ?><option value="<?= e($period['value']) ?>"<?= $repositoryPeriodValue === (string)$period['value'] ? ' selected' : '' ?>><?= e($period['label']) ?></option><?php endforeach; ?></select></label>
+                <label class="ar-filter-control"><span>Mostrar</span><select name="page_size" aria-label="Cantidad de proyectos por página" onchange="this.form.elements.repository_page.value='1';this.form.submit();"<?= $repositoryStatus === 'error' ? ' disabled' : '' ?>><?php foreach ([10,25,50,75,100] as $size): ?><option value="<?= $size ?>"<?= $repositoryPageSize === $size ? ' selected' : '' ?>><?= $size ?></option><?php endforeach; ?></select></label>
+            </form>
+
             <!-- Panel 1: Proyectos publicados -->
             <section
                 class="ar-panel"
@@ -131,7 +161,7 @@
                 <!-- Encabezado de sección exacto Admin -->
                 <header class="ar-section-head">
                     <div><span>Catálogo institucional</span><h2>Proyectos publicados</h2></div>
-                    <p><strong id="repositoryCount"><?= count($projects) ?></strong> resultados visibles</p>
+                    <p><strong id="repositoryCount"><?= $repositoryTotal ?></strong> <?= $repositoryTotal === 1 ? 'resultado visible' : 'resultados visibles' ?></p>
                 </header>
 
                 <!-- Grilla de proyectos con tarjetas exactas Admin -->
@@ -194,8 +224,8 @@
                                 </dl>
                             </div>
                             <div class="ar-card-meta">
-                                <span><i class="fa-regular fa-file-lines"></i> <?= (int) ($project['file_count'] ?? 1) ?> <?= ((int) ($project['file_count'] ?? 1)) === 1 ? 'documento' : 'documentos' ?></span>
-                                <span><i class="fa-solid fa-globe"></i> <?= e(!empty($project['published_at']) ? $project['published_at'] : $project['year']) ?></span>
+                                <span><i class="fa-regular fa-file-lines"></i> <?= (int) ($project['file_count'] ?? 0) ?> <?= ((int) ($project['file_count'] ?? 0)) === 1 ? 'documento' : 'documentos' ?></span>
+                                <span><i class="fa-solid fa-globe"></i> <?= e(!empty($project['published_at_label']) ? $project['published_at_label'] : $project['year']) ?></span>
                             </div>
                             <footer>
                                 <a class="ar-primary-action" href="<?= e($project['detail_url']) ?>">
@@ -212,14 +242,33 @@
                 </div>
 
                 <!-- Estado vacío exacto Admin -->
-                <div class="ar-empty" id="repositoryEmpty" hidden>
+                <?php if ($repositoryStatus === 'error'): ?>
+                    <div class="ar-empty" id="repositoryErrorState">
+                        <span><i class="fa-solid fa-triangle-exclamation"></i></span>
+                        <h2>No fue posible cargar el repositorio.</h2>
+                        <p><?= e((string) ($repositoryError ?: 'Inténtalo nuevamente más tarde.')) ?></p>
+                    </div>
+                <?php endif; ?>
+                <div class="ar-empty" id="repositoryEmpty" <?= $repositoryStatus !== 'empty' ? 'hidden' : '' ?>>
                     <span><i class="fa-solid fa-book-open"></i></span>
                     <h2 id="repositoryEmptyTitle">Aún no existen proyectos publicados.</h2>
                     <p id="repositoryEmptyText">Los proyectos aprobados aparecerán aquí después de completar su publicación.</p>
                 </div>
 
                 <!-- Paginación exacta Admin (Se oculta automáticamente si totalPages <= 1) -->
-                <footer class="ar-pagination" id="repositoryPagination" hidden>
+                <?php if ($repositoryStatus === 'loaded' && $repositoryPages > 1): ?>
+                    <footer class="ar-pagination" id="repositoryPagination">
+                        <span>Mostrando <?= (($repositoryPage - 1) * $repositoryPageSize + 1) ?> - <?= min($repositoryTotal, $repositoryPage * $repositoryPageSize) ?> de <?= $repositoryTotal ?></span>
+                        <nav aria-label="Paginación de proyectos publicados">
+                            <?php if ($repositoryPage > 1): ?><a href="<?= e($repositoryQuery($repositoryPage - 1)) ?>">Anterior</a><?php endif; ?>
+                            <?php for ($pageNumber = 1; $pageNumber <= $repositoryPages; $pageNumber++): ?>
+                                <a href="<?= e($repositoryQuery($pageNumber)) ?>"<?= $pageNumber === $repositoryPage ? ' aria-current="page"' : '' ?>><?= $pageNumber ?></a>
+                            <?php endfor; ?>
+                            <?php if ($repositoryPage < $repositoryPages): ?><a href="<?= e($repositoryQuery($repositoryPage + 1)) ?>">Siguiente</a><?php endif; ?>
+                        </nav>
+                    </footer>
+                <?php endif; ?>
+                <footer class="ar-pagination" id="repositoryPaginationLegacy" hidden>
                     <span id="repositoryPaginationSummary">Mostrando 0 de 0</span>
                     <nav id="repositoryPaginationPages" aria-label="Paginación de proyectos publicados">
                         <button type="button" id="repositoryPagePrevious" disabled><i class="fa-solid fa-chevron-left"></i> Anterior</button>

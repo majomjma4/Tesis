@@ -22,9 +22,15 @@ final class ProjectRepositoryPackageService
     {
         $descriptor = ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'stored'];
         if ($projectId < 1) return $descriptor;
-        $project = Database::connection()->prepare('SELECT status FROM projects WHERE id=:id AND deleted_at IS NULL');
+        $project = Database::connection()->prepare('SELECT status, is_available, withdrawn_at, deleted_at FROM projects WHERE id=:id');
         $project->execute(['id'=>$projectId]);
-        if ((string)$project->fetchColumn() !== 'published') return $descriptor;
+        $projectRow = $project->fetch(PDO::FETCH_ASSOC);
+        if (!$projectRow
+            || (string)$projectRow['status'] !== 'published'
+            || (int)($projectRow['is_available'] ?? 0) !== 1
+            || $projectRow['withdrawn_at'] !== null
+            || $projectRow['deleted_at'] !== null
+        ) return $descriptor;
 
         $files = $this->activeFiles($projectId);
         $descriptor['file_count'] = count($files);

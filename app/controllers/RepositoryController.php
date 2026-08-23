@@ -7,7 +7,7 @@ final class RepositoryController
     /**
      * Renderiza el repositorio institucional de proyectos finalizados.
      */
-    public function index(): void
+    public function legacyIndex(): void
     {
         $this->ensureSession();
         if ((new AuthSessionService())->isAdminModeActive()) {
@@ -66,6 +66,100 @@ final class RepositoryController
             'supportMaterialManageFileEndpoint' => $this->teacherMaterialUi($session) ? route('support-material-manage-file') : '',
             'supportMaterialManageSaveEndpoint' => $this->teacherMaterialUi($session) ? route('support-material-manage-save') : '',
             'supportMaterialCsrf' => $this->teacherMaterialUi($session) ? $session->csrfToken('admin_repository') : '',
+        ]);
+    }
+
+    public function index(): void
+    {
+        $this->ensureSession();
+        $session = new AuthSessionService();
+        if ($session->isAdminModeActive()) {
+            header('Location: ' . route('admin-repository'));
+            exit;
+        }
+
+        $repositoryModel = new RepositoryModel();
+        $projectTypes = [];
+        $academicPeriods = [];
+        $categories = [];
+        $supportMaterialCategories = [];
+        $supportMaterialTypes = [];
+        $result = [
+            'status' => 'error', 'items' => [], 'total' => 0,
+            'pagination' => ['page'=>1,'per_page'=>10,'page_size'=>10,'total'=>0,'pages'=>1,'from'=>0,'to'=>0,'page_key'=>'page','size_key'=>'page_size'],
+            'filters' => ['search'=>'','type'=>'all','period'=>'all','period_code'=>''],
+            'message' => 'No fue posible consultar el repositorio en este momento.',
+        ];
+        $repositoryError = null;
+        $supportDocuments = [];
+        $teacherMaterialUi = false;
+        try {
+            $projectTypes = $repositoryModel->getProjectTypes();
+            $academicPeriods = $repositoryModel->getAcademicPeriods();
+            $type = trim((string) ($_GET['type'] ?? 'all')) ?: 'all';
+            $period = trim((string) ($_GET['period'] ?? 'all')) ?: 'all';
+            if ($type !== 'all' && !in_array($type, array_column($projectTypes, 'value'), true)) $type = 'all';
+            $periodByValue = [];
+            foreach ($academicPeriods as $academicPeriod) $periodByValue[(string) $academicPeriod['value']] = (string) ($academicPeriod['code'] ?? '');
+            if ($period !== 'all' && !array_key_exists($period, $periodByValue)) $period = 'all';
+            $result = $repositoryModel->getPublishedProjectsResult([
+                'search' => (string) ($_GET['search'] ?? ''), 'type' => $type, 'period' => $period,
+                'period_code' => $period === 'all' ? '' : $periodByValue[$period],
+            ], PaginationService::request('repository_page', 'page_size'));
+            $repositoryError = $result['status'] === 'error' ? (string) $result['message'] : null;
+            $supportModel = new SupportMaterialModel();
+            $teacherMaterialUi = $this->teacherMaterialUi($session);
+            $supportDocuments = $teacherMaterialUi
+                ? $supportModel->getForTeacherManagement((int) $session->userId())
+                : $supportModel->getAll();
+            $categories = $repositoryModel->getCategories();
+            if ($teacherMaterialUi) {
+                $supportMaterialCategories = $supportModel->categories();
+                $supportMaterialTypes = $supportModel->materialTypeCatalog();
+            }
+        } catch (Throwable $exception) {
+            error_log('Repository index: ' . $exception->getMessage());
+            $repositoryError = 'No fue posible consultar el repositorio en este momento.';
+            $result['status'] = 'error';
+        }
+
+        $favoriteIds = [];
+        try { $favoriteIds = (new FavoriteModel())->getFavoriteIds($this->getCurrentUserId()); } catch (Throwable $exception) { error_log('Repository favorites: ' . $exception->getMessage()); }
+        $repositoryReturnUrl = (string) ($_SERVER['REQUEST_URI'] ?? route('repository'));
+        $packageService = new ProjectRepositoryPackageService();
+        $projects = array_map(function (array $project) use ($favoriteIds, $repositoryReturnUrl, $packageService): array {
+            $project['is_favorite'] = in_array($project['id'], $favoriteIds, true);
+            $project['detail_url'] = base_url('index.php?page=repository-detail&id=' . urlencode((string) $project['id']) . '&return=' . rawurlencode($repositoryReturnUrl));
+            $project['published_at_label'] = format_utc_datetime((string) ($project['published_at'] ?? ''), false);
+            try {
+                $package = $packageService->describe((int) $project['id'], route('repository-download') . '&id=' . (int) $project['id']);
+                $project['package_available'] = !empty($package['available']);
+                $project['package_download_url'] = (string) ($package['download_url'] ?? '');
+            } catch (Throwable $exception) {
+                error_log('Repository package descriptor: ' . $exception->getMessage());
+                $project['package_available'] = false;
+                $project['package_download_url'] = '';
+            }
+            return $project;
+        }, (array) ($result['items'] ?? []));
+
+        View::render('repository/repositorio', [
+            'currentPage'=>'repository', 'title'=>'Repositorio Institucional | Gestión Documental Académica',
+            'pageStyles'=>[asset('css/repository-reader.css')], 'pageScript'=>asset('js/repository.js'),
+            'pageScripts'=>$teacherMaterialUi ? [asset('js/teacher-support-materials.js')] : [],
+            'projects'=>$projects, 'repositoryStatus'=>(string) ($result['status'] ?? 'error'),
+            'repositoryError'=>$repositoryError, 'repositoryPagination'=>(array) ($result['pagination'] ?? []),
+            'repositoryFilters'=>(array) ($result['filters'] ?? []), 'favoriteActionUrl'=>route('repository-favorite'),
+            'favoriteCsrfToken'=>$this->getFavoriteCsrfToken(), 'semesters'=>$repositoryModel->getSemesters(),
+            'teachers'=>$repositoryModel->getTeachers(), 'categories'=>$categories,
+            'projectTypes'=>$projectTypes, 'academicPeriods'=>$academicPeriods,
+            'supportDocuments'=>array_map(static function (array $material): array { $material['detail_url']=base_url('index.php?page=support-material-detail&id='.rawurlencode((string)$material['id'])); return $material; }, $supportDocuments),
+            'supportMaterialsUrl'=>route('support-materials'), 'canCreateSupportMaterial'=>$teacherMaterialUi,
+            'supportMaterialCategories'=>$supportMaterialCategories,
+            'supportMaterialTypes'=>$supportMaterialTypes,
+            'supportMaterialManageFileEndpoint'=>$teacherMaterialUi ? route('support-material-manage-file') : '',
+            'supportMaterialManageSaveEndpoint'=>$teacherMaterialUi ? route('support-material-manage-save') : '',
+            'supportMaterialCsrf'=>$teacherMaterialUi ? $session->csrfToken('admin_repository') : '',
         ]);
     }
 
@@ -217,6 +311,7 @@ final class RepositoryController
             $this->sendJson(false, 'El proyecto solicitado no está disponible.');
         }
 
+        $this->ensureRepositoryPackage($project);
         $archiveState = (new ArchiveService())->listDirectory($project['archive']['path'], (string) ($_GET['path'] ?? ''));
         if (!$archiveState['success']) {
             http_response_code($archiveState['status'] === 'not_found' ? 404 : ($archiveState['status'] === 'invalid_path' ? 400 : 422));
@@ -243,7 +338,6 @@ final class RepositoryController
             $this->renderDownloadError('No fue posible preparar la descarga del proyecto.');
         }
 
-        (new DownloadModel())->increment($project['id']);
         session_write_close();
         $this->sendDownloadHeaders($project['archive']['name'], 'application/zip', $fileSize);
         readfile($zipPath);
@@ -408,7 +502,24 @@ final class RepositoryController
             $this->renderDownloadError('El proyecto solicitado no está disponible.');
         }
 
+        $this->ensureRepositoryPackage($project);
         return $project;
+    }
+
+    private function ensureRepositoryPackage(array $project): void
+    {
+        try {
+            $descriptor = (new ProjectRepositoryPackageService())->describe((int) ($project['id'] ?? 0));
+        } catch (Throwable $exception) {
+            error_log('Repository package validation: ' . $exception->getMessage());
+            http_response_code(503);
+            $this->renderDownloadError('El paquete del proyecto no está disponible en este momento.');
+        }
+
+        if (empty($descriptor['available'])) {
+            http_response_code(409);
+            $this->renderDownloadError('El paquete del proyecto no está disponible o necesita actualización.');
+        }
     }
 
     private function sendDownloadHeaders(string $fileName, string $mimeType, int $fileSize): void

@@ -432,7 +432,6 @@ final class SupportMaterialController
                     if (is_file($temporaryPath)) @unlink($temporaryPath);
                 });
             }
-            (new SupportMaterialDownloadModel())->increment((int) $material['id']);
             session_write_close();
             $name = 'material_' . (int) $material['id'] . '.zip';
             header('Content-Type: application/zip');
@@ -462,9 +461,6 @@ final class SupportMaterialController
         $this->ensureSession();
         $this->ensureGet();
         [$material, $file, $stream] = $this->resolveFileRequest();
-        if ($file['presentation'] || ($file['package'] ?? false)) {
-            (new SupportMaterialDownloadModel())->increment($material['id']);
-        }
         session_write_close();
         $fallbackName = preg_replace('/[^A-Za-z0-9._-]/', '_', $file['name']) ?: 'documento';
         header('Content-Type: ' . $this->mimeFor($file['extension']));
