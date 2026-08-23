@@ -53,28 +53,34 @@ final class DashboardController
             return;
         }
 
+        $studentId = (int) ($session->userId() ?? 0);
+        $studentDashboardError = null;
+        try {
+            $studentDashboard = $dashboard->getStudentDashboard($studentId);
+        } catch (Throwable $exception) {
+            error_log('Student dashboard error: ' . $exception->getMessage());
+            $studentDashboard = [
+                'projects' => ['status' => 'error', 'items' => [], 'message' => 'No fue posible cargar tu dashboard en este momento.'],
+                'upcoming' => ['status' => 'error', 'items' => [], 'message' => 'No fue posible cargar tus próximas fechas.'],
+                'notifications' => ['status' => 'error', 'unread_count' => null, 'items' => [], 'message' => 'No fue posible cargar tus notificaciones.'],
+                'resources' => ['status' => 'error', 'items' => [], 'message' => 'No fue posible cargar los recursos institucionales.'],
+            ];
+            $studentDashboardError = 'No fue posible cargar tu dashboard en este momento.';
+        }
+        $projectItems = (array) ($studentDashboard['projects']['items'] ?? []);
+        $requestedIndex = filter_var($_GET['project_index'] ?? 0, FILTER_VALIDATE_INT);
+        $selectedIndex = $requestedIndex === false ? 0 : max(0, min((int) $requestedIndex, max(0, count($projectItems) - 1)));
         View::render('dashboard/student', [
             'currentPage' => 'dashboard',
             'title' => 'Dashboard | Gestion Documental Academica',
             'bodyClass' => 'student-dashboard-page',
-            'pageStyles' => [asset('css/student-dashboard.css')],
+            'pageStyles' => [asset('css/student-dashboard.css'), asset('css/teacher-dashboard.css')],
             'pageScript' => asset('js/student-dashboard.js'),
-            'summaryCards' => $dashboard->getSummary(),
-            'currentReport' => $dashboard->getCurrentReport(),
-            'teamMembers' => $dashboard->getTeamMembers(),
-            'observations' => $dashboard->getObservations(),
-            'recentActivity' => $dashboard->getRecentActivity(),
-            'processDates' => $dashboard->getProcessDates(),
-            'notifications' => $dashboard->getNotifications(),
-            'reminders' => $dashboard->getReminders(),
-            'projectUrls' => [
-                'summary' => route('project-detail') . '&id=1&tab=summary',
-                'deliveries' => route('project-detail') . '&id=1&tab=deliveries',
-                'observations' => route('project-detail') . '&id=1&tab=observations',
-                'history' => route('project-detail') . '&id=1&tab=history',
-                'calendar' => route('project-detail') . '&id=1&tab=calendar',
-                'notifications' => route('notifications'),
-            ],
+            'studentDashboard' => $studentDashboard,
+            'studentDashboardError' => $studentDashboardError,
+            'studentProjects' => $projectItems,
+            'studentProject' => $projectItems[$selectedIndex] ?? null,
+            'studentProjectIndex' => $selectedIndex,
         ]);
     }
 }

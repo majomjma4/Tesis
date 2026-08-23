@@ -856,91 +856,155 @@ final class DashboardModel
     }
 
     // MÉTODOS PARA DASHBOARD GENERAL (DOCENTE / ESTUDIANTE)
-    public function getSummary(): array
+    /** Builds the student dashboard from the authenticated user's authorized projects. */
+    public function getStudentDashboard(int $studentId): array
     {
-        return [
-            ['cardClass' => 'is-primary', 'title' => 'Entregables Activos', 'label' => 'Entregables Activos', 'value' => 5, 'subtitle' => '1 pendiente de revision', 'description' => '1 pendiente de revision', 'meta' => '1 pendiente de revision', 'icon' => 'file-lines', 'tone' => 'primary'],
-            ['cardClass' => 'is-amber', 'title' => 'Observaciones', 'label' => 'Observaciones', 'value' => 2, 'subtitle' => 'Requieren atencion', 'description' => 'Requieren atencion', 'meta' => 'Requieren atencion', 'icon' => 'comment-dots', 'tone' => 'amber'],
-            ['cardClass' => 'is-emerald', 'title' => 'Progreso General', 'label' => 'Progreso General', 'value' => '68%', 'subtitle' => 'Fase 2 de 4 completada', 'description' => 'Fase 2 de 4 completada', 'meta' => 'Fase 2 de 4 completada', 'icon' => 'chart-line', 'tone' => 'emerald'],
-            ['cardClass' => 'is-indigo', 'title' => 'Proxima Entrega', 'label' => 'Proxima Entrega', 'value' => '04 Nov', 'subtitle' => 'Quedan 3 dias habiles', 'description' => 'Quedan 3 dias habiles', 'meta' => 'Quedan 3 dias habiles', 'icon' => 'calendar-day', 'tone' => 'indigo'],
+        $result = [
+            'projects' => ['status' => 'loaded', 'items' => []],
+            'upcoming' => ['status' => 'loaded', 'items' => []],
+            'notifications' => ['status' => 'loaded', 'unread_count' => 0, 'items' => []],
+            'resources' => ['status' => 'loaded', 'items' => []],
         ];
+        if ($studentId < 1 || !Database::isEnabled()) {
+            $message = 'No fue posible consultar la información del dashboard en este momento.';
+            $result['projects'] = ['status' => 'error', 'items' => [], 'message' => $message];
+            $result['upcoming'] = ['status' => 'error', 'items' => [], 'message' => $message];
+            $result['notifications'] = ['status' => 'error', 'unread_count' => null, 'items' => [], 'message' => $message];
+            $result['resources'] = ['status' => 'error', 'items' => [], 'message' => $message];
+            return $result;
+        }
+
+        try {
+            $records = [];
+            $recordModel = new ProjectRecordModel();
+            foreach ((new ProjectModel())->getProjectsForUser($studentId) as $listed) {
+                $id = (int) ($listed['id'] ?? 0);
+                if ($id < 1) continue;
+                $record = $recordModel->find($id, $studentId, false);
+                if ($record && $this->isActiveStudentParticipant($record, $studentId)) $records[] = $record;
+            }
+            $ids = array_map(static fn(array $project): int => (int) $project['id'], $records);
+            $capabilities = (new ProjectCapabilityService())->forProjectIds($ids, 'academic');
+            $situations = (new ProjectReviewSituationService())->forProjects($ids);
+            $items = [];
+            foreach ($records as $record) {
+                $id = (int) $record['id'];
+                $items[] = $this->studentProjectItem($record, $capabilities[$id] ?? [], $situations[$id] ?? ProjectReviewSituationService::emptySituation());
+            }
+            $result['projects'] = ['status' => $items === [] ? 'empty' : 'loaded', 'items' => $items];
+        } catch (Throwable $error) {
+            error_log('Student dashboard projects: ' . $error->getMessage());
+            $result['projects'] = ['status' => 'error', 'items' => [], 'message' => 'No fue posible consultar tus proyectos en este momento.'];
+        }
+
+        try {
+            $events = (new CalendarModel())->getEventsForOwner($studentId);
+            $today = (new DateTimeImmutable('now', new DateTimeZone('America/Guayaquil')))->format('Y-m-d');
+            $upcoming = array_values(array_filter($events, static fn(array $event): bool => (string) ($event['date'] ?? '') >= $today && empty($event['completed'])));
+            usort($upcoming, static fn(array $a, array $b): int => [(string) ($a['date'] ?? ''), (string) ($a['time'] ?? '')] <=> [(string) ($b['date'] ?? ''), (string) ($b['time'] ?? '')]);
+            $items = array_map(function (array $event): array {
+                $date = (string) ($event['date'] ?? '');
+                return ['date' => $date !== '' ? (new DateTimeImmutable($date, new DateTimeZone('America/Guayaquil')))->format('d/m/Y') : 'Fecha no disponible', 'time' => $event['time'] ?? null, 'title' => (string) ($event['title'] ?? 'Evento académico'), 'context' => (string) ($event['description'] ?? '')];
+            }, array_slice($upcoming, 0, 6));
+            $result['upcoming'] = ['status' => $items === [] ? 'empty' : 'loaded', 'items' => $items];
+        } catch (Throwable $error) {
+            error_log('Student dashboard calendar: ' . $error->getMessage());
+            $result['upcoming'] = ['status' => 'error', 'items' => [], 'message' => 'No fue posible cargar tus próximas fechas.'];
+        }
+
+        try {
+            $notificationModel = new NotificationModel();
+            $items = $this->studentNotificationItems($notificationModel->getByUser($studentId, [], '', 4));
+            $result['notifications'] = ['status' => 'loaded', 'unread_count' => (int) $notificationModel->getCounters($studentId, '')['unread'], 'items' => $items];
+        } catch (Throwable $error) {
+            error_log('Student dashboard notifications: ' . $error->getMessage());
+            $result['notifications'] = ['status' => 'error', 'unread_count' => null, 'items' => [], 'message' => 'No fue posible cargar tus notificaciones.'];
+        }
+
+        try {
+            $resources = [];
+            foreach (array_slice((new RepositoryModel())->getPublishedProjects(), 0, 4) as $project) $resources[] = ['title' => (string) $project['title'], 'description' => (string) $project['description'], 'badge' => strcasecmp(trim((string) ($project['type'] ?? '')), 'Proyecto integrador de saberes') === 0 ? 'Proyecto PIS' : (string) ($project['type'] ?? 'Proyecto'), 'meta' => (string) ($project['pao_label'] ?? ''), 'icon' => 'fa-book-open', 'route' => route('repository-detail') . '&id=' . (int) $project['id']];
+            $materials = array_values(array_filter((new SupportMaterialModel())->getAll(), static fn(array $material): bool => !empty($material['is_available'])));
+            foreach (array_slice($materials, 0, 4) as $material) $resources[] = ['title' => (string) ($material['title'] ?? 'Material de apoyo'), 'description' => (string) ($material['description'] ?? ''), 'badge' => (string) ($material['type'] ?? 'Material'), 'meta' => (string) ($material['pao_label'] ?? ''), 'icon' => 'fa-file-lines', 'route' => route('support-material-detail') . '&id=' . (int) ($material['id'] ?? 0)];
+            $result['resources'] = ['status' => $resources === [] ? 'empty' : 'loaded', 'items' => array_slice($resources, 0, 7)];
+        } catch (Throwable $error) {
+            error_log('Student dashboard resources: ' . $error->getMessage());
+            $result['resources'] = ['status' => 'error', 'items' => [], 'message' => 'No fue posible cargar los recursos institucionales.'];
+        }
+        return $result;
     }
 
-    public function getCurrentReport(): array
+    private function isActiveStudentParticipant(array $project, int $studentId): bool
     {
-        return [
-            'id' => 1,
-            'title' => 'Sistema de Gestion Academica para Titulacion Universitario',
-            'description' => 'Sistema de Gestion Academica para Titulacion Universitario',
-            'document' => 'informe_borrador_final_v2.pdf',
-            'version' => 'v2.1',
-            'lastDelivery' => '18 Ago 2026',
-            'semester' => 'I PAO 2026',
-            'career' => 'Ingenieria en Sistemas',
-            'tutor' => 'Dr. Carlos Mendoza',
-            'lastReview' => '16 Ago 2026',
-            'pendingObservations' => '2 pendientes',
-            'code' => 'TESIS-2026-004',
-            'author' => 'Juan Perez & Maria Rodriguez',
-            'advisor' => 'Dr. Carlos Mendoza',
-            'reviewer' => 'Dra. Ana Gomez',
-            'status' => 'under_review',
-            'status_label' => 'En Revision de Formato',
-            'statusClass' => 'is-amber',
-            'progress' => 68,
-            'current_phase' => 'Fase 2: Revision de Avance Metodologico',
-            'last_update' => '2026-08-18 10:30',
-        ];
+        foreach ((array) ($project['student_authors'] ?? []) as $participant) {
+            if ((int) ($participant['user_id'] ?? 0) === $studentId && (string) ($participant['role_code'] ?? '') === 'student' && (string) ($participant['status'] ?? 'active') === 'active' && empty($participant['removed_at'])) return true;
+        }
+        return false;
     }
 
-    public function getTeamMembers(): array
+    private function studentProjectItem(array $project, array $capabilities, array $situation): array
     {
-        return [
-            ['id' => 1, 'name' => 'Juan Perez', 'initial' => 'JP', 'role' => 'Estudiante Lead', 'avatar' => null, 'status' => 'active'],
-            ['id' => 2, 'name' => 'Maria Rodriguez', 'initial' => 'MR', 'role' => 'Co-autor', 'avatar' => null, 'status' => 'active'],
-            ['id' => 3, 'name' => 'Dr. Carlos Mendoza', 'initial' => 'CM', 'role' => 'Tutor Academico', 'avatar' => null, 'status' => 'active'],
-        ];
+        $status = (string) ($project['status'] ?? '');
+        $labels = project_academic_labels($status);
+        $deliveries = (array) ($project['deliveries'] ?? []);
+        $latest = $deliveries === [] ? null : $deliveries[array_key_last($deliveries)];
+        if (is_array($latest) && !empty($latest['submitted_at'])) {
+            try {
+                $latest['submitted_at'] = (new DateTimeImmutable((string) $latest['submitted_at'], new DateTimeZone('UTC')))->setTimezone(new DateTimeZone('America/Guayaquil'))->format('d/m/Y H:i');
+            } catch (Throwable) {
+                $latest['submitted_at'] = 'Fecha no disponible';
+            }
+        }
+        $pending = (int) ($situation['pending_observations_count'] ?? 0);
+        $observations = array_map(static fn(array $item): array => ['id' => (int) ($item['id'] ?? 0), 'title' => (string) ($item['category'] ?? 'Observación académica'), 'author' => (string) ($item['author_name'] ?? 'Revisión académica'), 'date' => (string) ($item['created_at'] ?? ''), 'text' => (string) ($item['body'] ?? ''), 'status' => (string) ($item['status'] ?? ''), 'file' => (string) ($item['file_id'] ?? '')], (array) ($project['observations'] ?? []));
+        $url = route('project-detail') . '&id=' . (int) $project['id'];
+        $reviewUrl = $pending > 0 ? $url . '&tab=observations' : $url . '&tab=summary';
+        $review = $pending > 0
+            ? ['icon' => 'fa-pen-to-square', 'eyebrow' => 'Requiere tu atención', 'title' => 'Observaciones pendientes', 'text' => $pending . ($pending === 1 ? ' observación requiere corrección.' : ' observaciones requieren corrección.'), 'action' => 'Ver observaciones', 'url' => $reviewUrl, 'needs_attention' => true]
+            : ['icon' => $status === 'defense' ? 'fa-scale-balanced' : ($status === 'published' ? 'fa-circle-check' : 'fa-file-pen'), 'eyebrow' => (string) $labels['stage'], 'title' => (string) $labels['status'], 'text' => $status === 'under_review' ? 'Tu entrega está siendo revisada.' : 'Consulta el proyecto para conocer su situación actual.', 'action' => 'Ver proyecto', 'url' => $reviewUrl, 'needs_attention' => false];
+        return ['id' => (int) $project['id'], 'code' => (string) ($project['code'] ?? ''), 'title' => (string) ($project['title'] ?? ''), 'type' => (string) ($project['type_name'] ?? $project['type_code'] ?? ''), 'type_code' => (string) ($project['type_code'] ?? ''), 'status' => $status, 'status_label' => (string) $labels['status'], 'stage_label' => (string) $labels['stage'], 'stage' => (string) ($project['current_stage'] ?? ''), 'semester' => (string) ($project['period_name'] ?? ''), 'tutor' => (string) ($project['tutor_name'] ?? ''), 'participants' => (array) ($project['student_authors'] ?? []), 'observations' => $observations, 'pending_observations' => $pending, 'latest_delivery' => $latest, 'capabilities' => $capabilities, 'review' => $review, 'urls' => ['summary' => $url . '&tab=summary', 'deliveries' => $url . '&tab=deliveries', 'observations' => $url . '&tab=observations']];
     }
 
-    public function getObservations(): array
+    private function studentNotificationItems(array $notifications): array
     {
-        return [
-            ['id' => 1, 'title' => 'Ajustar metodología', 'author' => 'Dra. Ana Gomez', 'role' => 'Revisora', 'date' => '2026-08-16', 'text' => 'Ajustar la seccion 3.2 referente a la metodologia cualitativa.', 'status' => 'pending', 'statusClass' => 'is-amber', 'file' => 'capitulo_3_v2.pdf'],
-            ['id' => 2, 'title' => 'Referencias APA 7', 'author' => 'Dr. Carlos Mendoza', 'role' => 'Tutor', 'date' => '2026-08-14', 'text' => 'Formato de referencias corregido segun norma APA 7.', 'status' => 'resolved', 'statusClass' => 'is-emerald', 'file' => 'referencias.pdf'],
-        ];
+        $timezone = (string) ($GLOBALS['config']['timezone'] ?? 'America/Guayaquil');
+        if (!in_array($timezone, timezone_identifiers_list(), true)) $timezone = 'America/Guayaquil';
+        foreach ($notifications as &$notification) {
+            $raw = trim((string) ($notification['created_at'] ?? ''));
+            if ($raw === '') continue;
+            try {
+                $notification['created_at'] = (new DateTimeImmutable($raw, new DateTimeZone('UTC')))->setTimezone(new DateTimeZone($timezone))->format('d/m/Y H:i');
+            } catch (Throwable) {
+                $notification['created_at'] = 'Fecha no disponible';
+            }
+        }
+        unset($notification);
+        return $notifications;
     }
+
+    public function getSummary(): array { return []; }
+
+    public function getCurrentReport(): array { return []; }
+
+    public function getTeamMembers(): array { return []; }
 
     public function getRecentActivity(): array
     {
-        return [
-            ['action' => 'Entrega subida', 'title' => 'Entrega subida', 'detail' => 'Capitulo 3 Metodologia v2.pdf', 'text' => 'Capitulo 3 Metodologia v2.pdf', 'user' => 'Juan Perez', 'date' => 'Hace 2 horas', 'time' => 'Hace 2 horas', 'type' => 'upload', 'icon' => 'fa-upload'],
-            ['action' => 'Observacion agregada', 'title' => 'Observacion agregada', 'detail' => 'Revisar seccion 3.2', 'text' => 'Revisar seccion 3.2', 'user' => 'Dra. Ana Gomez', 'date' => 'Hace 1 dia', 'time' => 'Hace 1 dia', 'type' => 'comment', 'icon' => 'fa-comment'],
-            ['action' => 'Estado actualizado', 'title' => 'Estado actualizado', 'detail' => 'Cambio a En Revision', 'text' => 'Cambio a En Revision', 'user' => 'Sistema', 'date' => 'Hace 2 dias', 'time' => 'Hace 2 dias', 'type' => 'status', 'icon' => 'fa-circle-check'],
-        ];
+        return [];
     }
 
     public function getProcessDates(): array
     {
-        return [
-            ['date' => '04 Nov', 'value' => '04 Nov', 'event' => 'Cierre de Revision Metodologica', 'label' => 'Cierre de Revision Metodologica', 'status' => 'upcoming', 'days_left' => 3],
-            ['date' => '18 Nov', 'value' => '18 Nov', 'event' => 'Entrega de Borrador Final', 'label' => 'Entrega de Borrador Final', 'status' => 'future', 'days_left' => 17],
-            ['date' => '02 Dic', 'value' => '02 Dic', 'event' => 'Defensa Borrador Ante Tribunal', 'label' => 'Defensa Borrador Ante Tribunal', 'status' => 'future', 'days_left' => 31],
-        ];
+        return [];
     }
 
     public function getNotifications(): array
     {
-        return [
-            ['id' => 1, 'title' => 'Nueva observacion recibida', 'message' => 'Dra. Ana Gomez agrego comentarios a tu ultima entrega.', 'text' => 'Dra. Ana Gomez agrego comentarios a tu ultima entrega.', 'date' => 'Hace 1 dia', 'time' => 'Hace 1 dia', 'read' => false],
-            ['id' => 2, 'title' => 'Recordatorio de entrega', 'message' => 'La fecha limite para la Fase 2 es el 04 de Noviembre.', 'text' => 'La fecha limite para la Fase 2 es el 04 de Noviembre.', 'date' => 'Hace 3 dias', 'time' => 'Hace 3 dias', 'read' => true],
-        ];
+        return [];
     }
 
     public function getReminders(): array
     {
-        return [
-            ['title' => 'Reunion con Tutor', 'text' => 'Reunion con Tutor', 'date' => 'Manana 10:00 AM', 'urgent' => true],
-            ['title' => 'Subir correcciones APA', 'text' => 'Subir correcciones APA', 'date' => '02 Nov 11:59 PM', 'urgent' => false],
-        ];
+        return [];
     }
 }
