@@ -47,10 +47,10 @@
             <input type="hidden" name="_csrf" value="<?= e($loginCsrfToken ?? '') ?>">
             <!-- Inicio de campo de usuario -->
             <div class="form-group" id="userGroup">
-                <label for="user">Correo electrónico</label>
+                <label for="user">Correo, usuario o cédula</label>
                 <div class="input-wrap">
                     <i class="fa-solid fa-user"></i>
-                    <input type="email" id="user" name="user" autocomplete="username" inputmode="email" placeholder="nombre@correo.com" value="<?= e($loginValue ?? '') ?>">
+                    <input type="text" id="user" name="user" autocomplete="username" inputmode="text" placeholder="correo, usuario o cédula" value="<?= e($loginValue ?? '') ?>">
                     <button class="login-user-clear" id="loginUserClear" type="button" aria-label="Limpiar usuario o correo" title="Limpiar usuario o correo" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                 </div>
                 <span class="field-error">Este campo es obligatorio.</span>

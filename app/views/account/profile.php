@@ -23,7 +23,7 @@ $avatarUrl = $hasAvatar ? (route('profile-avatar') . '&v=' . rawurlencode((strin
         <div class="profile-header-info">
             <small>Cuenta institucional</small>
             <h1><?= e($profile['full_name']) ?></h1>
-            <p><?= e($profile['email']) ?></p>
+            <p><?= !empty($profile['email']) ? e((string)$profile['email']) : 'Correo no registrado' ?></p>
             <div class="profile-avatar-actions">
                 <button type="button" class="profile-avatar-action-btn primary" id="profileAvatarAddBtn"><i class="fa-solid fa-camera" aria-hidden="true"></i> <span id="profileAvatarAddText">Agregar foto</span></button>
                 <button type="button" class="profile-avatar-action-btn danger" id="profileAvatarRemoveBtn" <?= !$hasAvatar ? 'hidden' : '' ?>><i class="fa-solid fa-trash-can" aria-hidden="true"></i> Eliminar foto</button>
@@ -42,7 +42,7 @@ $avatarUrl = $hasAvatar ? (route('profile-avatar') . '&v=' . rawurlencode((strin
                 <input type="hidden" name="profile_version" value="<?= e((string) ($profile['profile_version'] ?? 1)) ?>">
                 <label>Nombre completo<input name="full_name" value="<?= e($profile['full_name']) ?>" maxlength="180" required></label>
                 <label>Usuario (Opcional)<input name="username" value="<?= e($profile['username'] ?? '') ?>" maxlength="80" placeholder="Nombre de usuario"></label>
-                <label>Correo electrónico<input type="email" name="email" value="<?= e($profile['email']) ?>" maxlength="190" required></label>
+                <label>Correo electrónico <small>(opcional)</small><input type="email" name="email" value="<?= e((string)($profile['email'] ?? '')) ?>" maxlength="190"></label>
                 <label>Cédula<input type="text" value="<?= e($profile['institutional_code'] ?: 'No registrada') ?>" readonly tabindex="-1" class="profile-readonly-input" aria-readonly="true"></label>
                 <div class="profile-form-actions">
                     <button type="submit" class="profile-submit-btn" data-profile-submit disabled aria-disabled="true">Guardar cambios</button>

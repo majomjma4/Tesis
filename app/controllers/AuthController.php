@@ -29,8 +29,8 @@ final class AuthController
                 $error = 'La sesión del formulario venció. Inténtalo nuevamente.';
             } elseif (!Database::isEnabled()) {
                 $error = 'El acceso real estará disponible cuando se active la base de datos.';
-            } elseif (!filter_var($login, FILTER_VALIDATE_EMAIL) || (string) ($_POST['password'] ?? '') === '') {
-                $error = 'Completa un correo válido y la contraseña.';
+            } elseif ($login === '' || (string) ($_POST['password'] ?? '') === '') {
+                $error = 'Completa tu correo, usuario o cédula y la contraseña.';
             } else {
                 $user = $auth->findActiveUserByLogin($login);
                 if ($user && password_verify((string) $_POST['password'], (string) $user['password_hash'])) {
@@ -53,7 +53,7 @@ final class AuthController
                     if ($failState['is_locked']) {
                         $lockoutSeconds = (int) $failState['remaining_seconds'];
                         $error = 'Demasiados intentos de inicio de sesión. Podrás intentarlo nuevamente en ' . sprintf('%02d:%02d', floor($lockoutSeconds / 60), $lockoutSeconds % 60) . '.';
-                    } else $error = 'Correo electrónico o contraseña incorrectos.';
+                    } else $error = 'Identificador o contraseña incorrectos.';
                 }
             }
         }

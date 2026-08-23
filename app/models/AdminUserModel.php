@@ -50,6 +50,8 @@ final class AdminUserModel
     public function save(array $data,int $id,int $actorId):array
     {
         $data=$this->withInstitutionalDefaults($data);
+        $data['email']=mb_strtolower(trim((string)($data['email']??'')));
+        if($data['email']==='')$data['email']=null;
         if($id<1)$data['status']='active';
         if($id<1&&$data['role']==='teacher')$data['can_tutor']=1;
         $this->validate($data,$id);
@@ -138,16 +140,17 @@ final class AdminUserModel
             $errors=[];$name=trim((string)($row[0]??''));$email=mb_strtolower(trim((string)($row[1]??'')));$code=trim((string)($row[2]??''));$extra=trim((string)($row[3]??''));
             $username=$config['role']==='student'?$extra:'';$title=$config['role']==='teacher'?$extra:'';
             if(mb_strlen($name)<3)$errors[]='Nombre incompleto';
-            if(!filter_var($email,FILTER_VALIDATE_EMAIL))$errors[]='Correo inválido';
+            if($email!==''&&!filter_var($email,FILTER_VALIDATE_EMAIL))$errors[]='Correo inválido';
             if(!preg_match('/^\d{10}$/',$code))$errors[]='La cédula debe tener 10 dígitos';
             if($username!==''&&!preg_match('/^[a-zA-Z0-9._-]{3,80}$/',$username))$errors[]='Usuario inválido';
-            if(isset($emails[$email]))$errors[]='Correo repetido en la lista';
+            if($email!==''&&isset($emails[$email]))$errors[]='Correo repetido en la lista';
             if(isset($codes[$code]))$errors[]='Identificación repetida en la lista';
             if($username!==''&&isset($usernames[mb_strtolower($username)]))$errors[]='Usuario repetido en la lista';
             if(!$errors&&$email!==''){$emailCheck->execute(['email'=>$email]);if((int)$emailCheck->fetchColumn()>0)$errors[]='El correo ya está registrado';}
             if(!$errors&&$username!==''){$usernameCheck->execute(['username'=>$username]);if((int)$usernameCheck->fetchColumn()>0)$errors[]='El usuario ya está registrado';}
             if(!$errors&&$code!==''){if($this->institutionalCodeExists($code))$errors[]='La identificación ya está registrada';}
-            $emails[$email]=true;$codes[$code]=true;if($username!=='')$usernames[mb_strtolower($username)]=true;if(!$errors)$valid++;
+            if($email!=='')$emails[$email]=true;
+            $codes[$code]=true;if($username!=='')$usernames[mb_strtolower($username)]=true;if(!$errors)$valid++;
             $result[]=['line'=>$index+1,'name'=>$name,'email'=>$email,'code'=>$code,'username'=>$username,'academic_title'=>$title,'valid'=>!$errors,'error'=>implode('. ',$errors)];
         }
         return ['rows'=>$result,'total'=>count($result),'valid'=>$valid,'invalid'=>count($result)-$valid,'header_detected'=>(bool)$parsed['header_detected'],'unused_columns'=>(int)$parsed['unused_columns'],'config'=>['role'=>$config['role'],'career'=>'Desarrollo de Software','period'=>$config['period_name'],'semester'=>$config['semester']??null,'can_tutor'=>1]];
@@ -195,11 +198,11 @@ final class AdminUserModel
         $rows=array_map(static fn(string $line):array=>str_getcsv($line,$delimiter),$lines);$headerMap=[];$headerDetected=false;$unusedColumns=0;
         foreach(($rows[0]??[]) as $index=>$cell){$canonical=$this->importHeaderKey((string)$cell,$role);if($canonical===null)continue;if(isset($headerMap[$canonical]))throw new InvalidArgumentException('El encabezado contiene columnas repetidas.');$headerMap[$canonical]=$index;}
         $nonEmptyHeader=array_values(array_filter($rows[0]??[],static fn(mixed $cell):bool=>trim((string)$cell)!==''));
-        if(count($headerMap)>=2&&count($nonEmptyHeader)>=2){$headerDetected=true;$missing=array_values(array_diff(['name','email','code'],array_keys($headerMap)));if($missing!==[])throw new InvalidArgumentException('El encabezado debe incluir nombre, correo y cedula.');$unusedColumns=max(0,count($rows[0])-count($headerMap));array_shift($rows);}
+        if(count($headerMap)>=2&&count($nonEmptyHeader)>=2){$headerDetected=true;$missing=array_values(array_diff(['name','code'],array_keys($headerMap)));if($missing!==[])throw new InvalidArgumentException('El encabezado debe incluir nombre y cedula.');$unusedColumns=max(0,count($rows[0])-count($headerMap));array_shift($rows);}
         if(count($rows)>500)throw new InvalidArgumentException('Puedes importar maximo 500 usuarios por operacion.');
         if(!$rows)throw new InvalidArgumentException('El archivo solo contiene encabezados.');
         if(!$headerDetected)return ['rows'=>$rows,'header_detected'=>false,'unused_columns'=>0];
-        $mapped=array_map(function(array $row)use($headerMap):array{$extra=isset($headerMap['username'])?($row[$headerMap['username']]??''):(isset($headerMap['academic_title'])?($row[$headerMap['academic_title']]??''):'');return [$row[$headerMap['name']]??'',$row[$headerMap['email']]??'',$row[$headerMap['code']]??'',$extra];},$rows);
+        $mapped=array_map(function(array $row)use($headerMap):array{$extra=isset($headerMap['username'])?($row[$headerMap['username']]??''):(isset($headerMap['academic_title'])?($row[$headerMap['academic_title']]??''):'');return [$row[$headerMap['name']]??'',isset($headerMap['email'])?($row[$headerMap['email']]??''):'',$row[$headerMap['code']]??'',$extra];},$rows);
         return ['rows'=>$mapped,'header_detected'=>true,'unused_columns'=>$unusedColumns];
     }
     private function detectImportDelimiter(array $lines,string $role):string
@@ -247,13 +250,15 @@ final class AdminUserModel
     private function validate(array $data,int $id):void
     {
         if(mb_strlen($data['full_name'])<3)throw new InvalidArgumentException('Ingresa el nombre completo.');
-        if(!filter_var($data['email'],FILTER_VALIDATE_EMAIL))throw new InvalidArgumentException('Ingresa un correo válido.');
+        if($data['email']!==null&&!filter_var($data['email'],FILTER_VALIDATE_EMAIL))throw new InvalidArgumentException('Ingresa un correo válido.');
         if(!in_array($data['role'],self::ROLES,true))throw new InvalidArgumentException('Selecciona un rol válido.');
         if($id<1&&$data['role']==='administrator')throw new InvalidArgumentException('Las cuentas nuevas deben ser Estudiante o Docente.');
         if(!empty($data['is_admin'])&&$data['role']!=='teacher')throw new InvalidArgumentException('El acceso administrativo solo puede asignarse a un docente.');
         if(($id<1||$data['status']!=='')&&!in_array($data['status'],self::STATUSES,true))throw new InvalidArgumentException('Selecciona un estado válido.');
-        $check=Database::connection()->prepare('SELECT id FROM users WHERE email=:email AND id<>:id LIMIT 1');$check->execute(['email'=>$data['email'],'id'=>$id]);
-        if($check->fetch())throw new InvalidArgumentException('Ya existe una cuenta con ese correo.');
+        if($data['email']!==null){
+            $check=Database::connection()->prepare('SELECT id FROM users WHERE email=:email AND id<>:id LIMIT 1');$check->execute(['email'=>$data['email'],'id'=>$id]);
+            if($check->fetch())throw new InvalidArgumentException('Ya existe una cuenta con ese correo.');
+        }
         if($data['username']!==''&&!preg_match('/^[a-zA-Z0-9._-]{3,80}$/',$data['username']))throw new InvalidArgumentException('El usuario debe tener entre 3 y 80 caracteres y usar solo letras, números, punto, guion o guion bajo.');
         if($data['username']!==''){$check=Database::connection()->prepare('SELECT id FROM users WHERE username=:username AND id<>:id LIMIT 1');$check->execute(['username'=>$data['username'],'id'=>$id]);if($check->fetch())throw new InvalidArgumentException('Ese nombre de usuario ya está registrado.');}
         if(in_array($data['role'],['student','teacher'],true)){

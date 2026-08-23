@@ -86,7 +86,8 @@ final class AccountController
             catch (Throwable $exception) { error_log('Password change: '.$exception->getMessage()); $error = 'No fue posible actualizar la contraseña.'; }
         }
         $forcedPasswordChange = $session->mustChangePassword() && !$session->hasAdminAccess();
-        View::render('account/change-password',['currentPage'=>'profile','title'=>'Cambiar contraseña | Administración','bodyClass'=>'account-page','pageStyles'=>[asset('css/admin-access.css')],'passwordCsrfToken'=>$session->csrfToken('change_password'),'passwordError'=>$error,'passwordSuccess'=>$success,'forcedPasswordChange'=>$forcedPasswordChange]);
+        $passwordTitle = $session->isAdminModeActive() ? 'Cambiar contraseña | Administración' : ($session->isTeacher() ? 'Cambiar contraseña | Docente' : 'Cambiar contraseña');
+        View::render('account/change-password',['currentPage'=>'profile','title'=>$passwordTitle,'bodyClass'=>'account-page','pageStyles'=>[asset('css/admin-access.css')],'passwordCsrfToken'=>$session->csrfToken('change_password'),'passwordError'=>$error,'passwordSuccess'=>$success,'forcedPasswordChange'=>$forcedPasswordChange]);
     }
 
     public function dismissTemporaryPasswordWarning(): void

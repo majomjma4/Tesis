@@ -12,7 +12,8 @@ final class AuthModel
     public function updateProfile(int $userId,string $name,string $email,string $username,int $profileVersion,string $avatarAction='none',?string $avatarPath=null): array
     {
         if(mb_strlen($name)<3||mb_strlen($name)>180)throw new InvalidArgumentException('Ingresa tu nombre completo.');
-        if(!filter_var($email,FILTER_VALIDATE_EMAIL))throw new InvalidArgumentException('Ingresa un correo válido.');
+        $email=mb_strtolower(trim($email));
+        if($email!==''&&!filter_var($email,FILTER_VALIDATE_EMAIL))throw new InvalidArgumentException('Ingresa un correo válido.');
         $username=trim($username);
         if($username!==''&&!preg_match('/^[a-zA-Z0-9._-]{3,80}$/',$username))throw new InvalidArgumentException('El usuario debe tener entre 3 y 80 caracteres (letras, números, punto, guion o guion bajo).');
         if(!in_array($avatarAction,['none','replace','remove'],true))throw new InvalidArgumentException('La operación de fotografía no es válida.');
@@ -26,10 +27,13 @@ final class AuthModel
             if((int)$before['profile_version']!==$profileVersion)throw new RuntimeException('PROFILE_VERSION_CONFLICT');
             $changes=[];
             if($before['full_name']!==$name)$changes['full_name']=['from'=>$before['full_name'],'to'=>$name];
-            if($before['email']!==$email){
-                $duplicate=$db->prepare('SELECT id FROM users WHERE email=:email AND id<>:id LIMIT 1');
-                $duplicate->execute(['email'=>$email,'id'=>$userId]);
-                if($duplicate->fetch())throw new InvalidArgumentException('Ya existe una cuenta registrada con ese correo.');
+            $beforeEmail=(string)($before['email']??'');
+            if($beforeEmail!==$email){
+                if($email!==''){
+                    $duplicate=$db->prepare('SELECT id FROM users WHERE email=:email AND id<>:id LIMIT 1');
+                    $duplicate->execute(['email'=>$email,'id'=>$userId]);
+                    if($duplicate->fetch())throw new InvalidArgumentException('Ya existe una cuenta registrada con ese correo.');
+                }
                 $changes['email']=['from'=>$before['email'],'to'=>$email];
             }
             $currentUsername=(string)($before['username']??'');
@@ -46,7 +50,7 @@ final class AuthModel
             if($changes===[]&&!$avatarChanged)return ['changes'=>[],'avatar_changed'=>false,'previous_avatar_path'=>null];
 
             $sets=['full_name=:name','email=:email','username=:username','profile_version=profile_version+1'];
-            $params=['name'=>$name,'email'=>$email,'username'=>$username!==''?$username:null,'id'=>$userId];
+            $params=['name'=>$name,'email'=>$email!==''?$email:null,'username'=>$username!==''?$username:null,'id'=>$userId];
             if($avatarAction==='replace'){$sets[]='avatar_path=:avatar_path';$sets[]='avatar_updated_at=UTC_TIMESTAMP()';$params['avatar_path']=$avatarPath;}
             elseif($avatarAction==='remove'){$sets[]='avatar_path=NULL';$sets[]='avatar_updated_at=NULL';}
             if($changes!==[])$sets[]='session_version=session_version+1';
@@ -77,10 +81,10 @@ final class AuthModel
     public function findActiveUserByLogin(string $login): ?array
     {
         $statement = Database::connection()->prepare(
-            "SELECT id, email, username, password_hash, full_name, is_admin, is_initial_admin, must_change_password, password_warning_count, temporary_password_expires_at, temporary_password_last_warning_at, session_version, avatar_path, avatar_updated_at FROM users WHERE status = 'active' AND deleted_at IS NULL AND purged_at IS NULL AND email = :email_login LIMIT 1"
+            "SELECT DISTINCT u.id, u.email, u.username, u.password_hash, u.full_name, u.is_admin, u.is_initial_admin, u.must_change_password, u.password_warning_count, u.temporary_password_expires_at, u.temporary_password_last_warning_at, u.session_version, u.avatar_path, u.avatar_updated_at FROM users u LEFT JOIN student_profiles sp ON sp.user_id=u.id LEFT JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.status = 'active' AND u.deleted_at IS NULL AND u.purged_at IS NULL AND ((u.email IS NOT NULL AND LOWER(u.email)=:identifier_email) OR (u.username IS NOT NULL AND LOWER(u.username)=:identifier_username) OR sp.institutional_code=:identifier_code_student OR tp.institutional_code=:identifier_code_teacher) LIMIT 1"
         );
         $normalizedLogin = mb_strtolower(trim($login));
-        $statement->execute(['email_login' => $normalizedLogin]);
+        $statement->execute(['identifier_email'=>$normalizedLogin,'identifier_username'=>$normalizedLogin,'identifier_code_student'=>trim($login),'identifier_code_teacher'=>trim($login)]);
         $user = $statement->fetch();
         if (!$user) return null;
         $user['roles'] = $this->effectiveRoles((int)$user['id'],(bool)$user['is_admin']);
