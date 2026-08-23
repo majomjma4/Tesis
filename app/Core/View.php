@@ -71,6 +71,20 @@ final class View
             }
         }
 
+        $studentProjectNavLabel = 'Proyectos';
+        $roles = $session->roles();
+        $isAdminMode = $session->isAdminModeActive();
+        if (!$isAdminMode && !in_array('teacher', $roles, true)) {
+            try {
+                $projectCountResult = (new ProjectModel())->getStudentProjectCountResult((int) $session->userId());
+                if (($projectCountResult['status'] ?? 'error') === 'loaded' && (int) ($projectCountResult['count'] ?? 0) === 1) {
+                    $studentProjectNavLabel = 'Proyecto';
+                }
+            } catch (Throwable $exception) {
+                error_log('Layout student project count error: ' . $exception->getMessage());
+            }
+        }
+
         return [
             'notificationUnreadCount' => $unread,
             'notificationCounterError' => $notificationCounterError,
@@ -79,8 +93,9 @@ final class View
             'layoutUserName' => (new AuthSessionService())->name(),
             'layoutUserEmail' => (new AuthSessionService())->email(),
             'layoutAvatarUrl' => $session->avatarPath() !== null ? route('profile-avatar') . '&v=' . rawurlencode((string) $session->avatarUpdatedAt()) : null,
-            'layoutUserRoles' => (new AuthSessionService())->roles(),
-            'layoutIsAdmin' => (new AuthSessionService())->isAdminModeActive(),
+            'layoutUserRoles' => $roles,
+            'studentProjectNavLabel' => $studentProjectNavLabel,
+            'layoutIsAdmin' => $isAdminMode,
             'layoutCanToggleAdminMode' => (new AuthSessionService())->isTeacherAndAdmin(),
             'layoutIsAdminModeActive' => (new AuthSessionService())->isAdminModeActive(),
             'layoutToggleAdminModeCsrf' => (new AuthSessionService())->csrfToken('toggle_admin_mode'),

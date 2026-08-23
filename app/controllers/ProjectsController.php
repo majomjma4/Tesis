@@ -181,7 +181,35 @@ final class ProjectsController
         }
 
         $projectModel = new ProjectModel();
-        $projects = $projectModel->getProjectsForUser($access->currentUserId());
+        $studentProjects = $projectModel->getStudentProjectsResult($access->currentUserId());
+        $projects = (array) ($studentProjects['items'] ?? []);
+        $totalProjects = count($projects);
+        if (($studentProjects['status'] ?? 'error') === 'loaded' && $totalProjects === 1) {
+            $project = $projects[0];
+            $capabilities = (new ProjectCapabilityService())->forProjectId((int) $project['id'], 'academic');
+            $navigation = (new StudentProjectNavigationService())->resolve($project, $capabilities);
+            header('Location: ' . $navigation['action_url']);
+            exit;
+        }
+        if (($studentProjects['status'] ?? '') === 'loaded') {
+            $policy = new ProjectCapabilityService();
+            $navigation = new StudentProjectNavigationService();
+            foreach ($projects as &$project) {
+                $capabilities = $policy->forProjectId((int) $project['id'], 'academic');
+                $project['capabilities'] = $capabilities;
+                $project['navigation'] = $navigation->resolve($project, $capabilities);
+            }
+            unset($project);
+        }
+        $projectGroups = [
+            'development' => ['key' => 'development', 'title' => 'En desarrollo', 'description' => 'Proyectos que todavía se encuentran en seguimiento o tienen acciones pendientes.', 'items' => [], 'empty' => 'No tienes proyectos en seguimiento actualmente.'],
+            'finished' => ['key' => 'finished', 'title' => 'Terminados', 'description' => 'Proyectos que ya finalizaron su proceso de seguimiento.', 'items' => [], 'empty' => 'Todavía no tienes proyectos terminados.'],
+        ];
+        foreach ($projects as $project) {
+            $key = (string) ($project['navigation']['category'] ?? 'development');
+            if (isset($projectGroups[$key])) $projectGroups[$key]['items'][] = $project;
+        }
+        $projectGroups = array_values(array_filter($projectGroups, static fn(array $group): bool => $group['items'] !== []));
 
         View::render('projects/index', [
             'currentPage' => 'projects',
@@ -190,6 +218,13 @@ final class ProjectsController
             'pageStyles' => [asset('css/projects.css'), asset('css/projects-catalog.css'), asset('css/project-simplified.css')],
             'pageScript' => asset('js/projects.js'),
             'projects' => $projects,
+            'projectGroups' => $projectGroups,
+            'projectsStatus' => (string) ($studentProjects['status'] ?? 'error'),
+            'projectsMessage' => (string) ($studentProjects['message'] ?? ''),
+            'projectsTotal' => ($studentProjects['status'] ?? 'error') === 'loaded' ? $totalProjects : null,
+            'projectsHeading' => (($studentProjects['status'] ?? 'error') === 'loaded' && $totalProjects === 1) ? 'Mi proyecto' : 'Mis proyectos',
+            'canCreateStudentProject' => ($studentProjects['status'] ?? 'error') === 'empty' && $access->can('project.create'),
+            'newStudentProjectUrl' => route('new-project'),
             'studentProjectPublishEndpoint' => route('student-project-publish'),
             'studentProjectPublishCsrf' => $session->csrfToken('student_project_publish'),
         ]);
@@ -362,6 +397,19 @@ final class ProjectsController
         $returnUrl = ($isAdministrator || $isTeacher)
             ? $this->academicManagementReturnUrl((string) ($_GET['return'] ?? ''))
             : route('projects');
+        $studentBackUrl = route('dashboard');
+        $studentBackLabel = 'Volver al inicio';
+        if (!$isAdministrator && !$isTeacher && $isStudentParticipant) {
+            try {
+                $studentProjects = (new ProjectModel())->getStudentProjectsResult($access->currentUserId());
+                if (($studentProjects['status'] ?? 'error') === 'loaded' && count((array) ($studentProjects['items'] ?? [])) > 1) {
+                    $studentBackUrl = route('projects');
+                    $studentBackLabel = 'Volver a Proyectos';
+                }
+            } catch (Throwable $exception) {
+                error_log('Student project back link: ' . $exception->getMessage());
+            }
+        }
         $detailUrl = route('project-detail') . '&id=' . (int) $project['id'];
         if ($isAdministrator || $isTeacher) $detailUrl .= '&return=' . rawurlencode($returnUrl);
         $projectDocuments = null;
@@ -427,6 +475,8 @@ final class ProjectsController
             'projectEditUrl' => route('projects') . '&edit=' . (int) $project['id'],
             'detailUrl' => $detailUrl,
             'returnUrl' => $returnUrl,
+            'studentBackUrl' => $studentBackUrl,
+            'studentBackLabel' => $studentBackLabel,
             'previewActionUrl' => route('project-file-preview') . ($isAdministrator ? '&context=academic_management' : ''),
             'downloadActionUrl' => route('project-file-download') . ($isAdministrator ? '&context=academic_management' : ''),
             'projectDocuments' => $projectDocuments,

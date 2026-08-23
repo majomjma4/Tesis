@@ -59,8 +59,8 @@ $tabs = [
 ];
 if ($showTribunalTab) $tabs['tribunal'] = ['Tribunal y defensa', 'fa-gavel'];
 $formatDate = static function (?string $date, bool $time = false): string { if (!$date) return 'No disponible'; $stamp = strtotime($date); return $stamp === false ? 'No disponible' : date($time ? 'd/m/Y H:i' : 'd/m/Y', $stamp); };
-    $backUrl = !empty($isTeacherContext) ? route('assigned-projects') : route('projects');
-    $backLabel = !empty($isTeacherContext) ? 'Volver a Proyectos asignados' : 'Volver a Mis proyectos';
+    $backUrl = !empty($isTeacherContext) ? route('assigned-projects') : (string) ($studentBackUrl ?? route('projects'));
+    $backLabel = !empty($isTeacherContext) ? 'Volver a Proyectos asignados' : (string) ($studentBackLabel ?? 'Volver a Proyectos');
     ?>
 <div class="student-workspace" data-student-workspace data-project-url="<?= e($detailUrl) ?>" data-sw-project-status="<?= e($status) ?>">
     <div class="sw-top-bar">

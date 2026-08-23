@@ -51,6 +51,7 @@ function project_academic_labels(string $status): array
         'defense' => ['status' => 'En tribunal', 'stage' => 'Por finalizar'],
         'tribunal_approved' => ['status' => 'Aprobado por el Tribunal', 'stage' => 'Por publicar'],
         'published' => ['status' => 'Publicado', 'stage' => 'Finalizado'],
+        'completed' => ['status' => 'Completado', 'stage' => 'Finalizado'],
     ];
 
     return $labels[$status] ?? [

@@ -877,7 +877,11 @@ final class DashboardModel
         try {
             $records = [];
             $recordModel = new ProjectRecordModel();
-            foreach ((new ProjectModel())->getProjectsForUser($studentId) as $listed) {
+            $listedResult = (new ProjectModel())->getStudentProjectsResult($studentId);
+            if (($listedResult['status'] ?? 'error') === 'error') {
+                throw new RuntimeException((string) ($listedResult['message'] ?? 'No fue posible consultar tus proyectos.'));
+            }
+            foreach ((array) ($listedResult['items'] ?? []) as $listed) {
                 $id = (int) ($listed['id'] ?? 0);
                 if ($id < 1) continue;
                 $record = $recordModel->find($id, $studentId, false);

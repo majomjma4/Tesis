@@ -65,7 +65,7 @@ $isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen);
                 <a href="<?= e(route('projects')) ?>"
                     class="menu-item <?= ($currentPage ?? '') === 'projects' ? 'active' : '' ?>">
                     <span class="menu-icon"><i class="fa-solid fa-folder-open"></i></span>
-                    <span><?= ($isAdministratorLayout || in_array('teacher', (array) ($layoutUserRoles ?? []), true)) ? 'Proyectos activos' : 'Proyectos' ?></span>
+                    <span><?= ($isAdministratorLayout || in_array('teacher', (array) ($layoutUserRoles ?? []), true)) ? 'Proyectos activos' : e($studentProjectNavLabel ?? 'Proyectos') ?></span>
                 </a>
                 <?php if (!$isAdministratorLayout && in_array('teacher', (array) ($layoutUserRoles ?? []), true)): ?>
                     <a href="<?= e(route('assigned-projects')) ?>"
