@@ -12,14 +12,11 @@ final class CalendarController
         if (!$session->isAuthenticated() || (int)($session->userId() ?? 0) < 1) { header('Location: ' . route('login')); exit; }
         $calendar = new CalendarModel();
         $projectFilterId = filter_var($_GET['project_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0;
-        $isTeacherContext = $this->isTeacherContext($session);
         $calendarEvents = [];
         $calendarError = null;
 
         try {
-            $calendarEvents = $isTeacherContext
-                ? $calendar->getEventsForTeacher((int) $session->userId())
-                : $calendar->getEventsForOwner((int) $session->userId());
+            $calendarEvents = $this->eventsForSession($calendar, $session);
         } catch (Throwable $error) {
             error_log('Calendar initial load: ' . $error->getMessage());
             $calendarError = 'No fue posible cargar los eventos del calendario. Inténtalo nuevamente.';
@@ -51,9 +48,7 @@ final class CalendarController
             if (!$session->isAuthenticated() || (int)($session->userId() ?? 0) < 1) { $this->json(false, 'La sesión no está activa.', null, 403); return; }
             $owner = (int)$session->userId();
             if ($method === 'GET') {
-                $this->json(true, 'Eventos cargados.', $this->isTeacherContext($session)
-                    ? $model->getEventsForTeacher($owner)
-                    : $model->getEventsForOwner($owner));
+                $this->json(true, 'Eventos cargados.', $this->eventsForSession($model, $session));
                 return;
             }
             $payload = json_decode((string) file_get_contents('php://input'), true);
@@ -63,13 +58,13 @@ final class CalendarController
             $token = (string)($payload['_csrf'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
             if (!$session->validateCsrf('calendar_events', $token)) { $this->json(false, 'La solicitud contiene un token CSRF inválido.', null, 419); return; }
             if ($method === 'POST') {
-                $event = $model->saveForOwner($payload, $owner);
+                $event = $model->saveForOwner($payload, $owner, $this->isStudentContext($session));
                 (new CalendarEventReminderService())->syncForOwner($owner);
                 $this->json(true, 'Evento guardado correctamente.', $event);
                 return;
             }
             if ($method === 'DELETE') {
-                $model->deleteForOwner($payload['id'] ?? null, $owner);
+                $model->deleteForOwner($payload['id'] ?? null, $owner, $this->isStudentContext($session));
                 (new CalendarEventReminderService())->syncForOwner($owner);
                 $this->json(true, 'Evento eliminado.');
                 return;
@@ -91,6 +86,19 @@ final class CalendarController
     private function isTeacherContext(AuthSessionService $session): bool
     {
         return $session->isTeacher() && !$session->isAdminModeActive();
+    }
+
+    private function isStudentContext(AuthSessionService $session): bool
+    {
+        return !$this->isTeacherContext($session) && !$session->isAdminModeActive() && in_array('student', $session->roles(), true);
+    }
+
+    private function eventsForSession(CalendarModel $model, AuthSessionService $session): array
+    {
+        $userId = (int) $session->userId();
+        if ($this->isTeacherContext($session)) return $model->getEventsForTeacher($userId);
+        if ($this->isStudentContext($session)) return $model->getEventsForStudent($userId);
+        return $model->getEventsForOwner($userId);
     }
 
     private function json(bool $success, string $message, mixed $data = null, int $status = 200): void

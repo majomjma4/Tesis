@@ -22,6 +22,33 @@ final class CalendarModel
     }
 
     /** @return list<array<string,mixed>> */
+    public function getEventsForStudent(int $studentId): array
+    {
+        $statement = Database::connection()->prepare(
+            'SELECT DISTINCT e.id,CASE WHEN p.id IS NULL THEN NULL ELSE e.project_id END project_id,
+                    e.title,e.event_type,e.priority,e.event_date,e.event_time,e.description,e.is_completed,e.created_at,e.updated_at,
+                    CASE WHEN e.project_id IS NULL THEN 0 ELSE 1 END is_academic
+             FROM project_events e
+             LEFT JOIN projects p ON p.id=e.project_id
+             WHERE (
+                 (e.project_id IS NULL AND e.created_by=:student_personal)
+                 OR
+                 (e.project_id IS NOT NULL
+                  AND p.deleted_at IS NULL AND p.withdrawn_at IS NULL
+                  AND EXISTS (
+                      SELECT 1 FROM project_participants pp
+                      WHERE pp.project_id=e.project_id AND pp.user_id=:student_project
+                        AND LOWER(pp.role_code)=\'student\' AND pp.status=\'active\' AND pp.removed_at IS NULL
+                  ))
+             )
+             ORDER BY e.event_date,e.event_time IS NULL,e.event_time,e.id'
+        );
+        $student = $this->owner($studentId);
+        $statement->execute(['student_personal'=>$student, 'student_project'=>$student]);
+        return array_map(fn(array $event): array => $this->present($event), $statement->fetchAll());
+    }
+
+    /** @return list<array<string,mixed>> */
     public function getEventsForTeacher(int $teacherId): array
     {
         $events = $this->getEventsForOwner($teacherId);
@@ -47,7 +74,7 @@ final class CalendarModel
         return $events;
     }
 
-    public function saveForOwner(array $data, int $ownerId): array
+    public function saveForOwner(array $data, int $ownerId, bool $personalOnly = false): array
     {
         $owner = $this->owner($ownerId);
         $event = $this->normalize($data);
@@ -61,7 +88,7 @@ final class CalendarModel
             $insert->execute($event + ['owner'=>$owner]);
             return $this->findOwned($db, (int)$db->lastInsertId(), $owner);
         }
-        $this->findOwned($db, $id, $owner);
+        $this->findOwned($db, $id, $owner, $personalOnly);
         $update = $db->prepare(
             'UPDATE project_events SET title=:title,event_type=:type,priority=:priority,event_date=:date,event_time=:time,description=:description,is_completed=:completed
              WHERE id=:id AND created_by=:owner'
@@ -70,13 +97,13 @@ final class CalendarModel
         return $this->findOwned($db, $id, $owner);
     }
 
-    public function deleteForOwner(mixed $value, int $ownerId): void
+    public function deleteForOwner(mixed $value, int $ownerId, bool $personalOnly = false): void
     {
         $id = $this->id($value);
         if ($id === null) throw new CalendarEventException('El evento solicitado no es válido.', 422);
         $owner = $this->owner($ownerId);
         $db = Database::connection();
-        $this->findOwned($db, $id, $owner);
+        $this->findOwned($db, $id, $owner, $personalOnly);
         $delete = $db->prepare('DELETE FROM project_events WHERE id=:id AND created_by=:owner');
         $delete->execute(['id'=>$id,'owner'=>$owner]);
         if ($delete->rowCount() !== 1) throw new CalendarEventException('El evento ya no está disponible.', 404);
@@ -104,13 +131,14 @@ final class CalendarModel
         ];
     }
 
-    private function findOwned(PDO $db, int $id, int $owner): array
+    private function findOwned(PDO $db, int $id, int $owner, bool $personalOnly = false): array
     {
-        $exists = $db->prepare('SELECT created_by FROM project_events WHERE id=:id');
+        $exists = $db->prepare('SELECT created_by,project_id FROM project_events WHERE id=:id');
         $exists->execute(['id'=>$id]);
-        $creator = $exists->fetchColumn();
-        if ($creator === false) throw new CalendarEventException('El evento no existe.', 404);
-        if ((int)$creator !== $owner) throw new CalendarEventException('No tienes permiso para modificar este evento.', 403);
+        $record = $exists->fetch(PDO::FETCH_ASSOC);
+        if ($record === false) throw new CalendarEventException('El evento no existe.', 404);
+        if ((int)$record['created_by'] !== $owner) throw new CalendarEventException('No tienes permiso para modificar este evento.', 403);
+        if ($personalOnly && $record['project_id'] !== null) throw new CalendarEventException('Los eventos académicos son solo de consulta.', 403);
         $query = $db->prepare('SELECT e.id,CASE WHEN p.id IS NULL THEN NULL ELSE e.project_id END project_id,
                                       e.title,e.event_type,e.priority,e.event_date,e.event_time,e.description,e.is_completed,e.created_at,e.updated_at
                                FROM project_events e LEFT JOIN projects p ON p.id=e.project_id
@@ -121,7 +149,7 @@ final class CalendarModel
 
     private function present(array $event): array
     {
-        return ['id'=>(int)$event['id'],'projectId'=>$event['project_id'] === null ? 0 : (int)$event['project_id'],'title'=>(string)$event['title'],'date'=>(string)$event['event_date'],'time'=>empty($event['event_time']) ? null : substr((string)$event['event_time'],0,5),'type'=>(string)$event['event_type'],'priority'=>(string)$event['priority'],'description'=>(string)($event['description'] ?? ''),'completed'=>(bool)$event['is_completed'],'updatedAt'=>(string)($event['updated_at'] ?? $event['created_at'] ?? '')];
+        return ['id'=>(int)$event['id'],'projectId'=>$event['project_id'] === null ? 0 : (int)$event['project_id'],'title'=>(string)$event['title'],'date'=>(string)$event['event_date'],'time'=>empty($event['event_time']) ? null : substr((string)$event['event_time'],0,5),'type'=>(string)$event['event_type'],'priority'=>(string)$event['priority'],'description'=>(string)($event['description'] ?? ''),'completed'=>(bool)$event['is_completed'],'updatedAt'=>(string)($event['updated_at'] ?? $event['created_at'] ?? ''),'readOnly'=>(bool)($event['is_academic'] ?? false)];
     }
 
     private function owner(int $value): int { if ($value < 1) throw new CalendarEventException('La sesión no está activa.', 403); return $value; }

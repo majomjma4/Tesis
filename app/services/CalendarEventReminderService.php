@@ -20,11 +20,22 @@ final class CalendarEventReminderService
         $advanceKey = $today->modify("+{$reminderDays} days")->format('Y-m-d');
 
         $events = $db->prepare(
-            'SELECT id, project_id, title, event_type, event_date, event_time
-             FROM project_events
-             WHERE created_by = :owner AND is_completed = 0 AND event_date IN (:today, :advance_date)'
+            'SELECT DISTINCT e.id, e.project_id, e.title, e.event_type, e.event_date, e.event_time
+             FROM project_events e
+             LEFT JOIN projects p ON p.id=e.project_id
+             WHERE e.is_completed = 0 AND e.event_date IN (:today, :advance_date)
+               AND (
+                   (e.project_id IS NULL AND e.created_by=:personal_owner)
+                   OR
+                   (e.project_id IS NOT NULL AND p.deleted_at IS NULL AND p.withdrawn_at IS NULL
+                    AND EXISTS (
+                        SELECT 1 FROM project_participants pp
+                        WHERE pp.project_id=e.project_id AND pp.user_id=:project_owner
+                          AND LOWER(pp.role_code)=\'student\' AND pp.status=\'active\' AND pp.removed_at IS NULL
+                    ))
+               )'
         );
-        $events->execute(['owner' => $ownerId, 'today' => $todayKey, 'advance_date' => $advanceKey]);
+        $events->execute(['personal_owner' => $ownerId, 'project_owner' => $ownerId, 'today' => $todayKey, 'advance_date' => $advanceKey]);
 
         $insert = $db->prepare(
             "INSERT IGNORE INTO notifications

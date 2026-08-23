@@ -902,7 +902,7 @@ final class DashboardModel
         }
 
         try {
-            $events = (new CalendarModel())->getEventsForOwner($studentId);
+            $events = (new CalendarModel())->getEventsForStudent($studentId);
             $today = (new DateTimeImmutable('now', new DateTimeZone('America/Guayaquil')))->format('Y-m-d');
             $upcoming = array_values(array_filter($events, static fn(array $event): bool => (string) ($event['date'] ?? '') >= $today && empty($event['completed'])));
             usort($upcoming, static fn(array $a, array $b): int => [(string) ($a['date'] ?? ''), (string) ($a['time'] ?? '')] <=> [(string) ($b['date'] ?? ''), (string) ($b['time'] ?? '')]);
