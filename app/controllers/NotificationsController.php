@@ -113,7 +113,7 @@ final class NotificationsController
                 $result = $adminModel->getSentNotificationsPaginated($filters, ['page' => $page, 'size' => $perPage, 'pageKey' => 'notification_page', 'sizeKey' => 'notifications_per_page']);
                 $notifications = $result['items'];
                 $pagination = $result['pagination'];
-                $counters = $model->getCounters($this->currentUserId());
+                $counters = $model->getCounters($this->currentUserId(), $this->notificationContext());
                 
                 $adminSummary = $adminModel->summary();
                 $sectionCounters = [
@@ -239,7 +239,7 @@ final class NotificationsController
             if (!$model->softDelete($id, $userId)) {
                 $this->json(false, 'La notificacion ya no esta disponible para archivar.', [], 409);
             }
-            return ['notificationId' => $id, 'counters' => $model->getCounters($userId)];
+            return ['notificationId' => $id, 'counters' => $model->getCounters($userId, $this->notificationContext())];
         }, 'Notificacion archivada.', function () use ($id): array {
             $notifications = $this->demoNotifications();
             $exists = false;
@@ -296,7 +296,7 @@ final class NotificationsController
             if (!$model->restore($id, $userId)) {
                 $this->json(false, 'La notificacion oculta no existe.', [], 404);
             }
-            return ['notificationId' => $id, 'counters' => $model->getCounters($userId)];
+            return ['notificationId' => $id, 'counters' => $model->getCounters($userId, $this->notificationContext())];
         }, 'Notificacion restaurada.', function () use ($id): array {
             $notifications = $this->demoNotifications();
             $index = $this->findDemoNotificationIndex($notifications, $id);
@@ -318,7 +318,7 @@ final class NotificationsController
             if (!$model->moveToTrash($id, $userId)) {
                 $this->json(false, 'La notificacion no existe.', [], 404);
             }
-            return ['notificationId' => $id, 'counters' => $model->getCounters($userId)];
+            return ['notificationId' => $id, 'counters' => $model->getCounters($userId, $this->notificationContext())];
         }, 'Notificacion movida a la papelera.', function () use ($id): array {
             $notifications = $this->demoNotifications();
             $index = $this->findDemoNotificationIndex($notifications, $id);
@@ -337,7 +337,7 @@ final class NotificationsController
         $this->requirePostAndCsrf();
         $this->runJson(function (NotificationModel $model, int $userId): array {
             $deleted = $model->emptyTrash($userId);
-            return ['affected' => $deleted, 'counters' => $model->getCounters($userId)];
+            return ['affected' => $deleted, 'counters' => $model->getCounters($userId, $this->notificationContext())];
         }, 'Papelera vaciada.', function (): array {
             $notifications = $this->demoNotifications();
             $before = count($notifications);
@@ -357,7 +357,7 @@ final class NotificationsController
         $ids = $this->notificationIds();
         $this->runJson(function (NotificationModel $model, int $userId) use ($action, $ids): array {
             $affected = $action === 'restore' ? $model->restoreMany($ids, $userId) : $model->deleteManyFromTrash($ids, $userId);
-            return ['affected' => $affected, 'counters' => $model->getCounters($userId)];
+            return ['affected' => $affected, 'counters' => $model->getCounters($userId, $this->notificationContext())];
         }, $action === 'restore' ? 'Notificaciones restauradas.' : 'Notificaciones eliminadas definitivamente.', function () use ($action, $ids): array {
             $notifications = $this->demoNotifications();
             $affected = 0;
@@ -385,7 +385,7 @@ final class NotificationsController
         $this->requirePostAndCsrf();
         $id = $this->notificationId();
         $this->runJson(function (NotificationModel $model, int $userId) use ($id): array {
-            $notification = $model->findForUser($id, $userId);
+            $notification = $model->findActiveForUser($id, $userId);
             if ($notification === null && (new AuthSessionService())->hasAdminAccess()) {
                 $db = Database::connection();
                 $q = $db->prepare(
@@ -430,9 +430,9 @@ final class NotificationsController
 
                         return [
                             'notificationId' => $id,
-                            'url' => $this->safeInternalUrl($row['action_url']) ?? $this->contextualNotificationUrl($row),
+                            'url' => $this->safeInternalUrl($row['action_url']) ?? $this->contextualNotificationUrl($row) ?? $this->notificationDetailUrl($id),
                             'detail' => $row,
-                            'counters' => $model->getCounters($userId),
+                            'counters' => $model->getCounters($userId, $this->notificationContext()),
                         ];
                     }
                 }
@@ -441,13 +441,13 @@ final class NotificationsController
                 $this->json(false, 'La notificacion no existe.', [], 404);
             }
             $model->markAsRead($id, $userId);
-            $url = $this->safeInternalUrl($notification['action_url']) ?? $this->contextualNotificationUrl($notification);
+            $url = $this->safeInternalUrl($notification['action_url']) ?? $this->contextualNotificationUrl($notification) ?? $this->notificationDetailUrl($id);
 
             return [
                 'notificationId' => $id,
                 'url' => $url,
                 'detail' => $notification,
-                'counters' => $model->getCounters($userId),
+                'counters' => $model->getCounters($userId, $this->notificationContext()),
             ];
         }, 'Notificacion abierta.', function () use ($id): array {
             $notifications = $this->demoNotifications();
@@ -458,7 +458,7 @@ final class NotificationsController
             $notifications[$index]['is_read'] = true;
             $notifications[$index]['read_at'] = date('Y-m-d H:i:s');
             $this->saveDemoNotifications($notifications);
-            $url = $this->safeInternalUrl($notifications[$index]['action_url']);
+            $url = $this->safeInternalUrl($notifications[$index]['action_url']) ?? $this->notificationDetailUrl($id);
             return ['notificationId' => $id, 'url' => $url, 'detail' => $notifications[$index], 'counters' => (new NotificationModel())->getDemoCounters($notifications)];
         });
     }
@@ -475,7 +475,7 @@ final class NotificationsController
                 $this->json(false, 'La notificacion no existe.', [], 404);
             }
             $read ? $model->markAsRead($id, $userId) : $model->markAsUnread($id, $userId);
-            return ['notificationId' => $id, 'isRead' => $read, 'counters' => $model->getCounters($userId)];
+            return ['notificationId' => $id, 'isRead' => $read, 'counters' => $model->getCounters($userId, $this->notificationContext())];
         }, $read ? 'Notificacion marcada como leida.' : 'Notificacion marcada como no leida.', function () use ($id, $read): array {
             $notifications = $this->demoNotifications();
             $index = $this->findDemoNotificationIndex($notifications, $id);
@@ -603,6 +603,11 @@ final class NotificationsController
         return (int) ($_SESSION['user_id'] ?? $_SESSION['notification_demo_user_id'] ?? 0);
     }
 
+    private function notificationContext(): string
+    {
+        return (new AuthSessionService())->notificationContext();
+    }
+
     private function csrfToken(): string
     {
         if (!isset($_SESSION['notification_csrf'])) {
@@ -667,6 +672,11 @@ final class NotificationsController
         $url = route('project-detail') . '&id=' . $projectId;
         return $tab === null ? $url : $url . '&tab=' . $tab;
     }
+
+    private function notificationDetailUrl(int $notificationId): string
+    {
+        return route('notifications') . '&notification_id=' . $notificationId;
+    }
     // Final de validación de solicitudes
 
     // Inicio de transformación para la interfaz
@@ -686,12 +696,13 @@ final class NotificationsController
     private function groupNotifications(array $notifications): array
     {
         $groups = ['Hoy' => [], 'Ayer' => [], 'Esta semana' => [], 'Anteriores' => []];
-        $today = new DateTimeImmutable('today');
+        $today = new DateTimeImmutable('today', new DateTimeZone((string) (($GLOBALS['config']['timezone'] ?? 'America/Guayaquil'))));
         $yesterday = $today->modify('-1 day');
         $weekStart = $today->modify('monday this week');
 
         foreach ($notifications as $notification) {
-            $date = new DateTimeImmutable($notification['created_at']);
+            $date = utc_datetime((string) ($notification['created_at'] ?? ''));
+            if ($date === null) continue;
             $group = $date >= $today ? 'Hoy' : ($date >= $yesterday ? 'Ayer' : ($date >= $weekStart ? 'Esta semana' : 'Anteriores'));
             $groups[$group][] = $this->present($notification);
         }
@@ -710,8 +721,8 @@ final class NotificationsController
             'adjustment' => ['correction', 'Solicitudes de ajuste', 'fa-pen-to-square'],
         ];
         [$typeClass, $label, $icon] = $styles[$notification['type']] ?? $styles['system'];
-        $date = new DateTimeImmutable($notification['created_at']);
-        return array_merge($notification, ['description' => $notification['message'], 'project' => $notification['project_name'], 'time' => $date->format('H:i'), 'date' => $date->format('d/m/Y'), 'unread' => !$notification['is_read'], 'filter' => $label, 'type_class' => $typeClass, 'icon' => $icon]);
+        $date = utc_datetime((string) ($notification['created_at'] ?? ''));
+        return array_merge($notification, ['description' => $notification['message'], 'project' => $notification['project_name'], 'time' => $date?->format('H:i') ?? '—', 'date' => $date?->format('d/m/Y') ?? 'Fecha no disponible', 'unread' => !$notification['is_read'], 'filter' => $label, 'type_class' => $typeClass, 'icon' => $icon]);
     }
 
     private function summaryCards(array $counters, int $archivedCount = 0, ?int $sentCount = null, bool $error = false): array

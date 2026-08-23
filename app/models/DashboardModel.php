@@ -918,8 +918,9 @@ final class DashboardModel
 
         try {
             $notificationModel = new NotificationModel();
-            $items = $this->studentNotificationItems($notificationModel->getByUser($studentId, [], '', 4));
-            $result['notifications'] = ['status' => 'loaded', 'unread_count' => (int) $notificationModel->getCounters($studentId, '')['unread'], 'items' => $items];
+            $notificationContext = (new AuthSessionService())->notificationContext();
+            $items = $this->studentNotificationItems($notificationModel->getByUser($studentId, [], $notificationContext, 4));
+            $result['notifications'] = ['status' => 'loaded', 'unread_count' => (int) $notificationModel->getCounters($studentId, $notificationContext)['unread'], 'items' => $items];
         } catch (Throwable $error) {
             error_log('Student dashboard notifications: ' . $error->getMessage());
             $result['notifications'] = ['status' => 'error', 'unread_count' => null, 'items' => [], 'message' => 'No fue posible cargar tus notificaciones.'];
@@ -971,16 +972,10 @@ final class DashboardModel
 
     private function studentNotificationItems(array $notifications): array
     {
-        $timezone = (string) ($GLOBALS['config']['timezone'] ?? 'America/Guayaquil');
-        if (!in_array($timezone, timezone_identifiers_list(), true)) $timezone = 'America/Guayaquil';
         foreach ($notifications as &$notification) {
             $raw = trim((string) ($notification['created_at'] ?? ''));
             if ($raw === '') continue;
-            try {
-                $notification['created_at'] = (new DateTimeImmutable($raw, new DateTimeZone('UTC')))->setTimezone(new DateTimeZone($timezone))->format('d/m/Y H:i');
-            } catch (Throwable) {
-                $notification['created_at'] = 'Fecha no disponible';
-            }
+            $notification['created_at'] = format_utc_datetime($raw, true);
         }
         unset($notification);
         return $notifications;

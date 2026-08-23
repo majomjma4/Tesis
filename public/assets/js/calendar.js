@@ -8,6 +8,8 @@ if (calendarRoot) {
     const csrfToken = calendarRoot.dataset.csrf || '';
     const projectUrl = calendarRoot.dataset.projectUrl || '';
     const projectFilterId = Number(calendarRoot.dataset.projectFilter || 0);
+    const requestedEventId = Number(calendarRoot.dataset.requestedEventId || 0);
+    const requestedEventUnavailable = calendarRoot.dataset.requestedEventUnavailable === 'true';
     const toastElement = $('#calendarToast');
     if (toastElement?.parentElement !== document.body) document.body.append(toastElement);
     const typeLabels = { delivery: 'Entregas', meeting: 'Reuniones', review: 'Revisiones', deadline: 'Fechas límite', personal: 'Personal', defense: 'Defensa', defense_schedule: 'Jornada de defensa' };
@@ -298,6 +300,17 @@ if (calendarRoot) {
     initCustomSelects();
     $$('.calendar-view-switcher button').forEach((button) => { const selected = button.dataset.view === activeView; button.classList.toggle('active', selected); button.setAttribute('aria-selected', String(selected)); });
     renderAll();
+    if (requestedEventId > 0) {
+        const requestedEvent = events.find((event) => Number(event.id) === requestedEventId);
+        if (requestedEvent) {
+            selectedDate = requestedEvent.date;
+            visibleDate = new Date(fromKey(requestedEvent.date).getFullYear(), fromKey(requestedEvent.date).getMonth(), 1);
+            renderAll();
+            requestAnimationFrame(() => openDetails(requestedEvent));
+        }
+    } else if (requestedEventUnavailable) {
+        toast('El evento solicitado no está disponible.', true);
+    }
     if (calendarError) {
         ['#calendarNewEventBtn', '#calendarAgendaAdd'].forEach((selector) => {
             const button = $(selector);

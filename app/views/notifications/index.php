@@ -131,7 +131,8 @@
                                     <span class="notification-project"><i class="fa-regular fa-folder-open"></i><span class="notification-project-name"><?= e($notification['project']) ?></span></span>
                                 </div>
                                 <div class="notification-meta">
-                                    <time datetime="2026-07-15T<?= e($notification['time']) ?>:00"><?= e($notification['date']) ?><strong><?= e($notification['time']) ?></strong></time>
+                                    <?php $notificationDateTime = utc_datetime((string) ($notification['created_at'] ?? '')); ?>
+                                    <time datetime="<?= e($notificationDateTime?->format('c') ?? '') ?>"><?= e($notification['date']) ?><strong><?= e($notification['time']) ?></strong></time>
                                     <div class="notification-row-actions">
                                         <button class="view-notification" data-notification-action="open-detail" type="button"><i class="fa-regular fa-file-lines"></i> Detalle</button>
                                         <button class="more-notification" data-notification-action="menu" type="button" aria-label="Mas opciones" aria-haspopup="menu" aria-expanded="false" title="Mas opciones"><i class="fa-solid fa-ellipsis-vertical"></i></button>

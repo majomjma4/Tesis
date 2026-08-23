@@ -47,6 +47,74 @@ let paginationState = (() => {
 })();
 let currentPage = Number(paginationState.page || 1);
 let notificationsPerPage = Number(paginationState.per_page || 10);
+const allowedNotificationPageSizes = [10, 25, 50, 75, 100];
+
+function notificationUrlFromState(pagination = {}) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("page", "notifications");
+
+    const effectivePage = Number(pagination.page || currentPage || 1);
+    const effectiveSize = Number(pagination.per_page || notificationsPerPage || 10);
+    url.searchParams.set("notification_page", String(Math.max(1, effectivePage)));
+    url.searchParams.set("notifications_per_page", String(allowedNotificationPageSizes.includes(effectiveSize) ? effectiveSize : 10));
+
+    const filters = {
+        search: searchInput?.value?.trim() || "",
+        type: typeFilter?.value && typeFilter.value !== "all" ? typeFilter.value : "",
+        status: statusFilter?.value && statusFilter.value !== "all" ? statusFilter.value : "",
+        date_from: dateFromInput?.value || "",
+        date_to: dateToInput?.value || ""
+    };
+    Object.entries(filters).forEach(([key, value]) => {
+        if (value) url.searchParams.set(key, value);
+        else url.searchParams.delete(key);
+    });
+
+    return `${url.pathname}?${url.searchParams.toString()}${url.hash}`;
+}
+
+function syncNotificationUrl(pagination = {}, mode = "replace") {
+    const nextUrl = notificationUrlFromState(pagination);
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (nextUrl === currentUrl) return;
+    window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", nextUrl);
+}
+
+function notificationHistoryNeedsNormalization(pagination = {}) {
+    const url = new URL(window.location.href);
+    const effectivePage = Number(pagination.page || currentPage || 1);
+    const effectiveSize = Number(pagination.per_page || notificationsPerPage || 10);
+    const requestedPage = url.searchParams.get("notification_page");
+    const requestedSize = url.searchParams.get("notifications_per_page");
+
+    return (requestedPage !== null && requestedPage !== String(effectivePage))
+        || (requestedSize !== null && requestedSize !== String(effectiveSize));
+}
+
+function syncControlsFromNotificationUrl() {
+    const url = new URL(window.location.href);
+    if (searchInput) searchInput.value = url.searchParams.get("search") || "";
+
+    const type = url.searchParams.get("type") || "all";
+    if (typeFilter) typeFilter.value = [...typeFilter.options].some((option) => option.value === type) ? type : "all";
+
+    const status = url.searchParams.get("status") || "all";
+    if (statusFilter) statusFilter.value = [...statusFilter.options].some((option) => option.value === status) ? status : "all";
+
+    if (dateFromInput) dateFromInput.value = url.searchParams.get("date_from") || "";
+    if (dateToInput) dateToInput.value = url.searchParams.get("date_to") || "";
+
+    const requestedSize = Number(url.searchParams.get("notifications_per_page"));
+    notificationsPerPage = allowedNotificationPageSizes.includes(requestedSize) ? requestedSize : 10;
+
+    const requestedPage = Number(url.searchParams.get("notification_page"));
+    currentPage = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+}
+
+function notificationUrlHasFilters() {
+    const url = new URL(window.location.href);
+    return ["search", "type", "status", "date_from", "date_to", "project_id"].some((key) => url.searchParams.has(key));
+}
 
 function normalize(value) {
     return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -240,16 +308,16 @@ function renderPagination(pagination = {}) {
     sizeLabel.append(document.createTextNode("Mostrar "));
     const size = document.createElement("select");
     size.setAttribute("aria-label", "Cantidad de notificaciones visibles");
-    [10, 25, 50, 75, 100].filter((value) => value <= total).forEach((value) => {
+    allowedNotificationPageSizes.filter((value) => value <= total).forEach((value) => {
         const option = document.createElement("option"); option.value = value; option.textContent = value; option.selected = value === notificationsPerPage; size.append(option);
     });
-    size.addEventListener("change", () => { notificationsPerPage = Number(size.value); currentPage = 1; loadNotifications(); });
+    size.addEventListener("change", () => { notificationsPerPage = Number(size.value); currentPage = 1; loadNotifications(false, { updateHistory: true, historyMode: "push" }); });
     sizeLabel.append(size);
 
     const pages = document.createElement("div"); pages.className = "notification-pagination-pages";
     const addButton = (label, page, disabled = false, current = false) => {
         const button = document.createElement("button"); button.type = "button"; button.textContent = label; button.disabled = disabled; button.classList.toggle("is-current", current); button.setAttribute("aria-label", current ? `Pagina ${page}, actual` : `Ir a la pagina ${page}`); if (current) button.setAttribute("aria-current", "page");
-        button.addEventListener("click", () => { currentPage = page; loadNotifications(); groupsContainer?.scrollIntoView({ behavior: "smooth", block: "start" }); }); pages.append(button);
+        button.addEventListener("click", () => { currentPage = page; loadNotifications(false, { updateHistory: true, historyMode: "push" }); groupsContainer?.scrollIntoView({ behavior: "smooth", block: "start" }); }); pages.append(button);
     };
     addButton("‹", currentPage - 1, currentPage <= 1);
     const pageCount = pageTotal;
@@ -285,7 +353,7 @@ function updateTrashSelection() {
 
 function updateContextualCards() {}
 
-async function loadNotifications(showMessage = false) {
+async function loadNotifications(showMessage = false, { updateHistory = false, normalizeHistory = false, historyMode = "replace" } = {}) {
     requestController?.abort(); requestController = new AbortController();
     refreshButton?.setAttribute("disabled", ""); refreshButton?.querySelector("i")?.classList.add("is-spinning");
     const showingHidden = statusFilter.value === "hidden";
@@ -299,12 +367,16 @@ async function loadNotifications(showMessage = false) {
         trash: showingTrash ? "1" : "0",
         date_from: dateFromInput?.value || "",
         date_to: dateToInput?.value || "",
+        project_id: new URL(window.location.href).searchParams.get("project_id") || "",
         notification_page: String(currentPage),
         notifications_per_page: String(notificationsPerPage)
     });
     try {
         const payload = await request(`${endpoints.list}&${params}`, { signal: requestController.signal });
         updateCounters(payload.data.counters); renderGroups(payload.data.groups, payload.data.sectionCounters); renderPagination(payload.data.pagination); if (errorState) errorState.hidden = true;
+        if (updateHistory || (normalizeHistory && notificationHistoryNeedsNormalization(payload.data.pagination))) {
+            syncNotificationUrl(payload.data.pagination, normalizeHistory ? "replace" : historyMode);
+        }
         if (showMessage) showToast(payload.message);
     } catch (error) {
         if (error.name !== "AbortError") { if (errorState) errorState.hidden = false; showToast(error.message, true); }
@@ -314,7 +386,7 @@ async function loadNotifications(showMessage = false) {
 }
 
 function debounce(callback, delay) { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => callback(...args), delay); }; }
-const debouncedLoad = debounce(() => loadNotifications(), 300);
+const debouncedLoad = debounce(() => loadNotifications(false, { updateHistory: true, historyMode: "replace" }), 300);
 searchInput?.addEventListener("input", () => { syncSearchPlaceholder(); currentPage = 1; updateFilterState(); debouncedLoad(); });
 
 function closeFilterMenus(restoreFocus = false) {
@@ -393,7 +465,7 @@ function updateFilterState() {
     if (statusFilter?.value !== "all") active.push({ label: `Mostrar: ${statusFilter.options[statusFilter.selectedIndex]?.textContent || "Todas"}`, clear: () => { statusFilter.value = "all"; } });
     if (typeFilter?.value && typeFilter.value !== "all") active.push({ label: `Tipo: ${typeFilter.options[typeFilter.selectedIndex]?.textContent}`, clear: () => { typeFilter.value = "all"; } });
     if (dateFromInput?.value || dateToInput?.value) active.push({ label: `Fecha: ${dateFromInput?.value || "…"} — ${dateToInput?.value || "…"}`, clear: () => { if (dateFromInput) dateFromInput.value = ""; if (dateToInput) dateToInput.value = ""; } });
-    if (activeFilter) { activeFilter.replaceChildren(); activeFilter.hidden = active.length === 0; active.forEach((item) => { const chip = document.createElement("button"); chip.type = "button"; chip.className = "notification-filter-chip"; chip.append(document.createTextNode(item.label)); const close = document.createElement("i"); close.className = "fa-solid fa-xmark"; close.setAttribute("aria-hidden", "true"); chip.append(close); chip.addEventListener("click", () => { item.clear(); currentPage = 1; updateFilterState(); loadNotifications(); }); activeFilter.append(chip); }); }
+    if (activeFilter) { activeFilter.replaceChildren(); activeFilter.hidden = active.length === 0; active.forEach((item) => { const chip = document.createElement("button"); chip.type = "button"; chip.className = "notification-filter-chip"; chip.append(document.createTextNode(item.label)); const close = document.createElement("i"); close.className = "fa-solid fa-xmark"; close.setAttribute("aria-hidden", "true"); chip.append(close); chip.addEventListener("click", () => { item.clear(); currentPage = 1; updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); }); activeFilter.append(chip); }); }
     if (trashToolbar) trashToolbar.hidden = statusFilter?.value !== "trash";
 }
 
@@ -402,7 +474,7 @@ function selectFilter(control, value, requestUpdate = true) {
     select.value = value;
     menu?.querySelectorAll("[data-filter-value]").forEach((option) => option.setAttribute("aria-selected", String(option.dataset.filterValue === value)));
     closeFilterMenus(); updateFilterState();
-    if (requestUpdate) { currentPage = 1; loadNotifications(); }
+    if (requestUpdate) { currentPage = 1; loadNotifications(false, { updateHistory: true, historyMode: "push" }); }
 }
 
 filterControls.forEach((control) => {
@@ -422,7 +494,7 @@ filterControls.forEach((control) => {
     );
 
     if (!trigger || !menu) {
-        control.querySelector("select")?.addEventListener("change", () => { hideToast(); currentPage = 1; updateFilterState(); loadNotifications(); });
+        control.querySelector("select")?.addEventListener("change", () => { hideToast(); currentPage = 1; updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); });
         return;
     }
 
@@ -518,13 +590,25 @@ function clearAllFilters() {
     if (dateFromInput) dateFromInput.value = "";
     if (dateToInput) dateToInput.value = "";
     updateFilterState();
-    loadNotifications();
+    loadNotifications(false, { updateHistory: true, historyMode: "push" });
     searchInput.focus();
 }
 document.querySelector("#clearActiveNotificationFilter")?.addEventListener("click", clearAllFilters);
+syncControlsFromNotificationUrl();
 updateFilterState();
 syncSearchPlaceholder();
 renderPagination(paginationState);
+const initialUrl = new URL(window.location.href);
+if (initialUrl.searchParams.has("notification_page") || initialUrl.searchParams.has("notifications_per_page")) {
+    syncNotificationUrl(paginationState, "replace");
+}
+if (notificationUrlHasFilters()) loadNotifications(false, { updateHistory: true, historyMode: "replace" });
+window.addEventListener("popstate", () => {
+    syncControlsFromNotificationUrl();
+    updateFilterState();
+    syncSearchPlaceholder();
+    loadNotifications(false, { normalizeHistory: true });
+});
 selectAllTrash?.addEventListener("change", () => { document.querySelectorAll(".trash-notification-checkbox").forEach((checkbox) => { checkbox.checked = selectAllTrash.checked; }); updateTrashSelection(); });
 groupsContainer?.addEventListener("change", (event) => { if (event.target.matches(".trash-notification-checkbox")) updateTrashSelection(); });
 refreshButton?.addEventListener("click", () => loadNotifications(true));
@@ -878,7 +962,7 @@ document.addEventListener("click", (event) => {
         modalMenuBtn?.setAttribute("aria-expanded", "false");
     }
 });
-document.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchInput?.focus(); } if (event.key === "Escape") { closeMenus(); if (modalContextMenu) modalContextMenu.hidden = true; const hasOpenFilter = filterControls.some((control) => { const menu = control.querySelector(".notification-filter-menu"); return menu && !menu.hidden; }); if (hasOpenFilter) closeFilterMenus(true); else if (detailModal && !detailModal.hidden) closeModal(detailModal); else if (deleteModal && !deleteModal.hidden) closeModal(deleteModal); else if (createModal && !createModal.hidden) closeModal(createModal); else if (document.activeElement === searchInput) { searchInput.value = ""; syncSearchPlaceholder(); searchInput.blur(); updateFilterState(); loadNotifications(); } } });
+document.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchInput?.focus(); } if (event.key === "Escape") { closeMenus(); if (modalContextMenu) modalContextMenu.hidden = true; const hasOpenFilter = filterControls.some((control) => { const menu = control.querySelector(".notification-filter-menu"); return menu && !menu.hidden; }); if (hasOpenFilter) closeFilterMenus(true); else if (detailModal && !detailModal.hidden) closeModal(detailModal); else if (deleteModal && !deleteModal.hidden) closeModal(deleteModal); else if (createModal && !createModal.hidden) closeModal(createModal); else if (document.activeElement === searchInput) { searchInput.value = ""; syncSearchPlaceholder(); searchInput.blur(); updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); } } });
 
 let notificationsRevealed = false;
 
@@ -901,8 +985,8 @@ dateTrigger?.addEventListener("click", () => {
     dateTrigger.setAttribute("aria-expanded", String(open));
     if (open) dateFromInput?.focus();
 });
-document.querySelector("#applyNotificationDate")?.addEventListener("click", () => { hideToast(); currentPage = 1; updateFilterState(); loadNotifications(); if (datePopover) datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); });
-document.querySelector("#clearNotificationDate")?.addEventListener("click", () => { hideToast(); if (dateFromInput) dateFromInput.value = ""; if (dateToInput) dateToInput.value = ""; currentPage = 1; updateFilterState(); loadNotifications(); if (datePopover) datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); });
+document.querySelector("#applyNotificationDate")?.addEventListener("click", () => { hideToast(); currentPage = 1; updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); if (datePopover) datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); });
+document.querySelector("#clearNotificationDate")?.addEventListener("click", () => { hideToast(); if (dateFromInput) dateFromInput.value = ""; if (dateToInput) dateToInput.value = ""; currentPage = 1; updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); if (datePopover) datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); });
 document.addEventListener("click", (event) => { if (!event.target.closest(".notification-date-filter") && datePopover && !datePopover.hidden) { datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); } });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && datePopover && !datePopover.hidden) { datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); dateTrigger?.focus(); } });
 

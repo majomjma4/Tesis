@@ -14,9 +14,26 @@ final class CalendarController
         $projectFilterId = filter_var($_GET['project_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 0;
         $calendarEvents = [];
         $calendarError = null;
+        $requestedEvent = null;
+        $requestedEventUnavailable = false;
+        $rawEventId = $_GET['event_id'] ?? null;
+        $requestedEventId = is_scalar($rawEventId) ? filter_var($rawEventId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
 
         try {
             $calendarEvents = $this->eventsForSession($calendar, $session);
+            if ($rawEventId !== null) {
+                if ($requestedEventId === false) {
+                    $requestedEventUnavailable = true;
+                } else {
+                    foreach ($calendarEvents as $event) {
+                        if ((int) ($event['id'] ?? 0) === (int) $requestedEventId) {
+                            $requestedEvent = $event;
+                            break;
+                        }
+                    }
+                    $requestedEventUnavailable = $requestedEvent === null;
+                }
+            }
         } catch (Throwable $error) {
             error_log('Calendar initial load: ' . $error->getMessage());
             $calendarError = 'No fue posible cargar los eventos del calendario. Inténtalo nuevamente.';
@@ -32,6 +49,8 @@ final class CalendarController
             'calendarCsrf' => $session->csrfToken('calendar_events'),
             'projectsUrl' => route('project-detail'),
             'projectFilterId' => $projectFilterId,
+            'requestedEvent' => $requestedEvent,
+            'requestedEventUnavailable' => $requestedEventUnavailable,
         ]);
     }
     // Final de presentación del calendario

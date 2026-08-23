@@ -366,7 +366,7 @@ function renderRecentNotifications(groups) {
             const title = document.createElement("strong"); title.textContent = notification.title;
             const project = document.createElement("p"); project.textContent = notification.project || "Notificacion general";
             const time = document.createElement("small");
-            const createdAt = new Date(String(notification.created_at || "").replace(" ", "T"));
+            const createdAt = new Date(String(notification.created_at_iso || notification.created_at || "").replace(" ", "T"));
             const minutes = Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 60000));
             time.textContent = minutes < 60 ? `Hace ${minutes} min` : (minutes < 1440 ? `Hace ${Math.floor(minutes / 60)} h` : `Hace ${Math.floor(minutes / 1440)} d`);
             copy.append(title, project, time);
@@ -406,13 +406,27 @@ async function openRecentNotification(item) {
         return;
     }
 
-    // Navegar directamente al módulo de notificaciones usando el deep-link.
-    // notifications.js lo capturará en openNotificationFromQuery() y llamará al endpoint open.
-    const notificationsPageUrl = safeRecentNotificationUrl("index.php?page=notifications") || fallbackUrl;
-    const deepLinkUrl = new URL(notificationsPageUrl, window.location.href);
-    deepLinkUrl.searchParams.set("page", "notifications");
-    deepLinkUrl.searchParams.set("notification_id", String(notificationId));
-    window.location.assign(deepLinkUrl.toString());
+    const endpoint = topbarNotificationsButton?.dataset.openEndpoint;
+    const csrfToken = topbarNotificationsButton?.dataset.csrfToken || "";
+    if (!endpoint || !csrfToken) {
+        window.location.assign(fallbackUrl);
+        return;
+    }
+    const response = await fetch(endpoint, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "X-Requested-With": "XMLHttpRequest", "X-CSRF-Token": csrfToken, "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ notification_id: String(notificationId) })
+    });
+    const payload = await response.json().catch(() => ({ success: false }));
+    if (!response.ok || !payload.success) throw new Error(payload.message || "No fue posible abrir la notificación.");
+
+    updateTopbarNotificationCount(payload.data?.counters?.unread);
+    item.classList.remove("is-unread");
+    item.classList.add("is-read");
+    item.querySelector(".topbar-notification-dot")?.remove();
+    item.removeAttribute("aria-busy");
+    window.location.assign(safeRecentNotificationUrl(payload.data?.url) || fallbackUrl);
 }
 
 async function loadRecentNotifications() {
@@ -446,6 +460,7 @@ topbarNotificationsList?.addEventListener("click", async (event) => {
     const item = event.target.closest(".topbar-notification-item");
     if (!item) return;
     event.preventDefault();
+    if (item.getAttribute("aria-busy") === "true") return;
     item.setAttribute("aria-busy", "true");
     try {
         await openRecentNotification(item);

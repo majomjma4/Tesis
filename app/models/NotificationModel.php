@@ -66,6 +66,9 @@ final class NotificationModel
             $conditions[] = '(n.type = "system" OR n.action_url LIKE "%page=admin-%" OR JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.admin_sender_id")) IS NOT NULL OR JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.context")) = "admin" OR JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.scope")) = "admin")';
         } elseif ($context === 'teacher') {
             $conditions[] = '(n.type != "system" AND (n.action_url IS NULL OR n.action_url NOT LIKE "%page=admin-%") AND JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.admin_sender_id")) IS NULL AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.context")), "") != "admin" AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.scope")), "") != "admin")';
+        } elseif ($context === 'student') {
+            // El contexto describe la experiencia del destinatario. Las comunicaciones
+            // institucionales enviadas por Admin siguen siendo válidas para Student.
         }
 
         $search = trim((string) ($filters['search'] ?? ''));
@@ -124,6 +127,17 @@ final class NotificationModel
 
     public function findForUser(int $notificationId, int $userId): ?array
     {
+        return $this->findForUserByVisibility($notificationId, $userId, false);
+    }
+
+    public function findActiveForUser(int $notificationId, int $userId): ?array
+    {
+        return $this->findForUserByVisibility($notificationId, $userId, true);
+    }
+
+    private function findForUserByVisibility(int $notificationId, int $userId, bool $activeOnly): ?array
+    {
+        $visibility = $activeOnly ? ' AND n.archived_at IS NULL AND n.deleted_at IS NULL' : '';
         $statement = $this->connection()->prepare(
             'SELECT n.id, n.user_id, n.project_id, n.type, n.title, n.message, n.action_url, n.action_label, n.metadata, n.is_read, n.read_at, n.created_at, n.archived_at, n.deleted_at,
                     p.code AS project_code, p.status AS project_status,
@@ -132,7 +146,7 @@ final class NotificationModel
              FROM notifications n
              LEFT JOIN projects p ON p.id = n.project_id
              LEFT JOIN users u ON u.id = JSON_UNQUOTE(JSON_EXTRACT(n.metadata, "$.admin_sender_id"))
-             WHERE n.id = :id AND n.user_id = :user_id LIMIT 1'
+             WHERE n.id = :id AND n.user_id = :user_id' . $visibility . ' LIMIT 1'
         );
         $statement->execute(['id' => $notificationId, 'user_id' => $userId]);
         $notification = $statement->fetch();
@@ -395,6 +409,20 @@ final class NotificationModel
         $row['project_id'] = $row['project_id'] === null ? null : (int) $row['project_id'];
         $row['is_read'] = (bool) $row['is_read'];
         $row['metadata'] = $metadata;
+        $eventId = (int) ($metadata['event_id'] ?? 0);
+        $actionUrl = (string) ($row['action_url'] ?? '');
+        $isGenericCalendarUrl = $actionUrl === ''
+            || (preg_match('/(?:^|[?&])page=calendar(?:&|$)/', $actionUrl) === 1 && !str_contains($actionUrl, 'event_id='));
+        if ($eventId > 0 && $isGenericCalendarUrl) {
+            $row['action_url'] = route('calendar') . '&event_id=' . $eventId;
+        }
+        if (!empty($row['created_at'])) {
+            try {
+                $row['created_at_iso'] = (new DateTimeImmutable((string) $row['created_at'], new DateTimeZone('UTC')))->format(DATE_ATOM);
+            } catch (Throwable) {
+                $row['created_at_iso'] = null;
+            }
+        }
         if ($row['project_id'] !== null && array_key_exists('project_status', $row) && $row['project_status'] === null) {
             $row['action_url'] = null;
         }

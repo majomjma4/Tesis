@@ -72,17 +72,23 @@ function project_delivery_status_label(string $status): string
     };
 }
 
+function utc_datetime(?string $value): ?DateTimeImmutable
+{
+    if (!$value) return null;
+    try {
+        $timezone = (string) (($GLOBALS['config']['timezone'] ?? 'America/Guayaquil'));
+        if (!in_array($timezone, timezone_identifiers_list(), true)) $timezone = 'America/Guayaquil';
+        return (new DateTimeImmutable($value, new DateTimeZone('UTC')))->setTimezone(new DateTimeZone($timezone));
+    } catch (Throwable) {
+        return null;
+    }
+}
+
 function format_utc_datetime(?string $value, bool $withTime = false): string
 {
     if (!$value) return 'No disponible';
-    try {
-        $source = new DateTimeImmutable($value, new DateTimeZone('UTC'));
-        $timezone = (string) (($GLOBALS['config']['timezone'] ?? 'America/Guayaquil'));
-        if (!in_array($timezone, timezone_identifiers_list(), true)) $timezone = 'America/Guayaquil';
-        return $source->setTimezone(new DateTimeZone($timezone))->format($withTime ? 'd/m/Y H:i' : 'd/m/Y');
-    } catch (Throwable) {
-        return 'No disponible';
-    }
+    $date = utc_datetime($value);
+    return $date?->format($withTime ? 'd/m/Y H:i' : 'd/m/Y') ?? 'No disponible';
 }
 function app_is_development(): bool
 {
