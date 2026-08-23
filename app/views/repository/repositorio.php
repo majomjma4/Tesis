@@ -27,10 +27,19 @@
     <div class="ar-page" id="arPage">
         <!-- Encabezado exacto Admin -->
         <header class="ar-head">
-            <div>
+            <div class="ar-head-top">
                 <span class="ar-eyebrow">Biblioteca digital institucional</span>
                 <h1>Repositorio institucional</h1>
+            </div>
+            <div class="ar-head-bottom">
                 <p>Consulta proyectos publicados y materiales de apoyo disponibles para la comunidad académica.</p>
+                <?php if (!empty($canCreateSupportMaterial)): ?>
+                    <div class="ar-head-actions">
+                        <button class="ar-primary-action" type="button" data-teacher-material-create>
+                            <i class="fa-solid fa-plus"></i> Nuevo material
+                        </button>
+                    </div>
+                <?php endif; ?>
             </div>
         </header>
 
@@ -261,7 +270,7 @@
             <section class="ar-panel" id="panelSupport" role="tabpanel" aria-labelledby="tabSupport" data-support-status="<?= e($supportStatus) ?>" data-base-support-count="<?= count($supportDocuments) ?>" hidden>
                 <header class="ar-section-head">
                     <div><span>Recursos académicos</span><h2>Material de apoyo</h2></div>
-                    <div style="display:flex;align-items:center;gap:10px"><p id="repositorySupportCount" aria-live="polite"><?= $supportStatus === 'error' ? 'Estado no disponible' : count($supportDocuments) . ' ' . (count($supportDocuments) === 1 ? 'resultado visible' : 'resultados visibles') ?></p><?php if (!empty($canCreateSupportMaterial) && $supportStatus !== 'error'): ?><button class="ar-primary-action" type="button" data-teacher-material-create><i class="fa-solid fa-plus"></i> Nuevo material</button><?php endif; ?></div>
+                    <div style="display:flex;align-items:center;gap:10px"><p id="repositorySupportCount" aria-live="polite"><?= $supportStatus === 'error' ? 'Estado no disponible' : count($supportDocuments) . ' ' . (count($supportDocuments) === 1 ? 'resultado visible' : 'resultados visibles') ?></p></div>
                 </header>
 
                 <div class="ar-grid" id="repositorySupportGrid">
