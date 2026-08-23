@@ -66,10 +66,14 @@
                 $actionUrl = (string) ($navigation['action_url'] ?? (route('project-detail') . '&id=' . (int) $project['id']));
                 $cardAction = (string) ($navigation['action_label'] ?? 'Ver proyecto');
                 $phaseContext = (array) ($navigation['phase_context'] ?? []);
+                $projectTypeLabel = (string) ($project['type'] ?? 'Proyecto academico');
+                if (str_contains(strtolower($projectTypeLabel), 'integrador') || in_array(strtolower((string) ($project['type_key'] ?? '')), ['pis', 'integrator'], true)) {
+                    $projectTypeLabel = 'Proyecto PIS';
+                }
             ?>
                 <?php $hasPendingReview=!empty($project['review_situation']['has_pending_observations']); ?>
                 <article class="projects-card" data-project-card data-search="<?= e($search) ?>" data-status="<?= e($project['status_key']) ?>" data-situation="<?=$hasPendingReview?'pending':'none'?>" data-type="<?= e($project['type_key']) ?>" data-period="<?= e($project['period']) ?>" data-title="<?= e($project['title']) ?>" data-activity="<?= (int) ($project['activity_order'] ?? 0) ?>">
-                    <header><span class="projects-type"><?= e($project['type']) ?></span><span class="projects-status is-<?= e($project['status_key']) ?>"><?= e($project['status']) ?></span></header>
+                    <header><span class="projects-type"><?= e($projectTypeLabel) ?></span><span class="projects-status is-<?= e($project['status_key']) ?>"><?= e($project['status']) ?></span></header>
                     <?php if($hasPendingReview):?><span class="projects-review-situation"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>Observaciones pendientes</span><?php endif;?>
                     <div class="projects-card-title"><h2><?= e($project['title']) ?></h2></div>
                     <div class="project-card-tutor"><i class="fa-solid fa-chalkboard-user"></i><span><small>Tutor</small><strong><?= e($project['tutor'] ?: 'Por asignar') ?></strong></span><em><?= e($project['period']) ?></em></div>

@@ -70,6 +70,7 @@ final class CalendarController
             }
             if ($method === 'DELETE') {
                 $model->deleteForOwner($payload['id'] ?? null, $owner);
+                (new CalendarEventReminderService())->syncForOwner($owner);
                 $this->json(true, 'Evento eliminado.');
                 return;
             }

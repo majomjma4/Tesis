@@ -30,16 +30,15 @@ final class ProjectDescriptionService
         foreach ($students->fetchAll(PDO::FETCH_COLUMN) as $userId) $insert->execute(['user_id'=>(int)$userId,'project_id'=>$projectId,'url'=>route('project-detail').'&id='.$projectId,'metadata'=>$metadata,'deduplication_key'=>'project-description-status-'.$auditId]);
     }
 
-    /** Devuelve y consume el aviso que corresponde a esta apertura del proyecto. */
-    public function consumePendingReminder(int $projectId, int $userId): ?array
+    /** Consulta el aviso sin marcarlo como leído: abrir un GET no muta notificaciones. */
+    public function pendingReminder(int $projectId, int $userId): ?array
     {
         if ($projectId < 1 || $userId < 1) return null;
-        return Database::transaction(function(PDO $db) use($projectId,$userId):?array {
-            $q=$db->prepare("SELECT n.id FROM notifications n INNER JOIN projects p ON p.id=n.project_id AND p.deleted_at IS NULL INNER JOIN project_types pt ON pt.id=p.project_type_id INNER JOIN project_participants pp ON pp.project_id=p.id AND pp.user_id=n.user_id INNER JOIN student_profiles sp ON sp.user_id=pp.user_id WHERE n.project_id=:project_id AND n.user_id=:user_id AND n.type='reminder' AND n.is_read=0 AND n.archived_at IS NULL AND n.deleted_at IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(n.metadata,'$.purpose'))='project_description' AND TRIM(COALESCE(p.summary,''))='' AND pt.code IN ('thesis_profile','thesis','pis') AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL ORDER BY n.created_at,n.id LIMIT 1 FOR UPDATE");
-            $q->execute(['project_id'=>$projectId,'user_id'=>$userId]);$id=(int)$q->fetchColumn();if($id<1)return null;
-            $db->prepare('UPDATE notifications SET is_read=1,read_at=NOW(),updated_at=NOW() WHERE id=:id')->execute(['id'=>$id]);
-            return ['id'=>$id];
-        });
+        $db = $this->db ?? Database::connection();
+        $q=$db->prepare("SELECT n.id FROM notifications n INNER JOIN projects p ON p.id=n.project_id AND p.deleted_at IS NULL INNER JOIN project_types pt ON pt.id=p.project_type_id INNER JOIN project_participants pp ON pp.project_id=p.id AND pp.user_id=n.user_id INNER JOIN student_profiles sp ON sp.user_id=pp.user_id WHERE n.project_id=:project_id AND n.user_id=:user_id AND n.type='reminder' AND n.is_read=0 AND n.archived_at IS NULL AND n.deleted_at IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(n.metadata,'$.purpose'))='project_description' AND TRIM(COALESCE(p.summary,''))='' AND pt.code IN ('thesis_profile','thesis','pis') AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL ORDER BY n.created_at,n.id LIMIT 1");
+        $q->execute(['project_id'=>$projectId,'user_id'=>$userId]);
+        $id=(int)$q->fetchColumn();
+        return $id > 0 ? ['id'=>$id] : null;
     }
 
     public function saveForStudent(int $projectId,int $userId,string $description):void
@@ -48,9 +47,11 @@ final class ProjectDescriptionService
         if($description==='')throw new InvalidArgumentException('Escribe una descripción o selecciona “Omitir por ahora”.');
         if(mb_strlen($description,'UTF-8')>4000)throw new InvalidArgumentException('La descripción no puede superar los 4000 caracteres.');
         Database::transaction(function(PDO $db)use($projectId,$userId,$description):void{
-            $q=$db->prepare("SELECT p.summary,pt.code type_code FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id=:project_id AND p.deleted_at IS NULL FOR UPDATE");$q->execute(['project_id'=>$projectId]);$project=$q->fetch();
+            $q=$db->prepare("SELECT p.summary,p.status,p.withdrawn_at,pt.code type_code FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id=:project_id AND p.deleted_at IS NULL FOR UPDATE");$q->execute(['project_id'=>$projectId]);$project=$q->fetch();
+            if (is_array($project) && !empty($project['withdrawn_at'])) throw new InvalidArgumentException('El proyecto ya no está disponible para actualizarse.');
             if(!$project||!in_array((string)$project['type_code'],self::REMINDER_TYPES,true))throw new InvalidArgumentException('Este proyecto no admite una descripción escrita por el estudiante.');
-            $participant=$db->prepare("SELECT 1 FROM project_participants pp INNER JOIN student_profiles sp ON sp.user_id=pp.user_id WHERE pp.project_id=:project_id AND pp.user_id=:user_id AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL LIMIT 1");$participant->execute(['project_id'=>$projectId,'user_id'=>$userId]);
+            if ((string)$project['status'] !== 'development') throw new InvalidArgumentException('La descripción solo puede actualizarse mientras el proyecto está En desarrollo.');
+            $participant=$db->prepare("SELECT 1 FROM project_participants pp INNER JOIN student_profiles sp ON sp.user_id=pp.user_id WHERE pp.project_id=:project_id AND pp.user_id=:user_id AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL LIMIT 1 FOR UPDATE");$participant->execute(['project_id'=>$projectId,'user_id'=>$userId]);
             if(!$participant->fetchColumn())throw new InvalidArgumentException('No tienes permiso para modificar la descripción de este proyecto.');
             $previous=trim((string)($project['summary']??''));$db->prepare('UPDATE projects SET summary=:summary WHERE id=:id')->execute(['summary'=>$description,'id'=>$projectId]);
             (new ProjectAuditService($db))->record($projectId,$userId,'project_description_updated','project',$projectId,['summary'=>$previous?:null],['summary'=>$description]);

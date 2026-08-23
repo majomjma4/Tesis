@@ -128,6 +128,7 @@ final class ProjectCapabilityService
         if ($userId < 1) return false;
         if ($session->isAdminModeActive()) return true;
         if ($context === 'academic_management') return false;
+        if (!empty($project['withdrawn_at'])) return false;
         if ($context === 'repository') return !empty($this->resolve($project, $context, $userId, $access->currentRoles(), false)['view_project']);
 
         $roles = array_map('strtolower', array_map('strval', $access->currentRoles()));
@@ -141,7 +142,6 @@ final class ProjectCapabilityService
             return false;
         }
         if (!in_array('student', $roles, true)) return false;
-        if ((int) ($project['created_by'] ?? 0) === $userId) return true;
         foreach ($participants as $participant) {
             if ((int) ($participant['user_id'] ?? 0) === $userId && strtolower((string) ($participant['role_code'] ?? '')) === 'student') return true;
         }
@@ -239,6 +239,7 @@ final class ProjectCapabilityService
         $capabilities = $this->none();
         if (!in_array($context, ['academic_management', 'academic', 'repository'], true)) return $capabilities;
         if ((int) ($project['id'] ?? 0) < 1 || !empty($project['deleted_at']) || $userId < 1) return $capabilities;
+        if (!$administrator && !empty($project['withdrawn_at'])) return $capabilities;
 
         $roles = array_values(array_unique(array_map('strtolower', array_map('strval', $roles))));
         $participants = array_values(array_filter((array) ($project['participants'] ?? []), static fn (array $participant): bool =>
@@ -275,7 +276,11 @@ final class ProjectCapabilityService
         // Proyectos activos es una bandeja de seguimiento general para Docente:
         // puede consultar cualquier expediente, sin recibir capacidades de mutación.
         // El Estudiante conserva el requisito de relación directa con el proyecto.
-        if ($administrator || (!$isTeacher && (!$isStudent || !$related))) return $capabilities;
+        $activeStudentParticipant = $isStudent && count(array_filter($participants, static fn (array $participant): bool =>
+            (int) ($participant['user_id'] ?? 0) === $userId
+            && strtolower((string) ($participant['role_code'] ?? '')) === 'student'
+        )) > 0;
+        if ($administrator || (!$isTeacher && (!$isStudent || !$activeStudentParticipant))) return $capabilities;
         if ($isTeacher && !$this->isInstitutionallyVisibleActiveProject($project) && !$related) return $capabilities;
         $capabilities['view_project'] = true;
         $capabilities['view_academic_history'] = !$isTeacher;
@@ -383,7 +388,7 @@ final class ProjectCapabilityService
         $roles = array_map(static fn(array $row): string => strtolower((string)$row['code']), $rows);
         $assignment = $db->prepare(
             "SELECT LOWER(role_code) FROM project_participants WHERE project_id=:project AND user_id=:user
-             AND status='active' AND removed_at IS NULL"
+              AND status='active' AND removed_at IS NULL FOR UPDATE"
         );
         $assignment->execute(['project'=>(int)$project['id'], 'user'=>$userId]);
         $projectRoles = array_map('strval', $assignment->fetchAll(PDO::FETCH_COLUMN));

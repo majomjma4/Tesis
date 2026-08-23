@@ -581,7 +581,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const toggleStudentObservationStatusInBackend = async (item, newStatus, buttonEl) => {
+    /*
+        // El estado addressed sólo lo produce el flujo de corrección documental.
+        return;
+    }; /* Legacy direct status mutation removed; formal correction flow owns this state.
         if (!item.id || isRedirectingToLogin) return;
         buttonEl.disabled = true;
         try {
@@ -591,7 +594,7 @@ document.addEventListener('DOMContentLoaded', () => {
             body.set('observation_id', String(item.id));
             body.set('status', newStatus);
 
-            const response = await fetch('index.php?page=student-project-observation-toggle-status', jsonRequestInit({ method: 'POST', body }));
+            const response = await fetch('index.php?page=student-project-observation-status-removed', jsonRequestInit({ method: 'POST', body }));
             const payload = await readJsonResponse(response);
 
             if (!payload.success) {
@@ -612,6 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    */
     const sortStudentObservations = (itemList) => {
         return [...itemList].map((item, originalIndex) => {
             let anchorObj = null;
@@ -937,6 +941,7 @@ document.addEventListener('DOMContentLoaded', () => {
             author.style.fontSize = '0.72rem';
             author.textContent = `${item.author_name || 'Docente'} · ${item.created_at || ''}`;
 
+            /*
             const toggleBtn = document.createElement('button');
             toggleBtn.type = 'button';
             toggleBtn.className = 'sw-obs-toggle-status-btn';
@@ -970,7 +975,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 toggleStudentObservationStatusInBackend(item, nextStatus, toggleBtn);
             });
 
-            footer.append(author, toggleBtn);
+            */
+            footer.append(author);
 
             card.dataset.observationId = String(item.id || '');
             if (activeStudentObservationId !== null && Number(item.id) === activeStudentObservationId) {
@@ -1050,7 +1056,7 @@ document.addEventListener('DOMContentLoaded', () => {
     printButton?.addEventListener('click',printPreview);
     let projectActions=manager.querySelector('.sw-project-actions');
     if (!projectActions) {
-        projectActions=document.createElement('div'); projectActions.className='sw-project-actions'; const packageUrl=manager.dataset.packageUrl||`index.php?page=project-package-download&id=${encodeURIComponent(manager.dataset.projectId||'')}`; projectActions.innerHTML=`<div class="sw-project-actions-group"><a class="sw-viewer-action" href="${packageUrl}"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</a></div><div class="sw-project-actions-file"><a class="sw-viewer-action is-file-download" data-sw-viewer-download hidden><i class="fa-solid fa-download" aria-hidden="true"></i> Descargar</a><button type="button" class="sw-viewer-action" data-sw-print disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Imprimir</button></div>`; manager.querySelector('.sw-viewer-panel')?.prepend(projectActions);
+        projectActions=document.createElement('div'); projectActions.className='sw-project-actions'; const packageUrl=manager.dataset.packageUrl||''; const packageAction=packageUrl?`<a class="sw-viewer-action" href="${packageUrl}"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</a>`:'<span class="sw-viewer-action is-disabled" aria-disabled="true"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</span>'; projectActions.innerHTML=`<div class="sw-project-actions-group">${packageAction}</div><div class="sw-project-actions-file"><a class="sw-viewer-action is-file-download" data-sw-viewer-download hidden><i class="fa-solid fa-download" aria-hidden="true"></i> Descargar</a><button type="button" class="sw-viewer-action" data-sw-print disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Imprimir</button></div>`; manager.querySelector('.sw-viewer-panel')?.prepend(projectActions);
     }
     const modal=manager.querySelector('[data-sw-operation-modal]'), modalTitle=manager.querySelector('[data-sw-modal-title]'), modalMessage=manager.querySelector('[data-sw-modal-message]'), modalSummary=manager.querySelector('[data-sw-modal-summary]'), modalConfirm=manager.querySelector('[data-sw-modal-confirm]'); let modalAction=null;
     const closeMenus=()=>{

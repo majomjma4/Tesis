@@ -4,6 +4,8 @@ $projectId = (int) $project['id'];
 $status = (string) ($project['status'] ?? 'development');
 $statusLabels = ['development'=>'En desarrollo','under_review'=>'En revisión','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el tribunal','published'=>'Publicado'];
 $statusLabel = $statusLabels[$status] ?? 'No disponible';
+$statusLabels['completed'] = project_academic_labels('completed')['status'];
+$statusLabel = $statusLabels[$status] ?? project_academic_labels($status)['status'];
 $typeCode = (string) ($project['type_code'] ?? '');
 $isDegreeProject = $typeCode === 'thesis';
 $participants = (array) ($project['participants'] ?? []);
@@ -35,7 +37,7 @@ if ($isDegreeProject || in_array($status, ['defense', 'tribunal_approved'], true
     $workflowSequence[] = 'defense';
     $workflowSequence[] = 'tribunal_approved';
 }
-$workflowSequence[] = 'published';
+$workflowSequence[] = $status === 'completed' ? 'completed' : 'published';
 $currentIndex = array_search($status, $workflowSequence, true);
 if ($currentIndex === false) $currentIndex = 0;
 
@@ -58,7 +60,7 @@ $tabs = [
     'history' => ['Historial', 'fa-list-check'],
 ];
 if ($showTribunalTab) $tabs['tribunal'] = ['Tribunal y defensa', 'fa-gavel'];
-$formatDate = static function (?string $date, bool $time = false): string { if (!$date) return 'No disponible'; $stamp = strtotime($date); return $stamp === false ? 'No disponible' : date($time ? 'd/m/Y H:i' : 'd/m/Y', $stamp); };
+$formatDate = static fn (?string $date, bool $time = false): string => format_utc_datetime($date, $time);
     $backUrl = !empty($isTeacherContext) ? route('assigned-projects') : (string) ($studentBackUrl ?? route('projects'));
     $backLabel = !empty($isTeacherContext) ? 'Volver a Proyectos asignados' : (string) ($studentBackLabel ?? 'Volver a Proyectos');
     ?>

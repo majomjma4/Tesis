@@ -20,6 +20,7 @@ final class ProjectStudentDocumentController
         try {
             if ($action === 'remove') {
                 $result = Database::transaction(fn(PDO $db): array => $this->remove($db, $projectId, (int) ($_POST['file_id'] ?? 0), $actor));
+                $result['academic_package'] = $this->prepareAcademicPackage($projectId);
                 $this->json(true, 'Archivo quitado.', $result);
             }
             $upload = $this->singleUpload($_FILES['file'] ?? []);
@@ -29,6 +30,7 @@ final class ProjectStudentDocumentController
                 ? Database::transaction(fn(PDO $db): array => $this->add($db, $projectId, $stored, $actor))
                 : Database::transaction(fn(PDO $db): array => $this->replace($db, $projectId, (int) ($_POST['file_id'] ?? 0), (string) ($_POST['expected_checksum'] ?? ''), $stored, $actor, $_POST));
             $stored = [];
+            $result['academic_package'] = $this->prepareAcademicPackage($projectId);
             $this->json(true, $action === 'add' ? 'Archivo agregado correctamente.' : 'Archivo reemplazado correctamente.', $result);
         } catch (ProjectDocumentVersionException $error) {
             $storage->discardStored($stored); $this->json(false, $error->getMessage(), [], $error->httpStatus());
@@ -145,10 +147,10 @@ final class ProjectStudentDocumentController
 
     private function lockWorkspace(PDO $db, int $projectId, int $actor): void
     {
-        $project = $db->prepare('SELECT id,status,deleted_at FROM projects WHERE id=:id FOR UPDATE'); $project->execute(['id'=>$projectId]); $row=$project->fetch();
-        if (!$row || !empty($row['deleted_at'])) throw new InvalidArgumentException('El proyecto no está disponible.');
+        $project = $db->prepare('SELECT id,status,deleted_at,withdrawn_at FROM projects WHERE id=:id FOR UPDATE'); $project->execute(['id'=>$projectId]); $row=$project->fetch();
+        if (!$row || !empty($row['deleted_at']) || !empty($row['withdrawn_at'])) throw new InvalidArgumentException('El proyecto no está disponible.');
         if ((string)$row['status'] !== 'development') throw new ProjectDocumentVersionException('Los archivos solo pueden modificarse mientras el proyecto está En desarrollo.', 409);
-        $student=$db->prepare("SELECT 1 FROM project_participants pp JOIN user_roles ur ON ur.user_id=pp.user_id JOIN roles r ON r.id=ur.role_id AND r.code='student' WHERE pp.project_id=:project AND pp.user_id=:actor AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL LIMIT 1");
+        $student=$db->prepare("SELECT 1 FROM project_participants pp JOIN user_roles ur ON ur.user_id=pp.user_id JOIN roles r ON r.id=ur.role_id AND r.code='student' WHERE pp.project_id=:project AND pp.user_id=:actor AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL LIMIT 1 FOR UPDATE");
         $student->execute(['project'=>$projectId,'actor'=>$actor]); if (!$student->fetchColumn()) throw new ProjectDocumentVersionException('No tienes permiso para modificar los archivos de este proyecto.', 403);
     }
 
@@ -157,6 +159,20 @@ final class ProjectStudentDocumentController
         $state=$db->prepare('SELECT status FROM project_file_review_states WHERE project_id=:project AND file_id=:file AND checksum_sha256=:checksum');
         $state->execute(['project'=>$projectId,'file'=>(int)$file['id'],'checksum'=>(string)$file['checksum_sha256']]);
         if (($state->fetchColumn() ?: 'development') !== 'development') throw new ProjectDocumentVersionException('Este archivo está protegido por una revisión previa y no puede modificarse en esta fase.', 409);
+    }
+
+    /** La preparación del ZIP ocurre después de un POST documental explícito, nunca al descargar por GET. */
+    private function prepareAcademicPackage(int $projectId): array
+    {
+        try {
+            return (new ProjectRepositoryPackageService())->prepareAcademic(
+                $projectId,
+                route('project-package-download') . '&id=' . $projectId
+            );
+        } catch (Throwable $error) {
+            error_log('Student academic package preparation: ' . $error->getMessage());
+            return ['available' => false, 'download_url' => '', 'file_count' => 0, 'size_bytes' => 0, 'size' => '', 'source' => 'academic'];
+        }
     }
 
     private function singleUpload(array $file): array { if (is_array($file['name'] ?? null)) throw new InvalidArgumentException('Selecciona un archivo por operación.'); return $file; }

@@ -119,8 +119,8 @@ final class ProjectAdjustmentRequestService
 
     private function lockProject(PDO $db, int $id, string $expected): array
     {
-        $query=$db->prepare('SELECT id,tutor_id,status,deleted_at FROM projects WHERE id=:id FOR UPDATE'); $query->execute(['id'=>$id]);
-        $project=$query->fetch(); if(!$project||!empty($project['deleted_at'])) throw new ProjectAdjustmentRequestException('El proyecto solicitado no existe.',404);
+        $query=$db->prepare('SELECT id,tutor_id,status,deleted_at,withdrawn_at FROM projects WHERE id=:id FOR UPDATE'); $query->execute(['id'=>$id]);
+        $project=$query->fetch(); if(!$project||!empty($project['deleted_at'])||!empty($project['withdrawn_at'])) throw new ProjectAdjustmentRequestException('El proyecto solicitado no está disponible.',404);
         if ($expected === '' || $project['status'] !== $expected) throw new ProjectAdjustmentRequestException('El estado del proyecto cambió. Recarga el expediente antes de continuar.',409);
         return $project;
     }

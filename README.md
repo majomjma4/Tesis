@@ -329,6 +329,17 @@ de cada instalación y no deben publicarse en Git.
 
 ✔ Componentes reutilizables
 
+# Recordatorios programados
+
+Los recordatorios de calendario y de perÃ­odos acadÃ©micos se sincronizan mediante
+un proceso CLI periÃ³dico. El programador externo debe ejecutar diariamente:
+
+```powershell
+php scripts/sync_scheduled_reminders.php
+```
+
+El script no expone una ruta web y no debe ejecutarse desde el navegador.
+
 # Funcionalidades en desarrollo 
 
 - Calendario académico.

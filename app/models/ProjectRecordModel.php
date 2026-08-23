@@ -33,7 +33,7 @@ final class ProjectRecordModel
         return ['events'=>$page,'total'=>$total,'loaded'=>count($page),'has_more'=>$offset+count($page)<$total,'next_offset'=>$offset+count($page)];
     }
 
-    public function find(int $projectId, ?int $userId, bool $administrator, bool $publishedOnly = false, bool $institutionalTeacherReadOnly = false): ?array
+    public function find(int $projectId, ?int $userId, bool $administrator, bool $publishedOnly = false, bool $institutionalTeacherReadOnly = false, bool $studentOwnershipOnly = false): ?array
     {
         $db = Database::connection();
         $institutionalStatuses = "'" . implode("','", ProjectCapabilityService::INSTITUTIONAL_ACTIVE_STATUSES) . "'";
@@ -56,14 +56,18 @@ final class ProjectRecordModel
         if (!$administrator && !$publishedOnly) {
             $sql .= $institutionalTeacherReadOnly
                 ? " AND p.withdrawn_at IS NULL AND p.status IN (" . $institutionalStatuses . ")"
-                : " AND (p.created_by=:viewer_creator OR p.tutor_id=:viewer_tutor OR EXISTS (SELECT 1 FROM project_participants access_participant WHERE access_participant.project_id=p.id AND access_participant.user_id=:viewer_participant AND access_participant.status='active' AND access_participant.removed_at IS NULL))";
+                : ($studentOwnershipOnly
+                    ? " AND p.withdrawn_at IS NULL AND EXISTS (SELECT 1 FROM project_participants access_student INNER JOIN user_roles access_roles ON access_roles.user_id=access_student.user_id INNER JOIN roles access_role ON access_role.id=access_roles.role_id AND access_role.code='student' WHERE access_student.project_id=p.id AND access_student.user_id=:viewer_participant AND access_student.role_code='student' AND access_student.status='active' AND access_student.removed_at IS NULL)"
+                    : " AND (p.created_by=:viewer_creator OR p.tutor_id=:viewer_tutor OR EXISTS (SELECT 1 FROM project_participants access_participant WHERE access_participant.project_id=p.id AND access_participant.user_id=:viewer_participant AND access_participant.status='active' AND access_participant.removed_at IS NULL))");
         }
         $statement = $db->prepare($sql);
         $parameters = ['id' => $projectId];
         if (!$administrator && !$publishedOnly && !$institutionalTeacherReadOnly) {
-            $parameters['viewer_creator'] = (int) $userId;
-            $parameters['viewer_tutor'] = (int) $userId;
             $parameters['viewer_participant'] = (int) $userId;
+            if (!$studentOwnershipOnly) {
+                $parameters['viewer_creator'] = (int) $userId;
+                $parameters['viewer_tutor'] = (int) $userId;
+            }
         }
         $statement->execute($parameters);
         $project = $statement->fetch();

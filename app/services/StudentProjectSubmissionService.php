@@ -60,7 +60,7 @@ final class StudentProjectSubmissionService
         }
         if ($failAfterStateUpdates) throw new RuntimeException('Fallo de prueba posterior a los estados documentales.');
 
-        $update = $db->prepare("UPDATE projects SET status='under_review',updated_at=CURRENT_TIMESTAMP WHERE id=:id AND status='development' AND deleted_at IS NULL");
+        $update = $db->prepare("UPDATE projects SET status='under_review',updated_at=CURRENT_TIMESTAMP WHERE id=:id AND status='development' AND deleted_at IS NULL AND withdrawn_at IS NULL");
         $update->execute(['id' => $projectId]);
         if ($update->rowCount() !== 1) throw new StudentProjectSubmissionException('El estado del proyecto cambió mientras realizabas esta operación.', 409);
 
@@ -80,10 +80,10 @@ final class StudentProjectSubmissionService
 
     private function lockProject(PDO $db, int $projectId): array
     {
-        $query = $db->prepare('SELECT id,code,title,summary,tutor_id,status,deleted_at FROM projects WHERE id=:id FOR UPDATE');
+        $query = $db->prepare('SELECT id,code,title,summary,tutor_id,status,deleted_at,withdrawn_at FROM projects WHERE id=:id FOR UPDATE');
         $query->execute(['id'=>$projectId]);
         $project = $query->fetch();
-        if (!$project || !empty($project['deleted_at'])) throw new StudentProjectSubmissionException('El proyecto solicitado no está disponible.', 404);
+        if (!$project || !empty($project['deleted_at']) || !empty($project['withdrawn_at'])) throw new StudentProjectSubmissionException('El proyecto solicitado no está disponible.', 404);
         if ((string)$project['status'] !== 'development') throw new StudentProjectSubmissionException('El proyecto ya no está disponible para envío a revisión.', 409);
         return $project;
     }

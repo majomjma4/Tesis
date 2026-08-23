@@ -62,10 +62,10 @@ final class ProjectReviewRepresentationService
     public function uploadSupplemental(int $projectId, int $fileId, array $upload, int $actor): array
     {
         $file = Database::transaction(function (PDO $db) use ($projectId, $fileId, $actor): array {
-            $project = $db->prepare("SELECT id,status FROM projects WHERE id=:id AND deleted_at IS NULL AND status='development' FOR UPDATE");
+            $project = $db->prepare("SELECT id,status FROM projects WHERE id=:id AND deleted_at IS NULL AND withdrawn_at IS NULL AND status='development' FOR UPDATE");
             $project->execute(['id'=>$projectId]);
             if (!$project->fetch()) throw new InvalidArgumentException('El proyecto no está disponible para modificar la representación.');
-            $student = $db->prepare("SELECT 1 FROM project_participants WHERE project_id=:project AND user_id=:user AND role_code='student' AND status='active' AND removed_at IS NULL LIMIT 1");
+            $student = $db->prepare("SELECT 1 FROM project_participants WHERE project_id=:project AND user_id=:user AND role_code='student' AND status='active' AND removed_at IS NULL LIMIT 1 FOR UPDATE");
             $student->execute(['project'=>$projectId,'user'=>$actor]);
             if (!$student->fetchColumn()) throw new InvalidArgumentException('No tienes permiso para adjuntar esta representación.');
             $query = $db->prepare('SELECT * FROM project_files WHERE id=:file AND project_id=:project AND LOWER(extension)=\'docx\' AND deleted_at IS NULL AND purged_at IS NULL FOR UPDATE');
@@ -91,12 +91,19 @@ final class ProjectReviewRepresentationService
             if (!copy($temporary, $absolute)) throw new RuntimeException('No fue posible guardar la representación PDF.');
         }
         try {
-            $db = Database::connection();
-            $version = $db->prepare('SELECT id FROM project_file_versions WHERE file_id=:file AND checksum_sha256=:checksum ORDER BY id DESC LIMIT 1');
-            $version->execute(['file'=>$fileId,'checksum'=>$checksum]);
-            $versionId = $version->fetchColumn();
-            $insert = $db->prepare("INSERT INTO project_review_representations(project_id,file_id,project_file_version_id,checksum_sha256,representation_type,storage_name,storage_path,size_bytes,pdf_checksum_sha256,created_by) VALUES(:project,:file,:version,:checksum,'supplemental_pdf',:name,:path,:size,:pdf_checksum,:actor)");
-            $insert->execute(['project'=>$projectId,'file'=>$fileId,'version'=>$versionId ?: null,'checksum'=>$checksum,'name'=>$storageName,'path'=>$relative,'size'=>(int)filesize($absolute),'pdf_checksum'=>$pdfChecksum,'actor'=>$actor]);
+            Database::transaction(function (PDO $db) use ($projectId, $fileId, $checksum, $storageName, $relative, $absolute, $pdfChecksum, $actor): void {
+                $project = $db->prepare("SELECT id FROM projects WHERE id=:id AND deleted_at IS NULL AND withdrawn_at IS NULL AND status='development' FOR UPDATE");
+                $project->execute(['id'=>$projectId]);
+                if (!$project->fetchColumn()) throw new InvalidArgumentException('El proyecto ya no está disponible para modificar la representación.');
+                $student = $db->prepare("SELECT 1 FROM project_participants WHERE project_id=:project AND user_id=:user AND role_code='student' AND status='active' AND removed_at IS NULL LIMIT 1 FOR UPDATE");
+                $student->execute(['project'=>$projectId,'user'=>$actor]);
+                if (!$student->fetchColumn()) throw new InvalidArgumentException('No tienes permiso para adjuntar esta representación.');
+                $version = $db->prepare('SELECT id FROM project_file_versions WHERE file_id=:file AND checksum_sha256=:checksum ORDER BY id DESC LIMIT 1');
+                $version->execute(['file'=>$fileId,'checksum'=>$checksum]);
+                $versionId = $version->fetchColumn();
+                $insert = $db->prepare("INSERT INTO project_review_representations(project_id,file_id,project_file_version_id,checksum_sha256,representation_type,storage_name,storage_path,size_bytes,pdf_checksum_sha256,created_by) VALUES(:project,:file,:version,:checksum,'supplemental_pdf',:name,:path,:size,:pdf_checksum,:actor)");
+                $insert->execute(['project'=>$projectId,'file'=>$fileId,'version'=>$versionId ?: null,'checksum'=>$checksum,'name'=>$storageName,'path'=>$relative,'size'=>(int)filesize($absolute),'pdf_checksum'=>$pdfChecksum,'actor'=>$actor]);
+            });
         } catch (Throwable $exception) { @unlink($absolute); throw $exception; }
         return ['file_id'=>$fileId,'checksum_sha256'=>$checksum,'representation_source'=>'supplemental_pdf'];
     }

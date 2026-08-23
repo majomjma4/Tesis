@@ -114,7 +114,6 @@ match ($page) {
     'student-project-document' => (new ProjectStudentDocumentController())->change(),
     'student-project-save-information' => (new ProjectsController())->saveStudentProjectInformation(),
     'student-project-submit-review' => (new ProjectsController())->submitStudentProjectForReview(),
-    'student-project-observation-toggle-status' => (new ProjectsController())->toggleStudentObservationStatus(),
     'student-project-review-representation' => (new ProjectReviewRepresentationController())->change(),
     'project-document-review-save' => (new ProjectDocumentReviewController())->save(),
     'project-adjustment-create' => (new ProjectAdjustmentController())->create(),

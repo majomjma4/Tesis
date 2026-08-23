@@ -101,7 +101,7 @@ if ($project === null): ?>
         $headerPackage = $publicContext
             ? $packageService->describe($projectId, route('repository-download') . '&id=' . $projectId)
             : ($isTrackingContext && !empty($projectCapabilities['download_academic_package'])
-                ? $packageService->prepareAcademic($projectId, route('project-package-download') . '&id=' . $projectId)
+                ? $packageService->describeAcademic($projectId, route('project-package-download') . '&id=' . $projectId)
                 : ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'academic']);
     } catch (Throwable $packageError) {
         error_log('Academic project package descriptor: ' . $packageError->getMessage());

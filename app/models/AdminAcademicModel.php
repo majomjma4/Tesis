@@ -242,13 +242,14 @@ final class AdminAcademicModel
             }
             $this->saveMaterialCatalog($db, $entity, $values, $actor);
         });
+        if ($entity === 'period') (new AcademicPeriodReminderService())->sync();
     }
 
     public function promote(int $target, int $actor, bool $confirmEarlyClose = false): array
     {
         if ($target < 1) throw new InvalidArgumentException('Primero planifica el siguiente período.');
 
-        return Database::transaction(function (PDO $db) use ($target, $actor, $confirmEarlyClose): array {
+        $result = Database::transaction(function (PDO $db) use ($target, $actor, $confirmEarlyClose): array {
             $active = $this->lockedActivePeriod($db);
             if (!$active) throw new InvalidArgumentException('No existe un período activo.');
             if ((string) $active['ends_on'] > date('Y-m-d') && !$confirmEarlyClose) {
@@ -329,13 +330,15 @@ final class AdminAcademicModel
 
             return ['closed' => $active['name'], 'activated' => $planned['name'], 'projects' => $projectCount, 'transition_id' => $transitionId];
         });
+        if (empty($result['blocked'])) (new AcademicPeriodReminderService())->sync();
+        return $result;
     }
 
     public function reverseTransition(int $transitionId, int $actor): array
     {
         if ($transitionId < 1) throw new InvalidArgumentException('La transición académica seleccionada no es válida.');
 
-        return Database::transaction(function (PDO $db) use ($transitionId, $actor): array {
+        $result = Database::transaction(function (PDO $db) use ($transitionId, $actor): array {
             $statement = $db->prepare('SELECT * FROM academic_period_transitions WHERE id=:id FOR UPDATE');
             $statement->execute(['id' => $transitionId]);
             $transition = $statement->fetch();
@@ -406,6 +409,8 @@ final class AdminAcademicModel
 
             return ['reopened' => $closed['name'], 'planned' => $activated['name'], 'transition_id' => $transitionId];
         });
+        (new AcademicPeriodReminderService())->sync();
+        return $result;
     }
 
     private function savePeriod(PDO $db, array $values, int $actor): void

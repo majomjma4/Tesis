@@ -26,18 +26,18 @@ try {
     $pastEvent = $create('Evento pasado', '2026-08-07', null);
     $completedEvent = $create('Evento completado', '2026-08-08', null, true);
 
-    $assert($service->syncForOwner($owner) >= 2, 'se ejecuta la generación de recordatorios de hoy y de tres días');
+    $assert($service->syncForOwner($owner) >= 2, 'se ejecuta la generación de recordatorios de hoy y anticipados');
     $todayKey = 'calendar-event:' . $todayEvent . ':today:2026-08-08';
-    $threeDaysKey = 'calendar-event:' . $threeDayEvent . ':three_days:2026-08-11';
-    $query = $db->prepare('SELECT title,message,deduplication_key FROM notifications WHERE user_id=:owner AND deduplication_key IN (:today_key,:three_days_key) ORDER BY id');
-    $query->execute(['owner' => $owner, 'today_key' => $todayKey, 'three_days_key' => $threeDaysKey]); $notifications = $query->fetchAll(PDO::FETCH_ASSOC);
+    $advanceKey = 'calendar-event:' . $threeDayEvent . ':advance:2026-08-11';
+    $query = $db->prepare('SELECT title,message,deduplication_key FROM notifications WHERE user_id=:owner AND deduplication_key IN (:today_key,:advance_key) ORDER BY id');
+    $query->execute(['owner' => $owner, 'today_key' => $todayKey, 'advance_key' => $advanceKey]); $notifications = $query->fetchAll(PDO::FETCH_ASSOC);
     $assert(count($notifications) === 2, 'eventos fuera de rango, pasados y completados no generan recordatorio');
     $assert(str_contains($notifications[0]['message'] . $notifications[1]['message'], '14:30'), 'el recordatorio con hora muestra la hora');
-    $threeDaysNotification = array_values(array_filter($notifications, static fn(array $notification): bool => $notification['deduplication_key'] === $threeDaysKey))[0] ?? [];
-    $assert(!str_contains((string)($threeDaysNotification['message'] ?? ''), 'a las'), 'el recordatorio sin hora no muestra información vacía');
+    $advanceNotification = array_values(array_filter($notifications, static fn(array $notification): bool => $notification['deduplication_key'] === $advanceKey))[0] ?? [];
+    $assert(!str_contains((string)($advanceNotification['message'] ?? ''), 'a las'), 'el recordatorio sin hora no muestra información vacía');
     $assert($service->syncForOwner($owner) === 0, 'una segunda ejecución no duplica recordatorios');
-    $other = $db->prepare('SELECT COUNT(*) FROM notifications WHERE user_id=:owner AND deduplication_key IN (:today_key,:three_days_key)');
-    $other->execute(['owner' => $otherOwner, 'today_key' => $todayKey, 'three_days_key' => $threeDaysKey]); $assert((int)$other->fetchColumn() === 0, 'no se crean recordatorios para otro usuario');
+    $other = $db->prepare('SELECT COUNT(*) FROM notifications WHERE user_id=:owner AND deduplication_key IN (:today_key,:advance_key)');
+    $other->execute(['owner' => $otherOwner, 'today_key' => $todayKey, 'advance_key' => $advanceKey]); $assert((int)$other->fetchColumn() === 0, 'no se crean recordatorios para otro usuario');
 
     $db->prepare('UPDATE project_events SET event_date=:date WHERE id=:id AND created_by=:owner')->execute(['date' => '2026-08-08', 'id' => $futureEvent, 'owner' => $owner]);
     $service->syncForOwner($owner);

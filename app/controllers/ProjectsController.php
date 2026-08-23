@@ -254,7 +254,7 @@ final class ProjectsController
         // Un docente puede leer el catálogo institucional activo; la relación
         // académica sigue siendo necesaria para revisión y recursos privados.
         $project = $id && $access->can('project.view') && $canViewResource
-            ? (new ProjectRecordModel())->find((int)$id, $access->currentUserId(), $isAdministrator, false, $institutionalReadOnly)
+            ? (new ProjectRecordModel())->find((int)$id, $access->currentUserId(), $isAdministrator, false, $institutionalReadOnly, !$isAdministrator && !$isTeacher)
             : null;
 
         if ($project === null) {
@@ -346,7 +346,7 @@ final class ProjectsController
                 && (string) ($participant['status'] ?? 'active') === 'active'
                 && empty($participant['removed_at']))) > 0;
         $descriptionReminder = $isStudentParticipant
-            ? $descriptionService->consumePendingReminder((int) $project['id'], $access->currentUserId())
+            ? $descriptionService->pendingReminder((int) $project['id'], $access->currentUserId())
             : null;
         $projectCapabilities = (new ProjectCapabilityService())->forCurrentUser($project, $projectContext);
         $institutionalReadOnly = !$isAdministrator && $isTeacher && empty($projectCapabilities['review_documents']);
@@ -412,6 +412,17 @@ final class ProjectsController
         }
         $detailUrl = route('project-detail') . '&id=' . (int) $project['id'];
         if ($isAdministrator || $isTeacher) $detailUrl .= '&return=' . rawurlencode($returnUrl);
+        $studentAcademicPackage = ['available' => false, 'download_url' => '', 'file_count' => 0, 'size_bytes' => 0, 'size' => '', 'source' => 'academic'];
+        if ($isStudentParticipant && !$isAdministrator && !$isTeacher) {
+            try {
+                $studentAcademicPackage = (new ProjectRepositoryPackageService())->describeAcademic(
+                    (int) $project['id'],
+                    route('project-package-download') . '&id=' . (int) $project['id']
+                );
+            } catch (Throwable $exception) {
+                error_log('Student academic package descriptor: ' . $exception->getMessage());
+            }
+        }
         $projectDocuments = null;
         $projectStatusTransitions = [];
         if (!empty($projectCapabilities['manage_files']) || $documentReview !== null) {
@@ -497,6 +508,7 @@ final class ProjectsController
             'projectTrashCsrf' => $isAdministrator ? $session->csrfToken('admin_projects') : '',
             'projectEditorCatalogs' => $isAdministrator ? (new AdminProjectModel())->catalogs() : [],
             'descriptionReminder' => $descriptionReminder,
+            'studentAcademicPackage' => $studentAcademicPackage,
             'descriptionCsrf' => $session->csrfToken('project_description'),
             'descriptionSaveEndpoint' => route('project-description-save'),
             'lifecycleDescription' => $descriptionService->effectiveDescription((string) $project['type_code'], $project['summary'] ?? null),
@@ -683,8 +695,15 @@ final class ProjectsController
     }
 
     /** Permite al estudiante participante alternar el estado de una observación entre pendiente y atendida. */
-    public function toggleStudentObservationStatus(): void
+    /*
+     * Observation status is controlled by the formal document-correction flow.
+     * Students must not mutate pending/addressed directly from the workspace.
+     */
+    private function toggleStudentObservationStatus(): void
     {
+        http_response_code(410);
+        $this->json(['success'=>false,'message'=>'El estado de la observación se actualiza mediante el flujo documental.','data'=>[]]);
+        } /* Legacy implementation intentionally removed; route removed.
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
             http_response_code(405);
             $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]);
@@ -734,6 +753,7 @@ final class ProjectsController
         $this->json(['success'=>true, 'message'=>'Estado de la observación actualizado correctamente.', 'data'=>['id'=>$observationId, 'status'=>$targetStatus]]);
     }
 
+    */
     public function filePreview(): void
     {
         [$project, $file, $stream, $source, $institutionalAccess] = $this->resolveFile(true, true);
@@ -784,8 +804,10 @@ final class ProjectsController
             $path=(new ProjectDocumentFileService())->resolveStoredFile((int)$version['project_id'],(string)$version['storage_name']);
             if (session_status() === PHP_SESSION_ACTIVE) { session_write_close(); }
             if (strtolower((string)$version['extension'])==='docx') {
-                $supplemental=(new ProjectReviewRepresentationService())->supplementalPath((int)$version['project_id'],(int)$version['file_id'],(string)$version['checksum_sha256']);
-                $path=$supplemental??(new DocumentPreviewConversionService())->convertFile($path,(int)$version['project_id'],(int)$version['file_id'],(string)$version['checksum_sha256'])['path'];
+                $checksum=(string)$version['checksum_sha256'];
+                $path=(new ProjectReviewRepresentationService())->supplementalPath((int)$version['project_id'],(int)$version['file_id'],$checksum)
+                    ?? (new DocumentPreviewConversionService())->cachedPath((int)$version['project_id'],(int)$version['file_id'],$checksum);
+                if ($path === null) throw new RuntimeException('La vista previa histórica no está preparada.');
             }
             $stream=fopen($path,'rb'); if ($stream===false) throw new RuntimeException('Preview no disponible.');
             $this->stream(['original_name'=>(string)$version['original_name'].'.pdf','size_bytes'=>(int)filesize($path),'mime_type'=>'application/pdf'],$stream,'inline','application/pdf');
@@ -838,7 +860,7 @@ final class ProjectsController
         if ($project === null) { http_response_code(404); exit('El proyecto solicitado no está disponible.'); }
         try {
             $packages = new ProjectRepositoryPackageService();
-            $descriptor = $packages->prepareAcademic((int)$projectId, route('project-package-download') . '&id=' . (int)$projectId);
+            $descriptor = $packages->describeAcademic((int)$projectId, route('project-package-download') . '&id=' . (int)$projectId);
             $path = ProjectRepositoryPackageService::academicPackagePath((int)$projectId);
             if (empty($descriptor['available']) || !is_file($path) || !is_readable($path)) throw new RuntimeException('El paquete no está disponible.');
             clearstatcache(true, $path);
@@ -1064,13 +1086,13 @@ final class ProjectsController
                 $representation = new ProjectReviewRepresentationService();
                 if ($representation->supplementalPath((int)$project['id'], (int)$file['id'], $identity) !== null) return $this->docxPdfPayload($file, $url, ['cached'=>true], 'supplemental_pdf');
             }
-            $service = new DocumentPreviewConversionService();
-            if ($forceRetry) { $service->clearFailure((int)$project['id'], (int)$file['id'], $identity); }
-            $result = $service->convertFile($source, (int)$project['id'], (int)$file['id'], $identity);
-            if ($allowReviewRepresentation) (new ProjectReviewRepresentationService())->forFile($file, false);
-            $payload = $this->docxPdfPayload($file, $url, $result, 'libreoffice_pdf');
-            if (!$allowReviewRepresentation) $payload['review_representation'] = false;
-            return $payload;
+            $cached = (new DocumentPreviewConversionService())->cachedPath((int)$project['id'], (int)$file['id'], $identity);
+            if ($cached !== null) {
+                $payload = $this->docxPdfPayload($file, $url, ['cached'=>true], 'cached_pdf');
+                if (!$allowReviewRepresentation) $payload['review_representation'] = false;
+                return $payload;
+            }
+            return $this->docxPreviewFailure($file, 'La vista previa aún no está preparada.');
         }
         catch (Throwable $error) {
             error_log('Project DOCX preview: project='.(int)$project['id'].' file='.(int)$file['id'].' checksum='.$identity.' error='.$error->getMessage());
@@ -1081,10 +1103,7 @@ final class ProjectsController
     private function docxPreviewStream(array $project, array $file, array $entry, string $identity, string $url, bool $forceRetry = false): array
     {
         try {
-            $service = new DocumentPreviewConversionService();
-            if ($forceRetry) { $service->clearFailure((int)$project['id'], (int)$file['id'], $identity); }
-            $result = $service->convertStream($entry['stream'], (int)$project['id'], (int)$file['id'], $identity);
-            return $this->docxPdfPayload(['original_name'=>$entry['name'],'size_bytes'=>$entry['size']], $url, $result);
+            return $this->docxPreviewFailure(['original_name'=>$entry['name'],'size_bytes'=>$entry['size']], 'La vista previa aún no está preparada.');
         }
         catch (Throwable $error) {
             error_log('Project ZIP DOCX preview: project='.(int)$project['id'].' file='.(int)$file['id'].' entry='.$entry['path'].' error='.$error->getMessage());

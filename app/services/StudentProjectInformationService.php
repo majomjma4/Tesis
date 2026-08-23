@@ -39,11 +39,11 @@ final class StudentProjectInformationService
     public function saveInTransaction(PDO $db, array $payload, int $actorId): array
     {
         $projectQuery = $db->prepare(
-            'SELECT id,title,summary,tutor_id,status,deleted_at FROM projects WHERE id=:id FOR UPDATE'
+            'SELECT id,title,summary,tutor_id,status,deleted_at,withdrawn_at FROM projects WHERE id=:id FOR UPDATE'
         );
         $projectQuery->execute(['id' => $payload['project_id']]);
         $project = $projectQuery->fetch();
-        if (!$project || !empty($project['deleted_at'])) {
+        if (!$project || !empty($project['deleted_at']) || !empty($project['withdrawn_at'])) {
             throw new StudentProjectInformationException('El proyecto solicitado no está disponible.', 404);
         }
         if ((string) $project['status'] !== 'development') {
