@@ -15,6 +15,7 @@ final class ProjectCapabilityService
 
         return "{$alias}.deleted_at IS NULL
             AND {$alias}.withdrawn_at IS NULL
+            AND {$alias}.publication_origin = 'workflow'
             AND EXISTS (
                 SELECT 1
                 FROM project_participants active_student
@@ -128,6 +129,7 @@ final class ProjectCapabilityService
         if ($userId < 1) return false;
         if ($session->isAdminModeActive()) return true;
         if ($context === 'academic_management') return false;
+        if ((string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW) === ProjectPublicationOrigin::DIRECT_REPOSITORY) return false;
         if (!empty($project['withdrawn_at'])) return false;
         if ($context === 'repository') return !empty($this->resolve($project, $context, $userId, $access->currentRoles(), false)['view_project']);
 
@@ -186,7 +188,7 @@ final class ProjectCapabilityService
     {
         if ($projectId < 1) return null;
         $query = Database::connection()->prepare(
-             "SELECT p.id,p.created_by,p.tutor_id,p.status,p.is_available,p.withdrawn_at,p.deleted_at,pt.code type_code,
+             "SELECT p.id,p.created_by,p.tutor_id,p.status,p.publication_origin,p.is_available,p.withdrawn_at,p.deleted_at,pt.code type_code,
              (SELECT COUNT(*) FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL) active_file_count,
              (SELECT COUNT(*) FROM project_participants author WHERE author.project_id=p.id AND author.role_code='student' AND author.status='active' AND author.removed_at IS NULL) author_count
              FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id=:id"
@@ -210,7 +212,7 @@ final class ProjectCapabilityService
         if ($ids === []) return [];
         $marks = implode(',', array_fill(0, count($ids), '?'));
         $db = Database::connection();
-        $projects = $db->prepare("SELECT p.id,p.created_by,p.tutor_id,p.status,p.is_available,p.withdrawn_at,p.deleted_at,pt.code type_code,
+        $projects = $db->prepare("SELECT p.id,p.created_by,p.tutor_id,p.status,p.publication_origin,p.is_available,p.withdrawn_at,p.deleted_at,pt.code type_code,
             (SELECT COUNT(*) FROM project_files f WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL) active_file_count,
             (SELECT COUNT(*) FROM project_participants author WHERE author.project_id=p.id AND author.role_code='student' AND author.status='active' AND author.removed_at IS NULL) author_count
             FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id IN ($marks)");
@@ -240,6 +242,10 @@ final class ProjectCapabilityService
         if (!in_array($context, ['academic_management', 'academic', 'repository'], true)) return $capabilities;
         if ((int) ($project['id'] ?? 0) < 1 || !empty($project['deleted_at']) || $userId < 1) return $capabilities;
         if (!$administrator && !empty($project['withdrawn_at'])) return $capabilities;
+        if ($context !== 'repository'
+            && (string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW) === ProjectPublicationOrigin::DIRECT_REPOSITORY) {
+            return $capabilities;
+        }
 
         $roles = array_values(array_unique(array_map('strtolower', array_map('strval', $roles))));
         $participants = array_values(array_filter((array) ($project['participants'] ?? []), static fn (array $participant): bool =>
@@ -419,6 +425,7 @@ final class ProjectCapabilityService
     {
         return empty($project['deleted_at'])
             && empty($project['withdrawn_at'])
+            && (string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW) === ProjectPublicationOrigin::WORKFLOW
             && in_array((string) ($project['status'] ?? ''), self::INSTITUTIONAL_ACTIVE_STATUSES, true);
     }
 }

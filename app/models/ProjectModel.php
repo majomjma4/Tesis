@@ -25,6 +25,7 @@ final class ProjectModel
                 INNER JOIN project_participants pp ON pp.project_id=p.id
                 INNER JOIN users student_user ON student_user.id=pp.user_id
                 WHERE p.deleted_at IS NULL AND p.withdrawn_at IS NULL
+                  AND p.publication_origin = 'workflow'
                   AND pp.user_id=:user_id AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL
                   AND student_user.status='active' AND student_user.deleted_at IS NULL AND student_user.purged_at IS NULL");
             $statement->execute(['user_id' => $userId]);
@@ -52,6 +53,7 @@ final class ProjectModel
                 INNER JOIN academic_periods ap ON ap.id=p.academic_period_id LEFT JOIN users t ON t.id=p.tutor_id
                 INNER JOIN project_participants pp ON pp.project_id=p.id INNER JOIN users student_user ON student_user.id=pp.user_id
                 WHERE p.deleted_at IS NULL AND p.withdrawn_at IS NULL
+                  AND p.publication_origin = 'workflow'
                   AND pp.user_id=:user_id AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL
                   AND student_user.status='active' AND student_user.deleted_at IS NULL AND student_user.purged_at IS NULL
                 ORDER BY p.updated_at DESC,p.id DESC");

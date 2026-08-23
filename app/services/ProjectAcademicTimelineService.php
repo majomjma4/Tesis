@@ -13,8 +13,9 @@ final class ProjectAcademicTimelineService
     public function page(int $projectId, int $offset = 0, int $limit = 10): array
     {
         $offset=max(0,$offset);$limit=max(1,min(100,$limit));$this->currentProjectId=$projectId;$db=$this->db??Database::connection();
-        $exists=$db->prepare('SELECT 1 FROM projects WHERE id=:id AND deleted_at IS NULL');$exists->execute(['id'=>$projectId]);
-        if(!$exists->fetchColumn())return ['events'=>[],'total'=>0,'loaded'=>0,'has_more'=>false,'next_offset'=>$offset,'cursor'=>null];
+        $exists=$db->prepare('SELECT publication_origin FROM projects WHERE id=:id AND deleted_at IS NULL');$exists->execute(['id'=>$projectId]);
+        $origin = $exists->fetchColumn();
+        if ($origin === false || $origin === ProjectPublicationOrigin::DIRECT_REPOSITORY) return ['events'=>[],'total'=>0,'loaded'=>0,'has_more'=>false,'next_offset'=>$offset,'cursor'=>null];
         $union=$this->unionSql();$parameters=array_fill(0,substr_count($union,'?'),$projectId);
         $query=$db->prepare("SELECT timeline.*,COUNT(*) OVER() total_count FROM ($union) timeline ORDER BY occurred_at DESC,source_type DESC,source_id DESC,event_key DESC LIMIT $limit OFFSET $offset");
         $query->execute($parameters);$rows=$query->fetchAll();$total=isset($rows[0])?(int)$rows[0]['total_count']:0;

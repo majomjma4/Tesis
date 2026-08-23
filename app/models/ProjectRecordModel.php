@@ -10,7 +10,7 @@ final class ProjectRecordModel
         $offset = max(0, $offset); $limit = max(1, min(15, $limit));
         $window = $offset + $limit + 1;
         $db = Database::connection();
-        $base = $db->prepare('SELECT p.id,p.created_by,p.created_at,p.status,p.published_at,pt.code type_code FROM projects p JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id=:id AND p.deleted_at IS NULL');
+        $base = $db->prepare("SELECT p.id,p.created_by,p.created_at,p.status,p.publication_origin,p.published_at,pt.code type_code FROM projects p JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id=:id AND p.deleted_at IS NULL AND p.publication_origin='workflow'");
         $base->execute(['id' => $projectId]);
         $project = $base->fetch();
         if (!$project) return ['events'=>[],'total'=>0,'loaded'=>0,'has_more'=>false,'next_offset'=>$offset];
@@ -72,6 +72,10 @@ final class ProjectRecordModel
         $statement->execute($parameters);
         $project = $statement->fetch();
         if (!$project) return null;
+        if (!$publishedOnly && !$administrator
+            && (string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW) === ProjectPublicationOrigin::DIRECT_REPOSITORY) {
+            return null;
+        }
 
         $project['participants'] = $this->rows($db, "SELECT pp.user_id,pp.role_code,pp.permission_level,pp.is_leader,pp.assigned_at,
                     u.username,u.full_name,u.email,tp.academic_title,sp.institutional_code,(tp.user_id IS NOT NULL) AS is_teacher,(sp.user_id IS NOT NULL) AS is_student
