@@ -6,10 +6,25 @@ const tabProjects = document.querySelector("#tabProjects");
 const tabSupport = document.querySelector("#tabSupport");
 const panelProjects = document.querySelector("#panelProjects");
 const panelSupport = document.querySelector("#panelSupport");
-const repositoryProjectFilters = document.querySelector("#repositoryProjectFilters");
 const toolsSupport = document.querySelector("#toolsSupport");
 
+function getOrCreateSearchClearButton(input) {
+    const wrapper = input?.closest(".ar-search");
+    if (!wrapper) return null;
+    let button = wrapper.querySelector("[data-repository-clear-search]");
+    if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.setAttribute("data-repository-clear-search", "");
+        button.setAttribute("aria-label", "Limpiar búsqueda");
+        button.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+        wrapper.append(button);
+    }
+    return button;
+}
+
 const repositorySupportSearch = document.querySelector("#repositorySupportSearch");
+const repositorySupportClearSearch = getOrCreateSearchClearButton(repositorySupportSearch);
 const repositorySupportCategory = document.querySelector("#repositorySupportCategory");
 const repositoryBaseSupportCount = Number(panelSupport?.dataset.baseSupportCount || 0);
 
@@ -23,7 +38,234 @@ const repositorySupportPageSizeSelect = document.querySelector("#repositorySuppo
 
 const repositorySupportState = { page: 1, size: 10 };
 let repositoryToastTimer = null;
+let repositoryProjectSearchTimer = null;
+let repositoryProjectRequestController = null;
 const originalTextMap = new WeakMap();
+
+function updateSearchClearButton(input, button) {
+    if (!input || !button) return;
+    button.hidden = input.value.trim() === "";
+}
+
+function ensureProjectSearchState(form = document.querySelector("#repositoryProjectFilters")) {
+    const input = form?.querySelector('input[name="search"]');
+    if (!form || !input) return;
+    ["type", "period", "page_size"].forEach((name) => {
+        if (form.elements.namedItem(name)) return;
+        const hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = name;
+        hidden.value = new URL(window.location.href).searchParams.get(name) || (name === "page_size" ? "10" : "all");
+        form.append(hidden);
+    });
+    const clearButton = getOrCreateSearchClearButton(input);
+    updateSearchClearButton(input, clearButton);
+    form.querySelectorAll("select[onchange]").forEach((select) => select.removeAttribute("onchange"));
+    document.querySelectorAll("#repositoryPageSize[onchange]").forEach((select) => select.removeAttribute("onchange"));
+}
+
+function projectUrlFromForm(form) {
+    const url = new URL(form.action || window.location.href, window.location.origin);
+    url.search = new URLSearchParams(new FormData(form)).toString();
+    url.searchParams.set("page", "repository");
+    return url;
+}
+
+function syncRepositorySelectPresentation(select) {
+    const trigger = select?.closest(".custom-select")?.querySelector(".custom-select-trigger");
+    const label = trigger?.querySelector("span");
+    const option = select?.options?.[select.selectedIndex];
+    if (label && option) label.textContent = option.textContent.trim();
+    trigger?.classList.toggle("is-placeholder", !select?.value);
+}
+
+function syncProjectFilterForm(url) {
+    const form = document.querySelector("#repositoryProjectFilters");
+    if (!form) return;
+    const params = new URL(url, window.location.origin).searchParams;
+    const search = form.querySelector('input[name="search"]');
+    if (search) search.value = params.get("search") || "";
+    ["type", "period"].forEach((name) => {
+        const select = form.elements.namedItem(name);
+        if (!select || select.tagName !== "SELECT") return;
+        const value = params.get(name) || "all";
+        if ([...select.options].some((option) => option.value === value)) select.value = value;
+        syncRepositorySelectPresentation(select);
+    });
+    const pageSize = form.elements.namedItem("page_size");
+    if (pageSize) pageSize.value = params.get("page_size") || pageSize.value || "10";
+    updateSearchClearButton(search, getOrCreateSearchClearButton(search));
+}
+
+function cleanRepositoryEntryUrl() {
+    const url = new URL(window.location.href);
+    ["search", "type", "period", "page_size", "repository_page"].forEach((name) => url.searchParams.delete(name));
+    url.searchParams.set("page", "repository");
+    return url;
+}
+
+function clearRepositorySupportState() {
+    if (repositorySupportSearch) repositorySupportSearch.value = "";
+    if (repositorySupportCategory) repositorySupportCategory.value = "all";
+    repositorySupportState.page = 1;
+    filterRepositorySupportDocuments(false);
+}
+
+function resetRepositoryFiltersOnEntry() {
+    const currentUrl = new URL(window.location.href);
+    const hasPersistedFilters = ["search", "type", "period", "page_size", "repository_page"]
+        .some((name) => currentUrl.searchParams.has(name));
+    const cleanUrl = cleanRepositoryEntryUrl();
+    syncProjectFilterForm(cleanUrl);
+    const projectForm = document.querySelector("#repositoryProjectFilters");
+    ["type", "period"].forEach((name) => {
+        const select = projectForm?.elements.namedItem(name);
+        if (select && select.tagName === "SELECT" && [...select.options].some((option) => option.value === "all")) {
+            select.value = "all";
+            syncRepositorySelectPresentation(select);
+        }
+    });
+    clearRepositorySupportState();
+    if (hasPersistedFilters) loadProjectsAjax(cleanUrl, "replace");
+}
+
+function resetRepositoryFiltersOnSectionChange() {
+    const cleanUrl = cleanRepositoryEntryUrl();
+    syncProjectFilterForm(cleanUrl);
+    const projectForm = document.querySelector("#repositoryProjectFilters");
+    ["type", "period"].forEach((name) => {
+        const select = projectForm?.elements.namedItem(name);
+        if (select && select.tagName === "SELECT" && [...select.options].some((option) => option.value === "all")) {
+            select.value = "all";
+            syncRepositorySelectPresentation(select);
+        }
+    });
+    clearRepositorySupportState();
+    loadProjectsAjax(cleanUrl, "replace");
+}
+
+function showProjectAjaxError(message) {
+    const panel = document.querySelector("#panelProjects");
+    if (!panel) return;
+    let error = panel.querySelector("[data-repository-ajax-error]");
+    if (!error) {
+        error = document.createElement("div");
+        error.className = "ar-empty";
+        error.setAttribute("data-repository-ajax-error", "");
+        error.innerHTML = '<span><i class="fa-solid fa-triangle-exclamation"></i></span><h2>No fue posible actualizar el repositorio.</h2><p></p>';
+        panel.prepend(error);
+    }
+    error.querySelector("p").textContent = message;
+    error.hidden = false;
+}
+
+async function loadProjectsAjax(targetUrl, historyMode = "push") {
+    const url = new URL(targetUrl, window.location.origin);
+    repositoryProjectRequestController?.abort();
+    repositoryProjectRequestController = new AbortController();
+    const panel = document.querySelector("#panelProjects");
+    panel?.setAttribute("aria-busy", "true");
+    panel?.classList.add("is-loading");
+    try {
+        const response = await fetch(url.href, {
+            credentials: "same-origin",
+            headers: { "Accept": "text/html", "X-Requested-With": "XMLHttpRequest" },
+            signal: repositoryProjectRequestController.signal
+        });
+        if (!response.ok) throw new Error("No fue posible actualizar el catálogo de proyectos.");
+        const html = await response.text();
+        const documentParser = new DOMParser();
+        const nextDocument = documentParser.parseFromString(html, "text/html");
+        const nextPanel = nextDocument.querySelector("#panelProjects");
+        if (!nextPanel) throw new Error("La respuesta del catálogo no es válida.");
+        const currentPanel = document.querySelector("#panelProjects");
+        if (!currentPanel) throw new Error("No se encontro el catalogo de proyectos.");
+        currentPanel.innerHTML = nextPanel.innerHTML;
+        const nextBadge = nextDocument.querySelector("#badgeProjectsCount");
+        const currentBadge = document.querySelector("#badgeProjectsCount");
+        if (nextBadge && currentBadge) currentBadge.textContent = nextBadge.textContent;
+        ensureProjectSearchState();
+        highlightProjectResults();
+        bindProjectCardEvents();
+        if (historyMode === "push") window.history.pushState({}, "", url.href);
+        if (historyMode === "replace") window.history.replaceState({}, "", url.href);
+    } catch (error) {
+        if (error?.name !== "AbortError") showProjectAjaxError(error instanceof Error ? error.message : "No fue posible actualizar el catálogo.");
+    } finally {
+        document.querySelector("#panelProjects")?.removeAttribute("aria-busy");
+        document.querySelector("#panelProjects")?.classList.remove("is-loading");
+    }
+}
+
+ensureProjectSearchState();
+resetRepositoryFiltersOnEntry();
+
+document.addEventListener("input", (event) => {
+    const input = event.target.closest?.('#repositoryProjectFilters input[name="search"]');
+    if (!input) return;
+    const clearButton = getOrCreateSearchClearButton(input);
+    updateSearchClearButton(input, clearButton);
+    window.clearTimeout(repositoryProjectSearchTimer);
+    repositoryProjectSearchTimer = window.setTimeout(() => {
+        const form = input.form;
+        if (!form) return;
+        form.elements.repository_page.value = "1";
+        loadProjectsAjax(projectUrlFromForm(form), "replace");
+    }, 400);
+});
+
+document.addEventListener("keydown", (event) => {
+    const input = event.target.closest?.('#repositoryProjectFilters input[name="search"]');
+    if (!input || event.key !== "Enter") return;
+    event.preventDefault();
+    window.clearTimeout(repositoryProjectSearchTimer);
+    input.form.elements.repository_page.value = "1";
+    loadProjectsAjax(projectUrlFromForm(input.form), "replace");
+});
+
+document.addEventListener("click", (event) => {
+    const clearButton = event.target.closest?.("[data-repository-clear-search]");
+    if (clearButton) {
+        const input = clearButton.closest(".ar-search")?.querySelector('input[name="search"]');
+        if (!input) return;
+        event.preventDefault();
+        window.clearTimeout(repositoryProjectSearchTimer);
+        input.value = "";
+        updateSearchClearButton(input, clearButton);
+        input.form.elements.repository_page.value = "1";
+        loadProjectsAjax(projectUrlFromForm(input.form), "replace");
+        input.focus();
+        return;
+    }
+    const projectLink = event.target.closest?.("#panelProjects .ar-pagination a");
+    if (projectLink) {
+        event.preventDefault();
+        loadProjectsAjax(projectLink.href, "push");
+    }
+});
+
+document.addEventListener("change", (event) => {
+    const control = event.target.closest?.("#repositoryProjectFilters select, #repositoryPageSize");
+    if (!control) return;
+    const form = control.form;
+    if (!form) return;
+    event.preventDefault();
+    form.elements.repository_page.value = "1";
+    loadProjectsAjax(projectUrlFromForm(form), "push");
+});
+
+document.addEventListener("submit", (event) => {
+    const form = event.target.closest?.("#repositoryProjectFilters, #repositoryPagination .ar-pagination-size");
+    if (!form) return;
+    event.preventDefault();
+    form.elements.repository_page.value = "1";
+    loadProjectsAjax(projectUrlFromForm(form), "push");
+});
+
+window.addEventListener("popstate", () => {
+    syncProjectFilterForm(window.location.href);
+    loadProjectsAjax(window.location.href, "none");
+});
 
 // Manejo de pestañas unificadas (Proyectos / Material de apoyo)
 if (tabProjects && tabSupport && panelProjects && panelSupport) {
@@ -34,8 +276,9 @@ if (tabProjects && tabSupport && panelProjects && panelSupport) {
         tabSupport.setAttribute("aria-selected", "false");
         panelProjects.hidden = false;
         panelSupport.hidden = true;
-        if (repositoryProjectFilters) repositoryProjectFilters.hidden = false;
+        document.querySelector("#repositoryProjectFilters")?.removeAttribute("hidden");
         if (toolsSupport) toolsSupport.hidden = true;
+        resetRepositoryFiltersOnSectionChange();
     });
     tabSupport.addEventListener("click", () => {
         tabSupport.classList.add("active");
@@ -44,8 +287,10 @@ if (tabProjects && tabSupport && panelProjects && panelSupport) {
         tabProjects.setAttribute("aria-selected", "false");
         panelSupport.hidden = false;
         panelProjects.hidden = true;
-        if (repositoryProjectFilters) repositoryProjectFilters.hidden = true;
+        const currentProjectFilters = document.querySelector("#repositoryProjectFilters");
+        if (currentProjectFilters) currentProjectFilters.hidden = true;
         if (toolsSupport) toolsSupport.hidden = false;
+        resetRepositoryFiltersOnSectionChange();
     });
 }
 
@@ -75,6 +320,16 @@ function getProjectCards() {
 
 function getSupportCards() {
     return [...document.querySelectorAll("#panelSupport .ar-material-card:not(.repository-more-card)")];
+}
+
+function highlightProjectResults() {
+    const terms = normalizeRepositoryText(document.querySelector('#repositoryProjectFilters input[name="search"]')?.value || "")
+        .split(" ")
+        .filter(Boolean);
+    getProjectCards().forEach((card) => {
+        restoreHighlights(card);
+        if (terms.length > 0) getSearchableNodes(card).forEach((node) => highlightNode(node, terms));
+    });
 }
 
 function getSearchableNodes(container) {
@@ -356,6 +611,7 @@ function filterRepositorySupportDocuments(resetPage = true) {
     const searchValue = normalizeRepositoryText(rawSearchValue);
     const searchTerms = searchValue.split(" ").filter(Boolean);
     const categoryValue = repositorySupportCategory?.value ?? "all";
+    updateSearchClearButton(repositorySupportSearch, repositorySupportClearSearch);
     const supportCards = getSupportCards();
 
     supportCards.forEach((card) => {
@@ -419,7 +675,14 @@ repositorySupportPageSizeSelect?.addEventListener("change", () => { repositorySu
 repositorySupportSearch?.addEventListener("input", filterRepositorySupportDocuments);
 repositorySupportSearch?.addEventListener("keyup", filterRepositorySupportDocuments);
 repositorySupportCategory?.addEventListener("change", filterRepositorySupportDocuments);
+repositorySupportClearSearch?.addEventListener("click", () => {
+    if (!repositorySupportSearch) return;
+    repositorySupportSearch.value = "";
+    filterRepositorySupportDocuments(true);
+    repositorySupportSearch.focus();
+});
 
+highlightProjectResults();
 bindProjectCardEvents();
 filterRepositorySupportDocuments();
 // Final de filtros del repositorio lector

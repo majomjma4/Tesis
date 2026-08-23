@@ -139,30 +139,23 @@
     min-width: 0;
     width: 100%;
     flex: 1;
+    box-sizing: border-box;
     border: 0;
     outline: 0;
     background: transparent;
     color: var(--text);
     font: inherit;
-}
-
-/* Keep the search icon stable and ellipsize text only when the real input
-   width is insufficient. The placeholder value itself remains unchanged. */
-#repositoryShell .ar-search > i {
-    flex: 0 0 auto;
-}
-
-#repositoryShell .ar-search input {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-#repositoryShell .ar-search input::placeholder {
+.ar-search input::placeholder {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
 .ar-search input::-webkit-search-cancel-button,
 .ar-search input::-webkit-search-decoration,
 .ar-search input::-webkit-search-results-button,
@@ -189,6 +182,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+#repositoryShell #panelProjects.is-loading {
+    opacity: .62;
 }
 .ar-search button[hidden] {
     display: none !important;
@@ -574,6 +570,20 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
     align-items: center;
     gap: 5px;
 }
+.ar-pagination-size {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-self: center;
+    margin: 0;
+}
+.ar-pagination-size label {
+    color: var(--muted);
+    font-size: var(--font-sm);
+}
+.ar-pagination-size select {
+    min-width: 72px;
+}
 .ar-pagination nav button {
     min-height: 34px;
     padding: 0 12px;
@@ -676,6 +686,9 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
     .ar-pagination nav {
         grid-column: 1 / -1;
         justify-self: center;
+    }
+    .ar-pagination-size {
+        justify-self: end;
     }
 }
 

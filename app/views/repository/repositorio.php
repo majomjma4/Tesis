@@ -67,58 +67,6 @@
                 return $repositoryUrl . '&' . http_build_query(['search'=>$repositorySearchValue,'type'=>$repositoryTypeValue,'period'=>$repositoryPeriodValue,'page_size'=>$repositoryPageSize,'repository_page'=>$page], '', '&', PHP_QUERY_RFC3986);
             };
             ?>
-            <form method="get" action="<?= e(base_url('index.php')) ?>" class="ar-tools" id="toolsProjects" hidden>
-                <input type="hidden" name="page" value="repository">
-                <input type="hidden" name="page" value="1">
-                <label class="ar-search<?= !$projects ? ' is-disabled' : '' ?>">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    <input id="repositorySearch" type="text" role="searchbox" placeholder="Buscar por título, código, autor o tutor" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"<?= !$projects ? ' disabled' : '' ?>>
-                    <button id="repositoryClearSearch" type="button" aria-label="Limpiar búsqueda" hidden>
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                </label>
-
-                <label class="ar-filter-control">
-                    <span>Tipo</span>
-                    <select id="repositoryType"<?= !$projects ? ' disabled' : '' ?>>
-                        <option value="all">Todos</option>
-                        <?php foreach ($projectTypes as $type): ?>
-                            <option value="<?= e($type['value']) ?>"><?= e($type['label']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
-
-                <?php if (count($academicPeriods) === 1): ?>
-                    <div class="ar-filter-control ar-fixed-filter">
-                        <span>Período académico</span>
-                        <div>
-                            <i class="fa-regular fa-calendar"></i>
-                            <strong><?= e($academicPeriods[0]['label']) ?></strong>
-                        </div>
-                        <input id="repositoryPao" type="hidden" value="<?= e($academicPeriods[0]['value']) ?>">
-                    </div>
-                <?php elseif (count($academicPeriods) > 1): ?>
-                    <label class="ar-filter-control">
-                        <span>Período académico</span>
-                        <select id="repositoryPao"<?= !$projects ? ' disabled' : '' ?>>
-                            <option value="all">Todos</option>
-                            <?php foreach ($academicPeriods as $period): ?>
-                                <option value="<?= e($period['value']) ?>"><?= e($period['label']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </label>
-                <?php else: ?>
-                    <div class="ar-filter-control ar-fixed-filter">
-                        <span>Período académico</span>
-                        <div>
-                            <i class="fa-regular fa-calendar"></i>
-                            <strong>Sin períodos disponibles</strong>
-                        </div>
-                        <input id="repositoryPao" type="hidden" value="all">
-                    </div>
-                <?php endif; ?>
-            </form>
-
             <!-- Toolbar de materiales (se muestra solo en pestaña de materiales) -->
             <div class="ar-tools" id="toolsSupport" hidden>
                 <label class="ar-search<?= !$supportDocuments ? ' is-disabled' : '' ?>">
@@ -139,13 +87,25 @@
             <form method="get" action="<?= e(base_url('index.php')) ?>" class="ar-tools" id="repositoryProjectFilters">
                 <input type="hidden" name="page" value="repository">
                 <input type="hidden" name="repository_page" value="1">
+                <input type="hidden" name="page_size" value="<?= $repositoryPageSize ?>">
                 <label class="ar-search<?= $repositoryStatus === 'error' ? ' is-disabled' : '' ?>">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input name="search" value="<?= e($repositorySearchValue) ?>" type="search" role="searchbox" placeholder="Buscar por título, código, autor o tutor" aria-label="Buscar proyectos publicados"<?= $repositoryStatus === 'error' ? ' disabled' : '' ?>>
+                    <input name="search" value="<?= e($repositorySearchValue) ?>" type="text" role="searchbox" placeholder="Buscar por título, código, autor o tutor" aria-label="Buscar proyectos publicados" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"<?= $repositoryStatus === 'error' ? ' disabled' : '' ?>>
                 </label>
-                <label class="ar-filter-control"><span>Tipo</span><select name="type" onchange="this.form.elements.repository_page.value='1';this.form.submit();"<?= $repositoryStatus === 'error' ? ' disabled' : '' ?>><option value="all">Todos</option><?php foreach ($projectTypes as $type): ?><option value="<?= e($type['value']) ?>"<?= $repositoryTypeValue === (string)$type['value'] ? ' selected' : '' ?>><?= e($type['label']) ?></option><?php endforeach; ?></select></label>
-                <label class="ar-filter-control"><span>Período académico</span><select name="period" onchange="this.form.elements.repository_page.value='1';this.form.submit();"<?= $repositoryStatus === 'error' ? ' disabled' : '' ?>><option value="all">Todos</option><?php foreach ($academicPeriods as $period): ?><option value="<?= e($period['value']) ?>"<?= $repositoryPeriodValue === (string)$period['value'] ? ' selected' : '' ?>><?= e($period['label']) ?></option><?php endforeach; ?></select></label>
-                <label class="ar-filter-control"><span>Mostrar</span><select name="page_size" aria-label="Cantidad de proyectos por página" onchange="this.form.elements.repository_page.value='1';this.form.submit();"<?= $repositoryStatus === 'error' ? ' disabled' : '' ?>><?php foreach ([10,25,50,75,100] as $size): ?><option value="<?= $size ?>"<?= $repositoryPageSize === $size ? ' selected' : '' ?>><?= $size ?></option><?php endforeach; ?></select></label>
+                <label class="ar-filter-control"><span>Tipo</span><select name="type"<?= $repositoryStatus === 'error' ? ' disabled' : '' ?>><option value="all">Todos</option><?php foreach ($projectTypes as $type): ?><option value="<?= e($type['value']) ?>"<?= $repositoryTypeValue === (string)$type['value'] ? ' selected' : '' ?>><?= e($type['label']) ?></option><?php endforeach; ?></select></label>
+                <?php if (count($academicPeriods) === 1): ?>
+                    <div class="ar-filter-control ar-fixed-filter">
+                        <span>Período académico</span>
+                        <div><i class="fa-regular fa-calendar" aria-hidden="true"></i><strong><?= e($academicPeriods[0]['label']) ?></strong></div>
+                    </div>
+                <?php elseif (count($academicPeriods) > 1): ?>
+                    <label class="ar-filter-control"><span>Período académico</span><select name="period"<?= $repositoryStatus === 'error' ? ' disabled' : '' ?>><option value="all">Todos</option><?php foreach ($academicPeriods as $period): ?><option value="<?= e($period['value']) ?>"<?= $repositoryPeriodValue === (string)$period['value'] ? ' selected' : '' ?>><?= e($period['label']) ?></option><?php endforeach; ?></select></label>
+                <?php else: ?>
+                    <div class="ar-filter-control ar-fixed-filter">
+                        <span>Período académico</span>
+                        <div><i class="fa-regular fa-calendar" aria-hidden="true"></i><strong>Sin períodos disponibles</strong></div>
+                    </div>
+                <?php endif; ?>
             </form>
 
             <!-- Panel 1: Proyectos publicados -->
@@ -259,6 +219,17 @@
                 <?php if ($repositoryStatus === 'loaded' && $repositoryPages > 1): ?>
                     <footer class="ar-pagination" id="repositoryPagination">
                         <span>Mostrando <?= (($repositoryPage - 1) * $repositoryPageSize + 1) ?> - <?= min($repositoryTotal, $repositoryPage * $repositoryPageSize) ?> de <?= $repositoryTotal ?></span>
+                        <form method="get" action="<?= e(base_url('index.php')) ?>" class="ar-pagination-size">
+                            <input type="hidden" name="page" value="repository">
+                            <input type="hidden" name="search" value="<?= e($repositorySearchValue) ?>">
+                            <input type="hidden" name="type" value="<?= e($repositoryTypeValue) ?>">
+                            <input type="hidden" name="period" value="<?= e($repositoryPeriodValue) ?>">
+                            <input type="hidden" name="repository_page" value="1">
+                            <label for="repositoryPageSize">Mostrar</label>
+                            <select id="repositoryPageSize" name="page_size" aria-label="Cantidad de proyectos por página">
+                                <?php foreach ([10,25,50,75,100] as $size): ?><option value="<?= $size ?>"<?= $repositoryPageSize === $size ? ' selected' : '' ?>><?= $size ?></option><?php endforeach; ?>
+                            </select>
+                        </form>
                         <nav aria-label="Paginación de proyectos publicados">
                             <?php if ($repositoryPage > 1): ?><a href="<?= e($repositoryQuery($repositoryPage - 1)) ?>">Anterior</a><?php endif; ?>
                             <?php for ($pageNumber = 1; $pageNumber <= $repositoryPages; $pageNumber++): ?>
@@ -268,14 +239,6 @@
                         </nav>
                     </footer>
                 <?php endif; ?>
-                <footer class="ar-pagination" id="repositoryPaginationLegacy" hidden>
-                    <span id="repositoryPaginationSummary">Mostrando 0 de 0</span>
-                    <nav id="repositoryPaginationPages" aria-label="Paginación de proyectos publicados">
-                        <button type="button" id="repositoryPagePrevious" disabled><i class="fa-solid fa-chevron-left"></i> Anterior</button>
-                        <span id="repositoryPageInfo" aria-live="polite">Página 1 de 1</span>
-                        <button type="button" id="repositoryPageNext">Siguiente <i class="fa-solid fa-chevron-right"></i></button>
-                    </nav>
-                </footer>
             </section>
 
             <!-- Panel 2: Material de apoyo -->
