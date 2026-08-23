@@ -5,6 +5,7 @@ declare(strict_types=1);
 /** Resuelve capacidades efectivas del expediente sin confiar en datos enviados por el cliente. */
 final class ProjectCapabilityService
 {
+    public const REPOSITORY_DIRECT_PUBLISH = 'repository_direct_publish';
     public const INSTITUTIONAL_ACTIVE_STATUSES = ['development', 'under_review', 'approved', 'defense', 'tribunal_approved'];
     public const INSTITUTIONAL_ARCHIVE_EXTENSIONS = ['zip', 'rar', '7z', 'tar', 'gz'];
 
@@ -103,6 +104,20 @@ final class ProjectCapabilityService
             $project, $context, (int) ($session->userId() ?? 0),
             $access->currentRoles(), $session->isAdminModeActive()
         );
+    }
+
+    /** Capability explícita para el motor de publicación directa del Repository. */
+    public function canPublishDirectRepository(?AuthSessionService $session = null): bool
+    {
+        $session ??= new AuthSessionService();
+        if (!$session->isAuthenticated() || $session->isAdminModeActive()) return false;
+        $userId = (int) ($session->userId() ?? 0);
+        if ($userId < 1) return false;
+        $roles = array_map('strtolower', array_map('strval', (new ProjectAccessService())->currentRoles()));
+        if (!in_array('teacher', $roles, true)) return false;
+        $query = Database::connection()->prepare("SELECT 1 FROM users u INNER JOIN teacher_profiles tp ON tp.user_id=u.id INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id AND r.code='teacher' WHERE u.id=:user AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL LIMIT 1");
+        $query->execute(['user'=>$userId]);
+        return (bool) $query->fetchColumn();
     }
 
     /** @return array<string,bool> */

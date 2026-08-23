@@ -470,6 +470,51 @@ final class RepositoryController
         ]);
     }
 
+    /** Publica directamente un proyecto en Repository; no representa una transición académica. */
+    public function publishDirectProject(): void
+    {
+        $this->ensureSession();
+        header('Content-Type: application/json; charset=UTF-8');
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $this->sendJson(false, 'Método no permitido.');
+        }
+        $session = new AuthSessionService();
+        $capability = new ProjectCapabilityService();
+        if (!$capability->canPublishDirectRepository($session)) {
+            http_response_code(403);
+            $this->sendJson(false, 'No tienes autorización para publicar proyectos directamente en el repositorio.');
+        }
+        if (!$session->validateCsrf('repository_direct_publish', (string) ($_POST['_csrf'] ?? ''))) {
+            http_response_code(419);
+            $this->sendJson(false, 'La sesión del formulario expiró. Recarga la página e inténtalo nuevamente.');
+        }
+        $input = [
+            'title' => $_POST['title'] ?? '',
+            'project_type_id' => $_POST['project_type_id'] ?? null,
+            'description' => $_POST['description'] ?? '',
+            'author_ids' => $_POST['author_ids'] ?? [],
+            'tutor_id' => $_POST['tutor_id'] ?? null,
+            'keyword_ids' => $_POST['keyword_ids'] ?? [],
+        ];
+        try {
+            $result = (new RepositoryDirectProjectService())->publish(
+                (int) ($session->userId() ?? 0),
+                $input,
+                (array) ($_FILES['files'] ?? []),
+                (string) ($_POST['idempotency_token'] ?? '')
+            );
+            $this->sendJson(true, 'Proyecto publicado correctamente en el repositorio.', $result);
+        } catch (RepositoryDirectProjectException $exception) {
+            http_response_code($exception->status);
+            $this->sendJson(false, $exception->getMessage(), ['errors' => $exception->errors]);
+        } catch (Throwable $exception) {
+            error_log('Repository direct publish endpoint: ' . $exception->getMessage());
+            http_response_code(500);
+            $this->sendJson(false, 'No fue posible publicar el proyecto en este momento.');
+        }
+    }
+
     private function ensureSession(): void
     {
         if (session_status() !== PHP_SESSION_ACTIVE) {

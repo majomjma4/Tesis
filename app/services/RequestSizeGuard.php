@@ -22,6 +22,7 @@ final class RequestSizeGuard
         'student-project-document',
         'student-project-publish',
         'student-project-review-representation',
+        'repository-direct-project-publish',
     ];
 
     public static function rejectIfExceeded(string $page): void
