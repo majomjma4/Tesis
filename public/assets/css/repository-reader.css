@@ -550,64 +550,108 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
     font-size:var(--font-md);
 }
 
-/* Paginación Admin */
+/* Paginación de proyectos: mismo patrón visual que la paginación institucional de Usuarios. */
 .ar-pagination {
-    padding: 13px 18px;
-    border-top: 1px solid var(--line);
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 16px;
+    margin-top: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
     color: var(--muted);
-    font-size:var(--font-sm);
+    font-size: var(--font-md);
 }
 .ar-pagination[hidden] {
     display: none !important;
 }
+.ar-pagination > p {
+    margin: 0;
+    color: var(--muted);
+    white-space: nowrap;
+}
+.ar-pagination > p strong {
+    color: var(--text);
+}
 .ar-pagination nav {
-    justify-self: end;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 3px;
 }
 .ar-pagination-size {
     display: flex;
     align-items: center;
     gap: 8px;
-    justify-self: center;
+    flex: 0 0 auto;
     margin: 0;
 }
 .ar-pagination-size label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     color: var(--muted);
     font-size: var(--font-sm);
+    white-space: nowrap;
 }
 .ar-pagination-size select {
-    min-width: 72px;
-}
-.ar-pagination nav button {
-    min-height: 34px;
-    padding: 0 12px;
+    box-sizing: border-box;
+    width: 74px;
+    min-width: 74px;
+    height: 36px;
+    padding: 0 10px;
     border: 1px solid var(--line);
     border-radius: 9px;
-    background: var(--surface);
+    background: var(--surface-soft);
     color: var(--text);
     font: inherit;
-    font-weight: 800;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    font-weight: 750;
+}
+.ar-pagination-size select:focus-visible,
+.ar-pagination nav a:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .25);
+    outline-offset: 2px;
+}
+.ar-pagination nav a {
+    display: grid;
+    place-items: center;
+    min-width: 32px;
+    height: 32px;
+    box-sizing: border-box;
+    padding: 0 6px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface-soft);
+    color: var(--text);
+    font-size: var(--font-sm);
+    font-weight: 750;
     text-decoration: none;
     transition: border-color .15s ease, color .15s ease, background-color .15s ease;
 }
-.ar-pagination nav button:hover:not(:disabled) {
+.ar-pagination nav a:hover:not(.is-disabled) {
     border-color: var(--blue);
     color: var(--blue);
-    background: var(--surface-soft);
 }
-.ar-pagination nav button:disabled {
-    opacity: .45;
+.ar-pagination nav a.is-active {
+    border-color: var(--blue);
+    background: var(--blue);
+    color: #fff;
+}
+.ar-pagination nav a.is-disabled {
+    opacity: .4;
     cursor: not-allowed;
+    pointer-events: none;
+}
+.ar-pagination nav .pagination-ellipsis {
+    display: grid;
+    place-items: center;
+    min-width: 17px;
+    height: 32px;
+    color: var(--muted);
+    font-size: var(--font-sm);
+    font-weight: 850;
+    user-select: none;
 }
 
 /* Toast de favoritos */
@@ -681,14 +725,58 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
         gap: 5px;
     }
     .ar-pagination {
-        grid-template-columns: 1fr auto;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+    .ar-pagination nav {
+        width: 100%;
+        justify-content: center;
+        order: 3;
+    }
+    .ar-pagination-size {
+        margin-left: auto;
+    }
+}
+
+@media (max-width: 520px) {
+    .ar-pagination {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        max-width: 100%;
+        overflow: hidden;
+        padding: 11px;
+    }
+    .ar-pagination > p,
+    .ar-pagination-size label {
+        font-size: var(--font-sm);
+    }
+    .ar-pagination-size {
+        margin: 0;
+    }
+    .ar-pagination-size select {
+        width: 68px;
+        min-width: 68px;
+        padding-inline: 8px;
     }
     .ar-pagination nav {
         grid-column: 1 / -1;
-        justify-self: center;
+        order: initial;
+        justify-content: flex-start;
+        gap: 2px;
+        max-width: 100%;
+        overflow-x: auto;
     }
-    .ar-pagination-size {
-        justify-self: end;
+    .ar-pagination nav a {
+        min-width: 29px;
+        height: 29px;
+        padding: 0 5px;
+        font-size: var(--font-xs);
+    }
+    .ar-pagination nav .pagination-ellipsis {
+        min-width: 14px;
+        height: 29px;
+        font-size: var(--font-xs);
     }
 }
 

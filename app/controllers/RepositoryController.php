@@ -92,6 +92,8 @@ final class RepositoryController
         ];
         $repositoryError = null;
         $supportDocuments = [];
+        $supportStatus = 'error';
+        $supportError = null;
         $teacherMaterialUi = false;
         try {
             $projectTypes = $repositoryModel->getProjectTypes();
@@ -107,20 +109,33 @@ final class RepositoryController
                 'period_code' => $period === 'all' ? '' : $periodByValue[$period],
             ], PaginationService::request('repository_page', 'page_size'));
             $repositoryError = $result['status'] === 'error' ? (string) $result['message'] : null;
+        } catch (Throwable $exception) {
+            error_log('Repository index: ' . $exception->getMessage());
+            $repositoryError = 'No fue posible consultar el repositorio en este momento.';
+            $result['status'] = 'error';
+        }
+
+        try {
             $supportModel = new SupportMaterialModel();
             $teacherMaterialUi = $this->teacherMaterialUi($session);
             $supportDocuments = $teacherMaterialUi
                 ? $supportModel->getForTeacherManagement((int) $session->userId())
                 : $supportModel->getAll();
-            $categories = $repositoryModel->getCategories();
-            if ($teacherMaterialUi) {
-                $supportMaterialCategories = $supportModel->categories();
-                $supportMaterialTypes = $supportModel->materialTypeCatalog();
+            $supportStatus = $supportDocuments === [] ? 'empty' : 'loaded';
+            try {
+                $categories = $repositoryModel->getCategories();
+                if ($teacherMaterialUi) {
+                    $supportMaterialCategories = $supportModel->categories();
+                    $supportMaterialTypes = $supportModel->materialTypeCatalog();
+                }
+            } catch (Throwable $exception) {
+                error_log('Repository support material catalogs: ' . $exception->getMessage());
             }
         } catch (Throwable $exception) {
-            error_log('Repository index: ' . $exception->getMessage());
-            $repositoryError = 'No fue posible consultar el repositorio en este momento.';
-            $result['status'] = 'error';
+            error_log('Repository support materials: ' . $exception->getMessage());
+            $supportDocuments = [];
+            $supportStatus = 'error';
+            $supportError = 'No fue posible cargar los materiales de apoyo en este momento. Intenta nuevamente mÃ¡s tarde.';
         }
 
         $favoriteIds = [];
@@ -154,6 +169,7 @@ final class RepositoryController
             'teachers'=>$repositoryModel->getTeachers(), 'categories'=>$categories,
             'projectTypes'=>$projectTypes, 'academicPeriods'=>$academicPeriods,
             'supportDocuments'=>array_map(static function (array $material): array { $material['detail_url']=base_url('index.php?page=support-material-detail&id='.rawurlencode((string)$material['id'])); return $material; }, $supportDocuments),
+            'supportStatus'=>$supportStatus, 'supportError'=>$supportError,
             'supportMaterialsUrl'=>route('support-materials'), 'canCreateSupportMaterial'=>$teacherMaterialUi,
             'supportMaterialCategories'=>$supportMaterialCategories,
             'supportMaterialTypes'=>$supportMaterialTypes,

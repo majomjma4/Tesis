@@ -46,7 +46,7 @@
                 <button type="button" id="tabSupport" role="tab" aria-selected="false" aria-controls="panelSupport">
                     <i class="fa-solid fa-folder-open"></i>
                     <span class="ar-tab-label">Material de apoyo</span>
-                    <span class="ar-tab-count" id="badgeSupportCount"><?= count($supportDocuments) ?></span>
+                    <span class="ar-tab-count" id="badgeSupportCount"<?= ($supportStatus ?? 'loaded') === 'error' ? ' aria-label="Estado no disponible"' : '' ?>><?= ($supportStatus ?? 'loaded') === 'error' ? '—' : count($supportDocuments) ?></span>
                 </button>
             </nav>
 
@@ -59,9 +59,16 @@
             $repositoryTotal = (int) ($repositoryPagination['total'] ?? count($projects));
             $repositoryPages = max(1, (int) ($repositoryPagination['pages'] ?? 1));
             $repositoryStatus = (string) ($repositoryStatus ?? 'loaded');
+            $supportStatus = (string) ($supportStatus ?? 'loaded');
+            $supportError = (string) ($supportError ?? 'No fue posible cargar los materiales de apoyo en este momento.');
             $repositorySearchValue = (string) ($repositoryFilters['search'] ?? '');
             $repositoryTypeValue = (string) ($repositoryFilters['type'] ?? 'all');
             $repositoryPeriodValue = (string) ($repositoryFilters['period'] ?? 'all');
+            $repositoryPageItemCount = $repositoryTotal > 0
+                ? min($repositoryPageSize, max(0, $repositoryTotal - (($repositoryPage - 1) * $repositoryPageSize)))
+                : 0;
+            $repositoryPageSizes = array_values(array_filter([10, 25, 50, 75, 100], static fn (int $size): bool => $size <= max($repositoryTotal, 10)));
+            if (!$repositoryPageSizes) $repositoryPageSizes = [10];
             $repositoryUrl = route('repository');
             $repositoryQuery = static function (int $page) use ($repositorySearchValue, $repositoryTypeValue, $repositoryPeriodValue, $repositoryPageSize, $repositoryUrl): string {
                 return $repositoryUrl . '&' . http_build_query(['search'=>$repositorySearchValue,'type'=>$repositoryTypeValue,'period'=>$repositoryPeriodValue,'page_size'=>$repositoryPageSize,'repository_page'=>$page], '', '&', PHP_QUERY_RFC3986);
@@ -69,7 +76,7 @@
             ?>
             <!-- Toolbar de materiales (se muestra solo en pestaña de materiales) -->
             <div class="ar-tools" id="toolsSupport" hidden>
-                <label class="ar-search<?= !$supportDocuments ? ' is-disabled' : '' ?>">
+                <label class="ar-search<?= $supportStatus !== 'loaded' ? ' is-disabled' : '' ?>">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <input id="repositorySupportSearch" type="text" role="searchbox" placeholder="Buscar por título, descripción o palabra clave" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"<?= !$supportDocuments ? ' disabled' : '' ?>>
                 </label>
@@ -218,34 +225,43 @@
                 <!-- Paginación exacta Admin (Se oculta automáticamente si totalPages <= 1) -->
                 <?php if ($repositoryStatus === 'loaded' && $repositoryPages > 1): ?>
                     <footer class="ar-pagination" id="repositoryPagination">
-                        <span>Mostrando <?= (($repositoryPage - 1) * $repositoryPageSize + 1) ?> - <?= min($repositoryTotal, $repositoryPage * $repositoryPageSize) ?> de <?= $repositoryTotal ?></span>
-                        <form method="get" action="<?= e(base_url('index.php')) ?>" class="ar-pagination-size">
+                        <p>Mostrando <strong><?= $repositoryPageItemCount ?></strong> de <strong><?= $repositoryTotal ?></strong></p>
+                        <form method="get" action="<?= e(base_url('index.php')) ?>" class="ar-pagination-size data-pagination-size">
                             <input type="hidden" name="page" value="repository">
                             <input type="hidden" name="search" value="<?= e($repositorySearchValue) ?>">
                             <input type="hidden" name="type" value="<?= e($repositoryTypeValue) ?>">
                             <input type="hidden" name="period" value="<?= e($repositoryPeriodValue) ?>">
                             <input type="hidden" name="repository_page" value="1">
-                            <label for="repositoryPageSize">Mostrar</label>
-                            <select id="repositoryPageSize" name="page_size" aria-label="Cantidad de proyectos por página">
-                                <?php foreach ([10,25,50,75,100] as $size): ?><option value="<?= $size ?>"<?= $repositoryPageSize === $size ? ' selected' : '' ?>><?= $size ?></option><?php endforeach; ?>
+                            <label for="repositoryPageSize"><span>Mostrar</span></label>
+                            <select id="repositoryPageSize" name="page_size" aria-label="Cantidad de proyectos por página" data-dropdown-placement="top">
+                                <?php foreach ($repositoryPageSizes as $size): ?><option value="<?= $size ?>"<?= $repositoryPageSize === $size ? ' selected' : '' ?>><?= $size ?></option><?php endforeach; ?>
                             </select>
                         </form>
                         <nav aria-label="Paginación de proyectos publicados">
-                            <?php if ($repositoryPage > 1): ?><a href="<?= e($repositoryQuery($repositoryPage - 1)) ?>">Anterior</a><?php endif; ?>
-                            <?php for ($pageNumber = 1; $pageNumber <= $repositoryPages; $pageNumber++): ?>
-                                <a href="<?= e($repositoryQuery($pageNumber)) ?>"<?= $pageNumber === $repositoryPage ? ' aria-current="page"' : '' ?>><?= $pageNumber ?></a>
-                            <?php endfor; ?>
-                            <?php if ($repositoryPage < $repositoryPages): ?><a href="<?= e($repositoryQuery($repositoryPage + 1)) ?>">Siguiente</a><?php endif; ?>
+                            <?php $previousDisabled = $repositoryPage <= 1; ?>
+                            <a href="<?= e($repositoryQuery(max(1, $repositoryPage - 1))) ?>" class="<?= $previousDisabled ? 'is-disabled' : '' ?>" aria-label="Página anterior"<?= $previousDisabled ? ' aria-disabled="true" tabindex="-1"' : '' ?>><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></a>
+                            <?php
+                            if ($repositoryPages <= 5) $repositoryPageTokens = range(1, $repositoryPages);
+                            elseif ($repositoryPage <= 3) $repositoryPageTokens = [1, 2, 3, 'ellipsis', $repositoryPages];
+                            elseif ($repositoryPage >= $repositoryPages - 2) $repositoryPageTokens = [1, 'ellipsis', $repositoryPages - 2, $repositoryPages - 1, $repositoryPages];
+                            else $repositoryPageTokens = [1, 'ellipsis', $repositoryPage - 1, $repositoryPage, $repositoryPage + 1, 'ellipsis', $repositoryPages];
+                            foreach ($repositoryPageTokens as $pageToken):
+                                if ($pageToken === 'ellipsis'): ?><span class="pagination-ellipsis" aria-hidden="true">…</span><?php
+                                else: ?><a href="<?= e($repositoryQuery((int) $pageToken)) ?>" class="<?= (int) $pageToken === $repositoryPage ? 'is-active' : '' ?>"<?= (int) $pageToken === $repositoryPage ? ' aria-current="page"' : '' ?>><?= (int) $pageToken ?></a><?php
+                                endif;
+                            endforeach;
+                            $nextDisabled = $repositoryPage >= $repositoryPages;
+                            ?><a href="<?= e($repositoryQuery(min($repositoryPages, $repositoryPage + 1))) ?>" class="<?= $nextDisabled ? 'is-disabled' : '' ?>" aria-label="Página siguiente"<?= $nextDisabled ? ' aria-disabled="true" tabindex="-1"' : '' ?>><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
                         </nav>
                     </footer>
                 <?php endif; ?>
             </section>
 
             <!-- Panel 2: Material de apoyo -->
-            <section class="ar-panel" id="panelSupport" role="tabpanel" aria-labelledby="tabSupport" data-base-support-count="<?= count($supportDocuments) ?>" hidden>
+            <section class="ar-panel" id="panelSupport" role="tabpanel" aria-labelledby="tabSupport" data-support-status="<?= e($supportStatus) ?>" data-base-support-count="<?= count($supportDocuments) ?>" hidden>
                 <header class="ar-section-head">
                     <div><span>Recursos académicos</span><h2>Material de apoyo</h2></div>
-                    <div style="display:flex;align-items:center;gap:10px"><p id="repositorySupportCount" aria-live="polite"><?= count($supportDocuments) ?> <?= count($supportDocuments) === 1 ? 'resultado visible' : 'resultados visibles' ?></p><?php if (!empty($canCreateSupportMaterial)): ?><button class="ar-primary-action" type="button" data-teacher-material-create><i class="fa-solid fa-plus"></i> Nuevo material</button><?php endif; ?></div>
+                    <div style="display:flex;align-items:center;gap:10px"><p id="repositorySupportCount" aria-live="polite"><?= $supportStatus === 'error' ? 'Estado no disponible' : count($supportDocuments) . ' ' . (count($supportDocuments) === 1 ? 'resultado visible' : 'resultados visibles') ?></p><?php if (!empty($canCreateSupportMaterial) && $supportStatus !== 'error'): ?><button class="ar-primary-action" type="button" data-teacher-material-create><i class="fa-solid fa-plus"></i> Nuevo material</button><?php endif; ?></div>
                 </header>
 
                 <div class="ar-grid" id="repositorySupportGrid">
@@ -278,7 +294,12 @@
                         <?php endforeach; ?>
                 </div>
 
-                <div class="ar-empty" id="repositorySupportEmpty" <?= $supportDocuments ? 'hidden' : '' ?>>
+                <div class="ar-empty" id="repositorySupportError" role="status" aria-live="polite" <?= $supportStatus !== 'error' ? 'hidden' : '' ?>>
+                    <span><i class="fa-solid fa-triangle-exclamation"></i></span>
+                    <h2>No fue posible cargar los materiales de apoyo.</h2>
+                    <p><?= e($supportError) ?></p>
+                </div>
+                <div class="ar-empty" id="repositorySupportEmpty" <?= $supportStatus !== 'empty' ? 'hidden' : '' ?>>
                     <span><i class="fa-solid fa-folder-open"></i></span>
                     <h2 id="repositorySupportEmptyTitle">Aún no existen materiales de apoyo.</h2>
                     <p id="repositorySupportEmptyText">Los recursos institucionales publicados aparecerán en esta sección.</p>
