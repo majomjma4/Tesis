@@ -77,3 +77,122 @@
 .tm-custom-select-trigger:after{content:'\f078'!important;font-family:"Font Awesome 6 Free";font-weight:900}
 .tm-tribunal-review-modal>section{width:min(560px,100%)}.tm-tribunal-current{display:grid;gap:10px}.tm-tribunal-current h3{margin:0;color:var(--muted,#64748b);font-size:var(--font-sm);letter-spacing:.06em;text-transform:uppercase}.tm-tribunal-current>div{display:grid;gap:8px}.tm-current-member{grid-template-columns:38px minmax(0,1fr)}.tm-tribunal-review-copy{margin:0;color:var(--muted,#64748b);font-size:var(--font-md);line-height:1.45}
 .tm-modal[data-tribunal-modal] .tm-member-stepper button[data-tribunal-decrease],.tm-modal[data-tribunal-modal] .tm-member-stepper button[data-tribunal-increase]{display:none}.tm-modal[data-tribunal-modal] .tm-member-stepper{grid-template-columns:1fr auto}.tm-modal[data-tribunal-modal] .tm-member-stepper>div{min-width:0}.tm-modal[data-tribunal-modal] .tm-member-stepper strong{white-space:nowrap}
+
+/* Dark mode: adapta sólo color y contraste; no modifica posiciones ni dimensiones. */
+:is(html.theme-dark,body.dark-mode) .tm-modal>section,
+:is(html.theme-dark,body.dark-mode) .tm-tribunal-workspace>section[data-tribunal-dialog],
+:is(html.theme-dark,body.dark-mode) .tm-tribunal-proposal-surface,
+:is(html.theme-dark,body.dark-mode) .tm-attempt-confirm>section {
+    background:var(--surface);
+    border-color:var(--line);
+    color:var(--text);
+    color-scheme:dark;
+}
+:is(html.theme-dark,body.dark-mode) .tm-modal header,
+:is(html.theme-dark,body.dark-mode) .tm-modal footer,
+:is(html.theme-dark,body.dark-mode) .tm-tribunal-proposal-surface header,
+:is(html.theme-dark,body.dark-mode) .tm-tribunal-proposal-surface footer,
+:is(html.theme-dark,body.dark-mode) .tm-attempt-confirm header,
+:is(html.theme-dark,body.dark-mode) .tm-attempt-confirm footer { border-color:var(--line); }
+:is(html.theme-dark,body.dark-mode) .tm-modal header button,
+:is(html.theme-dark,body.dark-mode) .tm-modal footer>button:not(.tm-primary-action),
+:is(html.theme-dark,body.dark-mode) .tm-member-stepper button,
+:is(html.theme-dark,body.dark-mode) .tm-member-actions button,
+:is(html.theme-dark,body.dark-mode) .tm-modal-body textarea,
+:is(html.theme-dark,body.dark-mode) .tm-gate-label select,
+:is(html.theme-dark,body.dark-mode) .tm-gate-label textarea,
+:is(html.theme-dark,body.dark-mode) .tm-custom-select-trigger,
+:is(html.theme-dark,body.dark-mode) .tm-custom-select-menu [role=option],
+:is(html.theme-dark,body.dark-mode) .tm-result-option,
+:is(html.theme-dark,body.dark-mode) .tm-modal[data-result-modal] form label:has(input[value="approved"]),
+:is(html.theme-dark,body.dark-mode) .tm-modal[data-result-modal] form label:has(input[value="rejected"]),
+:is(html.theme-dark,body.dark-mode) .tm-replacement-option,
+:is(html.theme-dark,body.dark-mode) .tm-replacement-popover,
+:is(html.theme-dark,body.dark-mode) .tm-schedule-modal [data-defense-schedule-form] input[type=date],
+:is(html.theme-dark,body.dark-mode) .tm-schedule-modal [data-defense-schedule-form] input[type=time] {
+    background:var(--surface-soft);
+    border-color:var(--line);
+    color:var(--text);
+}
+:is(html.theme-dark,body.dark-mode) .tm-modal header button,
+:is(html.theme-dark,body.dark-mode) .tm-member-stepper button,
+:is(html.theme-dark,body.dark-mode) .tm-member-actions button { color:var(--muted); }
+:is(html.theme-dark,body.dark-mode) .tm-modal-body,
+:is(html.theme-dark,body.dark-mode) .tm-modal.is-expanded .tm-modal-body { background:var(--surface-soft); }
+:is(html.theme-dark,body.dark-mode) .tm-modal.is-expanded .tm-proposal,
+:is(html.theme-dark,body.dark-mode) .tm-proposal-surface .tm-proposal { background:transparent; }
+:is(html.theme-dark,body.dark-mode) .tm-available-panel,
+:is(html.theme-dark,body.dark-mode) .tm-regenerate,
+:is(html.theme-dark,body.dark-mode) .tm-attempt-transition>div {
+    background:var(--surface-soft);
+    border-color:var(--line);
+    color:var(--text);
+}
+:is(html.theme-dark,body.dark-mode) .tm-available-card,
+:is(html.theme-dark,body.dark-mode) .tm-proposal-empty,
+:is(html.theme-dark,body.dark-mode) .tm-proposal-loading {
+    background:var(--surface-soft);
+    border-color:var(--line);
+    color:var(--muted);
+}
+:is(html.theme-dark,body.dark-mode) .tm-member-avatar { background:var(--blue-soft); color:#93c5fd; }
+:is(html.theme-dark,body.dark-mode) .tm-proposal-loading span { background:color-mix(in srgb,var(--blue) 25%,var(--surface)); }
+:is(html.theme-dark,body.dark-mode) .tm-defense-warning,
+:is(html.theme-dark,body.dark-mode) .tm-reason-gate .tm-defense-warning,
+:is(html.theme-dark,body.dark-mode) .tm-attempt-confirm .tm-defense-warning {
+    background:color-mix(in srgb,var(--warning) 16%,var(--surface));
+    border-color:color-mix(in srgb,var(--warning) 46%,var(--line));
+    color:#fcd34d;
+}
+:is(html.theme-dark,body.dark-mode) .tm-defense-warning[data-tribunal-approved-note] {
+    background:color-mix(in srgb,var(--blue) 18%,var(--surface));
+    border-color:color-mix(in srgb,var(--blue) 44%,var(--line));
+    color:#bfdbfe;
+}
+:is(html.theme-dark,body.dark-mode) .tm-modal-error { color:#fca5a5; }
+:is(html.theme-dark,body.dark-mode) .tm-result-option:has(input:checked),
+:is(html.theme-dark,body.dark-mode) .tm-modal[data-result-modal] form label:has(input:checked) {
+    background:color-mix(in srgb,var(--blue) 18%,var(--surface));
+    border-color:color-mix(in srgb,var(--blue) 48%,var(--line));
+}
+:is(html.theme-dark,body.dark-mode) .tm-result-option[data-result="approved"]:has(input:checked),
+:is(html.theme-dark,body.dark-mode) .tm-modal[data-result-modal] form label:has(input[value="approved"]:checked) {
+    background:color-mix(in srgb,var(--accent) 18%,var(--surface));
+    border-color:color-mix(in srgb,var(--accent) 50%,var(--line));
+}
+:is(html.theme-dark,body.dark-mode) .tm-result-option[data-result="rejected"]:has(input:checked),
+:is(html.theme-dark,body.dark-mode) .tm-modal[data-result-modal] form label:has(input[value="rejected"]:checked) {
+    background:color-mix(in srgb,var(--danger) 18%,var(--surface));
+    border-color:color-mix(in srgb,var(--danger) 50%,var(--line));
+}
+:is(html.theme-dark,body.dark-mode) .tm-result-effect,
+:is(html.theme-dark,body.dark-mode) .tm-schedule-modal .tm-info-notice,
+:is(html.theme-dark,body.dark-mode) .tm-attempt-info {
+    background:color-mix(in srgb,var(--blue) 18%,var(--surface));
+    border-color:color-mix(in srgb,var(--blue) 44%,var(--line));
+    color:#bfdbfe;
+}
+:is(html.theme-dark,body.dark-mode) .tm-modal[data-result-modal] form:has(input[value="rejected"]:checked) [data-result-effect] {
+    background:color-mix(in srgb,var(--warning) 16%,var(--surface));
+    border-color:color-mix(in srgb,var(--warning) 46%,var(--line));
+    color:#fcd34d;
+}
+:is(html.theme-dark,body.dark-mode) .tm-custom-select-menu {
+    background:var(--surface);
+    border-color:var(--line);
+}
+:is(html.theme-dark,body.dark-mode) .tm-custom-select-menu [role=option]:hover,
+:is(html.theme-dark,body.dark-mode) .tm-custom-select-menu [role=option]:focus,
+:is(html.theme-dark,body.dark-mode) .tm-custom-select-menu [role=option][aria-selected=true],
+:is(html.theme-dark,body.dark-mode) .tm-replacement-option:hover {
+    background:color-mix(in srgb,var(--blue) 18%,var(--surface));
+    border-color:color-mix(in srgb,var(--blue) 46%,var(--line));
+    color:#bfdbfe;
+}
+:is(html.theme-dark,body.dark-mode) .tm-replacement-popover>strong,
+:is(html.theme-dark,body.dark-mode) .tm-replacement-option strong { color:var(--text); }
+:is(html.theme-dark,body.dark-mode) .tm-replacement-hint,
+:is(html.theme-dark,body.dark-mode) .tm-replacement-popover>p,
+:is(html.theme-dark,body.dark-mode) .tm-tribunal-review-copy,
+:is(html.theme-dark,body.dark-mode) .tm-tribunal-current h3 { color:var(--muted); }
+:is(html.theme-dark,body.dark-mode) .tm-load-input { background:var(--surface-soft); color:var(--text); }

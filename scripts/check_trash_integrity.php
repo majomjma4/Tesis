@@ -21,7 +21,12 @@ try {
     $result = [];
     foreach ($checks as $name => $sql) $result[$name] = $db->query($sql)->fetch();
     $result['missing_recoverable_files'] = ['projects'=>0, 'materials'=>0];
-    $projectFiles = $db->query('SELECT project_id,storage_name FROM project_files WHERE purged_at IS NULL')->fetchAll();
+    $projectFiles = $db->query('SELECT f.project_id,f.storage_name
+        FROM project_files f
+        INNER JOIN projects p ON p.id=f.project_id
+        WHERE p.deleted_at IS NOT NULL
+          AND f.deleted_at IS NULL
+          AND f.purged_at IS NULL')->fetchAll();
     $projectStorage = new ProjectDocumentFileService();
     foreach ($projectFiles as $file) {
         try { $projectStorage->resolveStoredFile((int)$file['project_id'], (string)$file['storage_name']); }

@@ -3,6 +3,7 @@
 
 $adjustmentItems = (array)($adjustmentData['items'] ?? []);
 $adjustmentSummary = (array)($adjustmentData['summary'] ?? []);
+$adjustmentContext = (string)($adjustmentContext ?? $projectContext);
 $pendingAdjustments = array_values(array_filter($adjustmentItems, static fn(array $item): bool => ($item['status'] ?? '') === 'pending'));
 $addressedAdjustments = array_values(array_filter($adjustmentItems, static fn(array $item): bool => ($item['status'] ?? '') === 'addressed'));
 $latestAdjustment = (array)($adjustmentSummary['latest'] ?? $adjustmentSummary['latest_request'] ?? []);
@@ -38,7 +39,7 @@ $adjustmentDate = static function (?string $value): string {
 <div class="project-adjustment-dialog" id="projectAdjustmentDialog" data-adjustment-dialog hidden>
  <section role="dialog" aria-modal="true" aria-labelledby="projectAdjustmentTitle" aria-describedby="projectAdjustmentHelp">
   <header><div><span>Seguimiento del proyecto</span><h2 id="projectAdjustmentTitle">Solicitar ajuste</h2></div><button type="button" data-adjustment-cancel aria-label="Cerrar diálogo"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header>
-  <form data-adjustment-create-form><div class="modal-body"><input type="hidden" name="_csrf" value="<?=e((string)$adjustmentCsrf)?>"><input type="hidden" name="project_id" value="<?=(int)$projectId?>"><input type="hidden" name="expected_project_status" value="<?=e((string)$project['status'])?>"><input type="hidden" name="context" value="<?=e($projectContext)?>">
+  <form data-adjustment-create-form><div class="modal-body"><input type="hidden" name="_csrf" value="<?=e((string)$adjustmentCsrf)?>"><input type="hidden" name="project_id" value="<?=(int)$projectId?>"><input type="hidden" name="expected_project_status" value="<?=e((string)$project['status'])?>"><input type="hidden" name="context" value="<?=e($adjustmentContext)?>">
    <p id="projectAdjustmentHelp">Indica qué cambio necesitas solicitar.</p>
    <div class="project-adjustment-fields"><label>Tipo de ajuste<select name="request_type" required><option value="">Selecciona</option><?php foreach($typeLabels as $value=>$label):?><option value="<?=e($value)?>"><?=e($label)?></option><?php endforeach;?></select></label>
    <label>Sección<select name="related_section"><option value="">Sin sección específica</option><option>Descripción del proyecto</option><option>Información académica</option><option>Participantes</option><option>Clasificación</option><option>Documentación</option></select></label>
@@ -55,4 +56,4 @@ $adjustmentDate = static function (?string $value): string {
 <?php if(!empty($projectCapabilities['respond_adjustment_request'])): ?>
 <div class="project-adjustment-dialog" data-adjustment-response-dialog hidden><section role="dialog" aria-modal="true" aria-labelledby="projectAdjustmentResponseTitle"><header><h2 id="projectAdjustmentResponseTitle">Responder solicitud</h2><button type="button" data-adjustment-response-cancel aria-label="Cerrar diálogo"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header><form data-adjustment-response-form><label>Respuesta<textarea name="message" maxlength="2000" rows="5" required></textarea></label><p data-adjustment-message role="status" aria-live="polite" hidden></p><footer><button type="button" data-adjustment-response-cancel>Cancelar</button><button class="is-primary" type="submit">Enviar respuesta</button></footer></form></section></div>
 <?php endif; ?>
-<div data-adjustment-config data-project-id="<?=(int)$projectId?>" data-status="<?=e((string)$project['status'])?>" data-context="<?=e($projectContext)?>" data-csrf="<?=e((string)$adjustmentCsrf)?>" data-create="<?=e((string)($adjustmentEndpoints['create']??''))?>" data-respond="<?=e((string)($adjustmentEndpoints['respond']??''))?>" data-address="<?=e((string)($adjustmentEndpoints['address']??''))?>" data-close="<?=e((string)($adjustmentEndpoints['close']??''))?>"></div>
+<div data-adjustment-config data-project-id="<?=(int)$projectId?>" data-status="<?=e((string)$project['status'])?>" data-context="<?=e($adjustmentContext)?>" data-csrf="<?=e((string)$adjustmentCsrf)?>" data-create="<?=e((string)($adjustmentEndpoints['create']??''))?>" data-respond="<?=e((string)($adjustmentEndpoints['respond']??''))?>" data-address="<?=e((string)($adjustmentEndpoints['address']??''))?>" data-close="<?=e((string)($adjustmentEndpoints['close']??''))?>"></div>

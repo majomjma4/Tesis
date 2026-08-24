@@ -258,23 +258,24 @@ final class RepositoryController
             ];
         }
         $adjustmentData = ['items' => [], 'summary' => ['has_pending_adjustments' => false, 'pending_count' => 0, 'latest' => null]];
+        $adjustmentContext = $isAdministratorView ? 'academic_management' : 'repository';
         if ($project !== null && !empty($projectCapabilities['view_adjustment_requests'])) {
             try {
                 $adjustmentData = (new ProjectAdjustmentRequestService())->listForProject(
                     (int) $project['id'],
                     (string) $project['status'],
                     (int) ($session->userId() ?? 0),
-                    'repository'
+                    $adjustmentContext
                 );
             } catch (Throwable $e) {
                 error_log('Repository detail adjustment list: ' . $e->getMessage());
             }
         }
         $adjustmentEndpoints = [
-            'create' => route('project-adjustment-request-create'),
-            'respond' => route('project-adjustment-request-respond'),
-            'address' => route('project-adjustment-request-status'),
-            'close' => route('project-adjustment-request-status'),
+            'create' => route('project-adjustment-create'),
+            'respond' => route('project-adjustment-respond'),
+            'address' => route('project-adjustment-address'),
+            'close' => route('project-adjustment-close'),
         ];
         View::render('projects/detail', [
             'currentPage' => 'repository',
@@ -299,10 +300,8 @@ final class RepositoryController
             'projectCapabilities' => $projectCapabilities,
             'adjustmentData' => $adjustmentData,
             'adjustmentCsrf' => $session->csrfToken('project_adjustment'),
+            'adjustmentContext' => $adjustmentContext,
             'adjustmentEndpoints' => $adjustmentEndpoints,
-            'adjustmentEndpoint' => route('project-adjustment-request-create'),
-            'adjustmentRespondEndpoint' => route('project-adjustment-request-respond'),
-            'adjustmentStatusEndpoint' => route('project-adjustment-request-status'),
             'projectEditUrl' => '',
             'detailUrl' => route('repository-detail') . '&id=' . (int)($project['id'] ?? 0),
             'returnUrl' => $returnUrl,

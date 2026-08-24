@@ -10,6 +10,8 @@
     --sw-violet-soft: #f5f3ff;
     --sw-green: #059669;
     --sw-green-soft: #f0fdf4;
+    --sw-text: var(--text, #0f172a);
+    --sw-text-muted: var(--muted, #64748b);
     --sw-bg-soft: var(--surface-soft, #f8fafc);
     --sw-border: var(--line, #e2e8f0);
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -625,12 +627,12 @@ body:is(.app-student-workspace-fullscreen,.project-review-fullscreen) .student-w
 .student-workspace .sw-file-download,.student-workspace .sw-file-menu-trigger { display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:6px;background:transparent;color:var(--sw-text-muted);cursor:pointer;text-decoration:none; }
 .student-workspace .sw-file-download:hover,.student-workspace .sw-file-menu-trigger:hover { background:var(--sw-bg-soft);color:var(--sw-primary); }
 .student-workspace .sw-file-menu,
-body > .sw-file-menu { position:absolute;z-index:100000;right:0;top:calc(100% + 4px);min-width:160px;padding:5px;border:1px solid var(--sw-border);border-radius:8px;background:#fff;box-shadow:0 10px 25px rgba(15,23,42,.16);display:grid; }
+body > .sw-file-menu { position:absolute;z-index:100000;right:0;top:calc(100% + 4px);min-width:160px;padding:5px;border:1px solid var(--sw-border, var(--line, #e2e8f0));border-radius:8px;background:#fff;box-shadow:0 10px 25px rgba(15,23,42,.16);display:grid; }
 body > .sw-file-menu { position:fixed !important;z-index:100000 !important; }
 .student-workspace .sw-file-menu[hidden],
 body > .sw-file-menu[hidden] { display:none !important; }
 .student-workspace .sw-file-menu button,.student-workspace .sw-file-menu a,
-body > .sw-file-menu button,body > .sw-file-menu a { border:0;background:transparent;color:var(--sw-text);text-align:left;padding:.55rem .65rem;border-radius:5px;font:inherit;font-size:var(--font-md);text-decoration:none;cursor:pointer; }
+body > .sw-file-menu button,body > .sw-file-menu a { border:0;background:transparent;color:var(--sw-text, var(--text, #0f172a));text-align:left;padding:.55rem .65rem;border-radius:5px;font:inherit;font-size:var(--font-md);text-decoration:none;cursor:pointer; }
 .student-workspace .sw-protected-label {
     color: #92400e;
     background: #fef3c7;

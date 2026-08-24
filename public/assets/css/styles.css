@@ -46,10 +46,13 @@
     --bg:#f4f7fb;
     --surface:#ffffff;
     --surface-soft:#f8fafc;
+    --blue-soft:color-mix(in srgb,var(--blue) 10%,var(--surface-soft));
+    --primary-soft:color-mix(in srgb,var(--primary) 8%,var(--surface));
     --text:#0f172a;
     --muted:#64748b;
     --line:#e2e8f0;
     --shadow:0 12px 30px rgba(15,23,42,.07);
+    --shadow-soft:var(--shadow);
     --radius:18px;
 }
 html.dashboard-root{
