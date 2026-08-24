@@ -183,15 +183,18 @@ final class ProjectsController
         $projectModel = new ProjectModel();
         $studentProjects = $projectModel->getStudentProjectsResult($access->currentUserId());
         $projects = (array) ($studentProjects['items'] ?? []);
+        $directFinished = $projectModel->getDirectRepositoryFinishedProjectsResult($access->currentUserId());
+        $directProjects = (array) ($directFinished['items'] ?? []);
+        $projects = array_merge($projects, $directProjects);
         $totalProjects = count($projects);
-        if (($studentProjects['status'] ?? 'error') === 'loaded' && $totalProjects === 1) {
+        if (($studentProjects['status'] ?? 'error') === 'loaded' && $totalProjects === 1 && empty($projects[0]['is_direct_repository'])) {
             $project = $projects[0];
             $capabilities = (new ProjectCapabilityService())->forProjectId((int) $project['id'], 'academic');
             $navigation = (new StudentProjectNavigationService())->resolve($project, $capabilities);
             header('Location: ' . $navigation['action_url']);
             exit;
         }
-        if (($studentProjects['status'] ?? '') === 'loaded') {
+        if (($studentProjects['status'] ?? '') === 'loaded' || $directProjects !== []) {
             $policy = new ProjectCapabilityService();
             $navigation = new StudentProjectNavigationService();
             foreach ($projects as &$project) {
@@ -219,11 +222,11 @@ final class ProjectsController
             'pageScript' => asset('js/projects.js'),
             'projects' => $projects,
             'projectGroups' => $projectGroups,
-            'projectsStatus' => (string) ($studentProjects['status'] ?? 'error'),
+            'projectsStatus' => (($studentProjects['status'] ?? 'error') === 'loaded' || $directProjects !== []) ? 'loaded' : (string) ($studentProjects['status'] ?? 'error'),
             'projectsMessage' => (string) ($studentProjects['message'] ?? ''),
-            'projectsTotal' => ($studentProjects['status'] ?? 'error') === 'loaded' ? $totalProjects : null,
+            'projectsTotal' => (($studentProjects['status'] ?? 'error') === 'loaded' || $directProjects !== []) ? $totalProjects : null,
             'projectsHeading' => (($studentProjects['status'] ?? 'error') === 'loaded' && $totalProjects === 1) ? 'Mi proyecto' : 'Mis proyectos',
-            'canCreateStudentProject' => ($studentProjects['status'] ?? 'error') === 'empty' && $access->can('project.create'),
+            'canCreateStudentProject' => $projects === [] && $access->can('project.create'),
             'newStudentProjectUrl' => route('new-project'),
             'studentProjectPublishEndpoint' => route('student-project-publish'),
             'studentProjectPublishCsrf' => $session->csrfToken('student_project_publish'),
@@ -762,7 +765,8 @@ final class ProjectsController
         $version=!empty($file['checksum_sha256'])?'&v='.rawurlencode(substr((string)$file['checksum_sha256'],0,16)):'';
         $forceRetry = !empty($_GET['retry_preview']) || !empty($_GET['retry']);
         if (session_status() === PHP_SESSION_ACTIVE) { session_write_close(); }
-        if (strtolower((string)$file['extension']) === 'docx') {
+        $useClientSideDocxPreview = $scope === '&scope=repository';
+        if (strtolower((string)$file['extension']) === 'docx' && !$useClientSideDocxPreview) {
             $preview = $this->docxPreview($project, $file, $source, (string)$file['checksum_sha256'], route('project-file-preview-pdf').$query.$scope.$version, $forceRetry, !$institutionalAccess);
         } else {
             $preview=(new FilePreviewService())->prepare($this->previewFile($file,$stream),route('project-file-content').$query.$scope.$version,$institutionalAccess?'':route('project-file-download').$query.$scope);
@@ -1086,13 +1090,18 @@ final class ProjectsController
                 $representation = new ProjectReviewRepresentationService();
                 if ($representation->supplementalPath((int)$project['id'], (int)$file['id'], $identity) !== null) return $this->docxPdfPayload($file, $url, ['cached'=>true], 'supplemental_pdf');
             }
-            $cached = (new DocumentPreviewConversionService())->cachedPath((int)$project['id'], (int)$file['id'], $identity);
+            $conversion = new DocumentPreviewConversionService();
+            if ($forceRetry) $conversion->clearFailure((int)$project['id'], (int)$file['id'], $identity);
+            $cached = $conversion->cachedPath((int)$project['id'], (int)$file['id'], $identity);
             if ($cached !== null) {
                 $payload = $this->docxPdfPayload($file, $url, ['cached'=>true], 'cached_pdf');
                 if (!$allowReviewRepresentation) $payload['review_representation'] = false;
                 return $payload;
             }
-            return $this->docxPreviewFailure($file, 'La vista previa aún no está preparada.');
+            $converted = $conversion->convertFile($source, (int)$project['id'], (int)$file['id'], $identity);
+            $payload = $this->docxPdfPayload($file, $url, $converted, 'libreoffice_pdf');
+            if (!$allowReviewRepresentation) $payload['review_representation'] = false;
+            return $payload;
         }
         catch (Throwable $error) {
             error_log('Project DOCX preview: project='.(int)$project['id'].' file='.(int)$file['id'].' checksum='.$identity.' error='.$error->getMessage());

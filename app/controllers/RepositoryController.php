@@ -84,6 +84,7 @@ final class RepositoryController
         $categories = [];
         $supportMaterialCategories = [];
         $supportMaterialTypes = [];
+        $supportMaterialKeywords = [];
         $result = [
             'status' => 'error', 'items' => [], 'total' => 0,
             'pagination' => ['page'=>1,'per_page'=>10,'page_size'=>10,'total'=>0,'pages'=>1,'from'=>0,'to'=>0,'page_key'=>'page','size_key'=>'page_size'],
@@ -95,6 +96,10 @@ final class RepositoryController
         $supportStatus = 'error';
         $supportError = null;
         $teacherMaterialUi = false;
+        $directProjectUi = false;
+        $directProjectTypes = [];
+        $directProjectKeywords = [];
+        $directProjectPeriod = null;
         try {
             $projectTypes = $repositoryModel->getProjectTypes();
             $academicPeriods = $repositoryModel->getAcademicPeriods();
@@ -127,6 +132,7 @@ final class RepositoryController
                 if ($teacherMaterialUi) {
                     $supportMaterialCategories = $supportModel->categories();
                     $supportMaterialTypes = $supportModel->materialTypeCatalog();
+                    $supportMaterialKeywords = $supportModel->keywordCatalog();
                 }
             } catch (Throwable $exception) {
                 error_log('Repository support material catalogs: ' . $exception->getMessage());
@@ -136,6 +142,19 @@ final class RepositoryController
             $supportDocuments = [];
             $supportStatus = 'error';
             $supportError = 'No fue posible cargar los materiales de apoyo en este momento. Intenta nuevamente mÃ¡s tarde.';
+        }
+
+        try {
+            $directProjectUi = (new ProjectCapabilityService())->canPublishDirectRepository($session);
+            if ($directProjectUi) {
+                $catalog = new AcademicCatalogService();
+                $directProjectTypes = $catalog->directProjectTypes();
+                $directProjectKeywords = $catalog->activeKeywords();
+                $directProjectPeriod = $catalog->activePeriod();
+            }
+        } catch (Throwable $exception) {
+            error_log('Repository direct project catalogs: ' . $exception->getMessage());
+            $directProjectUi = false;
         }
 
         $favoriteIds = [];
@@ -161,7 +180,10 @@ final class RepositoryController
         View::render('repository/repositorio', [
             'currentPage'=>'repository', 'title'=>'Repositorio Institucional | Gestión Documental Académica',
             'pageStyles'=>[asset('css/repository-reader.css')], 'pageScript'=>asset('js/repository.js'),
-            'pageScripts'=>$teacherMaterialUi ? [asset('js/teacher-support-materials.js')] : [],
+            'pageScripts'=>array_values(array_filter([
+                $teacherMaterialUi ? asset('js/teacher-support-materials.js') : null,
+                ($teacherMaterialUi || $directProjectUi) ? asset('js/teacher-repository-content.js') : null,
+            ])),
             'projects'=>$projects, 'repositoryStatus'=>(string) ($result['status'] ?? 'error'),
             'repositoryError'=>$repositoryError, 'repositoryPagination'=>(array) ($result['pagination'] ?? []),
             'repositoryFilters'=>(array) ($result['filters'] ?? []), 'favoriteActionUrl'=>route('repository-favorite'),
@@ -171,8 +193,15 @@ final class RepositoryController
             'supportDocuments'=>array_map(static function (array $material): array { $material['detail_url']=base_url('index.php?page=support-material-detail&id='.rawurlencode((string)$material['id'])); return $material; }, $supportDocuments),
             'supportStatus'=>$supportStatus, 'supportError'=>$supportError,
             'supportMaterialsUrl'=>route('support-materials'), 'canCreateSupportMaterial'=>$teacherMaterialUi,
+            'canPublishDirectProject'=>$directProjectUi, 'canAddRepositoryContent'=>$teacherMaterialUi || $directProjectUi,
+            'directProjectTypes'=>$directProjectTypes, 'directProjectKeywords'=>$directProjectKeywords,
+            'directProjectPeriod'=>$directProjectPeriod,
+            'directProjectEndpoint'=>route('repository-direct-project-publish'),
+            'directProjectSearchEndpoint'=>route('repository-direct-project-search'),
+            'directProjectCsrf'=>$directProjectUi ? $session->csrfToken('repository_direct_publish') : '',
             'supportMaterialCategories'=>$supportMaterialCategories,
             'supportMaterialTypes'=>$supportMaterialTypes,
+            'supportMaterialKeywords'=>$supportMaterialKeywords,
             'supportMaterialManageFileEndpoint'=>$teacherMaterialUi ? route('support-material-manage-file') : '',
             'supportMaterialManageSaveEndpoint'=>$teacherMaterialUi ? route('support-material-manage-save') : '',
             'supportMaterialCsrf'=>$teacherMaterialUi ? $session->csrfToken('admin_repository') : '',
@@ -257,7 +286,6 @@ final class RepositoryController
             'pageScript' => $isAdministratorView ? asset('js/admin-projects.js') : asset('js/repository-detail.js'),
             'pageScripts' => array_values(array_filter([
                 $isAdministratorView ? asset('js/material-admin-actions.js') : null,
-                asset('js/repository-detail.js'),
                 !empty($projectCapabilities['view_adjustment_requests']) ? asset('js/project-adjustments.js') : null,
             ])),
             'project' => $project,
@@ -470,6 +498,30 @@ final class RepositoryController
         ]);
     }
 
+    public function searchDirectProjectPeople(): void
+    {
+        $this->ensureSession();
+        header('Content-Type: application/json; charset=UTF-8');
+        $session = new AuthSessionService();
+        if (!$this->directProjectCapability($session)) {
+            http_response_code(403);
+            $this->sendJson(false, 'No tienes autorización para consultar este catálogo.');
+        }
+        $kind = strtolower(trim((string) ($_GET['kind'] ?? '')));
+        $search = trim((string) ($_GET['q'] ?? ''));
+        if (!in_array($kind, ['students','tutors'], true) || mb_strlen($search) < 2) {
+            $this->sendJson(true, '', ['items'=>[]]);
+        }
+        try {
+            $items = (new AcademicCatalogService())->directProjectPeople($kind, $search);
+            $this->sendJson(true, '', ['items'=>$items]);
+        } catch (Throwable $exception) {
+            error_log('Repository direct project search: ' . $exception->getMessage());
+            http_response_code(500);
+            $this->sendJson(false, 'No fue posible consultar las personas disponibles.');
+        }
+    }
+
     /** Publica directamente un proyecto en Repository; no representa una transición académica. */
     public function publishDirectProject(): void
     {
@@ -480,8 +532,7 @@ final class RepositoryController
             $this->sendJson(false, 'Método no permitido.');
         }
         $session = new AuthSessionService();
-        $capability = new ProjectCapabilityService();
-        if (!$capability->canPublishDirectRepository($session)) {
+        if (!$this->directProjectCapability($session)) {
             http_response_code(403);
             $this->sendJson(false, 'No tienes autorización para publicar proyectos directamente en el repositorio.');
         }
@@ -494,6 +545,8 @@ final class RepositoryController
             'project_type_id' => $_POST['project_type_id'] ?? null,
             'description' => $_POST['description'] ?? '',
             'author_ids' => $_POST['author_ids'] ?? [],
+            'tutoring_user_ids' => $_POST['tutoring_user_ids'] ?? [],
+            'tutoring_primary_id' => $_POST['tutoring_primary_id'] ?? null,
             'tutor_id' => $_POST['tutor_id'] ?? null,
             'keyword_ids' => $_POST['keyword_ids'] ?? [],
         ];
@@ -513,6 +566,11 @@ final class RepositoryController
             http_response_code(500);
             $this->sendJson(false, 'No fue posible publicar el proyecto en este momento.');
         }
+    }
+
+    private function directProjectCapability(AuthSessionService $session): bool
+    {
+        return (new ProjectCapabilityService())->canPublishDirectRepository($session);
     }
 
     private function ensureSession(): void

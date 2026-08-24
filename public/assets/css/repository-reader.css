@@ -10,6 +10,37 @@
     --status-completed: 37, 99, 235;
 }
 
+.teacher-repository-content-modal[hidden] { display: none; }
+.teacher-repository-content-modal { position: fixed; inset: 0; z-index: 2200; display: grid; place-items: center; padding: 16px; background: rgba(15, 23, 42, .48); }
+.teacher-repository-content-modal__card, .teacher-direct-project-modal__card { position: relative; width: min(560px, 100%); max-height: calc(100dvh - 32px); overflow: hidden; border: 1px solid var(--line, #dbe3ef); border-radius: 18px; background: var(--surface, #fff); box-shadow: 0 24px 70px rgba(15, 23, 42, .24); color: var(--text, #12203a); }
+.teacher-repository-content-modal__card { padding: 28px; }
+.teacher-repository-content-modal__close { position: absolute; top: 14px; right: 14px; width: 34px; height: 34px; border: 0; border-radius: 50%; background: transparent; color: var(--muted, #64748b); font-size: 24px; cursor: pointer; }
+.teacher-repository-content-modal__close:focus-visible, .teacher-repository-content-option:focus-visible, .teacher-direct-project-modal button:focus-visible, .teacher-direct-project-modal input:focus-visible, .teacher-direct-project-modal select:focus-visible, .teacher-direct-project-modal textarea:focus-visible { outline: 3px solid rgba(37, 99, 235, .28); outline-offset: 2px; }
+.teacher-repository-content-modal__intro { margin: 8px 0 20px; color: var(--muted, #64748b); }
+.teacher-repository-content-modal__options { display: grid; gap: 12px; }
+.teacher-repository-content-option { display: flex; gap: 14px; align-items: flex-start; width: 100%; padding: 16px; border: 1px solid var(--line, #dbe3ef); border-radius: 13px; background: var(--surface, #fff); color: inherit; text-align: left; cursor: pointer; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.teacher-repository-content-option:hover { border-color: var(--primary, #2563eb); background: #f5f8ff; transform: translateY(-1px); }
+.teacher-repository-content-option > i { width: 24px; color: var(--primary, #2563eb); font-size: 20px; }
+.teacher-repository-content-option span { display: grid; gap: 5px; } .teacher-repository-content-option small { color: var(--muted, #64748b); line-height: 1.45; }
+.teacher-direct-project-modal__card { width: min(860px, 100%); }
+.teacher-direct-project-modal__header, .teacher-direct-project-modal__footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; border-bottom: 1px solid var(--line, #dbe3ef); }
+.teacher-direct-project-modal__header h2 { margin: 3px 0 0; } .teacher-direct-project-modal__footer { justify-content: flex-end; border-top: 1px solid var(--line, #dbe3ef); border-bottom: 0; }
+.teacher-direct-project-modal__body { max-height: calc(100dvh - 170px); overflow-y: auto; padding: 22px 24px; display: grid; gap: 17px; }
+.teacher-direct-project-modal label, .teacher-direct-project-modal fieldset { display: grid; gap: 7px; min-width: 0; border: 0; padding: 0; margin: 0; font-weight: 700; font-size: 13px; }
+.teacher-direct-project-modal small, [data-direct-error-for] { color: var(--muted, #64748b); font-weight: 400; line-height: 1.4; } .teacher-direct-project-modal [data-direct-error-for] { color: #b42318; }
+.teacher-direct-project-modal input, .teacher-direct-project-modal select, .teacher-direct-project-modal textarea { width: 100%; min-height: 42px; border: 1px solid var(--line, #dbe3ef); border-radius: 9px; padding: 10px 12px; background: var(--surface, #fff); color: inherit; font: inherit; font-weight: 400; box-sizing: border-box; }
+.teacher-direct-project-modal textarea { resize: vertical; } .teacher-direct-project-modal input[readonly] { background: #f7f9fc; }
+.teacher-direct-project-grid--two { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; }
+.teacher-direct-project-picker { position: relative; } .teacher-direct-project-results { display: grid; gap: 4px; max-height: 180px; overflow: auto; padding: 5px; border: 1px solid var(--line, #dbe3ef); border-radius: 9px; background: var(--surface, #fff); } .teacher-direct-project-results[hidden] { display: none; }
+.teacher-direct-project-results button { border: 0; border-radius: 6px; padding: 9px 10px; background: transparent; text-align: left; cursor: pointer; color: inherit; } .teacher-direct-project-results button:hover { background: #eef4ff; }
+.teacher-direct-project-chips { display: flex; flex-wrap: wrap; gap: 7px; } .teacher-direct-project-chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; border-radius: 999px; background: #edf3ff; color: var(--primary, #2563eb); font-size: 12px; font-weight: 700; } .teacher-direct-project-chip button { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 16px; line-height: 1; }
+.teacher-direct-project-keywords { display: flex; flex-wrap: wrap; gap: 8px; } .teacher-direct-project-keywords label { display: block; } .teacher-direct-project-keywords input { position: absolute; opacity: 0; pointer-events: none; } .teacher-direct-project-keywords span { display: block; padding: 7px 10px; border: 1px solid var(--line, #dbe3ef); border-radius: 999px; color: var(--muted, #64748b); cursor: pointer; font-weight: 600; } .teacher-direct-project-keywords input:checked + span { border-color: var(--primary, #2563eb); background: #edf3ff; color: var(--primary, #2563eb); }
+.teacher-direct-project-dropzone { display: grid; gap: 4px; justify-items: center; padding: 18px; border: 1px dashed #9bb7e8; border-radius: 11px; background: #f7faff; text-align: center; } .teacher-direct-project-dropzone input { min-height: auto; padding: 0; border: 0; background: transparent; } .teacher-direct-project-dropzone.is-dragover { border-color: var(--primary, #2563eb); background: #edf3ff; }
+.teacher-direct-project-file-list { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; } .teacher-direct-project-file-list li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 8px; background: #f7f9fc; font-size: 13px; } .teacher-direct-project-file-list button { border: 0; background: transparent; color: #b42318; cursor: pointer; }
+.teacher-direct-project-errors { padding: 10px 12px; border-radius: 8px; background: #fff4f2; color: #b42318; } .teacher-direct-project-errors[hidden] { display: none; }
+@media (max-width: 720px) { .teacher-direct-project-grid--two { grid-template-columns: 1fr; } .teacher-direct-project-modal__header, .teacher-direct-project-modal__footer { padding: 16px; } .teacher-direct-project-modal__body { padding: 18px 16px; } }
+@media (max-width: 480px) { .teacher-repository-content-modal { padding: 8px; } .teacher-repository-content-modal__card { padding: 22px 16px; } .teacher-direct-project-modal__card { max-height: calc(100dvh - 16px); border-radius: 13px; } .teacher-direct-project-modal__body { max-height: calc(100dvh - 145px); padding: 16px 12px; } .teacher-direct-project-modal__footer { flex-wrap: wrap; } .teacher-direct-project-modal__footer button { flex: 1 1 130px; } }
+
 [hidden], .ar-project-card[hidden], .ar-material-card[hidden] {
     display: none !important;
 }
@@ -381,6 +412,18 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
     color: var(--text);
     font-size:var(--font-lg);
     line-height: 1.38;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+.ar-material-card .ar-card-copy p {
+    margin: 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: var(--font-sm);
+    line-height: 1.55;
+    white-space: pre-line;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
@@ -812,6 +855,201 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
     width: 100%;
 }
 
+.teacher-material-field > span small {
+    color: var(--muted);
+    font-size: var(--font-xs);
+    font-weight: 500;
+}
+
+.teacher-material-field .ed-keyword-selector {
+    position: relative;
+    min-width: 0;
+}
+
+.teacher-material-field .ed-keyword-trigger {
+    width: 100%;
+    min-height: 42px;
+    padding: 11px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font: inherit;
+    font-size: var(--font-sm);
+    font-weight: 500;
+    text-align: left;
+}
+
+.teacher-material-field .ed-keyword-trigger:focus-visible,
+.teacher-material-field .ed-keyword-selector.is-open .ed-keyword-trigger {
+    border-color: var(--primary);
+    outline: 0;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
+}
+
+.teacher-material-field .ed-keyword-trigger > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.teacher-material-field .ed-keyword-panel {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: 0 18px 44px rgba(15, 23, 42, .2);
+    overflow: hidden;
+}
+
+.teacher-material-field .ed-keyword-panel[hidden] {
+    display: none !important;
+}
+
+.teacher-material-field .ed-keyword-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.teacher-material-field .ed-keyword-search .ed-sr-only {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.teacher-material-field .ed-keyword-search i {
+    position: static;
+    width: 16px;
+    height: 16px;
+    margin-left: 11px;
+    flex: 0 0 auto;
+    display: grid;
+    color: var(--muted);
+    line-height: 1;
+    place-items: center;
+}
+
+.teacher-material-field .ed-keyword-search .search-history-field {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.teacher-material-field .ed-keyword-search input {
+    min-height: 40px;
+    padding-left: 10px !important;
+}
+
+.teacher-material-field .ed-keyword-options {
+    max-height: 190px;
+    margin-top: 7px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+
+.teacher-material-field .ed-keyword-option {
+    min-width: 0;
+    min-height: 40px;
+    padding: 7px 9px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: var(--font-sm);
+    font-weight: 500;
+}
+
+.teacher-material-field .ed-keyword-option[hidden] {
+    display: none !important;
+}
+
+.teacher-material-field .ed-keyword-option:hover,
+.teacher-material-field .ed-keyword-option:focus-within {
+    background: var(--surface-soft);
+}
+
+.teacher-material-field .ed-keyword-option input {
+    width: 17px !important;
+    height: 17px;
+    min-height: 0 !important;
+    flex: 0 0 auto;
+    padding: 0 !important;
+    accent-color: var(--primary);
+}
+
+.teacher-material-field .ed-keyword-option > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.teacher-material-field .ed-keyword-limit {
+    margin: 7px 3px 2px;
+    color: #a15c00;
+    font-size: var(--font-xs);
+    font-weight: 750;
+}
+
+.teacher-material-field .ed-keyword-limit[hidden] {
+    display: none !important;
+}
+
+.teacher-material-field .ed-keyword-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 7px;
+}
+
+.teacher-material-field .ed-keyword-chips:empty {
+    display: none;
+}
+
+.teacher-material-field .ed-keyword-chip {
+    max-width: 100%;
+    min-height: 30px;
+    padding: 4px 7px 4px 9px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface-soft);
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font: inherit;
+    font-size: var(--font-xs);
+    font-weight: 750;
+}
+
+.teacher-material-field .ed-keyword-chip span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.teacher-material-field .ed-keyword-chip i {
+    color: var(--muted);
+}
+
 .teacher-material-modal .ed-edit-modal-body :is(input, select, textarea) {
     width: 100%;
     min-width: 0;
@@ -1047,6 +1285,648 @@ body.teacher-material-modal-open {
 .repository-toast.show {
     opacity: 1;
     transform: translateY(0);
+}
+
+/* Footers compartidos de los modales de creación Teacher. */
+.teacher-material-footer,
+.teacher-direct-project-modal__footer {
+    align-items: center;
+    gap: 16px;
+    padding: 22px 24px 24px;
+}
+
+.teacher-material-btn,
+.teacher-direct-project-modal__footer .ar-secondary-action,
+.teacher-direct-project-modal__footer .ar-primary-action {
+    min-height: 48px;
+    padding: 0 24px;
+    border-radius: 9px;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+
+.teacher-direct-project-modal__footer .ar-secondary-action {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--text);
+}
+
+.teacher-direct-project-modal__footer .ar-primary-action {
+    min-width: 204px;
+}
+
+/* Alineación uniforme de las acciones del wizard académico. */
+.teacher-direct-project-modal__footer > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font: inherit;
+    font-weight: 800;
+    line-height: normal;
+}
+
+.teacher-direct-project-keyword-selector {
+    position: relative;
+}
+
+.teacher-direct-project-keyword-trigger {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 12px;
+    border: 1px solid var(--line, #dbe3ef);
+    border-radius: 9px;
+    background: var(--surface, #fff);
+    color: inherit;
+    font: inherit;
+    font-weight: 400;
+    text-align: left;
+    cursor: pointer;
+}
+
+.teacher-direct-project-keyword-trigger i {
+    color: var(--muted, #64748b);
+    transition: transform .18s ease;
+}
+
+.teacher-direct-project-keyword-selector.is-open .teacher-direct-project-keyword-trigger i {
+    transform: rotate(180deg);
+}
+
+.teacher-direct-project-keyword-panel {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 6px);
+    right: 0;
+    left: 0;
+    display: grid;
+    gap: 8px;
+    padding: 9px;
+    border: 1px solid var(--line, #dbe3ef);
+    border-radius: 10px;
+    background: var(--surface, #fff);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, .16);
+}
+
+.teacher-direct-project-keyword-panel[hidden] {
+    display: none;
+}
+
+.teacher-direct-project-keyword-search {
+    position: relative;
+    display: flex !important;
+    align-items: center;
+    gap: 7px !important;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 0 9px;
+    border: 1px solid var(--line, #dbe3ef);
+    border-radius: 8px;
+    background: var(--surface-soft, #f7f9fc);
+    font-weight: 400 !important;
+}
+
+.teacher-direct-project-keyword-search i {
+    flex: 0 0 auto;
+    color: var(--muted, #64748b);
+}
+
+.teacher-direct-project-keyword-search > .search-history-field {
+    display: flex !important;
+    align-items: center;
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 100%;
+}
+
+.teacher-direct-project-keyword-search .search-history-field > input[data-direct-keyword-search] {
+    display: block !important;
+    flex: 1 1 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    inline-size: auto !important;
+    box-sizing: border-box;
+    min-height: 36px;
+    padding: 7px 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.teacher-direct-project-keyword-search input:focus {
+    box-shadow: none;
+}
+
+.teacher-direct-project-keyword-options {
+    display: grid;
+    gap: 3px;
+    max-height: 190px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 3px;
+}
+
+.teacher-direct-project-keyword-options > label {
+    display: flex !important;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    min-height: 36px;
+    padding: 7px 8px;
+    border-radius: 7px;
+    font-weight: 400 !important;
+    cursor: pointer;
+}
+
+.teacher-direct-project-keyword-options > label:hover {
+    background: #f1f5f9;
+}
+
+.teacher-direct-project-keyword-options > label[hidden] {
+    display: none !important;
+}
+
+.teacher-direct-project-keyword-options input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 16px;
+    min-height: 16px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--primary, #2563eb);
+}
+
+.teacher-direct-project-keyword-options > label span {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+    .teacher-material-footer,
+    .teacher-direct-project-modal__footer {
+        gap: 12px;
+        padding: 18px 16px 20px;
+    }
+
+    .teacher-material-footer {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .teacher-material-btn,
+    .teacher-direct-project-modal__footer .ar-secondary-action,
+    .teacher-direct-project-modal__footer .ar-primary-action {
+        width: 100%;
+        min-width: 0;
+        padding: 0 14px;
+    }
+}
+
+@media (max-width: 360px) {
+    .teacher-material-footer,
+    .teacher-direct-project-modal__footer {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+}
+
+.teacher-direct-project-modal__card {
+    display: flex;
+    flex-direction: column;
+}
+
+.teacher-direct-project-modal__header,
+.teacher-direct-project-stepper,
+.teacher-direct-project-modal__footer {
+    flex-shrink: 0;
+}
+
+.teacher-direct-project-stepper {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--line, #dbe3ef);
+}
+
+.teacher-direct-project-stepper > button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted, #64748b);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.teacher-direct-project-stepper > button:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: calc(100% - 2px);
+    width: calc(100% - 14px);
+    height: 2px;
+    background: var(--line, #dbe3ef);
+}
+
+.teacher-direct-project-stepper span {
+    display: grid;
+    place-items: center;
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    border: 2px solid var(--line, #dbe3ef);
+    border-radius: 50%;
+    background: var(--surface, #fff);
+    font-weight: 800;
+}
+
+.teacher-direct-project-stepper [aria-current="step"] {
+    color: var(--primary, #2563eb);
+}
+
+.teacher-direct-project-stepper [aria-current="step"] span {
+    border-color: var(--primary, #2563eb);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, .1);
+}
+
+.teacher-direct-project-stepper .is-complete {
+    color: #087443;
+}
+
+.teacher-direct-project-stepper .is-complete span {
+    border-color: #087443;
+    background: #087443;
+    color: #fff;
+}
+
+.teacher-direct-project-stepper > button:disabled {
+    cursor: not-allowed;
+}
+
+.teacher-direct-project-stepper > button:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .24);
+    outline-offset: 3px;
+    border-radius: 8px;
+}
+
+.teacher-direct-project-stepper > button:not(:last-child)::after {
+    display: block;
+    top: 50%;
+    left: calc(100% - 2px);
+    right: auto;
+    width: clamp(18px, 28%, 64px);
+    height: 2px;
+    transform: translateY(-50%);
+    background: var(--line, #dbe3ef);
+    z-index: 0;
+}
+
+.teacher-direct-project-stepper > button.is-complete:not(:last-child)::after {
+    background: #087443;
+}
+
+/* Ajuste visual final del modal académico: compacto y centrado en el contenido. */
+.teacher-direct-project-modal__card {
+    width: min(760px, 100%);
+}
+
+.teacher-direct-project-stepper {
+    position: relative;
+    align-items: start;
+    gap: 0;
+    padding: 16px 28px 14px;
+}
+
+.teacher-direct-project-stepper > button {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-rows: 30px auto;
+    justify-items: center;
+    gap: 5px;
+    min-width: 0;
+    padding: 0 8px;
+    text-align: center;
+}
+
+.teacher-direct-project-stepper > button:not(:last-child)::after {
+    display: block;
+    top: 14px;
+    left: calc(50% + 15px);
+    width: calc(100% - 30px);
+    height: 2px;
+    transform: none;
+    background: var(--line, #dbe3ef);
+}
+
+.teacher-direct-project-stepper > button.is-complete:not(:last-child)::after {
+    background: #10b981;
+}
+
+.teacher-direct-project-stepper span {
+    position: relative;
+    z-index: 2;
+    flex-basis: 30px;
+    width: 30px;
+    height: 30px;
+    border-width: 2px;
+    background: var(--surface, #fff);
+}
+
+.teacher-direct-project-stepper [aria-current="step"] {
+    color: #059669;
+}
+
+.teacher-direct-project-stepper [aria-current="step"] span {
+    border-color: #10b981;
+    background: #10b981;
+    color: #fff;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, .14);
+}
+
+.teacher-direct-project-stepper .is-complete {
+    color: #047857;
+}
+
+.teacher-direct-project-stepper .is-complete span {
+    border-color: #10b981;
+    background: #10b981;
+    color: #fff;
+}
+
+.teacher-direct-project-stepper > button b {
+    overflow-wrap: anywhere;
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+@media (max-width: 480px) {
+    .teacher-direct-project-stepper {
+        padding-inline: 12px;
+    }
+
+    .teacher-direct-project-stepper > button {
+        padding-inline: 2px;
+    }
+
+    .teacher-direct-project-stepper > button b {
+        font-size: 10px;
+    }
+}
+
+.teacher-direct-project-modal__body {
+    max-height: none;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.teacher-direct-project-step {
+    display: grid;
+    gap: 17px;
+}
+
+.teacher-direct-project-step[hidden] {
+    display: none;
+}
+
+.teacher-direct-project-step__kicker {
+    margin: 0;
+    color: var(--primary, #2563eb);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.teacher-direct-project-step h3 {
+    margin: -10px 0 0;
+    font-size: 20px;
+}
+
+.teacher-direct-project-step__help {
+    margin: -8px 0 0;
+    color: var(--muted, #64748b);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+}
+
+.teacher-direct-project-dropzone > input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.teacher-direct-project-dropzone > label {
+    display: grid;
+    justify-items: center;
+    gap: 5px;
+    width: 100%;
+    cursor: pointer;
+    text-align: center;
+}
+
+.teacher-direct-project-dropzone > label i {
+    color: var(--primary, #2563eb);
+    font-size: 23px;
+}
+
+.teacher-direct-project-summary {
+    padding: 14px 16px;
+    border: 1px solid var(--line, #dbe3ef);
+    border-radius: 11px;
+    background: #f7f9fc;
+}
+
+.teacher-direct-project-summary h4 {
+    margin: 0 0 10px;
+    font-size: 14px;
+}
+
+.teacher-direct-project-summary dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 18px;
+    margin: 0;
+}
+
+.teacher-direct-project-summary dt {
+    color: var(--muted, #64748b);
+    font-size: 11px;
+}
+
+.teacher-direct-project-summary dd {
+    margin: 2px 0 0;
+    overflow-wrap: anywhere;
+    font-weight: 700;
+}
+
+@media (max-width: 720px) {
+    .teacher-direct-project-stepper,
+    .teacher-direct-project-modal__footer {
+        padding-inline: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .teacher-direct-project-stepper {
+        gap: 4px;
+        padding-block: 11px;
+    }
+
+    .teacher-direct-project-stepper > button {
+        justify-content: center;
+        gap: 4px;
+        font-size: 10px;
+    }
+
+    .teacher-direct-project-stepper span {
+        flex-basis: 25px;
+        width: 25px;
+        height: 25px;
+    }
+
+    .teacher-direct-project-stepper > button:not(:last-child)::after {
+        width: calc(100% - 9px);
+    }
+
+    .teacher-direct-project-summary dl {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Campo de descripción: compacto, guiado y consistente con los demás campos. */
+.teacher-direct-project-description {
+    gap: 5px;
+}
+
+.teacher-direct-project-modal__card {
+    box-sizing: border-box;
+    height: min(760px, calc(100dvh - 32px));
+}
+
+.teacher-direct-project-modal__body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+/* El formulario es el shell flexible que permite que el body sea realmente desplazable. */
+.teacher-direct-project-modal__card > form[data-direct-project-form] {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* La ayuda institucional se mantiene compacta, pero deja de parecer texto auxiliar. */
+.teacher-direct-project-step__help {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: -8px 0 0;
+    padding: 11px 13px;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    background: #eff6ff;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.teacher-direct-project-step__help::before {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    color: #2563eb;
+    content: '\f05a';
+    font-family: 'Font Awesome 6 Free';
+    font-size: 15px;
+    font-weight: 900;
+}
+
+.teacher-direct-project-description textarea {
+    min-height: 112px;
+    resize: vertical;
+    background: var(--surface, #fff);
+    line-height: 1.45;
+}
+
+.teacher-direct-project-description textarea::placeholder {
+    color: var(--muted, #64748b);
+    opacity: .78;
+}
+
+.teacher-direct-project-modal :is(input, select, textarea):focus {
+    border-color: var(--primary, #2563eb);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+    outline: 0;
+}
+
+.teacher-direct-project-modal .teacher-direct-project-description:has([data-direct-error-for="description"]:not(:empty)) textarea {
+    border-color: #b42318;
+}
+
+.teacher-direct-project-modal .teacher-direct-project-description:has([data-direct-error-for="description"]:not(:empty)) textarea:focus {
+    box-shadow: 0 0 0 3px rgba(180, 35, 24, .12);
+}
+
+.teacher-direct-project-modal .teacher-direct-project-description [data-direct-error-for="description"] {
+    margin-top: 0;
+    font-size: 12px;
+}
+
+@media (max-width: 480px) {
+    .teacher-direct-project-modal__card {
+        height: calc(100dvh - 16px);
+    }
+
+    .teacher-direct-project-step__help {
+        gap: 8px;
+        padding: 10px 11px;
+    }
+
+}
+
+/* El backdrop cubre el viewport; el contenido se centra en el espacio del main. */
+@media (min-width: 1001px) {
+    .teacher-repository-content-modal,
+    .teacher-material-modal[data-teacher-material-modal] {
+        padding-left: calc(var(--app-sidebar-width, 280px) + var(--app-shell-gutter, 0px) + 16px);
+        padding-right: calc(var(--app-shell-gutter, 0px) + 16px);
+    }
+}
+
+@media (max-width: 1000px) {
+    .teacher-repository-content-modal,
+    .teacher-material-modal[data-teacher-material-modal] {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+}
+
+/* Conexiones cortas: el espacio y los estados de los pasos hacen el trabajo visual. */
+.teacher-direct-project-stepper > div:not(:last-child)::after {
+    display: none;
 }
 
 @media (max-width: 1000px) {

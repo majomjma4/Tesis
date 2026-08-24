@@ -36,7 +36,7 @@
             <?php if ($group['items'] === []): ?><p class="projects-section-empty"><?= e($group['empty']) ?></p>
             <?php else: ?><div class="projects-grid" aria-label="<?= e($group['title']) ?>">
             <?php foreach ($group['items'] as $project):
-                $search = mb_strtolower(implode(' ', array_merge([$project['title'] ?? '', $project['subtitle'] ?? '', $project['type'] ?? '', $project['tutor'] ?? '', $project['period'] ?? '', $project['career'] ?? ''], (array) ($project['tags'] ?? []), (array) ($project['technologies'] ?? []))), 'UTF-8');
+                $search = mb_strtolower(implode(' ', array_merge([$project['title'] ?? '', $project['subtitle'] ?? '', $project['type'] ?? '', $project['tutor'] ?? '', $project['period'] ?? '', $project['career'] ?? '', $project['publisher'] ?? ''], (array) ($project['tags'] ?? []), (array) ($project['technologies'] ?? []))), 'UTF-8');
                 /* Legacy state presentation removed; navigation is resolved by the controller. */
                 /*
                 $actionUrl = route('project-detail') . '&id=' . (int) $project['id'];
@@ -74,6 +74,7 @@
                 <?php $hasPendingReview=!empty($project['review_situation']['has_pending_observations']); ?>
                 <article class="projects-card" data-project-card data-search="<?= e($search) ?>" data-status="<?= e($project['status_key']) ?>" data-situation="<?=$hasPendingReview?'pending':'none'?>" data-type="<?= e($project['type_key']) ?>" data-period="<?= e($project['period']) ?>" data-title="<?= e($project['title']) ?>" data-activity="<?= (int) ($project['activity_order'] ?? 0) ?>">
                     <header><span class="projects-type"><?= e($projectTypeLabel) ?></span><span class="projects-status is-<?= e($project['status_key']) ?>"><?= e($project['status']) ?></span></header>
+                    <?php if (!empty($project['is_direct_repository'])): ?><p class="projects-direct-origin"><i class="fa-solid fa-book-open" aria-hidden="true"></i> Publicado directamente en el repositorio<?php if (!empty($project['publisher'])): ?> · Publicado por: <?= e((string) $project['publisher']) ?><?php endif; ?></p><?php endif; ?>
                     <?php if($hasPendingReview):?><span class="projects-review-situation"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>Observaciones pendientes</span><?php endif;?>
                     <div class="projects-card-title"><h2><?= e($project['title']) ?></h2></div>
                     <div class="project-card-tutor"><i class="fa-solid fa-chalkboard-user"></i><span><small>Tutor</small><strong><?= e($project['tutor'] ?: 'Por asignar') ?></strong></span><em><?= e($project['period']) ?></em></div>

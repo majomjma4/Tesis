@@ -41,7 +41,9 @@ final class ProjectRecordModel
                        ap.name AS period_name, s.code AS subject_code, s.name AS subject_name,
                        rl.name AS research_line_name, tutor.id AS tutor_user_id,
                        tutor.username AS tutor_username, tutor.full_name AS tutor_name,
-                       tutor.email AS tutor_email
+                       tutor.email AS tutor_email,
+                       publisher.full_name AS publisher_name,
+                       publisher_profile.academic_title AS publisher_academic_title
                 FROM projects p
                 INNER JOIN project_types pt ON pt.id=p.project_type_id
                 INNER JOIN careers c ON c.id=p.career_id
@@ -49,6 +51,8 @@ final class ProjectRecordModel
                 LEFT JOIN academic_subjects s ON s.id=p.academic_subject_id
                 LEFT JOIN research_lines rl ON rl.id=p.research_line_id
                 LEFT JOIN users tutor ON tutor.id=p.tutor_id
+                LEFT JOIN users publisher ON publisher.id=p.repository_added_by
+                LEFT JOIN teacher_profiles publisher_profile ON publisher_profile.user_id=publisher.id
                 WHERE p.id=:id AND p.deleted_at IS NULL";
         if ($publishedOnly) $sql .= " AND p.status='published' AND p.withdrawn_at IS NULL" . ($administrator ? '' : ' AND p.is_available=1') . "
             AND EXISTS (SELECT 1 FROM project_files visible_file WHERE visible_file.project_id=p.id AND visible_file.deleted_at IS NULL AND visible_file.purged_at IS NULL)

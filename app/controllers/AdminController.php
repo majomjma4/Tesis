@@ -422,9 +422,6 @@ final class AdminController
         // RequestSizeGuard handles oversized multipart bodies before this controller runs.
         if(!$session->validateCsrf('admin_repository',(string)($_POST['_csrf']??'')))$this->json(false,'La solicitud contiene un token CSRF inválido.',[],419);
         $id=(int)($_POST['id']??0);$title=$this->normalizeAuditText($_POST['title']??'');
-        if($id===0&&!$session->hasAdminAccess()){
-            $_POST['publisher']=trim((string)$session->name());
-        }
         $initialUploads=[];
         if($id===0&&isset($_FILES['initial_files']['name'])&&is_array($_FILES['initial_files']['name'])){
             foreach(array_keys($_FILES['initial_files']['name']) as $index)$initialUploads[]=[
@@ -476,7 +473,7 @@ final class AdminController
                     if($currentKeywords['comparison']!==$submittedKeywords['comparison'])$auditChanges[]=['field'=>'keywords','label'=>'Palabras clave','old'=>$currentKeywords['display'],'new'=>$submittedKeywords['display']];
                     if($auditChanges===[])return ['id'=>$id,'no_changes'=>true];
                 }
-                $saved=$model->save($_POST,(int)$session->userId());
+                $saved=$model->save($_POST,(int)$session->userId(),$id===0&&!$session->isAdminModeActive());
                 if($id===0&&$initialUploads!==[]){
                     $fileService=new SupportMaterialFileService();
                     foreach($initialUploads as $upload){

@@ -130,8 +130,13 @@
         ? (string) $packageDownloadActionUrl . '&material_id=' . $materialId
         : '';
 
-    $publicationState = (string) ($material['status_key'] ?? 'published');
+    $publicationState = (string) ($material['status_key'] ?? 'draft');
     $isPublished = $publicationState === 'published';
+    $statusLabel = match ($publicationState) {
+        'published' => 'Publicado',
+        'draft' => 'Borrador',
+        default => 'Retirado',
+    };
     $materialFiles = array_values(array_filter(
         (array) ($material['files'] ?? []),
         static fn (array $file): bool => ($file['state'] ?? '') === 'available'
@@ -168,7 +173,7 @@
             'title' => (string) ($material['title'] ?? 'Material de apoyo'),
             'description' => $mode === 'edit' ? 'Editando información del material.' : (string) ($material['description'] ?? ''),
             'type_label' => 'Material de apoyo',
-            'status_label' => $isPublished ? 'Publicado' : 'Retirado',
+            'status_label' => $statusLabel,
             'status_tone' => $isPublished ? 'success' : 'neutral',
         ],
         'metadata' => array_values(array_filter([

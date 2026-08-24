@@ -18,6 +18,7 @@ final class TeacherAssignedProjectService
         if ($teacherId < 1) return ['projects'=>[], 'types'=>[], 'periods'=>[], 'relations'=>[]];
         $db = Database::connection();
         $projects = $this->projects($db, $teacherId, $periodId);
+        $projects = array_merge($projects, $this->directRepositoryProjects($db, $teacherId, $periodId));
         if ($projects === []) return ['projects'=>[], 'types'=>[], 'periods'=>[], 'relations'=>[]];
         $ids = array_map(static fn(array $row): int => (int)$row['id'], $projects);
         $relations = $this->relations($db, $teacherId, $ids);
@@ -30,7 +31,9 @@ final class TeacherAssignedProjectService
             $situationRelations[$projectId] = array_values(array_unique($codes));
         }
         try {
-            $reviewSituations = (new ProjectReviewSituationService())->teacherSituations($projects, $situationRelations, $db);
+            $workflowProjects = array_values(array_filter($projects, static fn(array $project): bool => (string)($project['publication_origin'] ?? 'workflow') === 'workflow'));
+            $workflowRelations = array_intersect_key($situationRelations, array_flip(array_map(static fn(array $project): int => (int)$project['id'], $workflowProjects)));
+            $reviewSituations = (new ProjectReviewSituationService())->teacherSituations($workflowProjects, $workflowRelations, $db);
         } catch (Throwable $error) {
             error_log('Teacher assigned project situation: ' . $error->getMessage());
             $reviewSituations = [];
@@ -45,11 +48,12 @@ final class TeacherAssignedProjectService
             $names = array_map(static fn(array $row): string => (string)$row['name'], $studentRows);
             $status = (string)$project['status'];
             $labels = project_academic_labels($status);
-            $teacherSituation = $reviewSituations[$id] ?? [
+            $isDirect = (string)($project['publication_origin'] ?? 'workflow') === 'direct_repository';
+            $teacherSituation = $isDirect ? ['key'=>'direct_repository','label'=>'Publicado directamente en el repositorio','description'=>'Consulta institucional de solo lectura.','requires_attention'=>false,'actor'=>'repository','review_units'=>0] : ($reviewSituations[$id] ?? [
                 'key'=>'waiting_process', 'label'=>'En seguimiento',
                 'description'=>'No fue posible determinar una acción docente; se requiere revisión del expediente.',
                 'requires_attention'=>false, 'actor'=>'unknown', 'review_units'=>0,
-            ];
+            ]);
             $items[] = [
                 'id'=>$id, 'code'=>(string)$project['code'], 'title'=>(string)$project['title'],
                 'type'=>(string)$project['type_name'], 'type_code'=>(string)$project['type_code'], 'updated_at'=>(string)$project['updated_at'],
@@ -57,6 +61,8 @@ final class TeacherAssignedProjectService
                 'students'=>$this->compactNames($names), 'student_rows'=>$studentRows, 'students_search'=>implode(' ', $names),
                 'relationships'=>array_map(static fn(string $code): array => ['code'=>$code, 'label'=>self::RELATION_LABELS[$code]], $codes),
                 'status'=>(string)$labels['status'], 'status_key'=>$status,
+                'publication_origin'=>(string)($project['publication_origin'] ?? 'workflow'),
+                'is_direct_repository'=>$isDirect, 'publisher'=>(string)($project['publisher'] ?? ''),
                 'teacher_situation'=>$teacherSituation['label'],
                 'teacher_situation_requires_attention'=>$teacherSituation['requires_attention'],
                 'teacher_situation_data'=>$teacherSituation,
@@ -77,6 +83,22 @@ final class TeacherAssignedProjectService
         $period = $periodId !== null ? ' AND p.academic_period_id=:period_id' : '';
         $query = $db->prepare("SELECT p.id,p.code,p.title,p.status,p.tutor_id,p.updated_at,pt.code type_code,pt.name type_name,ap.id period_id,ap.name period_name FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id INNER JOIN academic_periods ap ON ap.id=p.academic_period_id WHERE p.deleted_at IS NULL AND p.publication_origin='workflow'{$period} AND (p.tutor_id=:teacher_tutor OR EXISTS (SELECT 1 FROM project_participants pp WHERE pp.project_id=p.id AND pp.user_id=:teacher_participant AND pp.status='active' AND pp.removed_at IS NULL AND LOWER(pp.role_code) IN ('tutor','cotutor','co_tutor','co-tutor','tribunal','jury'))) ORDER BY p.updated_at DESC,p.id DESC");
         $params=['teacher_tutor'=>$teacherId, 'teacher_participant'=>$teacherId]; if ($periodId !== null) $params['period_id']=$periodId;
+        $query->execute($params);
+        return $query->fetchAll();
+    }
+
+    /** Direct repository projects are historical read-only assignments, never active assignments. */
+    private function directRepositoryProjects(PDO $db, int $teacherId, ?int $periodId): array
+    {
+        $period = $periodId !== null ? ' AND p.academic_period_id=:period_id' : '';
+        $query = $db->prepare("SELECT p.id,p.code,p.title,p.status,p.tutor_id,p.updated_at,p.publication_origin,p.repository_added_by,
+            pt.code type_code,pt.name type_name,ap.id period_id,ap.name period_name,publisher.full_name publisher
+            FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id INNER JOIN academic_periods ap ON ap.id=p.academic_period_id
+            LEFT JOIN users publisher ON publisher.id=p.repository_added_by
+            WHERE p.deleted_at IS NULL AND p.withdrawn_at IS NULL AND p.status='published' AND p.is_available=1
+              AND p.publication_origin='direct_repository' AND (p.tutor_id=:teacher_tutor OR EXISTS (SELECT 1 FROM project_participants pp WHERE pp.project_id=p.id AND pp.user_id=:teacher_participant_direct AND pp.status='active' AND pp.removed_at IS NULL AND LOWER(pp.role_code) IN ('tutor','cotutor','co_tutor','co-tutor'))){$period}
+            ORDER BY p.published_at DESC,p.id DESC");
+        $params=['teacher_tutor'=>$teacherId,'teacher_participant_direct'=>$teacherId]; if ($periodId !== null) $params['period_id']=$periodId;
         $query->execute($params);
         return $query->fetchAll();
     }

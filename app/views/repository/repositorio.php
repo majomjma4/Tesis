@@ -33,10 +33,10 @@
             </div>
             <div class="ar-head-bottom">
                 <p>Consulta proyectos publicados y materiales de apoyo disponibles para la comunidad académica.</p>
-                <?php if (!empty($canCreateSupportMaterial)): ?>
+                <?php if (!empty($canAddRepositoryContent)): ?>
                     <div class="ar-head-actions">
-                        <button class="ar-primary-action" type="button" data-teacher-material-create>
-                            <i class="fa-solid fa-plus"></i> Nuevo material
+                        <button class="ar-primary-action" type="button" data-teacher-content-trigger data-teacher-material-create>
+                            <i class="fa-solid fa-plus"></i> Agregar contenido
                         </button>
                     </div>
                 <?php endif; ?>
@@ -322,3 +322,5 @@
     </div>
 </div>
 <?php require __DIR__ . '/_teacher-material-modal.php'; ?>
+<?php require __DIR__ . '/_teacher-repository-content-selector.php'; ?>
+<?php require __DIR__ . '/_teacher-direct-project-modal.php'; ?>

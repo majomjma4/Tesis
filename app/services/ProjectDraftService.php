@@ -61,6 +61,11 @@ final class ProjectDraftService
         return $contract;
     }
 
+    public static function defaultTitleFor(string $code): string
+    {
+        return trim((string) (self::TYPE_RULES[$code]['default_title'] ?? ''));
+    }
+
     public function normalize(array $payload, array $policy, array $catalogs): array
     {
         $value = static fn(string $key): string => trim((string) ($payload[$key] ?? ''));

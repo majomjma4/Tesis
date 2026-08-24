@@ -98,3 +98,12 @@
 @media(max-width:480px){.projects-pagination{grid-template-columns:1fr}.projects-pagination label{justify-content:space-between}.projects-pagination-pages{grid-column:auto;justify-content:flex-start;overflow-x:auto}}
 .projects-pagination p,.projects-pagination label{white-space:nowrap}@media(max-width:480px){.projects-pagination{grid-template-columns:minmax(0,1fr) auto}.projects-pagination-pages{grid-column:1/-1}.projects-pagination label{gap:6px}}
 .projects-pagination-pages{gap:3px}.projects-pagination-pages button{min-width:32px;height:32px;padding:0 6px;border-radius:8px;font-size:var(--font-sm)}.projects-pagination-pages .pagination-ellipsis{display:grid;place-items:center;min-width:17px;height:32px;color:var(--muted);font-size:var(--font-sm);font-weight:850;user-select:none}.projects-pagination label,.projects-pagination select{min-width:0;max-width:100%;box-sizing:border-box}@media(max-width:480px){.projects-pagination{max-width:100%;overflow:hidden}.projects-pagination label{min-width:0}.projects-pagination select{width:68px;padding-inline:8px 22px}.projects-pagination-pages{gap:2px}.projects-pagination-pages button{min-width:29px;height:29px;padding:0 5px;font-size:var(--font-xs)}.projects-pagination-pages .pagination-ellipsis{min-width:14px;height:29px;font-size:var(--font-xs)}}
+.projects-direct-origin {
+    margin: .55rem 0 0;
+    color: var(--muted, #64748b);
+    font-size: .78rem;
+    line-height: 1.35;
+}
+
+.projects-direct-origin i,
+.assigned-direct-origin i { color: var(--primary, #2563eb); }

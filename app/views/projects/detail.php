@@ -42,6 +42,7 @@ if ($project === null): ?>
         || str_contains(mb_strtolower((string)($project['type_name'] ?? ''),'UTF-8'), 'titul');
     $stageLabel = $academicLabels['stage'];
     $dateLabel = static fn (?string $value): string => $value ? date('d/m/Y', strtotime($value)) : '';
+    $publisherName = trim((string) ($project['publisher_academic_title'] ?? '') . ' ' . (string) ($project['publisher_name'] ?? ''));
     $roleLabels = ['student'=>'Estudiante','tutor'=>'Tutor','cotutor'=>'Cotutor','tribunal'=>'Tribunal','jury'=>'Jurado'];
     $students = $project['student_authors'] ?? array_values(array_filter($project['participants'], static fn (array $row): bool => $row['role_code'] === 'student'));
     $academicTeam = array_values(array_filter($project['participants'], static fn (array $row): bool => in_array($row['role_code'], ['tutor','cotutor'], true)));
@@ -83,7 +84,7 @@ if ($project === null): ?>
             'current_updated_at'=>(string)($file['current_updated_at']??$file['created_at']??''),
             'current_updated_label'=>!empty($file['current_updated_at']??$file['created_at']??null)?date('d/m/Y H:i',strtotime((string)($file['current_updated_at']??$file['created_at']))):''];
     }, $project['files']);
-    if (!empty($institutionalReadOnly)) {
+    if (!empty($institutionalReadOnly) && empty($projectCapabilities['download_files'])) {
         $documents = array_values(array_filter($documents, static fn (array $file): bool => !in_array(strtolower((string) ($file['extension'] ?? '')), ProjectCapabilityService::INSTITUTIONAL_ARCHIVE_EXTENSIONS, true)));
         foreach ($documents as &$institutionalDocument) {
             $institutionalDocument['download_url'] = '';
@@ -281,7 +282,7 @@ if ($project === null): ?>
     $digitalRecord=['entity'=>['type'=>'project','id'=>$projectId,'query_key'=>'project_id'],'context'=>$projectContext,'mode'=>'view','return_url'=>$returnUrl,
         'capabilities'=>$projectCapabilities,
         'breadcrumbs'=>$breadcrumbs,
-        'header'=>['title'=>(string)$project['title'],'description'=>(string)($project['subtitle']??''),'type_label'=>(string)$project['type_name'],'type_icon'=>$publicContext?'fa-folder-tree':null,'status_label'=>$statusLabel,'status_tone'=>in_array((string)$project['status'],['approved','published'],true)?'success':'neutral'],
+        'header'=>['title'=>(string)$project['title'],'description'=>(string)($project['subtitle']??''),'type_label'=>(string)$project['type_name'],'type_icon'=>$publicContext?'fa-folder-tree':null,'status_label'=>$statusLabel,'status_tone'=>in_array((string)$project['status'],['approved','published'],true)?'success':'neutral','publisher_name'=>$publicContext&&$publisherName!==''?$publisherName:''],
         'metadata'=>array_values(array_filter($headerMetadata,static fn(?array $row):bool=>$row!==null&&$row['value']!=='')),
         'actions'=>$actions,'menu_actions'=>$menuActions,'tabs'=>$tabs,'active_tab'=>$activeTab,'information_sections'=>$informationSections,
         'adjustment_notice'=>$adjustmentNotice,

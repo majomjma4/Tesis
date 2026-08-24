@@ -144,7 +144,8 @@ final class ProjectCapabilityService
         if ($userId < 1) return false;
         if ($session->isAdminModeActive()) return true;
         if ($context === 'academic_management') return false;
-        if ((string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW) === ProjectPublicationOrigin::DIRECT_REPOSITORY) return false;
+        if ($context !== 'repository'
+            && (string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW) === ProjectPublicationOrigin::DIRECT_REPOSITORY) return false;
         if (!empty($project['withdrawn_at'])) return false;
         if ($context === 'repository') return !empty($this->resolve($project, $context, $userId, $access->currentRoles(), false)['view_project']);
 

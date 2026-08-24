@@ -139,6 +139,7 @@ match ($page) {
     'repository-preview-content' => (new RepositoryController())->previewContent(),
     'repository-favorite' => (new RepositoryController())->toggleFavorite(),
     'repository-direct-project-publish' => (new RepositoryController())->publishDirectProject(),
+    'repository-direct-project-search' => (new RepositoryController())->searchDirectProjectPeople(),
     'support-materials' => (new SupportMaterialController())->index(),
     'support-material-detail' => (new SupportMaterialController())->detail(),
     'support-material-evolution-events' => (new SupportMaterialController())->evolutionEvents(),

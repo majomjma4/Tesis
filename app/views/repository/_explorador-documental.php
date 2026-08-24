@@ -179,12 +179,12 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
                         <button type="button" role="menuitem" data-record-file-add><i class="fa-solid fa-plus" aria-hidden="true"></i><span>Agregar archivos</span></button>
                         <hr>
                         <button type="button" role="menuitem" data-file-restore-open<?= $restorableFiles ? '' : ' hidden' ?>><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>Archivos retirados recientemente</span></button>
-                        <button type="button" role="menuitem" data-file-selection-toggle<?= $retirableFiles ? '' : ' disabled' ?>><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>Seleccionar archivos</span></button>
+                        <?php if (count($retirableFiles) >= 2): ?><button type="button" role="menuitem" data-file-selection-toggle><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>Seleccionar archivos</span></button><?php endif; ?>
                     <?php else: ?>
                         <?php if ($showPackageDownload): ?>
                             <a data-record-package-download data-record-download download role="menuitem" href="<?= e($packageDownloadUrl) ?>"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i><span>Descargar ZIP<small><?= count($selectableFiles) ?> <?= count($selectableFiles) === 1 ? 'archivo' : 'archivos' ?></small></span><?php if (!empty($package['size'])): ?><strong class="ed-package-size"><?= e((string) $package['size']) ?></strong><?php endif; ?></a>
                         <?php endif; ?>
-                        <?php if ($canDownloadFiles): ?><button type="button" role="menuitem" data-file-selection-toggle<?= $selectableFiles ? '' : ' disabled' ?>><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>Seleccionar archivos</span></button><?php endif; ?>
+                        <?php if ($canDownloadFiles && count($selectableFiles) >= 2): ?><button type="button" role="menuitem" data-file-selection-toggle><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>Seleccionar archivos</span></button><?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div><?php endif; ?>
@@ -253,7 +253,7 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
                                 </div>
                             <?php endif; ?>
                         <?php elseif ($available && !empty($document['download_url'])): ?>
-                            <a class="ed-file-direct-download" href="<?= e($document['download_url']) ?>" download aria-label="Descargar <?= e($document['name']) ?>" title="Descargar <?= e($document['name']) ?>">
+                            <a class="ed-file-direct-download" data-record-download href="<?= e($document['download_url']) ?>" download aria-label="Descargar <?= e($document['name']) ?>" title="Descargar <?= e($document['name']) ?>">
                                 <i class="fa-solid fa-download" aria-hidden="true"></i>
                             </a>
                         <?php endif; ?>

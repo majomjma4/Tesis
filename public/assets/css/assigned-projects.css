@@ -317,3 +317,9 @@
         flex: 1 1 100% !important;
     }
 }
+.assigned-direct-origin {
+    margin: .45rem 0 0;
+    color: var(--muted, #64748b);
+    font-size: .78rem;
+    line-height: 1.35;
+}

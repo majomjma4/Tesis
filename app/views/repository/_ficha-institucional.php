@@ -113,6 +113,7 @@ body.dark-mode .ed-label.is-success{color:#86efac}
                 <div class="ed-labels">
                     <span class="ed-label"><?php if (!empty($header['type_icon'])): ?><i class="fa-solid <?= e((string)$header['type_icon']) ?>" aria-hidden="true"></i><?php endif; ?><?= e((string) ($header['type_label'] ?? 'Expediente')) ?></span>
                     <span class="ed-label is-<?= e((string) ($header['status_tone'] ?? 'neutral')) ?>" data-record-status-label><i class="fa-solid <?= ($header['status_tone'] ?? '') === 'success' ? 'fa-circle-check' : 'fa-circle-minus' ?>" aria-hidden="true"></i><span><?= e((string) ($header['status_label'] ?? 'Sin estado')) ?></span></span>
+                    <?php if (!empty($header['publisher_name'])): ?><span class="ed-label is-secondary"><i class="fa-solid fa-user-check" aria-hidden="true"></i><span>Publicado por: <?= e((string) $header['publisher_name']) ?></span></span><?php endif; ?>
                 </div>
                 <div class="ed-actions" aria-label="Acciones del expediente">
                     <div class="ed-primary-actions">
@@ -133,7 +134,6 @@ body.dark-mode .ed-label.is-success{color:#86efac}
                 </div>
             </div>
             <h1 id="digitalRecordTitle"><?= e((string) ($header['title'] ?? 'Expediente')) ?></h1>
-            <?php if (($header['description'] ?? '') !== ''): ?><p class="ed-description"><?= e($header['description']) ?></p><?php endif; ?>
             <?php if ($metadata): ?><dl class="ed-meta"><?php foreach ($metadata as $item): ?><div class="<?= ($item['tone'] ?? '') === 'secondary' ? 'is-secondary' : '' ?>"<?= !empty($item['key']) ? ' data-record-meta="' . e($item['key']) . '"' : '' ?>><dt><?php if (!empty($item['icon'])): ?><i class="fa-solid <?= e((string)$item['icon']) ?>" aria-hidden="true"></i><span><?= e($item['label']) ?></span><?php else: ?><?= e($item['label']) ?><?php endif; ?></dt><dd><?= e($item['value']) ?></dd></div><?php endforeach; ?></dl><?php endif; ?>
         </header>
         <?php if(!empty($digitalRecord['review_notice'])):$reviewNotice=$digitalRecord['review_notice'];?><aside class="ed-review-notice" role="status"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div><strong><?=e((string)$reviewNotice['message'])?></strong><?php if(!empty($reviewNotice['count'])):?><span><?=(int)$reviewNotice['count']?> observación<?=((int)$reviewNotice['count']===1?'':'es')?> pendiente<?=((int)$reviewNotice['count']===1?'':'s')?>.</span><?php endif;?></div></aside><?php endif;?>

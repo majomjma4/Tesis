@@ -5,6 +5,56 @@ declare(strict_types=1);
 /** Consultas reales del conjunto de proyectos del estudiante autenticado. */
 final class ProjectModel
 {
+    /** Proyectos directos publicados relacionados con el estudiante, sólo para Terminados. */
+    public function getDirectRepositoryFinishedProjectsResult(int $userId): array
+    {
+        if ($userId < 1 || !Database::isEnabled()) return ['status' => 'error', 'items' => []];
+        try {
+            $db = Database::connection();
+            $statement = $db->prepare("SELECT DISTINCT p.id,p.code,p.title,p.subtitle,p.status,p.current_stage,p.updated_at,
+                p.published_at,p.repository_added_by,pt.code AS type_key,pt.name AS type,c.name AS career,
+                ap.name AS period,t.full_name AS tutor,publisher.full_name AS publisher
+                FROM projects p
+                INNER JOIN project_types pt ON pt.id=p.project_type_id
+                INNER JOIN careers c ON c.id=p.career_id
+                INNER JOIN academic_periods ap ON ap.id=p.academic_period_id
+                INNER JOIN project_participants pp ON pp.project_id=p.id
+                INNER JOIN users student_user ON student_user.id=pp.user_id
+                LEFT JOIN users t ON t.id=p.tutor_id
+                LEFT JOIN users publisher ON publisher.id=p.repository_added_by
+                WHERE p.deleted_at IS NULL AND p.withdrawn_at IS NULL
+                  AND p.status='published' AND p.publication_origin='direct_repository'
+                  AND p.is_available=1 AND p.published_at IS NOT NULL
+                  AND pp.user_id=:user_id AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL
+                  AND student_user.status='active' AND student_user.deleted_at IS NULL AND student_user.purged_at IS NULL
+                ORDER BY p.published_at DESC,p.id DESC");
+            $statement->execute(['user_id' => $userId]);
+            $rows = $statement->fetchAll();
+            $items = array_map(static function (array $row): array {
+                $publishedAt = (string) ($row['published_at'] ?? '');
+                $date = $publishedAt;
+                try { $date = (new DateTimeImmutable($publishedAt, new DateTimeZone('UTC')))->setTimezone(new DateTimeZone('America/Guayaquil'))->format('d/m/Y'); } catch (Throwable) {}
+                $publisher = trim((string) ($row['publisher'] ?? ''));
+                return [
+                    'id' => (int) $row['id'], 'code' => (string) $row['code'], 'title' => (string) $row['title'],
+                    'subtitle' => (string) ($row['subtitle'] ?? ''), 'status' => 'Publicado', 'status_key' => 'published',
+                    'type' => (string) $row['type'], 'type_key' => (string) $row['type_key'], 'career' => (string) $row['career'],
+                    'period' => (string) $row['period'], 'tutor' => (string) ($row['tutor'] ?? ''),
+                    'stage' => 'repository_direct', 'last_activity' => 'Publicación en repositorio · ' . $date,
+                    'review_situation' => [], 'observations' => [], 'final_documents' => [], 'latest_delivery' => null,
+                    'key_dates' => [['label' => 'Publicación', 'value' => $date]], 'activity_order' => 0,
+                    'tags' => [], 'technologies' => [], 'repository_id' => (int) $row['id'], 'repository_available' => true,
+                    'publication_origin' => 'direct_repository', 'is_direct_repository' => true,
+                    'publisher' => $publisher, 'capabilities' => [],
+                ];
+            }, $rows);
+            return ['status' => $items === [] ? 'empty' : 'loaded', 'items' => $items];
+        } catch (Throwable $error) {
+            error_log('Student direct repository finished query: ' . $error->getMessage());
+            return ['status' => 'error', 'items' => []];
+        }
+    }
+
     public function getProjectsForUser(int $userId): array
     {
         return (array) $this->getStudentProjectsResult($userId)['items'];

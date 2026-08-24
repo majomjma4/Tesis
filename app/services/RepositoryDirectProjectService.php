@@ -36,7 +36,12 @@ final class RepositoryDirectProjectService
             $period = $this->lockActivePeriod($db);
             $type = $this->type($db, (int) ($input['project_type_id'] ?? 0));
             $authors = $this->authors($db, $input['author_ids'] ?? [], (int) $period['id']);
-            $tutorId = $this->tutor($db, $input['tutor_id'] ?? null);
+            // ProjectDraftService exige tutor para todos los tipos académicos activos.
+            $tutorIds = $this->tutorsMulti($db, $input['tutoring_user_ids'] ?? [], $input['tutor_id'] ?? null);
+            $primaryTutorId = (int) ($input['tutoring_primary_id'] ?? 0);
+            if ($primaryTutorId < 1) $primaryTutorId = $tutorIds[0] ?? 0;
+            if ($primaryTutorId < 1 || !in_array($primaryTutorId, $tutorIds, true)) throw new RepositoryDirectProjectException('Selecciona un tutor principal válido.', ['tutoring_primary_id'=>'Selecciona un tutor principal.'], 422);
+            $this->ensureTutorAuthorSeparation($tutorIds, $authors);
             $keywordIds = $this->keywords($db, $input['keyword_ids'] ?? []);
             $title = trim((string) ($input['title'] ?? ''));
             $description = trim((string) ($input['description'] ?? ''));
@@ -46,7 +51,8 @@ final class RepositoryDirectProjectService
             if ($errors !== []) throw new RepositoryDirectProjectException('Revisa la información indicada.', $errors, 422);
             $careerId = (int) $authors[0]['career_id'];
             foreach ($authors as $author) if ((int) $author['career_id'] !== $careerId) throw new RepositoryDirectProjectException('Todos los autores deben pertenecer a la misma carrera.', ['author_ids'=>'Selecciona autores de una misma carrera.'], 422);
-            $payloadHash = $this->payloadHash($title, (int) $type['id'], $description, $authors, $tutorId, $keywordIds, (int) $period['id'], $files);
+            sort($tutorIds, SORT_NUMERIC);
+            $payloadHash = $this->payloadHash($title, (int) $type['id'], $description, $authors, $tutorIds, $primaryTutorId, $keywordIds, (int) $period['id'], $files);
             $existing = $db->prepare('SELECT project_id,response_json,payload_hash FROM repository_direct_publish_requests WHERE user_id=:user AND request_token=:token FOR UPDATE');
             $existing->execute(['user'=>$userId,'token'=>$tokenHash]);
             $replay = $existing->fetch();
@@ -67,10 +73,12 @@ final class RepositoryDirectProjectService
 
             $code = (new ProjectCodeService())->next($db, (int) $type['id'], (string) $type['code'], (int) gmdate('Y'));
             $insertProject = $db->prepare("INSERT INTO projects (code,project_type_id,career_id,academic_period_id,title,subtitle,summary,tutor_id,status,current_stage,is_available,published_at,publication_origin,repository_added_by,repository_added_at,created_by,created_at,updated_at) VALUES (:code,:type,:career,:period,:title,NULL,:summary,:tutor,'published','repository_direct',0,NULL,'direct_repository',:added_by,UTC_TIMESTAMP(),:creator,UTC_TIMESTAMP(),UTC_TIMESTAMP())");
-            $insertProject->execute(['code'=>$code,'type'=>(int)$type['id'],'career'=>$careerId,'period'=>(int)$period['id'],'title'=>$title,'summary'=>$description,'tutor'=>$tutorId,'added_by'=>$userId,'creator'=>$userId]);
+            $insertProject->execute(['code'=>$code,'type'=>(int)$type['id'],'career'=>$careerId,'period'=>(int)$period['id'],'title'=>$title,'summary'=>$description,'tutor'=>$primaryTutorId,'added_by'=>$userId,'creator'=>$userId]);
             $projectId = (int) $db->lastInsertId();
             $participant = $db->prepare("INSERT INTO project_participants(project_id,user_id,role_code,permission_level,is_leader,status) VALUES(:project,:user,'student','read',:leader,'active')");
             foreach ($authors as $index => $author) $participant->execute(['project'=>$projectId,'user'=>(int)$author['id'],'leader'=>$index === 0 ? 1 : 0]);
+            $tutorParticipant = $db->prepare("INSERT INTO project_participants(project_id,user_id,role_code,permission_level,is_leader,status) VALUES(:project,:user,'tutor','review',0,'active')");
+            foreach ($tutorIds as $tutor) $tutorParticipant->execute(['project'=>$projectId,'user'=>$tutor]);
 
             $insertFile = $db->prepare("INSERT INTO project_files(project_id,delivery_id,category,original_name,storage_name,storage_path,mime_type,extension,size_bytes,checksum_sha256,sort_order,uploaded_by) VALUES(:project,NULL,'repository',:original,:storage,:path,:mime,:extension,:size,:checksum,:sort_order,:uploaded_by)");
             foreach ($files as $index => $file) {
@@ -124,9 +132,28 @@ final class RepositoryDirectProjectService
         usort($rows, static fn(array $a,array $b): int => array_search((int)$a['id'],$ids,true) <=> array_search((int)$b['id'],$ids,true)); return $rows;
     }
 
-    private function tutor(PDO $db, mixed $value): ?int
+    private function tutorsMulti(PDO $db, mixed $rawIds, mixed $legacyTutorId = null): array
     {
-        $id=(int)$value; if ($id < 1) return null;
+        $ids = $this->ids($rawIds, 'tutoring_user_ids');
+        if ($ids === [] && (int) $legacyTutorId > 0) $ids = [(int) $legacyTutorId];
+        if ($ids === []) throw new RepositoryDirectProjectException('Selecciona al menos un tutor.', ['tutoring_user_ids'=>'Selecciona al menos un tutor.'], 422);
+        $marks=[]; $params=[];
+        foreach ($ids as $index => $id) { $key='tutor'.$index; $marks[]=':'.$key; $params[$key]=$id; }
+        $query=$db->prepare("SELECT DISTINCT u.id FROM users u INNER JOIN teacher_profiles tp ON tp.user_id=u.id INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id AND r.code='teacher' WHERE u.id IN (".implode(',',$marks).") AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL AND tp.can_tutor=1"); $query->execute($params);
+        $valid=array_map('intval',$query->fetchAll(PDO::FETCH_COLUMN)); sort($valid,SORT_NUMERIC);
+        if (count($valid)!==count($ids)) throw new RepositoryDirectProjectException('Uno o más tutores no están disponibles.', ['tutoring_user_ids'=>'Selecciona docentes activos habilitados para tutoría.'], 422);
+        return $valid;
+    }
+
+    private function ensureTutorAuthorSeparation(array $tutorIds, array $authors): void
+    {
+        $authorIds=array_map(static fn(array $author):int=>(int)$author['id'],$authors);
+        if (array_intersect($tutorIds,$authorIds)!==[]) throw new RepositoryDirectProjectException('Un usuario no puede ser autor y tutor del mismo proyecto.', ['tutoring_user_ids'=>'Separa autores y tutores.'], 422);
+    }
+
+    private function tutor(PDO $db, mixed $value, bool $required = false): ?int
+    {
+        $id=(int)$value; if ($id < 1) { if ($required) throw new RepositoryDirectProjectException('Selecciona un tutor para el proyecto.', ['tutor_id'=>'Selecciona un tutor.'], 422); return null; }
         $query=$db->prepare("SELECT u.id FROM users u INNER JOIN teacher_profiles tp ON tp.user_id=u.id INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id AND r.code='teacher' WHERE u.id=:id AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL AND tp.can_tutor=1 LIMIT 1"); $query->execute(['id'=>$id]);
         if (!$query->fetchColumn()) throw new RepositoryDirectProjectException('El tutor seleccionado no está disponible.', ['tutor_id'=>'Selecciona un docente válido.'], 422); return $id;
     }
@@ -139,7 +166,7 @@ final class RepositoryDirectProjectService
         if (count($valid)!==count($ids)) throw new RepositoryDirectProjectException('Una o más palabras clave no están disponibles.', ['keyword_ids'=>'Selecciona palabras clave válidas.'], 422); return $valid;
     }
 
-    private function payloadHash(string $title, int $typeId, string $description, array $authors, ?int $tutorId, array $keywordIds, int $periodId, array $files): string
+    private function payloadHash(string $title, int $typeId, string $description, array $authors, array $tutorIds, int $primaryTutorId, array $keywordIds, int $periodId, array $files): string
     {
         $canonicalFiles = array_map(static fn(array $file): array => [
             'original_name' => (string) $file['metadata']['original_name'],
@@ -153,7 +180,8 @@ final class RepositoryDirectProjectService
             'project_type_id' => $typeId,
             'description' => $description,
             'author_ids' => array_map(static fn(array $author): int => (int) $author['id'], $authors),
-            'tutor_id' => $tutorId,
+            'tutoring_user_ids' => array_values($tutorIds),
+            'tutoring_primary_id' => $primaryTutorId,
             'keyword_ids' => array_values($keywordIds),
             'period_id' => $periodId,
             'files' => $canonicalFiles,

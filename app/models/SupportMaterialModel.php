@@ -392,18 +392,18 @@ final class SupportMaterialModel
         return null;
     }
 
-    public function save(array $input, int $actor): int
+    public function save(array $input, int $actor, bool $publishImmediately = false): int
     {
         $id = (int) ($input['id'] ?? 0);
         $title = trim((string) ($input['title'] ?? ''));
         $controlledType = $id > 0 && (string) ($input['controlled_material_type'] ?? '') === '1';
-        $controlledKeywords = $id > 0 && (string) ($input['controlled_keywords'] ?? '') === '1';
+        $controlledKeywords = (string) ($input['controlled_keywords'] ?? '') === '1';
         $type = $this->resolveMaterialType($input, $controlledType);
         $description = trim((string) ($input['description'] ?? ''));
         $fullDescription = trim((string) ($input['full_description'] ?? ''));
         $publisher = trim((string) ($input['publisher'] ?? ''));
         $categoryId = (int) ($input['category_id'] ?? 0);
-        $publicationDate = null;
+        $publicationDate = $publishImmediately ? gmdate('Y-m-d') : null;
         $keywords = [];
 
         if ($title === '' || mb_strlen($title) > 220 || count(array_filter(preg_split('/\s+/u', $title) ?: [])) < 3) {
@@ -440,10 +440,18 @@ final class SupportMaterialModel
                 $controlledKeywords
             );
         } else {
-            $keywords = $this->resolveKeywords($input);
+            $keywords = $controlledKeywords
+                ? $this->resolveKeywords($input, [], true)
+                : $this->resolveKeywords($input);
+            $publisherStatement = $database->prepare(
+                "SELECT full_name FROM users
+                 WHERE id=:id AND status='active' AND deleted_at IS NULL AND purged_at IS NULL"
+            );
+            $publisherStatement->execute(['id' => $actor]);
+            $publisher = trim((string) ($publisherStatement->fetchColumn() ?: ''));
         }
         if ($publisher === '' || mb_strlen($publisher) > 180) {
-            throw new InvalidArgumentException('Ingresa el responsable de la publicación.');
+            throw new InvalidArgumentException('No fue posible identificar al responsable de la publicación.');
         }
         $category = $database->prepare(
             'SELECT COUNT(*) FROM support_material_categories WHERE id=:id AND is_active=1'
@@ -481,13 +489,15 @@ final class SupportMaterialModel
         }
 
         $payload['created_by'] = $actor;
+        $payload['published_at'] = $publishImmediately ? gmdate('Y-m-d H:i:s') : null;
+        $payload['status'] = $publishImmediately ? 'published' : 'draft';
         $statement = $database->prepare(
             "INSERT INTO support_materials
              (category_id,title,material_type,description,full_description,publisher,
-              publication_date,status,keywords_json,created_by,updated_by)
+              publication_date,published_at,status,is_available,keywords_json,created_by,updated_by)
              VALUES
              (:category_id,:title,:material_type,:description,:full_description,:publisher,
-              :publication_date,'draft',:keywords_json,:created_by,:updated_by)"
+             :publication_date,:published_at,:status,1,:keywords_json,:created_by,:updated_by)"
         );
         $statement->execute($payload);
         return (int) $database->lastInsertId();
