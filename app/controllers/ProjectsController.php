@@ -1029,8 +1029,8 @@ final class ProjectsController
             $privateAccess = $institutionalProjectId > 0 && $policy->canViewProjectResource($institutionalProjectId, $context);
             if (!$privateAccess && (!$projectId || !$institutionalFile || $institutionalProjectId !== (int) $projectId || !$policy->canViewInstitutionalFile((int) $fileId, $context))) {
                 http_response_code(403);
-                if ($json) $this->json(['success'=>false,'message'=>'No tienes autorizaciÃ³n para consultar este archivo.','data'=>[]]);
-                exit('No tienes autorizaciÃ³n para consultar este archivo.');
+                if ($json) $this->json(['success'=>false,'message'=>'No tienes autorización para consultar este archivo.','data'=>[]]);
+                exit('No tienes autorización para consultar este archivo.');
             }
             if (!$privateAccess) {
                 $institutionalProject = $access->can('project.view')
@@ -1044,8 +1044,8 @@ final class ProjectsController
                 }
                 if (!$institutionalProject || $institutionalStream === false) {
                     http_response_code(404);
-                    if ($json) $this->json(['success'=>false,'message'=>'El archivo solicitado no estÃ¡ disponible.','data'=>[]]);
-                    exit('El archivo solicitado no estÃ¡ disponible.');
+                    if ($json) $this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);
+                    exit('El archivo solicitado no está disponible.');
                 }
                 $requestedVersionId = filter_var($_GET['version_id'] ?? null, FILTER_VALIDATE_INT);
                 $requestedV = trim((string) ($_GET['v'] ?? $_GET['checksum'] ?? ''));
@@ -1053,8 +1053,8 @@ final class ProjectsController
                 if ($requestedVersionId > 0 || ($requestedV !== '' && !hash_equals(substr($currentChecksum, 0, strlen($requestedV)), $requestedV))) {
                     fclose($institutionalStream);
                     http_response_code(403);
-                    if ($json) $this->json(['success'=>false,'message'=>'Las versiones histÃ³ricas no estÃ¡n disponibles en la lectura institucional.','data'=>[]]);
-                    exit('Las versiones histÃ³ricas no estÃ¡n disponibles en la lectura institucional.');
+                    if ($json) $this->json(['success'=>false,'message'=>'Las versiones históricas no están disponibles en la lectura institucional.','data'=>[]]);
+                    exit('Las versiones históricas no están disponibles en la lectura institucional.');
                 }
                 return [$institutionalProject, $institutionalFile, $institutionalStream, $institutionalPath, true];
             }

@@ -166,7 +166,7 @@ final class ProjectCapabilityService
         return false;
     }
 
-    /** Lectura institucional del catÃ¡logo docente; no concede capacidades de gestiÃ³n. */
+    /** Lectura institucional del catálogo docente; no concede capacidades de gestión. */
     public function canViewActiveProject(int $projectId, string $context = 'academic'): bool
     {
         if ($context !== 'academic' || $projectId < 1) return false;

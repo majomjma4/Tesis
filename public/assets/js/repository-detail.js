@@ -857,16 +857,6 @@ function fitNeutralDocxForCurrentContext() {
     applyNeutralZoom();
     const horizontalMaximum = Math.max(0, neutralViewerDocx.scrollWidth - neutralViewerDocx.clientWidth);
     neutralViewerDocx.scrollLeft = horizontalMaximum * neutralDocxHorizontalRatio;
-    console.debug("[DOCX viewer] Escala inicial calculada", {
-        mode: contextKey.endsWith(":expanded") ? "expanded" : "lateral",
-        naturalPageWidth: Number(neutralViewerDocx.dataset.docxNaturalPageWidth || 0),
-        naturalWidth,
-        usefulWidth,
-        baseScale,
-        userZoomPercent: neutralZoomPercent,
-        effectiveScale: baseScale * (neutralZoomPercent / 100),
-        horizontalOverflow: neutralViewerDocx.scrollWidth > neutralViewerDocx.clientWidth,
-    });
 }
 
 function scheduleNeutralDocxFit() {
@@ -1412,7 +1402,6 @@ function renderNeutralDocx(blocks) {
 
 function loadNeutralViewerScript(url, isReady) {
     if (isReady()) {
-        console.debug("[DOCX viewer] Biblioteca disponible", { url });
         return Promise.resolve();
     }
     const resolvedUrl = new URL(url, document.baseURI).href;
@@ -1422,7 +1411,6 @@ function loadNeutralViewerScript(url, isReady) {
         const script = document.createElement("script");
         script.addEventListener("load", () => {
             if (isReady()) {
-                console.debug("[DOCX viewer] Biblioteca cargada", { url: resolvedUrl });
                 resolve();
             } else {
                 reject(new Error("La biblioteca del visor no se inicializó correctamente."));
@@ -1437,11 +1425,6 @@ function loadNeutralViewerScript(url, isReady) {
 
 function ensureNeutralDocxLibraries() {
     if (window.JSZip && typeof window.docx?.renderAsync === "function") {
-        console.debug("[DOCX viewer] Globales disponibles", {
-            jszip: typeof window.JSZip,
-            docx: typeof window.docx,
-            renderAsync: typeof window.docx.renderAsync,
-        });
         return Promise.resolve();
     }
     if (neutralDocxLibrariesPromise) return neutralDocxLibrariesPromise;
@@ -1450,13 +1433,6 @@ function ensureNeutralDocxLibraries() {
     if (!jsZipUrl || !docxPreviewUrl) return Promise.reject(new Error("El visor DOCX local no está configurado."));
     neutralDocxLibrariesPromise = loadNeutralViewerScript(jsZipUrl, () => Boolean(window.JSZip))
         .then(() => loadNeutralViewerScript(docxPreviewUrl, () => typeof window.docx?.renderAsync === "function"))
-        .then(() => {
-            console.debug("[DOCX viewer] Globales inicializados", {
-                jszip: typeof window.JSZip,
-                docx: typeof window.docx,
-                renderAsync: typeof window.docx?.renderAsync,
-            });
-        })
         .catch((error) => {
             neutralDocxLibrariesPromise = null;
             throw error;
@@ -1467,21 +1443,10 @@ function ensureNeutralDocxLibraries() {
 async function renderNeutralDocxPreview(preview, requestSequence, fileId) {
     if (!neutralViewerDocx || !preview.content_url) throw new Error("El contenido DOCX no está disponible.");
     await ensureNeutralDocxLibraries();
-    console.debug("[DOCX viewer] Descargando DOCX", {
-        fileId,
-        url: preview.content_url,
-        requestSequence,
-    });
     const contentResponse = await fetch(preview.content_url, {
         signal: neutralPreviewRequest?.signal,
         headers: { Accept: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
         credentials: "same-origin",
-    });
-    console.debug("[DOCX viewer] Respuesta DOCX", {
-        status: contentResponse.status,
-        ok: contentResponse.ok,
-        mime: contentResponse.headers.get("content-type"),
-        contentLength: contentResponse.headers.get("content-length"),
     });
     if (!contentResponse.ok) {
         const error = new Error("No fue posible obtener el contenido del documento.");
@@ -1490,10 +1455,8 @@ async function renderNeutralDocxPreview(preview, requestSequence, fileId) {
     }
     const documentData = await contentResponse.arrayBuffer();
     if (documentData.byteLength === 0) throw new Error("El endpoint protegido devolvió un DOCX sin contenido.");
-    console.debug("[DOCX viewer] DOCX descargado", { bytes: documentData.byteLength });
     const detachedBody = document.createElement("div");
     const detachedStyles = document.createElement("div");
-    console.debug("[DOCX viewer] Iniciando renderAsync", { fileId, bytes: documentData.byteLength });
     await window.docx.renderAsync(documentData, detachedBody, detachedStyles, {
         className: "ed-docx-render",
         inWrapper: true,
@@ -1509,12 +1472,6 @@ async function renderNeutralDocxPreview(preview, requestSequence, fileId) {
         renderComments: false,
         renderChanges: false,
         useBase64URL: true,
-    });
-    console.debug("[DOCX viewer] renderAsync completado", {
-        fileId,
-        pages: detachedBody.querySelectorAll("section.ed-docx-render").length,
-        images: detachedBody.querySelectorAll("img").length,
-        styles: detachedStyles.querySelectorAll("style").length,
     });
     if (
         requestSequence !== neutralPreviewSequence

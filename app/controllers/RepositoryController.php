@@ -141,7 +141,7 @@ final class RepositoryController
             error_log('Repository support materials: ' . $exception->getMessage());
             $supportDocuments = [];
             $supportStatus = 'error';
-            $supportError = 'No fue posible cargar los materiales de apoyo en este momento. Intenta nuevamente mÃ¡s tarde.';
+            $supportError = 'No fue posible cargar los materiales de apoyo en este momento. Intenta nuevamente más tarde.';
         }
 
         try {

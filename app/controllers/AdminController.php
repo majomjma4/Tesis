@@ -1329,7 +1329,7 @@ final class AdminController
 
         $s = new AuthSessionService();
         View::render('admin/repository', [
-            'currentPage'=>'repository','title'=>'Repositorio | AdministraciÃ³n','bodyClass'=>'admin-repository-page',
+            'currentPage'=>'repository','title'=>'Repositorio | Administración','bodyClass'=>'admin-repository-page',
             'pageStyles'=>[asset('css/admin-repository.css')],'pageScript'=>asset('js/admin-repository.js'),
             'repositoryProjects'=>$projects,'pagePagination'=>$pagination,'repositorySummary'=>$summary,
             'repositoryError'=>null,'repositorySectionErrors'=>$sectionErrors,'repositoryCatalogs'=>$catalogs,

@@ -1,5 +1,3 @@
-console.log("Dashboard inicializado correctamente.");
-
 // Inicio de selección de elementos específicos del dashboard
 const teamToggle = document.querySelector("#teamToggle");
 const teamDropdown = document.querySelector("#teamDropdown");

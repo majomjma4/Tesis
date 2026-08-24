@@ -611,7 +611,7 @@ function filterRepositorySupportDocuments(resetPage = true) {
     const repositorySupportEmptyText = document.querySelector("#repositorySupportEmptyText");
     if (repositorySupportEmptyTitle && repositorySupportEmptyText && repositoryBaseSupportCount > 0) {
         repositorySupportEmptyTitle.textContent = "No se encontraron materiales";
-        repositorySupportEmptyText.textContent = "Prueba con otros tÃ©rminos o modifica la categorÃ­a seleccionada.";
+        repositorySupportEmptyText.textContent = "Prueba con otros términos o modifica la categoría seleccionada.";
     }
     const from = matches.length === 0 ? 0 : start + 1;
     const to = Math.min(start + repositorySupportState.size, matches.length);

@@ -1,5 +1,3 @@
-console.log("Layout global (main.js) inicializado correctamente.");
-
 const navigationEntry = performance.getEntriesByType("navigation")[0];
 const isFullPageReload = navigationEntry?.type === "reload";
 const sidebarScrollKey = "app-sidebar-scroll";
