@@ -33,7 +33,7 @@ final class ThesisManagementService
         $ids = array_map(static fn(array $row): int => (int) $row['id'], $rows);
         $marks = implode(',', array_fill(0, count($ids), '?'));
         $people = $db->prepare(
-            "SELECT pp.project_id,pp.user_id,pp.role_code,pp.is_leader,u.full_name,u.email
+            "SELECT pp.project_id,pp.user_id,pp.role_code,pp.tribunal_position,pp.is_leader,u.full_name,u.email
              FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id
              WHERE pp.project_id IN ($marks) AND pp.status='active' AND pp.removed_at IS NULL
                AND LOWER(pp.role_code) IN ('student','tutor','cotutor','co_tutor','co-tutor','tribunal','jury')
@@ -52,7 +52,7 @@ final class ThesisManagementService
                 $role = strtolower((string) $member['role_code']);
                 if ($role === 'student') $students[] = (string) $member['full_name'];
                 elseif (in_array($role, ['cotutor','co_tutor','co-tutor'], true)) $cotutors[] = (string) $member['full_name'];
-                elseif (in_array($role, ['tribunal','jury'], true)) {$tribunal[] = (string) $member['full_name']; $tribunalDetails[]=['name'=>(string)$member['full_name'],'email'=>(string)($member['email']??'')]; $tribunalIds[]=(int)$member['user_id'];}
+                elseif (in_array($role, ['tribunal','jury'], true)) {$tribunal[] = (string) $member['full_name']; $tribunalDetails[]=['user_id'=>(int)$member['user_id'],'name'=>(string)$member['full_name'],'email'=>(string)($member['email']??''),'tribunal_position'=>$member['tribunal_position']??null]; $tribunalIds[]=(int)$member['user_id'];}
             }
             $situation = $this->situation((string) $row['status'], count($tribunal), (string) ($row['defense_result'] ?? ''));
             $summary[$situation['key']]++;
@@ -75,7 +75,7 @@ final class ThesisManagementService
     private function situation(string $status, int $tribunalCount, string $latestDefenseResult = ''): array
     {
         if ($status === 'defense' && $latestDefenseResult === 'rejected') return ['key'=>'rejected','label'=>'No aprobado','description'=>'El último intento de defensa no fue aprobado','action'=>'Cambiar Tribunal'];
-        if ($status === 'approved') return ['key'=>'pending_tribunal','label'=>'Pendiente de Tribunal','description'=>ThesisTribunalService::isValidMemberCount($tribunalCount)?'Tribunal listo para confirmar':'Se requieren entre 3 y 5 miembros activos','action'=>'Gestionar Tribunal'];
+        if ($status === 'approved') return ['key'=>'pending_tribunal','label'=>'Pendiente de Tribunal','description'=>ThesisTribunalService::isValidMemberCount($tribunalCount)?'Tribunal listo para confirmar':'Se requieren exactamente 3 cargos activos','action'=>'Gestionar Tribunal'];
         if ($status === 'defense') return ['key'=>'defense','label'=>'Defensa en curso','description'=>'Proceso de evaluación en curso','action'=>'Ver proceso'];
         return ['key'=>'pending_publication','label'=>'Pendiente de publicación','description'=>'Aprobado por el Tribunal','action'=>'Continuar proceso'];
     }

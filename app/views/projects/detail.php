@@ -44,12 +44,13 @@ if ($project === null): ?>
     $dateLabel = static fn (?string $value): string => $value ? date('d/m/Y', strtotime($value)) : '';
     $publisherName = trim((string) ($project['publisher_academic_title'] ?? '') . ' ' . (string) ($project['publisher_name'] ?? ''));
     $roleLabels = ['student'=>'Estudiante','tutor'=>'Tutor','cotutor'=>'Cotutor','tribunal'=>'Tribunal','jury'=>'Jurado'];
+    $tribunalPositionLabels = ['president'=>'Presidente','member_1'=>'Miembro 1','member_2'=>'Miembro 2'];
     $students = $project['student_authors'] ?? array_values(array_filter($project['participants'], static fn (array $row): bool => $row['role_code'] === 'student'));
     $academicTeam = array_values(array_filter($project['participants'], static fn (array $row): bool => in_array($row['role_code'], ['tutor','cotutor'], true)));
     $tribunal = array_values(array_filter($project['participants'], static fn (array $row): bool => in_array($row['role_code'], ['tribunal','jury'], true)));
     $participantRows = static function (array $rows) use ($roleLabels, $dateLabel): array {
         return array_map(static fn (array $row): array => [
-            'label' => ($roleLabels[$row['role_code']] ?? ucfirst((string) $row['role_code'])) . (!empty($row['is_leader']) ? ' líder' : ''),
+            'label' => (in_array((string)($row['role_code']??''),['tribunal','jury'],true) ? ($tribunalPositionLabels[$row['tribunal_position']??''] ?? 'Cargo no especificado') : ($roleLabels[$row['role_code']] ?? ucfirst((string) $row['role_code']))) . (!empty($row['is_leader']) ? ' líder' : ''),
             'value' => trim((string) ($row['academic_title'] ?? '') . ' ' . (string) $row['full_name']),
         ], $rows);
     };
@@ -159,7 +160,7 @@ if ($project === null): ?>
             'user_id'=>(int)($row['user_id']??0),'username'=>trim((string)($row['username']??'')),
             'name'=>trim((string)($row['full_name']??'')),'role'=>$role,
             'initial'=>mb_strtoupper(mb_substr(trim((string)($row['full_name']??'U')),0,1,'UTF-8'),'UTF-8'),
-            'email'=>$includeEmail?$usableEmail($row['email']??''):'','avatar_url'=>'',
+            'email'=>$includeEmail?$usableEmail($row['email']??''):'','tribunal_position'=>$row['tribunal_position']??null,'avatar_url'=>'',
         ];};
         $richAuthors=array_map(static function(array $row)use($person):array{return $person($row,'Estudiante')+['leader'=>!empty($row['is_display_leader'])];},$students);
         $richTeachingParticipants=$publicContext
@@ -173,7 +174,7 @@ if ($project === null): ?>
         $primaryActiveTutor=$richTutoring[0]??null;
         $headerTutorNames=array_values(array_filter(array_map(static fn(array $tutor):string=>trim((string)($tutor['name']??'')),$richTutoring)));
         $headerTutorValue=$headerTutorNames!==[]?implode(', ',$headerTutorNames):(trim((string)($project['tutor_name']??''))?:'Sin tutor asignado');
-        $richTribunalMembers=array_map(static fn(array $row):array=>$person($row,$roleLabels[$row['role_code']]??'Miembro del tribunal',true),$richTribunal);
+        $richTribunalMembers=array_map(static fn(array $row):array=>$person($row,$tribunalPositionLabels[$row['tribunal_position']??'']??'Cargo no especificado',true),$richTribunal);
         $academicProgressStatuses=$isDegreeProject
             ?['development','under_review','approved','defense','tribunal_approved','published']
             :['development','under_review','approved','published'];

@@ -185,8 +185,9 @@ final class ProjectStatusTransitionService
             if ($requirement === 'tribunal') {
                 $count = (int) ($project['tribunal_count'] ?? $this->participantCount($project, ['tribunal', 'jury']));
                 $defenseStart = (string)($project['status']??'') === 'approved' && (string)($project['type_code']??'') === 'thesis';
-                $met = $defenseStart ? ThesisTribunalService::isValidMemberCount($count) : $count > 0;
-                $result[] = ['key' => 'tribunal', 'label' => 'Tribunal asignado', 'met' => $met, 'message' => $defenseStart ? 'El Tribunal debe tener entre '.ThesisTribunalService::memberRangeLabel().' miembros activos antes de iniciar la defensa.' : 'Asigna al menos un integrante del Tribunal antes de continuar.'];
+                $complete = (int)($project['id']??0)>0 ? ThesisTribunalService::hasCompleteTribunal(Database::connection(),(int)$project['id']) : false;
+                $met = $defenseStart ? $complete : ($count > 0 && ($project['type_code']??'') !== 'thesis' || $complete);
+                $result[] = ['key' => 'tribunal', 'label' => 'Tribunal asignado', 'met' => $met, 'message' => $defenseStart ? 'El Tribunal debe tener exactamente Presidente, Miembro 1 y Miembro 2 activos antes de iniciar la defensa.' : 'El Tribunal debe conservar sus tres cargos activos antes de continuar.'];
             } elseif ($requirement === 'authors') {
                 $met = (int) ($project['author_count'] ?? $this->participantCount($project, ['student'])) > 0;
                 $result[] = ['key' => 'authors', 'label' => 'Autor o autores activos', 'met' => $met, 'message' => 'El proyecto debe conservar al menos un autor activo antes de publicarse.'];

@@ -34,9 +34,7 @@ final class ThesisPublicationService
         $defense->execute(['id' => $id]);
         if ((string) $defense->fetchColumn() !== 'approved') throw new ThesisPublicationException('El resultado del Tribunal no está aprobado.');
 
-        $tribunal = $db->prepare("SELECT COUNT(DISTINCT user_id) FROM project_participants WHERE project_id=:id AND status='active' AND removed_at IS NULL AND LOWER(role_code) IN ('tribunal','jury') FOR UPDATE");
-        $tribunal->execute(['id' => $id]);
-        if (!ThesisTribunalService::isValidMemberCount((int) $tribunal->fetchColumn())) throw new ThesisPublicationException('El Tribunal no tiene una composición válida de ' . ThesisTribunalService::memberRangeLabel() . ' miembros activos.');
+        if (!ThesisTribunalService::hasCompleteTribunal($db, $id)) throw new ThesisPublicationException('El Tribunal no tiene Presidente, Miembro 1 y Miembro 2 activos.');
 
         $result = (new ProjectStatusTransitionService())->transitionInTransaction($db, $id, 'tribunal_approved', 'published', '', $actor, 'thesis_management');
         $this->notify($db, $id, (string) $project['code']);

@@ -93,7 +93,8 @@ final class ProjectsController
                 (int) ($_GET['desired_count'] ?? 0),
                 (array) ($_GET['exclude_user_ids'] ?? []),
                 $replacement,
-                (array) ($_GET['load_overrides'] ?? [])
+                (array) ($_GET['load_overrides'] ?? []),
+                (string) ($_GET['position'] ?? '')
             );
             $this->json(['success'=>true,'message'=>'','data'=>$data]);
         } catch (ThesisTribunalException $e) {
@@ -111,7 +112,7 @@ final class ProjectsController
         if (($_SERVER['REQUEST_METHOD']??'GET')!=='POST') { http_response_code(405); $this->json(['success'=>false,'message'=>'Método no permitido.','data'=>[]]); }
         $session=new AuthSessionService();if(!(new TeacherThesisCapabilityService())->canManageCurrentUser()){http_response_code(403);$this->json(['success'=>false,'message'=>'No tienes autorización para gestionar Tribunal.','data'=>[]]);}
         if(!$session->validateCsrf('thesis_management',(string)($_POST['_csrf']??''))){http_response_code(419);$this->json(['success'=>false,'message'=>'La sesión del formulario venció.','data'=>[]]);}
-        try{$result=(new ThesisTribunalService())->save((int)($_POST['project_id']??0),(string)($_POST['expected_status']??''),(array)($_POST['member_ids']??[]),(string)($_POST['reason']??''),(int)$session->userId());$message=($result['status']??'')==='defense'&&(string)($_POST['expected_status']??'')==='approved'?'Tribunal conformado correctamente. El proyecto avanzó a la etapa de defensa.':'Tribunal actualizado correctamente.';$this->json(['success'=>true,'message'=>$message,'data'=>$result]);}catch(ThesisTribunalException|ProjectStatusTransitionException $e){http_response_code($e->httpStatus());$this->json(['success'=>false,'message'=>$e->getMessage(),'data'=>[]]);}catch(Throwable $e){error_log('Thesis tribunal: '.$e->getMessage());http_response_code(500);$this->json(['success'=>false,'message'=>'No fue posible actualizar el Tribunal.','data'=>[]]);}
+        $assignments=['president'=>(int)($_POST['president_id']??0),'member_1'=>(int)($_POST['member_1_id']??0),'member_2'=>(int)($_POST['member_2_id']??0)];try{$result=(new ThesisTribunalService())->save((int)($_POST['project_id']??0),(string)($_POST['expected_status']??''),$assignments,(string)($_POST['reason']??''),(int)$session->userId());$message=($result['status']??'')==='defense'&&(string)($_POST['expected_status']??'')==='approved'?'Tribunal conformado correctamente. El proyecto avanzó a la etapa de defensa.':'Tribunal actualizado correctamente.';$this->json(['success'=>true,'message'=>$message,'data'=>$result]);}catch(ThesisTribunalException|ProjectStatusTransitionException $e){http_response_code($e->httpStatus());$this->json(['success'=>false,'message'=>$e->getMessage(),'data'=>[]]);}catch(Throwable $e){error_log('Thesis tribunal: '.$e->getMessage());http_response_code(500);$this->json(['success'=>false,'message'=>'No fue posible actualizar el Tribunal.','data'=>[]]);}
     }
 
     public function saveThesisDefenseInformation(): void

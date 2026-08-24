@@ -96,7 +96,7 @@ final class TeacherAssignedProjectService
             FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id INNER JOIN academic_periods ap ON ap.id=p.academic_period_id
             LEFT JOIN users publisher ON publisher.id=p.repository_added_by
             WHERE p.deleted_at IS NULL AND p.withdrawn_at IS NULL AND p.status='published' AND p.is_available=1
-              AND p.publication_origin='direct_repository' AND (p.tutor_id=:teacher_tutor OR EXISTS (SELECT 1 FROM project_participants pp WHERE pp.project_id=p.id AND pp.user_id=:teacher_participant_direct AND pp.status='active' AND pp.removed_at IS NULL AND LOWER(pp.role_code) IN ('tutor','cotutor','co_tutor','co-tutor'))){$period}
+              AND p.publication_origin='direct_repository' AND (p.tutor_id=:teacher_tutor OR EXISTS (SELECT 1 FROM project_participants pp WHERE pp.project_id=p.id AND pp.user_id=:teacher_participant_direct AND pp.status='active' AND pp.removed_at IS NULL AND LOWER(pp.role_code) IN ('tutor','cotutor','co_tutor','co-tutor','tribunal','jury'))){$period}
             ORDER BY p.published_at DESC,p.id DESC");
         $params=['teacher_tutor'=>$teacherId,'teacher_participant_direct'=>$teacherId]; if ($periodId !== null) $params['period_id']=$periodId;
         $query->execute($params);
