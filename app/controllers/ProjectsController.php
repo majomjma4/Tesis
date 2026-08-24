@@ -400,6 +400,13 @@ final class ProjectsController
         $returnUrl = ($isAdministrator || $isTeacher)
             ? $this->academicManagementReturnUrl((string) ($_GET['return'] ?? ''))
             : route('projects');
+        $returnParts = parse_url($returnUrl);
+        $returnQuery = [];
+        if (is_array($returnParts)) parse_str((string) ($returnParts['query'] ?? ''), $returnQuery);
+        $projectReviewFullscreen = !$isAdministrator
+            && $isTeacher
+            && !empty($projectCapabilities['review_documents'])
+            && strtolower(trim((string) ($returnQuery['page'] ?? ''))) === 'assigned-projects';
         $studentBackUrl = route('dashboard');
         $studentBackLabel = 'Volver al inicio';
         if (!$isAdministrator && !$isTeacher && $isStudentParticipant) {
@@ -452,8 +459,10 @@ final class ProjectsController
             'title' => ($isAdministrator || $isTeacher)
                 ? (string) $project['code'] . ' · Gestión académica'
                 : ($project['title'] ?? 'Proyecto no encontrado') . ' | Gestión Académica',
-            'bodyClass' => 'project-detail-page' . (!$isAdministrator ? ' student-project-workspace-page workspace-fullscreen' : ''),
-            'studentWorkspaceFullscreen' => !$isAdministrator,
+            'bodyClass' => 'project-detail-page'
+                . (!$isAdministrator && !$isTeacher ? ' student-project-workspace-page workspace-fullscreen' : '')
+                . ($projectReviewFullscreen ? ' project-review-fullscreen' : ''),
+            'studentWorkspaceFullscreen' => !$isAdministrator && !$isTeacher,
             'isTeacherContext' => $isTeacher,
             'institutionalReadOnly' => $institutionalReadOnly,
             'pageStyles' => array_values(array_filter([

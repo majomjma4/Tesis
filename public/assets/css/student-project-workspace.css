@@ -24,14 +24,14 @@
     margin: 0 auto;
 }
 
-/* Opt-in only for the student's real project detail route. */
-body.app-student-workspace-fullscreen .sidebar { display:none; }
-body.app-student-workspace-fullscreen .sidebar-overlay { display:none !important; }
-body.app-student-workspace-fullscreen { width:100%; min-width:0; min-height:100vh; background:var(--bg); }
-body.app-student-workspace-fullscreen .main { box-sizing:border-box; margin-left:0; width:100%; max-width:none; min-width:0; min-height:100vh; background:var(--bg); }
-body.app-student-workspace-fullscreen .topbar { display:none; }
-body.app-student-workspace-fullscreen .app-page-content { box-sizing:border-box; width:100%; max-width:none; min-width:0; flex:1 1 auto; display:flex; flex-direction:column; min-height:0; background:var(--bg); padding:0.75rem 1.25rem 0.75rem !important; }
-body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box; width:100%; max-width:none; min-width:0; flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
+/* Opt-in only for the student's workspace and teacher review detail route. */
+body:is(.app-student-workspace-fullscreen,.project-review-fullscreen) .sidebar { display:none; }
+body:is(.app-student-workspace-fullscreen,.project-review-fullscreen) .sidebar-overlay { display:none !important; }
+body:is(.app-student-workspace-fullscreen,.project-review-fullscreen) { width:100%; min-width:0; min-height:100vh; background:var(--bg); }
+body:is(.app-student-workspace-fullscreen,.project-review-fullscreen) .main { box-sizing:border-box; margin-left:0; width:100%; max-width:none; min-width:0; min-height:100vh; background:var(--bg); }
+body:is(.app-student-workspace-fullscreen,.project-review-fullscreen) .topbar { display:none; }
+body:is(.app-student-workspace-fullscreen,.project-review-fullscreen) .app-page-content { box-sizing:border-box; width:100%; max-width:none; min-width:0; flex:1 1 auto; display:flex; flex-direction:column; min-height:0; background:var(--bg); padding:0.75rem 1.25rem 0.75rem !important; }
+body:is(.app-student-workspace-fullscreen,.project-review-fullscreen) .student-workspace { box-sizing:border-box; width:100%; max-width:none; min-width:0; flex:1 1 auto; display:flex; flex-direction:column; min-height:0; }
 .sw-tabs-more { display:none; position:relative; }
 .sw-tabs-more summary { list-style:none; cursor:pointer; }
 .sw-tabs-more summary::-webkit-details-marker { display:none; }
@@ -595,7 +595,7 @@ body.app-student-workspace-fullscreen .student-workspace { box-sizing:border-box
     }
 }
 @media (max-width: 480px) {
-    body.app-student-workspace-fullscreen .app-page-content {
+    body:is(.app-student-workspace-fullscreen,.project-review-fullscreen) .app-page-content {
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
     }
@@ -5273,7 +5273,7 @@ body.sw-modal-open {
 }
 
 @media (max-width: 1080px) {
-    body.app-student-workspace-fullscreen .app-page-content {
+    body:is(.app-student-workspace-fullscreen,.project-review-fullscreen) .app-page-content {
         padding: 0.5rem 0.5rem 1.5rem !important;
     }
 }
