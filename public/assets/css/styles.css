@@ -38,6 +38,9 @@
     --blue-dark:#1d4ed8;
     --danger:#ef4444;
     --warning:#f59e0b;
+    --success:#10b981;
+    --surface-elevated:#ffffff;
+    --focus-ring:rgba(37,99,235,.28);
     --project-thesis:37,99,235;
     --project-profile:139,92,246;
     --project-practices:244,99,90;
@@ -73,13 +76,19 @@ body.app-shell{
 }
 html.theme-dark,
 body.dark-mode{
-    --bg:#0f172a;
+    --bg:#0b1220;
     --surface:#111c2f;
-    --surface-soft:#17243a;
+    --surface-soft:#192b45;
+    --surface-elevated:#203653;
+    --primary:#4f83e8;
+    --blue:#60a5fa;
+    --blue-dark:#93c5fd;
+    --success:#6ee7b7;
     --text:#f8fafc;
     --muted:#cbd5e1;
-    --line:#26364d;
-    --shadow:0 14px 35px rgba(0,0,0,.24);
+    --line:#334966;
+    --focus-ring:rgba(96,165,250,.38);
+    --shadow:0 14px 35px rgba(0,0,0,.3);
 }
 button,
 input,
@@ -4292,3 +4301,51 @@ body.app-shell.calendar-page :is(.calendar-agenda-item h3,.calendar-board h2){fo
 @media(max-width:420px){.calendar-page .calendar-board{padding:12px}.calendar-page .calendar-modal-overlay{padding:12px}.calendar-page .calendar-modal{padding:14px}.calendar-page .calendar-modal h2{font-size:20px}.calendar-page .calendar-form-field textarea{min-height:60px}.calendar-page .calendar-cell{min-height:58px}.calendar-page .calendar-event-chip{min-height:16px;padding:2px 3px;font-size:var(--font-xs)}.calendar-page .calendar-view-switcher button{min-width:0;font-size:var(--font-xs)}.calendar-page .calendar-hero{padding:20px 16px;border-radius:19px}.calendar-page .calendar-stats{gap:10px}}
 @media(max-height:540px) and (orientation:landscape){.calendar-page .calendar-modal-overlay{place-items:start;overflow-y:auto;padding:8px}.calendar-page .calendar-modal,.calendar-page .calendar-detail-modal,.calendar-page .calendar-confirm-modal{max-height:calc(100dvh - 16px)}}
 .login-session-modal-overlay{position:fixed;inset:0;z-index:2000;display:grid;place-items:center;padding:20px;background:rgba(15,23,42,.6);backdrop-filter:blur(4px)}.login-session-modal{width:min(440px,100%);box-sizing:border-box;padding:26px;border:1px solid var(--line);border-radius:20px;background:var(--surface);box-shadow:0 28px 72px rgba(15,23,42,.35)}.login-session-modal-icon{width:48px;height:48px;display:grid;place-items:center;border-radius:14px;background:rgba(37,99,235,.12);color:var(--blue);font-size:20px}.login-session-modal h2{margin:15px 0 8px;font-size:1.25rem}.login-session-modal p{margin:0;color:var(--muted);line-height:1.55}.login-session-modal small{display:block;margin-top:14px;color:var(--muted);font-weight:700}.login-session-modal-actions{display:grid;grid-template-columns:1fr 1.45fr;gap:10px;margin-top:24px}.login-session-modal-actions form{min-width:0}.login-session-modal-actions button{width:100%;min-height:44px;border-radius:10px;font:inherit;font-weight:800;cursor:pointer}.login-session-cancel{border:1px solid var(--line);background:var(--surface-soft);color:var(--text)}.login-session-confirm{border:1px solid var(--blue);background:var(--blue);color:#fff;display:inline-flex;align-items:center;justify-content:center;gap:8px}.login-session-confirm:disabled{opacity:.65;cursor:wait}@media(max-width:420px){.login-session-modal-overlay{padding:14px}.login-session-modal{padding:20px}.login-session-modal-actions{grid-template-columns:1fr}.login-session-modal-actions form:first-child{order:2}}
+
+/* Normalización cromática del tema oscuro. Conserva la geometría y el contrato
+   de los componentes; sólo separa superficies y refuerza estados legibles. */
+:is(html.theme-dark,body.dark-mode) .login-panel {
+    border-color:var(--line);
+    box-shadow:0 28px 65px rgba(0,0,0,.34);
+}
+:is(html.theme-dark,body.dark-mode) .institution-brand img { background:var(--surface-elevated); }
+:is(html.theme-dark,body.dark-mode) .login-alert-success {
+    background:rgba(16,185,129,.16);
+    border-color:rgba(110,231,183,.34);
+    color:#a7f3d0;
+}
+:is(html.theme-dark,body.dark-mode) .login-alert-success i { color:var(--success); }
+:is(html.theme-dark,body.dark-mode) .login-alert:not(.login-alert-success) { color:#fca5a5; }
+:is(html.theme-dark,body.dark-mode) .input-wrap:focus-within { box-shadow:0 0 0 4px var(--focus-ring); }
+:is(html.theme-dark,body.dark-mode) :is(.logout-modal,.calendar-modal,.calendar-confirm-modal,.calendar-detail-modal,.login-session-modal,.custom-select-panel,.calendar-select-menu) {
+    background:var(--surface-elevated);
+    border-color:var(--line);
+}
+:is(html.theme-dark,body.dark-mode) :is(.custom-select-option:hover,.custom-select-option:focus-visible,.calendar-select-option:hover,.calendar-select-option:focus-visible) {
+    background:color-mix(in srgb,var(--blue) 14%,var(--surface-elevated));
+}
+:is(html.theme-dark,body.dark-mode) :is(.custom-select-option[aria-selected=true],.calendar-select-option.selected) {
+    background:color-mix(in srgb,var(--blue) 22%,var(--surface-elevated));
+}
+:is(html.theme-dark,body.dark-mode) .repository-preview-modal-dialog {
+    background:var(--surface-elevated);
+    border-color:var(--line);
+}
+:is(html.theme-dark,body.dark-mode) .repository-preview-modal-header { background:var(--surface-elevated); }
+:is(html.theme-dark,body.dark-mode) .repository-preview-modal-body { background:var(--surface-soft); }
+:is(html.theme-dark,body.dark-mode) :is(.calendar-modal-close,.repository-preview-modal-close) {
+    background:var(--surface-soft);
+    border-color:var(--line);
+    color:var(--text);
+}
+:is(html.theme-dark,body.dark-mode) :is(.calendar-form-field input,.calendar-form-field select,.calendar-form-field textarea,.calendar-time-inputs input) {
+    background:var(--surface-soft);
+    border-color:var(--line);
+    color:var(--text);
+}
+:is(html.theme-dark,body.dark-mode) .calendar-detail-project {
+    background:color-mix(in srgb,var(--blue) 18%,var(--surface-elevated));
+    border-color:color-mix(in srgb,var(--blue) 45%,var(--line));
+}
+:is(html.theme-dark,body.dark-mode) .calendar-detail-project strong { color:#bfdbfe; }
+:is(html.theme-dark,body.dark-mode) .calendar-detail-project>i { background:var(--blue-soft); color:var(--blue); }

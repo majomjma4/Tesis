@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= e($title ?? 'Gestion Documental Academica') ?></title>
+    <script>
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.classList.add('theme-dark');
+        }
+    </script>
     <link rel="stylesheet" href="<?= e(asset('css/styles.css')) ?>">
     <?php foreach (($pageStyles ?? []) as $pageStyle): ?>
         <link rel="stylesheet" href="<?= e($pageStyle) ?>">

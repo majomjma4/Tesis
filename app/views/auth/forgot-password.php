@@ -25,10 +25,8 @@
         <?php endif; ?>
 
         <?php if (!empty($forgotSuccess)): ?>
-            <div class="login-alert show"
-                style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: #047857;"
-                role="status" aria-live="polite">
-                <i class="fa-solid fa-circle-check" style="color: #10b981;"></i>
+            <div class="login-alert login-alert-success show" role="status" aria-live="polite">
+                <i class="fa-solid fa-circle-check"></i>
                 <span><?= e($forgotSuccess) ?></span>
             </div>
         <?php endif; ?>

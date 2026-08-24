@@ -5801,3 +5801,103 @@ canvas.hiddenCanvasElement {
         justify-content: flex-end;
     }
 }
+
+/* Project Review: dark mode scoped to workspace chrome only. Real PDF/DOCX/image
+   surfaces intentionally keep their document colors. */
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace {
+    --sw-primary:var(--blue);
+    --sw-primary-hover:var(--blue-dark);
+    --sw-teal:#5eead4;
+    --sw-amber:#fbbf24;
+    --sw-violet:#c4b5fd;
+    --sw-green:#6ee7b7;
+    --sw-text:var(--text);
+    --sw-text-muted:var(--muted);
+    --sw-bg-soft:var(--surface-soft);
+    --sw-border:var(--line);
+}
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-header-card,.sw-viewer-panel,.sw-observations-panel,.sw-card) {
+    background:var(--surface);
+    border-color:var(--line);
+}
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-viewer-toolbar,.sw-project-actions,.sw-viewer-download-note,.sw-viewer-help-banner,.sw-review-file-heading) {
+    background:var(--surface-soft);
+    border-color:var(--line);
+}
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-viewer-action {
+    background:var(--surface-elevated);
+    border-color:var(--line);
+    color:var(--text);
+}
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-viewer-action:hover:not(:disabled) {
+    background:color-mix(in srgb,var(--blue) 14%,var(--surface-elevated));
+    border-color:var(--blue);
+}
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-viewer-action.is-file-download:not(:disabled),.sw-obs-action-btn) {
+    background:var(--blue);
+    border-color:var(--blue);
+    color:#07111f;
+}
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-viewer-action.is-file-download:not(:disabled):hover,.sw-obs-action-btn:hover:not(:disabled)) {
+    background:var(--blue-dark);
+    border-color:var(--blue-dark);
+}
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-viewer-action:disabled,.sw-viewer-action[disabled]) {
+    background:var(--surface-soft) !important;
+    border-color:var(--line) !important;
+    color:var(--muted) !important;
+}
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-viewer-download-note,
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-viewer-download-note i { color:var(--muted); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-viewer-help-banner {
+    background:color-mix(in srgb,var(--blue) 14%,var(--surface-soft));
+    border-color:color-mix(in srgb,var(--blue) 42%,var(--line));
+    color:var(--text);
+}
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-viewer-help-banner i,.sw-viewer-help-content strong:first-child) { color:var(--blue); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-viewer-help-content span,.sw-viewer-help-content span strong) { color:var(--text); }
+
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-viewer-canvas,.sw-preview-stage,.sw-preview-docx,.sw-poc-pages) { background:var(--surface-soft); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-state-title,.sw-state-message) { color:var(--text); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-state-message { color:var(--muted); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-preview-state-card.is-empty .sw-state-icon-badge {
+    background:color-mix(in srgb,var(--blue) 18%,var(--surface-elevated));
+    border-color:color-mix(in srgb,var(--blue) 42%,var(--line));
+    color:var(--blue);
+}
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-state-icon-badge .sub-icon { background:var(--surface-elevated); color:var(--blue); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-preview-error-wrapper .sw-retry-preview-btn { background:var(--surface-elevated); border-color:var(--line); color:var(--text); }
+
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-file-menu,.sw-tabs-more>div),
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) > .sw-file-menu { background:var(--surface-elevated); border-color:var(--line); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-file-menu button,.sw-file-menu a),
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) > .sw-file-menu :is(button,a) { color:var(--text); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-tree-item:hover,.sw-tree-item.is-selected,.sw-zip-entry:hover,.sw-zip-entry.is-selected,.sw-tabs-more a:hover,.sw-tabs-more a:focus) { background:color-mix(in srgb,var(--blue) 14%,var(--surface-soft)); color:var(--text); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-tab-btn.is-active { color:var(--blue); border-bottom-color:var(--blue); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-obs-filter,.sw-obs-footer,.sw-mobile-review-footer) { background:var(--surface-elevated); border-color:var(--line); color:var(--text); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-obs-filter.is-all.is-active { background:color-mix(in srgb,var(--blue) 22%,var(--surface-elevated)) !important; border-color:var(--blue) !important; color:var(--blue) !important; }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-obs-filter.is-pending.is-active { background:color-mix(in srgb,var(--sw-amber) 20%,var(--surface-elevated)) !important; border-color:var(--sw-amber) !important; color:var(--sw-amber) !important; }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-obs-filter.is-addressed.is-active { background:color-mix(in srgb,var(--sw-green) 20%,var(--surface-elevated)) !important; border-color:var(--sw-green) !important; color:var(--sw-green) !important; }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-obs-card { background:var(--surface-soft); border-color:var(--line); color:var(--text); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-obs-card.is-selected,.sw-obs-card.is-active) { background:color-mix(in srgb,var(--blue) 18%,var(--surface-soft)) !important; border-color:var(--blue) !important; }
+
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-review-progress-heading strong,.sw-review-file-heading strong,.sw-review-group-heading strong,.sw-review-unavailable strong,.sw-review-persisted-approved strong) { color:var(--text); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-review-progress-heading span,.sw-review-file-heading span,.sw-review-group-heading>span,.sw-review-card-meta span,.sw-review-parent-zip-subtitle,.sw-review-progress-counts,.sw-review-draft-meta-bar,.sw-review-unavailable,.sw-review-persisted-approved span) { color:var(--muted); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-review-autosave-tag { color:#7dd3fc; }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-review-progress-counts .is-approved i { color:var(--sw-green); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-review-progress-counts .is-corrections i { color:var(--sw-amber); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-review-read-only-banner,.sw-zip-internal-banner) { background:color-mix(in srgb,var(--sw-amber) 14%,var(--surface-soft)) !important; border-color:var(--sw-amber) !important; color:var(--text) !important; }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-review-read-only-banner i,.sw-zip-internal-banner i) { color:var(--sw-amber) !important; }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-review-persisted-approved { background:color-mix(in srgb,var(--sw-green) 16%,var(--surface-soft)) !important; border-color:color-mix(in srgb,var(--sw-green) 42%,var(--line)) !important; }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-review-persisted-approved:has(.fa-triangle-exclamation) { background:color-mix(in srgb,var(--sw-amber) 14%,var(--surface-soft)) !important; border-color:color-mix(in srgb,var(--sw-amber) 42%,var(--line)) !important; }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-review-persisted-approved i { color:var(--sw-green); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-review-persisted-approved:has(.fa-triangle-exclamation) i { color:var(--sw-amber); }
+
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-review-card-location,
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-review-card-location>div,
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-review-card-location [data-sw-review-card-quote] { background:var(--surface-soft) !important; border-color:var(--line) !important; color:var(--text) !important; }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace .sw-review-card-location i { color:var(--blue) !important; }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-submit-modal-card,.sw-operation-modal section) { background:var(--surface-elevated); border-color:var(--line); color:var(--text); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-submit-modal-header,.sw-submit-modal-footer) { background:var(--surface); border-color:var(--line); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-submit-cancel-btn,.sw-operation-modal section footer button:not(.is-primary):not(.sw-submit-confirm-btn)) { background:var(--surface-soft); border-color:var(--line); color:var(--text); }
+:is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-review-confirm-stats [data-sw-review-approved-count],.sw-review-confirm-stats [data-sw-review-corrections-count],.sw-review-confirm-stats [data-sw-review-observations-count],.sw-review-confirm-error) { background:var(--surface-soft) !important; border-color:var(--line) !important; color:var(--text) !important; }
