@@ -322,10 +322,30 @@ final class RepositoryController
 
     private function repositoryReturnUrl(string $candidate): string
     {
-        if ($candidate==='') return (new AuthSessionService())->hasAdminAccess()?route('admin-repository'):route('repository');
-        $parts=parse_url($candidate); if($parts===false||isset($parts['scheme'])||isset($parts['host'])) return route('repository');
-        parse_str((string)($parts['query']??''),$query); $page=strtolower((string)($query['page']??''));
-        return in_array($page,['repository','repositorio','admin-repository'],true)?$candidate:route('repository');
+        $session = new AuthSessionService();
+        $fallback = $session->isAdminModeActive() ? route('admin-repository') : route('repository');
+
+        if ($candidate === '') {
+            return $fallback;
+        }
+
+        $parts = parse_url($candidate);
+        if ($parts === false || isset($parts['scheme']) || isset($parts['host'])) {
+            return $fallback;
+        }
+
+        parse_str((string) ($parts['query'] ?? ''), $query);
+        $page = strtolower((string) ($query['page'] ?? ''));
+
+        if (in_array($page, ['repository', 'repositorio'], true)) {
+            return $candidate;
+        }
+
+        if ($page === 'admin-repository' && $session->isAdminModeActive()) {
+            return $candidate;
+        }
+
+        return $fallback;
     }
 
     public function files(): void
