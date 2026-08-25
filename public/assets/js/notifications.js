@@ -1,5 +1,4 @@
 const shell = document.querySelector("#notificationsShell");
-const preloader = document.querySelector("#notificationsPreloader");
 const searchInput = document.querySelector("#notificationSearch");
 const searchPlaceholder = document.querySelector(".notification-search-placeholder");
 
@@ -48,6 +47,7 @@ let paginationState = (() => {
 let currentPage = Number(paginationState.page || 1);
 let notificationsPerPage = Number(paginationState.per_page || 10);
 const allowedNotificationPageSizes = [10, 25, 50, 75, 100];
+let notificationRequestSequence = 0;
 
 function notificationUrlFromState(pagination = {}) {
     const url = new URL(window.location.href);
@@ -354,8 +354,12 @@ function updateTrashSelection() {
 function updateContextualCards() {}
 
 async function loadNotifications(showMessage = false, { updateHistory = false, normalizeHistory = false, historyMode = "replace" } = {}) {
+    const requestSequence = ++notificationRequestSequence;
     requestController?.abort(); requestController = new AbortController();
-    refreshButton?.setAttribute("disabled", ""); refreshButton?.querySelector("i")?.classList.add("is-spinning");
+    if (refreshButton) window.AppLoading?.setButtonLoading(refreshButton, true, "Actualizando…");
+    const skeleton = window.AppLoading?.showSkeleton(groupsContainer, { type: "rows", count: 5 });
+    if (skeleton) groupsContainer?.querySelector(".notification-listing-heading")?.after(skeleton);
+    groupsContainer?.classList.add("is-loading-data");
     const showingHidden = statusFilter.value === "hidden";
     const showingTrash = statusFilter.value === "trash";
     
@@ -381,7 +385,11 @@ async function loadNotifications(showMessage = false, { updateHistory = false, n
     } catch (error) {
         if (error.name !== "AbortError") { if (errorState) errorState.hidden = false; showToast(error.message, true); }
     } finally {
-        refreshButton?.removeAttribute("disabled"); refreshButton?.querySelector("i")?.classList.remove("is-spinning");
+        if (requestSequence === notificationRequestSequence) {
+            window.AppLoading?.hideSkeleton(groupsContainer);
+            groupsContainer?.classList.remove("is-loading-data");
+            window.AppLoading?.setButtonLoading(refreshButton, false);
+        }
     }
 }
 
@@ -964,21 +972,6 @@ document.addEventListener("click", (event) => {
 });
 document.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); searchInput?.focus(); } if (event.key === "Escape") { closeMenus(); if (modalContextMenu) modalContextMenu.hidden = true; const hasOpenFilter = filterControls.some((control) => { const menu = control.querySelector(".notification-filter-menu"); return menu && !menu.hidden; }); if (hasOpenFilter) closeFilterMenus(true); else if (detailModal && !detailModal.hidden) closeModal(detailModal); else if (deleteModal && !deleteModal.hidden) closeModal(deleteModal); else if (createModal && !createModal.hidden) closeModal(createModal); else if (document.activeElement === searchInput) { searchInput.value = ""; syncSearchPlaceholder(); searchInput.blur(); updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); } } });
 
-let notificationsRevealed = false;
-
-function revealNotifications() {
-    if (notificationsRevealed) return;
-    notificationsRevealed = true;
-    preloader?.classList.add("is-leaving");
-    shell?.classList.remove("is-loading");
-    shell?.classList.add("is-ready");
-    shell?.setAttribute("aria-busy", "false");
-    window.setTimeout(() => preloader?.setAttribute("hidden", ""), 280);
-}
-
-window.setTimeout(revealNotifications, 650);
-window.setTimeout(revealNotifications, 2500);
-
 dateTrigger?.addEventListener("click", () => {
     const open = Boolean(datePopover?.hidden);
     if (datePopover) datePopover.hidden = !open;
@@ -1109,7 +1102,7 @@ const sendConfirmModal=document.querySelector("#notificationSendConfirmModal");c
 function closeSendConfirmation(){if(!sendConfirmModal)return;sendConfirmModal.hidden=true;pendingNotificationSend=null;}
 function validateNotificationSend(){const scope=scopeSelect?.value||"";if(!createForm?.reportValidity())throw new Error("Completa los campos obligatorios.");if(scope.endsWith("_one")&&chosenRecipients.size!==1)throw new Error("Selecciona un destinatario.");if(scope.endsWith("_many")&&chosenRecipients.size<1)throw new Error("Selecciona al menos un destinatario.");if(scope==="semester_students"&&!semesterSelect?.value)throw new Error("Selecciona un semestre.");if((scope==="all_students"||scope==="all_teachers")&&!document.querySelector("#confirmMassCheckbox")?.checked)throw new Error("Confirma el envío masivo.");if(scope==="all"&&!document.querySelector("#confirmAllCheckbox")?.checked)throw new Error("Confirma el envío a todos los usuarios.");return scope;}
 function confirmationCopy(scope){const title=document.querySelector("#newNotificationTitle")?.value.trim()||"Sin título";const total=semesterSelect?.selectedOptions[0]?.dataset.total||"";if(scope.endsWith("_one")){const person=[...chosenRecipients.values()][0];return [`¿Deseas enviar esta notificación a ${person.full_name}?`,title];}if(scope.endsWith("_many")){const kind=scope.startsWith("student")?"estudiantes":"docentes";return [`¿Deseas enviar esta notificación a ${chosenRecipients.size} ${kind} seleccionados?`,title];}if(scope==="semester_students")return [`¿Deseas enviar esta notificación a los ${total||""} estudiantes activos de ${semesterSelect?.selectedOptions[0]?.textContent||"este semestre"}?`,title];if(scope==="all_students")return ["Esta notificación será enviada a todos los estudiantes activos. ¿Deseas continuar?",title];if(scope==="all_teachers")return ["Esta notificación será enviada a todos los docentes activos. ¿Deseas continuar?",title];return ["Este comunicado será enviado a todos los usuarios activos del sistema. Esta acción afectará a toda la comunidad de la plataforma. ¿Deseas continuar?",title];}
-async function persistNotificationSend(){if(!pendingNotificationSend||!createForm)return;const {scope,data}=pendingNotificationSend;if(data.get("type")==="other")data.set("type","system");const submit=document.querySelector("#btnSubmitNewNotification");try{confirmSendButton.disabled=true;confirmSendButton.textContent="Enviando…";submit.disabled=true;submit.textContent="Enviando…";const endpoint=scope==="all"?endpoints["admin-send"]:endpoints["admin-audience-send"];const response=await fetch(endpoint,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/x-www-form-urlencoded","X-Requested-With":"XMLHttpRequest"},body:new URLSearchParams(data)});const payload=await response.json().catch(()=>({success:false}));if(!response.ok||!payload.success)throw new Error(payload.message||"❌ No se pudo enviar la notificación. Inténtalo nuevamente.");closeSendConfirmation();createForm.reset();chosenRecipients.clear();renderChosenRecipients();updateAudienceScope();closeModal(createModal);showToast("✅ Notificación enviada correctamente.");if(statusFilter?.value==="sent")await loadNotifications();else loadNotifications();}catch(problem){console.error("Notification send failed",problem);const message="No se pudo enviar la notificación. Inténtalo nuevamente.";showToast(message,true);if(errorMsg){errorMsg.textContent=message;errorMsg.hidden=false;}closeSendConfirmation();}finally{confirmSendButton.disabled=false;confirmSendButton.textContent="Enviar notificación";submit.disabled=false;submit.textContent="Enviar notificación";}}
+async function persistNotificationSend(){if(!pendingNotificationSend||!createForm)return;const {scope,data}=pendingNotificationSend;if(data.get("type")==="other")data.set("type","system");const submit=document.querySelector("#btnSubmitNewNotification");try{window.AppLoading?.setButtonLoading(confirmSendButton,true,"Enviando…");window.AppLoading?.setButtonLoading(submit,true,"Enviando…");const endpoint=scope==="all"?endpoints["admin-send"]:endpoints["admin-audience-send"];const response=await fetch(endpoint,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/x-www-form-urlencoded","X-Requested-With":"XMLHttpRequest"},body:new URLSearchParams(data)});const payload=await response.json().catch(()=>({success:false}));if(!response.ok||!payload.success)throw new Error(payload.message||"❌ No se pudo enviar la notificación. Inténtalo nuevamente.");closeSendConfirmation();createForm.reset();chosenRecipients.clear();renderChosenRecipients();updateAudienceScope();closeModal(createModal);showToast("✅ Notificación enviada correctamente.");if(statusFilter?.value==="sent")await loadNotifications();else loadNotifications();}catch(problem){console.error("Notification send failed",problem);const message="No se pudo enviar la notificación. Inténtalo nuevamente.";showToast(message,true);if(errorMsg){errorMsg.textContent=message;errorMsg.hidden=false;}closeSendConfirmation();}finally{window.AppLoading?.setButtonLoading(confirmSendButton,false);window.AppLoading?.setButtonLoading(submit,false);}}
 createForm?.addEventListener("submit",(event)=>{event.preventDefault();event.stopImmediatePropagation();try{const scope=validateNotificationSend();if(errorMsg)errorMsg.hidden=true;const data=new FormData(createForm);chosenRecipients.forEach(person=>data.append("recipient_ids[]",person.id));const [text,title]=confirmationCopy(scope);pendingNotificationSend={scope,data};if(sendConfirmText)sendConfirmText.textContent=text;if(sendConfirmMeta)sendConfirmMeta.textContent=`Título: ${title}`;if(sendConfirmModal){sendConfirmModal.hidden=false;confirmSendButton?.focus();}}catch(problem){if(errorMsg){errorMsg.textContent=problem.message;errorMsg.hidden=false;}}},true);
 confirmSendButton?.addEventListener("click",persistNotificationSend);document.querySelector("#cancelNotificationSendConfirm")?.addEventListener("click",closeSendConfirmation);document.querySelector("#closeNotificationSendConfirm")?.addEventListener("click",closeSendConfirmation);sendConfirmModal?.addEventListener("click",(event)=>{if(event.target===sendConfirmModal&&pendingNotificationSend?.scope!=="all")closeSendConfirmation();});document.addEventListener("keydown",(event)=>{if(event.key==="Escape"&&sendConfirmModal&&!sendConfirmModal.hidden){event.stopImmediatePropagation();closeSendConfirmation();createForm?.querySelector("#btnSubmitNewNotification")?.focus();}},true);
 document.addEventListener("click",(event)=>{if(event.target===detailModal)closeModal(detailModal);if(event.target===createModal)closeModal(createModal);if(!event.target.closest("[data-filter-control]"))closeFilterMenus();if(!event.target.closest(".notification-date-filter")&&datePopover&&!datePopover.hidden){datePopover.hidden=true;dateTrigger?.setAttribute("aria-expanded","false");}if(!event.target.closest("#groupScopeRecipients")&&recipientResults)recipientResults.hidden=true;});

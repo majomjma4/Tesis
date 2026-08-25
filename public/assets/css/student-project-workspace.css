@@ -929,6 +929,7 @@ body > .sw-file-menu button,body > .sw-file-menu a { border:0;background:transpa
 .student-workspace .sw-preview-state-card.is-processing .sw-state-icon-badge .sub-icon {
     color: #4f46e5;
 }
+.student-workspace .sw-state-skeleton-block{display:block;width:58px;height:58px;border-radius:16px}
 
 .student-workspace .sw-preview-state-card.is-unsupported .sw-state-icon-badge {
     background: #fffbeb;

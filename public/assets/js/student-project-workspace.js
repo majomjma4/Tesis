@@ -1522,7 +1522,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (type === 'empty') {
             badge.innerHTML = '<i class="fa-regular fa-file-lines main-icon" aria-hidden="true"></i><i class="fa-solid fa-eye sub-icon" aria-hidden="true"></i>';
         } else if (type === 'loading' || type === 'processing') {
-            badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin main-icon" aria-hidden="true"></i>';
+            badge.innerHTML = '<span class="skeleton sw-state-skeleton-block" aria-hidden="true"></span>';
         } else if (type === 'unsupported') {
             badge.innerHTML = '<i class="fa-solid fa-file-arrow-down main-icon" aria-hidden="true"></i><i class="fa-solid fa-eye-slash sub-icon" aria-hidden="true"></i>';
         } else if (type === 'forbidden') {

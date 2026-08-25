@@ -12,7 +12,7 @@ $avatarUrl = $hasAvatar ? (route('profile-avatar') . '&v=' . rawurlencode((strin
         <div class="profile-avatar-wrapper" id="profileAvatarContainer">
             <span class="profile-avatar-display" id="profileAvatarDisplay">
                 <?php if ($hasAvatar): ?>
-                    <img id="profileHeaderAvatarImg" src="<?= e($avatarUrl) ?>" alt="Fotografía de perfil de <?= e($profile['full_name']) ?>">
+                    <img id="profileHeaderAvatarImg" data-skeleton-image src="<?= e($avatarUrl) ?>" alt="Fotografía de perfil de <?= e($profile['full_name']) ?>">
                 <?php else: ?>
                     <span id="profileHeaderAvatarInitial" class="profile-initial"><?= e($initialLetter) ?></span>
                 <?php endif; ?>

@@ -1,54 +1,6 @@
 <link rel="stylesheet" href="<?= e(asset('css/notifications.css')) ?>">
 
-<section class="notifications-preloader" id="notificationsPreloader" aria-label="Cargando notificaciones" aria-live="polite">
-    <span class="sr-only">Cargando notificaciones...</span>
-    <div class="skeleton-heading">
-        <div>
-            <span class="notification-skeleton skeleton-kicker"></span>
-            <span class="notification-skeleton skeleton-title"></span>
-            <span class="notification-skeleton skeleton-subtitle"></span>
-        </div>
-        <div class="skeleton-heading-actions">
-            <span class="notification-skeleton skeleton-button"></span>
-            <span class="notification-skeleton skeleton-button wide"></span>
-        </div>
-    </div>
-    <div class="skeleton-stats" aria-hidden="true">
-        <?php for ($i = 0; $i < ($isAdmin ? 4 : 3); $i++): ?>
-            <div class="skeleton-stat">
-                <span class="notification-skeleton skeleton-icon"></span>
-                <div><span class="notification-skeleton skeleton-number"></span><span class="notification-skeleton skeleton-label"></span></div>
-            </div>
-        <?php endfor; ?>
-    </div>
-    <div class="skeleton-toolbar notification-skeleton" aria-hidden="true"></div>
-    <div class="skeleton-content" aria-hidden="true">
-        <div>
-            <span class="notification-skeleton skeleton-group-title"></span>
-            <?php for ($i = 0; $i < 5; $i++): ?>
-                <div class="skeleton-notification">
-                    <span class="notification-skeleton skeleton-dot"></span>
-                    <span class="notification-skeleton skeleton-avatar"></span>
-                    <div class="skeleton-lines">
-                        <span class="notification-skeleton skeleton-line short"></span>
-                        <span class="notification-skeleton skeleton-line"></span>
-                        <span class="notification-skeleton skeleton-line medium"></span>
-                    </div>
-                    <span class="notification-skeleton skeleton-action"></span>
-                </div>
-            <?php endfor; ?>
-        </div>
-        <div class="skeleton-side-card">
-            <span class="notification-skeleton skeleton-line medium"></span>
-            <span class="notification-skeleton skeleton-chart"></span>
-            <span class="notification-skeleton skeleton-line"></span>
-            <span class="notification-skeleton skeleton-line"></span>
-            <span class="notification-skeleton skeleton-side-block"></span>
-        </div>
-    </div>
-</section>
-
-<section class="notifications-shell is-loading" id="notificationsShell" aria-labelledby="notificationsTitle" aria-busy="true" data-csrf-token="<?= e($notificationCsrfToken) ?>" data-endpoints="<?= e(json_encode($notificationEndpoints, JSON_UNESCAPED_SLASHES)) ?>" data-is-admin="<?= $isAdmin ? 'true' : 'false' ?>" data-trash-retention-days="<?= (int)($notificationTrashRetentionDays ?? 60) ?>">
+<section class="notifications-shell" id="notificationsShell" aria-labelledby="notificationsTitle" data-csrf-token="<?= e($notificationCsrfToken) ?>" data-endpoints="<?= e(json_encode($notificationEndpoints, JSON_UNESCAPED_SLASHES)) ?>" data-is-admin="<?= $isAdmin ? 'true' : 'false' ?>" data-trash-retention-days="<?= (int)($notificationTrashRetentionDays ?? 60) ?>">
     <header class="notifications-heading">
         <div>
             <span class="notifications-eyebrow"><i class="fa-regular fa-comments"></i> Comunicación</span>

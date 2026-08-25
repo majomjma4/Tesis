@@ -1,5 +1,4 @@
 // Inicio de filtros del repositorio lector
-const repositorySkeleton = document.querySelector("#repositorySkeleton");
 const repositoryContent = document.querySelector("#repositoryContent");
 
 const tabProjects = document.querySelector("#tabProjects");
@@ -8,6 +7,7 @@ const panelProjects = document.querySelector("#panelProjects");
 const panelSupport = document.querySelector("#panelSupport");
 const toolsSupport = document.querySelector("#toolsSupport");
 const repositorySupportStatus = panelSupport?.dataset.supportStatus || "loaded";
+let repositoryProjectRequestSequence = 0;
 
 function getOrCreateSearchClearButton(input) {
     const wrapper = input?.closest(".ar-search");
@@ -118,12 +118,16 @@ function showProjectAjaxError(message) {
 }
 
 async function loadProjectsAjax(targetUrl, historyMode = "push", navigationMode = false) {
+    const requestSequence = ++repositoryProjectRequestSequence;
     const url = new URL(targetUrl, window.location.origin);
     repositoryProjectRequestController?.abort();
     repositoryProjectRequestController = new AbortController();
     const panel = document.querySelector("#panelProjects");
+    const grid = panel?.querySelector("#readerProjectGrid");
     panel?.setAttribute("aria-busy", "true");
     panel?.classList.add("is-loading");
+    grid?.classList.add("is-loading-data");
+    window.AppLoading?.showSkeleton(grid, { type: "cards", count: 6 });
     try {
         const response = await fetch(url.href, {
             credentials: "same-origin",
@@ -155,8 +159,13 @@ async function loadProjectsAjax(targetUrl, historyMode = "push", navigationMode 
     } catch (error) {
         if (error?.name !== "AbortError") showProjectAjaxError(error instanceof Error ? error.message : "No fue posible actualizar el catálogo.");
     } finally {
-        document.querySelector("#panelProjects")?.removeAttribute("aria-busy");
-        document.querySelector("#panelProjects")?.classList.remove("is-loading");
+        if (requestSequence === repositoryProjectRequestSequence) {
+            const activeGrid = document.querySelector("#panelProjects #readerProjectGrid");
+            window.AppLoading?.hideSkeleton(activeGrid);
+            activeGrid?.classList.remove("is-loading-data");
+            document.querySelector("#panelProjects")?.removeAttribute("aria-busy");
+            document.querySelector("#panelProjects")?.classList.remove("is-loading");
+        }
     }
 }
 
@@ -254,17 +263,6 @@ if (tabProjects && tabSupport && panelProjects && panelSupport) {
         if (toolsSupport) toolsSupport.hidden = false;
     });
 }
-
-// Precarga estilo skeleton
-setTimeout(() => {
-    if (repositorySkeleton) {
-        repositorySkeleton.hidden = true;
-    }
-    if (repositoryContent) {
-        repositoryContent.style.display = "block";
-        requestAnimationFrame(() => repositoryContent.classList.add("is-loaded"));
-    }
-}, 800);
 
 function normalizeRepositoryText(value) {
     return String(value || "")

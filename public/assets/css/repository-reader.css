@@ -248,8 +248,11 @@
     justify-content: center;
 }
 #repositoryShell #panelProjects.is-loading {
-    opacity: .62;
+    opacity: 1;
 }
+#repositoryShell #readerProjectGrid.is-loading-data>.ar-project-card,
+#repositoryShell #readerProjectGrid.is-loading-data>.repository-card,
+#repositoryShell #readerProjectGrid.is-loading-data>.ar-empty { display:none; }
 .ar-search button[hidden] {
     display: none !important;
 }

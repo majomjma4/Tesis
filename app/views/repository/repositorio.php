@@ -1,29 +1,4 @@
-<!-- Inicio de precarga del repositorio -->
-<section class="skeleton-loader repository-skeleton" id="repositorySkeleton" aria-label="Cargando repositorio">
-    <div class="skeleton-card repository-skeleton-hero">
-        <span class="skeleton-line medium"></span>
-        <span class="skeleton-line title"></span>
-        <span class="skeleton-line"></span>
-    </div>
-    <div class="repository-skeleton-toolbar">
-        <span class="skeleton-line"></span>
-        <span class="skeleton-line"></span>
-    </div>
-    <div class="repository-skeleton-grid">
-        <?php for ($skeletonIndex = 0; $skeletonIndex < 4; $skeletonIndex++): ?>
-            <div class="skeleton-card repository-skeleton-card">
-                <span class="skeleton-pill"></span>
-                <span class="skeleton-line title"></span>
-                <span class="skeleton-line"></span>
-                <span class="skeleton-line medium"></span>
-                <span class="skeleton-line short"></span>
-            </div>
-        <?php endfor; ?>
-    </div>
-</section>
-<!-- Final de precarga del repositorio -->
-
-<div id="repositoryContent" style="display: none;">
+<div id="repositoryContent">
     <div class="ar-page" id="arPage">
         <!-- Encabezado exacto Admin -->
         <header class="ar-head">

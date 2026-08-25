@@ -561,10 +561,12 @@
                 if (!img) {
                     img = document.createElement('img');
                     img.id = 'profileHeaderAvatarImg';
+                    img.dataset.skeletonImage = '';
                     avatarDisplay.innerHTML = '';
                     avatarDisplay.appendChild(img);
                 }
                 img.src = avatarUrl;
+                window.AppLoading?.bindMedia(img);
                 img.alt = 'Fotografía de perfil';
             } else {
                 const initialLetter = (document.querySelector('.profile-header-info h1')?.textContent ?? 'U').trim().charAt(0).toUpperCase();
@@ -584,7 +586,8 @@
         const userAvatarBtn = document.getElementById('avatarButton');
         if (userAvatarBtn) {
             if (avatarUrl) {
-                userAvatarBtn.innerHTML = `<img src="${avatarUrl}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+                userAvatarBtn.innerHTML = `<img data-skeleton-image src="${avatarUrl}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+                window.AppLoading?.bindMedia(userAvatarBtn.querySelector('img'));
             } else {
                 const initialLetter = (document.querySelector('.profile-header-info h1')?.textContent ?? 'U').trim().charAt(0).toUpperCase();
                 userAvatarBtn.textContent = initialLetter;

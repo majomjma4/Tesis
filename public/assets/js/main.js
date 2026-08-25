@@ -66,24 +66,122 @@ if (isFullPageReload) {
     window.addEventListener("load", () => window.scrollTo(0, 0), { once: true });
 }
 
-const appPageContent = document.querySelector("#appPageContent");
-const appGlobalSkeleton = document.querySelector("#appGlobalSkeleton");
-const appSkeletonStartedAt = performance.now();
-function revealGlobalPage() {
-    if (!appGlobalSkeleton) return;
-    document.body.classList.remove("app-page-loading");
-    requestAnimationFrame(() => {
-        appPageContent?.classList.add("is-revealed");
-    });
-}
-if (appGlobalSkeleton) {
-    const minimumSkeletonTime = 520;
-    const remainingSkeletonTime = Math.max(0, minimumSkeletonTime - (performance.now() - appSkeletonStartedAt));
-    window.setTimeout(revealGlobalPage, remainingSkeletonTime);
-}
-window.addEventListener("pageshow", (event) => {
-    if (event.persisted) revealGlobalPage();
-});
+// API visual compartida. Sólo se activa cuando un componente tiene una
+// espera async real; la navegación GET y el contenido server-side no pasan
+// por aquí.
+(() => {
+    const buttonStates = new WeakMap();
+    const skeletonRemovalTimers = new WeakMap();
+
+    const setButtonLoading = (button, loading, label = "Cargando…") => {
+        if (!(button instanceof HTMLButtonElement)) return;
+        if (loading) {
+            if (!buttonStates.has(button)) {
+                buttonStates.set(button, {
+                    html: button.innerHTML,
+                    ariaLabel: button.getAttribute("aria-label"),
+                    minWidth: button.style.minWidth,
+                    width: Math.ceil(button.getBoundingClientRect().width),
+                });
+            }
+            const state = buttonStates.get(button);
+            if (state.width > 0) button.style.minWidth = `${state.width}px`;
+            button.disabled = true;
+            button.setAttribute("aria-busy", "true");
+            button.classList.add("is-loading");
+            button.innerHTML = `<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><span>${String(label)}</span>`;
+            return;
+        }
+        const state = buttonStates.get(button);
+        if (!state) return;
+        button.innerHTML = state.html;
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+        button.classList.remove("is-loading");
+        button.setAttribute("aria-label", state.ariaLabel ?? "");
+        if (state.ariaLabel === null) button.removeAttribute("aria-label");
+        button.style.minWidth = state.minWidth;
+        buttonStates.delete(button);
+    };
+
+    const makeRows = (count) => {
+        const fragment = document.createDocumentFragment();
+        for (let index = 0; index < count; index += 1) {
+            const row = document.createElement("div");
+            row.className = "skeleton-row";
+            row.setAttribute("aria-hidden", "true");
+            row.innerHTML = '<span class="skeleton skeleton-table-cell"></span><span class="skeleton skeleton-table-cell medium"></span><span class="skeleton skeleton-table-cell short"></span>';
+            fragment.append(row);
+        }
+        return fragment;
+    };
+
+    const makeCards = (count) => {
+        const fragment = document.createDocumentFragment();
+        for (let index = 0; index < count; index += 1) {
+            const card = document.createElement("article");
+            card.className = "skeleton-card app-skeleton-card";
+            card.setAttribute("aria-hidden", "true");
+            card.innerHTML = '<span class="skeleton skeleton-icon"></span><span class="skeleton skeleton-title"></span><span class="skeleton skeleton-text"></span><span class="skeleton skeleton-text medium"></span><span class="skeleton skeleton-text short"></span>';
+            fragment.append(card);
+        }
+        return fragment;
+    };
+
+    const showSkeleton = (container, { type = "rows", count = 5 } = {}) => {
+        if (!(container instanceof HTMLElement)) return null;
+        let host = container.querySelector(":scope > [data-app-skeleton]");
+        if (!host) {
+            host = document.createElement("div");
+            host.dataset.appSkeleton = type;
+            host.className = `app-skeleton app-skeleton-${type}`;
+            host.setAttribute("aria-hidden", "true");
+            container.prepend(host);
+        }
+        host.classList.remove("is-leaving");
+        const pendingRemoval = skeletonRemovalTimers.get(host);
+        if (pendingRemoval) {
+            window.clearTimeout(pendingRemoval);
+            skeletonRemovalTimers.delete(host);
+        }
+        host.replaceChildren();
+        if (type === "rows" || type === "table") host.append(makeRows(Math.max(1, count)));
+        if (type === "cards") host.append(makeCards(Math.max(1, count)));
+        container.setAttribute("aria-busy", "true");
+        return host;
+    };
+
+    const hideSkeleton = (container) => {
+        if (!(container instanceof HTMLElement)) return;
+        const host = container.querySelector(":scope > [data-app-skeleton]");
+        if (host) {
+            host.classList.add("is-leaving");
+            const pendingRemoval = skeletonRemovalTimers.get(host);
+            if (pendingRemoval) window.clearTimeout(pendingRemoval);
+            const removalTimer = window.setTimeout(() => {
+                host.remove();
+                skeletonRemovalTimers.delete(host);
+            }, 160);
+            skeletonRemovalTimers.set(host, removalTimer);
+        }
+        if (container.getAttribute("aria-busy") === "true") container.removeAttribute("aria-busy");
+    };
+
+    const bindMedia = (image) => {
+        if (!(image instanceof HTMLImageElement)) return;
+        const host = image.parentElement;
+        const finish = () => host?.classList.remove("is-media-loading");
+        host?.classList.add("is-media-loading");
+        image.addEventListener("load", finish, { once: true });
+        image.addEventListener("error", finish, { once: true });
+        if (image.complete) finish();
+    };
+
+    window.AppLoading = { setButtonLoading, showSkeleton, hideSkeleton, bindMedia };
+})();
+
+document.querySelectorAll("img[data-skeleton-image]").forEach((image) => window.AppLoading.bindMedia(image));
+
 document.addEventListener("click", (event) => {
     const menuLink = event.target.closest(".menu-item[href]");
     if (!menuLink || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

@@ -1,5 +1,4 @@
 // Inicio de interacciones del detalle del repositorio
-const repositoryDetailSkeleton = document.querySelector("#repositoryDetailSkeleton");
 const repositoryDetailContent = document.querySelector("#repositoryDetailContent");
 const repositoryDetailFavorite = document.querySelector("#repositoryDetailFavorite");
 const repositoryDetailToast = document.querySelector("#repositoryDetailToast");
@@ -36,14 +35,6 @@ let repositoryImageZoom = 1;
 let repositoryPreviewReturnFocus = null;
 let repositoryPreviewModalPanel = null;
 let repositoryPreviewModalPlaceholder = null;
-
-setTimeout(() => {
-    if (repositoryDetailSkeleton) repositoryDetailSkeleton.hidden = true;
-    if (repositoryDetailContent) {
-        repositoryDetailContent.style.display = "block";
-        requestAnimationFrame(() => repositoryDetailContent.classList.add("is-loaded"));
-    }
-}, 0);
 
 function showRepositoryDetailToast(message) {
     if (!repositoryDetailToast) return;
@@ -186,6 +177,9 @@ function resetRepositoryPreviewPanels() {
 
 function setRepositoryPreviewState(message, iconClass = "fa-spinner fa-spin") {
     if (!repositoryPreviewState) return;
+    repositoryPreviewState.innerHTML = iconClass.includes("fa-spinner")
+        ? '<div class="ed-viewer-loading-skeleton" aria-hidden="true"><span class="skeleton skeleton-icon"></span><span class="skeleton skeleton-title"></span><span class="skeleton skeleton-text medium"></span></div><p></p>'
+        : `<i class="fa-solid ${iconClass}" aria-hidden="true"></i><p></p>`;
     const icon = repositoryPreviewState.querySelector("i");
     const text = repositoryPreviewState.querySelector("p");
     if (icon) icon.className = `fa-solid ${iconClass}`;
@@ -359,6 +353,7 @@ async function loadRepositoryPreview(path, trigger = null) {
         } else if (preview.preview_type === "image" && repositoryPreviewImageShell && repositoryPreviewImage) {
             repositoryPreviewImage.alt = `Vista previa de ${preview.name}`;
             repositoryPreviewImage.src = preview.content_url;
+            window.AppLoading?.bindMedia(repositoryPreviewImage);
             repositoryPreviewImageShell.hidden = false;
             updateRepositoryImageZoom(1);
         } else if (preview.preview_type === "text" && repositoryPreviewText) {
@@ -1002,6 +997,13 @@ function setNeutralViewerState(state, message = "", retryButton = null) {
     heading.textContent = title;
     copy.textContent = description;
     wrapper.append(icon, heading, copy);
+    if (state === "loading") {
+        const skeleton = document.createElement("div");
+        skeleton.className = "ed-viewer-loading-skeleton";
+        skeleton.setAttribute("aria-hidden", "true");
+        skeleton.innerHTML = '<span class="skeleton skeleton-icon"></span><span class="skeleton skeleton-title"></span><span class="skeleton skeleton-text medium"></span>';
+        wrapper.replaceChildren(skeleton, heading, copy);
+    }
     if (["unsupported", "error", "missing"].includes(state)) {
         const selected = neutralFileButtons.find((button) => button.getAttribute("aria-pressed") === "true")
             || document.querySelector('[data-zip-entry-file][aria-selected="true"]');

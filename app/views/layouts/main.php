@@ -25,22 +25,7 @@ $isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen);
 ?>
 
 <body
-    class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout app-page-loading' : '') . ($isStudentWorkspaceFullscreen ? ' app-student-workspace-fullscreen' : ''))) ?>">
-    <noscript>
-        <style>
-            .app-global-skeleton {
-                display: none !important
-            }
-
-            .app-page-content {
-                position: static !important;
-                width: 100% !important;
-                height: auto !important;
-                overflow: visible !important;
-                opacity: 1 !important
-            }
-        </style>
-    </noscript>
+    class="<?= e(trim(($bodyClass ?? 'dashboard-page') . ' app-shell' . ($isAdministratorLayout ? ' app-admin-layout' : '') . ($isStudentWorkspaceFullscreen ? ' app-student-workspace-fullscreen' : ''))) ?>">
     <!-- Inicio de capa para cerrar el menu movil -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <!-- Final de capa para cerrar el menu movil -->
@@ -198,7 +183,7 @@ $isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen);
                 <div class="avatar-menu">
                     <button class="user-avatar" id="avatarButton" type="button" aria-label="Abrir menu de usuario"
                         aria-expanded="false">
-                        <?php if (!empty($layoutAvatarUrl)): ?><img src="<?= e((string) $layoutAvatarUrl) ?>"
+                        <?php if (!empty($layoutAvatarUrl)): ?><img data-skeleton-image src="<?= e((string) $layoutAvatarUrl) ?>"
                                 alt=""><?php else: ?><?= e(mb_strtoupper(mb_substr($layoutUserName ?? 'U', 0, 1, 'UTF-8'), 'UTF-8')) ?><?php endif; ?>
                     </button>
                     <div class="avatar-dropdown" id="avatarDropdown">
@@ -263,19 +248,6 @@ $isStudentWorkspaceFullscreen = !empty($studentWorkspaceFullscreen);
         <?php endif; ?>
         <!-- Final de barra superior -->
 
-        <?php if ($isAdministratorLayout): ?>
-            <section class="app-global-skeleton" id="appGlobalSkeleton" aria-label="Cargando contenido" aria-live="polite">
-                <div class="app-skeleton-heading"><span class="app-skeleton-block kicker"></span><span
-                        class="app-skeleton-block title"></span><span class="app-skeleton-block subtitle"></span></div>
-                <div class="app-skeleton-toolbar"><span class="app-skeleton-block"></span><span
-                        class="app-skeleton-block"></span><span class="app-skeleton-block compact"></span></div>
-                <div class="app-skeleton-grid"><?php for ($i = 0; $i < 4; $i++): ?>
-                        <article><span class="app-skeleton-block icon"></span><span
-                                class="app-skeleton-block line strong"></span><span class="app-skeleton-block line"></span><span
-                                class="app-skeleton-block line short"></span></article><?php endfor; ?>
-                </div>
-            </section>
-        <?php endif; ?>
         <div class="app-page-content" id="appPageContent">
             <?= $content ?><?php if (!empty($pagePagination) && (int) ($pagePagination['pages'] ?? 1) > 1):
                   $pagination = $pagePagination;

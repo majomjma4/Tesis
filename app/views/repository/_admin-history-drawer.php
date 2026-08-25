@@ -24,7 +24,7 @@ $historyEmpty=$historyIsAcademicManagement?'No hay modificaciones administrativa
         <div class="admin-history-drawer__body" tabindex="0" data-admin-history-drawer-body>
             <p class="ed-history-notice" role="status" aria-live="polite" hidden data-record-history-notice></p>
             <p class="ed-history-progress" aria-live="polite" hidden data-record-history-progress></p>
-            <div class="ed-history-state" role="status" aria-live="polite" hidden data-record-history-loading><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><span>Cargando historial administrativo…</span></div>
+            <div class="ed-history-state" role="status" aria-live="polite" hidden data-record-history-loading><span class="skeleton ed-history-skeleton" aria-hidden="true"></span><span>Cargando historial administrativo…</span></div>
             <div class="ed-history-state" hidden data-record-history-empty><i class="fa-regular fa-clock" aria-hidden="true"></i><span><?=e($historyEmpty)?></span></div>
             <div class="ed-history-state is-error" role="alert" hidden data-record-history-error><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>No fue posible cargar el historial administrativo.</span></div>
             <div class="ed-history-list" role="list" hidden data-record-history-list></div>

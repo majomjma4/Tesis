@@ -29,7 +29,8 @@
             <div data-viewer-docx-top-scroll-track></div>
         </div>
         <div class="ed-viewer-state" data-viewer-state role="status">
-            <div><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><h3>Preparando vista previa</h3><p>Estamos cargando el archivo seleccionado.</p></div>
+            <div class="ed-viewer-loading-skeleton" aria-hidden="true"><span class="skeleton skeleton-icon"></span><span class="skeleton skeleton-title"></span><span class="skeleton skeleton-text medium"></span></div>
+            <h3>Preparando vista previa</h3><p>Estamos cargando el archivo seleccionado.</p>
         </div>
         <iframe class="ed-preview-frame" data-viewer-pdf title="Vista previa del documento PDF" hidden></iframe>
         <div class="ed-preview-image-shell" data-viewer-image-shell hidden><img class="ed-preview-image" data-viewer-image alt=""></div>

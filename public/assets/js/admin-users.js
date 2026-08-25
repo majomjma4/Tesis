@@ -215,6 +215,7 @@
     }
 
     let abortController = null;
+    let listingRequestSequence = 0;
     const bindPaginationAjax = () => {
         document.querySelectorAll('.data-pagination-pages a[href]').forEach(link => {
             if (link.dataset.paginationReady) return;
@@ -243,24 +244,22 @@
     };
 
     updateListing = async (url, pushState = true) => {
+        const requestSequence = ++listingRequestSequence;
         if (abortController) abortController.abort();
         abortController = new AbortController();
 
         const card = document.querySelector('.users-table-card');
         const refreshButton = document.querySelector('.users-refresh');
-        const refreshIcon = refreshButton?.querySelector('i');
-
         if (card) {
-            card.classList.add('is-refreshing');
             card.setAttribute('aria-busy', 'true');
+            card.classList.add('is-loading-data');
+            const usersList = card.querySelector('.users-list');
+            const skeleton = window.AppLoading?.showSkeleton(usersList || card, { type: 'rows', count: 6 });
+            if (skeleton && usersList) usersList.classList.add('is-loading-data');
         }
         if (refreshButton) {
-            refreshButton.disabled = true;
-            refreshButton.setAttribute('aria-busy', 'true');
-            refreshIcon?.classList.add('fa-spin');
+            window.AppLoading?.setButtonLoading(refreshButton, true, 'Actualizando…');
         }
-
-        const startTime = performance.now();
 
         try {
             const res = await fetch(url.href, {
@@ -270,13 +269,6 @@
             });
             if (!res.ok) throw new Error();
             const html = await res.text();
-
-            // Garantizar tiempo mínimo de skeleton de 400ms para feedback visual fluido
-            const elapsed = performance.now() - startTime;
-            const minDuration = 400;
-            if (elapsed < minDuration) {
-                await new Promise(resolve => setTimeout(resolve, minDuration - elapsed));
-            }
 
             const doc = new DOMParser().parseFromString(html, 'text/html');
             const newResults = doc.querySelector('#adminUsersResults');
@@ -325,19 +317,19 @@
                 console.error('Error actualizando listado:', error);
             }
         } finally {
-            // Asegurar que siempre se desactiva el estado de carga al terminar
-            const activeCard = document.querySelector('.users-table-card');
-            const activeRefreshButton = document.querySelector('.users-refresh');
-            const activeRefreshIcon = activeRefreshButton?.querySelector('i');
+            if (requestSequence === listingRequestSequence) {
+                // Asegurar que siempre se desactiva el estado de carga al terminar
+                const activeCard = document.querySelector('.users-table-card');
+                const activeRefreshButton = document.querySelector('.users-refresh');
+                const activeList = activeCard?.querySelector('.users-list');
 
-            if (activeCard) {
-                activeCard.classList.remove('is-refreshing');
-                activeCard.removeAttribute('aria-busy');
-            }
-            if (activeRefreshButton) {
-                activeRefreshButton.disabled = false;
-                activeRefreshButton.removeAttribute('aria-busy');
-                activeRefreshIcon?.classList.remove('fa-spin');
+                if (activeCard) {
+                    window.AppLoading?.hideSkeleton(activeList || activeCard);
+                    activeCard.classList.remove('is-loading-data');
+                    activeCard.removeAttribute('aria-busy');
+                }
+                activeList?.classList.remove('is-loading-data');
+                window.AppLoading?.setButtonLoading(activeRefreshButton, false);
             }
         }
     };
