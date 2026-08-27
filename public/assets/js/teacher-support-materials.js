@@ -93,8 +93,8 @@
     document.documentElement.classList.toggle('teacher-material-modal-open', locked);
     document.body.classList.toggle('teacher-material-modal-open', locked);
   };
-  const showToast = message => {
-    if (typeof window.showRepositoryToast === 'function') window.showRepositoryToast(message);
+  const showToast = (message, type = 'success') => {
+    window.AppToast?.show(message, type);
   };
   const close = () => { modal.hidden = true; setDocumentScrollLocked(false); form.reset(); closeKeywordSelector(false); keywordOptions.forEach(option => { option.disabled = false; option.closest('[role="option"]')?.removeAttribute('aria-selected'); }); keywordOptions.forEach(option => { option.closest('[role="option"]')?.removeAttribute('hidden'); }); renderKeywordSelection(); selectedFiles = []; form.querySelector('[data-file-list]').replaceChildren(); form.querySelector('[data-teacher-material-error]').hidden = true; };
   const openModal = () => { modal.hidden = false; setDocumentScrollLocked(true); modal.querySelector('input[name="title"]')?.focus(); };
@@ -112,13 +112,13 @@
   form.addEventListener('submit', async event => {
     event.preventDefault(); const submit = form.querySelector('[type="submit"]'); const error = form.querySelector('[data-teacher-material-error]');
     submit.disabled = true; error.hidden = true;
-    const title = form.querySelector('[data-title]')?.value.trim() || ''; if (title.split(/\s+/).filter(Boolean).length < 3) { error.textContent = 'El título debe contener al menos tres palabras.'; error.hidden = false; showToast(error.textContent); submit.disabled = false; return; }
+    const title = form.querySelector('[data-title]')?.value.trim() || ''; if (title.split(/\s+/).filter(Boolean).length < 3) { error.textContent = 'El título debe contener al menos tres palabras.'; error.hidden = false; submit.disabled = false; return; }
     const data = new FormData(form); data.set('_csrf', form.dataset.csrf || ''); data.set('full_description', data.get('description') || ''); data.delete('files');
     selectedFiles.forEach(file => data.append('initial_files[]', file));
     try { const response = await fetch(form.dataset.endpoint, {method:'POST', body:data, headers:{Accept:'application/json'}}); const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.message || 'No fue posible crear el material.');
       close(); showToast(payload.message || 'Material creado correctamente.');
       window.setTimeout(() => window.location.reload(), 2400);
-    } catch (exception) { error.textContent = exception.message; error.hidden = false; showToast(error.textContent); submit.disabled = false; }
+    } catch (exception) { error.textContent = exception.message; error.hidden = false; showToast(error.textContent, 'error'); submit.disabled = false; }
   });
 })();

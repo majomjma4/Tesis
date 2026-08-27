@@ -10,8 +10,6 @@ if (calendarRoot) {
     const projectFilterId = Number(calendarRoot.dataset.projectFilter || 0);
     const requestedEventId = Number(calendarRoot.dataset.requestedEventId || 0);
     const requestedEventUnavailable = calendarRoot.dataset.requestedEventUnavailable === 'true';
-    const toastElement = $('#calendarToast');
-    if (toastElement?.parentElement !== document.body) document.body.append(toastElement);
     const typeLabels = { delivery: 'Entregas', meeting: 'Reuniones', review: 'Revisiones', deadline: 'Fechas límite', personal: 'Personal', defense: 'Defensa', defense_schedule: 'Jornada de defensa' };
     const priorityLabels = { low: 'Baja', medium: 'Media', high: 'Alta' };
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -62,9 +60,10 @@ if (calendarRoot) {
         return result;
     }
     function toast(message, error = false, action = null) {
-        const element = toastElement; element.innerHTML = ''; const text = document.createElement('span'); text.textContent = message; element.append(text); element.classList.toggle('error', error);
-        if (action) { const button = document.createElement('button'); button.type = 'button'; button.textContent = action.label; button.addEventListener('click', async () => { button.disabled = true; await action.handler(); element.hidden = true; }); element.append(button); }
-        element.hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => { element.hidden = true; }, action ? 6000 : 3200);
+        window.AppToast?.show(message, error ? 'error' : 'success', action ? {
+            duration: 6000,
+            action: { label: action.label, callback: action.handler }
+        } : {});
     }
     // Final de comunicación y mensajes
 

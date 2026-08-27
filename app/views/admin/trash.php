@@ -161,7 +161,5 @@
     </div>
 </div>
 
-<!-- Toast Container -->
-<div id="atToastContainer" class="at-toast-container"></div>
 
 <div id="atConfig" data-user="<?=e($trashEndpoints['user'])?>" data-restore="<?=e($trashEndpoints['restore'])?>" data-restore-batch="<?=e($trashEndpoints['restoreBatch'])?>" data-restore-all="<?=e($trashEndpoints['restoreAll'])?>" data-delete="<?=e($trashEndpoints['delete'])?>" data-delete-batch="<?=e($trashEndpoints['deleteBatch'])?>" data-empty-category="<?=e($trashEndpoints['emptyCategory'])?>" data-purge="<?=e($trashEndpoints['purge'])?>" data-csrf="<?=e($trashCsrf)?>" data-users-retention="<?= (int)($retention['users'] ?? 60) ?>" data-projects-retention="<?= (int)($retention['projects'] ?? 60) ?>" data-materials-retention="<?= (int)($retention['materials'] ?? 60) ?>"></div>

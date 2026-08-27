@@ -358,7 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const announce = (message, kind = 'info') => {
-        if (typeof window.showToast === 'function') window.showToast(message, kind);
+        window.AppToast?.show(message, kind);
     };
     const setFlashToast = (message, kind = 'success') => {
         try {

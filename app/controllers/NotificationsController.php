@@ -276,7 +276,8 @@ final class NotificationsController
     public function purgeExpired(): void
     {
         $this->requirePostAndCsrf();
-        if (!(new AuthSessionService())->hasAdminAccess()) {
+        $auth = new AuthSessionService();
+        if (!$auth->hasAdminAccess() || !$auth->isAdminModeActive()) {
             $this->json(false, 'No tienes permiso para ejecutar el mantenimiento.', [], 403);
         }
         try {

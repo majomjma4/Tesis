@@ -733,25 +733,6 @@ body.dark-mode .ar-project-card:hover, body.dark-mode .ar-material-card:hover {
     user-select: none;
 }
 
-/* Toast de favoritos */
-.repository-toast {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    z-index: 9999;
-    padding: 12px 18px;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: var(--surface);
-    color: var(--text);
-    box-shadow: 0 10px 30px rgba(0,0,0,.2);
-    font-size:var(--font-md);
-    font-weight: 700;
-    opacity: 0;
-    transform: translateY(10px);
-    transition: opacity .2s ease, transform .2s ease;
-}
-
 /* Modal docente de Material de apoyo: esta hoja se carga en ?page=repository. */
 /* Modal docente de Material de apoyo: esta hoja se carga en ?page=repository. */
 .teacher-material-modal[data-teacher-material-modal] {
@@ -1285,11 +1266,6 @@ body.teacher-material-modal-open {
         padding: 0;
     }
 }
-.repository-toast.show {
-    opacity: 1;
-    transform: translateY(0);
-}
-
 /* Footers compartidos de los modales de creación Teacher. */
 .teacher-material-footer,
 .teacher-direct-project-modal__footer {
@@ -2078,11 +2054,5 @@ body.teacher-material-modal-open {
         flex: 1;
         justify-content: center;
         min-height: 40px;
-    }
-    .repository-toast {
-        right: 14px;
-        bottom: 14px;
-        left: 14px;
-        width: auto;
     }
 }

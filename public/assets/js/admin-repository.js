@@ -52,13 +52,11 @@
     const confirmationReasonInput = confirmation?.querySelector("[data-confirm-reason-input]");
     const confirmationAccept = confirmation?.querySelector("[data-confirm-accept]");
     const confirmationCancel = confirmation?.querySelector("[data-confirm-cancel]");
-    const toastStack = document.querySelector("#arToastStack");
     const tooltip = document.querySelector("#arTooltip");
     if (materialEditModal) document.body.append(materialEditModal);
     if (materialFilesModal) document.body.append(materialFilesModal);
     if (presentationModal) document.body.append(presentationModal);
     if (confirmation) document.body.append(confirmation);
-    if (toastStack) document.body.append(toastStack);
     if (tooltip) document.body.append(tooltip);
     let activeTab = "projects";
     const searchPlaceholders = {
@@ -66,29 +64,7 @@
         materials: "Buscar por título, descripción o palabra clave",
         withdrawn: "Buscar por título, descripción o palabra clave",
     };
-    const toastRegistry = new Map();
-    const toastDurations = { success: 3800, info: 4000, warning: 5000, error: 5600 };
     const originalText = new WeakMap();
-
-    const reflowToasts = (mutator) => {
-        const before = new Map(
-            [...toastStack.children].map((toast) => [toast, toast.getBoundingClientRect().top])
-        );
-        mutator();
-        [...toastStack.children].forEach((toast) => {
-            const previousTop = before.get(toast);
-            if (previousTop === undefined) return;
-            const delta = previousTop - toast.getBoundingClientRect().top;
-            if (!delta) return;
-            toast.style.transition = "none";
-            toast.style.transform = `translateY(${delta}px)`;
-            window.requestAnimationFrame(() => {
-                toast.style.transition = "transform 220ms ease";
-                toast.style.transform = "";
-                window.setTimeout(() => { toast.style.transition = ""; }, 230);
-            });
-        });
-    };
 
     const normalize = (value) => String(value || "")
         .normalize("NFD")
@@ -127,46 +103,7 @@
         }
     };
 
-    const dismissToast = (key) => {
-        const entry = toastRegistry.get(key);
-        if (!entry) return;
-        window.clearTimeout(entry.timer);
-        entry.element.classList.add("is-leaving");
-        window.setTimeout(() => reflowToasts(() => entry.element.remove()), 210);
-        toastRegistry.delete(key);
-    };
-
-    const showToast = (message, type = "success") => {
-        if (!toastStack || !message) return;
-        const normalizedType = ["success", "info", "warning", "error"].includes(type) ? type : "info";
-        const key = `${normalizedType}:${message}`;
-        const existing = toastRegistry.get(key);
-        if (existing?.element?.isConnected) {
-            existing.count += 1;
-            existing.copy.textContent = `${message} ×${existing.count}`;
-            window.clearTimeout(existing.timer);
-            existing.timer = window.setTimeout(() => dismissToast(key), toastDurations[normalizedType]);
-            return;
-        }
-        const element = document.createElement("div");
-        const icon = document.createElement("i");
-        const copy = document.createElement("span");
-        const close = document.createElement("button");
-        const icons = { success: "fa-circle-check", info: "fa-circle-info", warning: "fa-triangle-exclamation", error: "fa-circle-xmark" };
-        element.className = `ar-toast ${normalizedType}`;
-        element.setAttribute("role", normalizedType === "error" ? "alert" : "status");
-        icon.className = `fa-solid ${icons[normalizedType]}`;
-        copy.textContent = message;
-        close.type = "button";
-        close.setAttribute("aria-label", "Cerrar mensaje");
-        close.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
-        element.append(icon, copy, close);
-        toastStack.prepend(element);
-        const entry = { element, copy, count: 1, timer: null };
-        entry.timer = window.setTimeout(() => dismissToast(key), toastDurations[normalizedType]);
-        toastRegistry.set(key, entry);
-        close.addEventListener("click", () => dismissToast(key));
-    };
+    const showToast = (message, type = "success") => window.AppToast?.show(message, type);
 
     const requestConfirmation = (message, options = {}) => new Promise((resolve) => {
         if (!confirmation) {

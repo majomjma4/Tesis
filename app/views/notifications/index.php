@@ -280,5 +280,3 @@
     </section>
 </div>
 <?php endif; ?>
-
-<div class="notification-toast" id="notificationToast" role="status" aria-live="polite" hidden></div>

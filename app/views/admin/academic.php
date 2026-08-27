@@ -434,5 +434,4 @@ $friendlyRange = static function (?string $start, ?string $end) use ($monthNames
     data-suggested-year="<?= (int) ($suggestedPeriod['year'] ?? date('Y')) ?>"
     data-suggested-name="<?= e($suggestedPeriod['name'] ?? 'siguiente período') ?>"
 ></div>
-<div class="aa-toast" id="aaToast" role="status" aria-live="polite" hidden></div>
 <div class="aa-tooltip" id="aaTooltip" role="tooltip" hidden></div>

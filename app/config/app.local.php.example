@@ -19,7 +19,7 @@ return [
     'mail_port' => 587,
     'mail_encryption' => 'tls',
     'mail_username' => '',
-    'mail_password' => '', // Gmail App Password
+    'mail_password' => getenv('SMTP_PASSWORD') ?: '', // Gmail App Password: configurar fuera del repositorio
     'mail_from_address' => '',
     'mail_from_name' => 'Gestión Documental Académica',
 ];

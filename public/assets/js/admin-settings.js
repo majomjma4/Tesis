@@ -1,68 +1,4 @@
 (() => {
-    // 1. Sistema de Toasts Reutilizable
-    const ToastSystem = {
-        container: null,
-        init() {
-            let el = document.getElementById('asToastContainer');
-            if (!el) {
-                el = document.createElement('div');
-                el.id = 'asToastContainer';
-                el.className = 'as-toast-container';
-                document.body.appendChild(el);
-            } else if (el.parentElement !== document.body) {
-                document.body.appendChild(el);
-            }
-            this.container = el;
-        },
-        show(type = 'info', title = '', message = '', duration = 4500) {
-            if (!this.container) this.init();
-
-            const icons = {
-                success: 'fa-circle-check',
-                error: 'fa-circle-exclamation',
-                warning: 'fa-triangle-exclamation',
-                info: 'fa-circle-info'
-            };
-
-            const toast = document.createElement('div');
-            toast.className = `as-toast as-toast-${type}`;
-            toast.innerHTML = `
-                <i class="fa-solid ${icons[type] || icons.info} as-toast-icon"></i>
-                <div class="as-toast-content">
-                    ${title ? `<div class="as-toast-title">${this.escapeHtml(title)}</div>` : ''}
-                    <div>${this.escapeHtml(message)}</div>
-                </div>
-                <button type="button" class="as-toast-close" aria-label="Cerrar notificación">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            `;
-
-            const closeBtn = toast.querySelector('.as-toast-close');
-            const removeToast = () => {
-                toast.classList.add('is-hiding');
-                setTimeout(() => {
-                    if (toast.parentNode) toast.parentNode.removeChild(toast);
-                }, 200);
-            };
-
-            closeBtn.addEventListener('click', removeToast);
-            this.container.appendChild(toast);
-
-            if (duration > 0) {
-                setTimeout(removeToast, duration);
-            }
-        },
-        escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-    };
-
-    // Exportar globalmente para reutilización en otros scripts si fuera necesario
-    window.AppToast = ToastSystem;
-
-    // 2. Modal de Confirmación Reutilizable
     const ModalSystem = {
         overlay: null,
         titleEl: null,
@@ -187,7 +123,6 @@
 
     // Dom Ready Handlers
     document.addEventListener('DOMContentLoaded', () => {
-        ToastSystem.init();
         ModalSystem.init();
 
         const form = document.querySelector('#settingsForm');
@@ -315,11 +250,11 @@
                 });
 
                 if (!isValid) {
-                    ToastSystem.show('warning', 'Validación', 'Revisa los campos requeridos antes de continuar.');
+                    window.AppToast?.warning('Revisa los campos requeridos antes de continuar.');
                     return;
                 }
                 if (Number(form.elements.file_total_max_mb?.value || 0) < Number(form.elements.file_max_mb?.value || 0)) {
-                    ToastSystem.show('warning', 'Validación', 'El límite total por operación no puede ser menor que el tamaño máximo por archivo.');
+                    window.AppToast?.warning('El límite total por operación no puede ser menor que el tamaño máximo por archivo.');
                     return;
                 }
 
@@ -369,12 +304,12 @@
                         throw new Error(result.message || 'No fue posible guardar la configuración.');
                     }
 
-                    ToastSystem.show('success', 'Éxito', result.message || 'Configuración actualizada correctamente.');
+                    window.AppToast?.success(result.message || 'Configuración actualizada correctamente.');
                     if (form.elements.temporary_password) form.elements.temporary_password.value = '';
                     initialSettings = settingSnapshot();
                     checkDirtyState();
                 } catch (error) {
-                    ToastSystem.show('error', 'Error', error.message || 'Ocurrió un error al guardar la configuración.');
+                    window.AppToast?.error(error.message || 'Ocurrió un error al guardar la configuración.');
                     checkDirtyState();
                 } finally {
                     if (submitIcon) submitIcon.hidden = false;

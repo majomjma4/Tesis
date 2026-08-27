@@ -1,3 +1,112 @@
+// Feedback temporal global. Mantiene la geometría del toast canónico de Admin → Usuarios
+// y centraliza iconografía, duración, accesibilidad y apilado sin tocar contratos async.
+(() => {
+    const types = new Set(["success", "error", "warning", "info"]);
+    const icons = {
+        success: "fa-circle-check",
+        error: "fa-circle-xmark",
+        warning: "fa-triangle-exclamation",
+        info: "fa-circle-info",
+    };
+    const durations = { success: 2600, info: 3200, warning: 4200, error: 4200 };
+    const entries = new Map();
+
+    const ensureContainer = () => {
+        let container = document.querySelector("#appToastContainer");
+        if (!container) {
+            container = document.createElement("div");
+            container.id = "appToastContainer";
+            container.className = "app-toast-container";
+            container.setAttribute("role", "region");
+            container.setAttribute("aria-label", "Notificaciones temporales");
+            document.body.append(container);
+        } else if (container.parentElement !== document.body) {
+            document.body.append(container);
+        }
+        return container;
+    };
+
+    const normalizeType = type => types.has(type) ? type : "info";
+    const dismiss = entry => {
+        if (!entry) return;
+        window.clearTimeout(entry.timer);
+        entries.delete(entry.key);
+        if (!entry.element.isConnected) return;
+        entry.element.classList.remove("is-visible");
+        entry.element.classList.add("is-hiding");
+        window.setTimeout(() => entry.element.remove(), 220);
+    };
+
+    const show = (message, type = "info", options = {}) => {
+        options = options || {};
+        if (message === null || message === undefined || String(message) === "") return null;
+        const normalizedType = normalizeType(type);
+        const text = String(message);
+        const key = `${normalizedType}:${text}`;
+        const previous = entries.get(key);
+        if (previous?.element?.isConnected && !options.fresh && !options.freshAttempt) {
+            window.clearTimeout(previous.timer);
+            const duration = Number(options.duration ?? durations[normalizedType]);
+            previous.timer = duration > 0 ? window.setTimeout(() => dismiss(previous), duration) : null;
+            return previous.element;
+        }
+        if (previous) dismiss(previous);
+
+        const element = document.createElement("div");
+        const icon = document.createElement("i");
+        const copy = document.createElement("span");
+        const container = ensureContainer();
+        if (!container) return null;
+
+        element.className = `app-toast app-toast-${normalizedType}`;
+        element.setAttribute("role", normalizedType === "error" || normalizedType === "warning" ? "alert" : "status");
+        element.setAttribute("aria-live", normalizedType === "error" || normalizedType === "warning" ? "assertive" : "polite");
+        element.setAttribute("aria-atomic", "true");
+        icon.className = `fa-solid ${icons[normalizedType]}`;
+        icon.setAttribute("aria-hidden", "true");
+        copy.className = "app-toast-copy";
+        copy.textContent = text;
+        element.append(icon, copy);
+
+        const action = options.action;
+        if (action?.label && typeof (action.callback || action.handler) === "function") {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "app-toast-action";
+            button.textContent = String(action.label);
+            element.append(button);
+            button.addEventListener("click", async () => {
+                button.disabled = true;
+                try {
+                    await (action.callback || action.handler)();
+                } finally {
+                    dismiss(entry);
+                }
+            });
+        }
+
+        const entry = { key, element, timer: null };
+        container.append(element);
+        entries.set(key, entry);
+        window.requestAnimationFrame(() => element.classList.add("is-visible"));
+        const duration = Number(options.duration ?? durations[normalizedType]);
+        entry.timer = duration > 0 ? window.setTimeout(() => dismiss(entry), duration) : null;
+        return element;
+    };
+
+    window.AppToast = {
+        show,
+        success: (message, options = {}) => show(message, "success", options),
+        error: (message, options = {}) => show(message, "error", options),
+        warning: (message, options = {}) => show(message, "warning", options),
+        info: (message, options = {}) => show(message, "info", options),
+        dismiss: element => {
+            const entry = [...entries.values()].find(item => item.element === element);
+            dismiss(entry);
+        },
+    };
+})();
+
 const navigationEntry = performance.getEntriesByType("navigation")[0];
 const isFullPageReload = navigationEntry?.type === "reload";
 const sidebarScrollKey = "app-sidebar-scroll";

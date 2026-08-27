@@ -1,56 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
     const workspace = document.querySelector('[data-student-workspace]');
-    let toastContainer = document.querySelector('.sw-toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.className = 'sw-toast-container';
-        document.body.appendChild(toastContainer);
-    }
-
     const escapeHtml = (str = '') => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
     const showVisualToast = (message, kind = false, title = '') => {
         if (!message) return;
-
-        const isError = kind === true || kind === 'error';
-        const isInfo = kind === 'info' || kind === 'warning';
-        const toastClass = isError ? 'is-error' : (isInfo ? 'is-info' : 'is-success');
-        const iconClass = isError ? 'fa-circle-xmark' : (isInfo ? 'fa-circle-info' : 'fa-circle-check');
-
-        const toastEl = document.createElement('div');
-        toastEl.className = `sw-toast ${toastClass}`;
-        toastEl.setAttribute('role', isError ? 'alert' : 'status');
-
-        const icon = document.createElement('i');
-        icon.className = `fa-solid ${iconClass}`;
-        icon.setAttribute('aria-hidden', 'true');
-
-        const text = document.createElement('span');
-        text.className = 'sw-toast-text';
-        if (title) {
-            const heading = document.createElement('strong');
-            heading.textContent = title;
-            text.append(heading, document.createElement('br'));
-        }
-        text.append(document.createTextNode(message));
-
-        const closeBtn = document.createElement('button');
-        closeBtn.type = 'button';
-        closeBtn.className = 'sw-toast-close';
-        closeBtn.setAttribute('aria-label', 'Cerrar mensaje');
-        closeBtn.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
-
-        const dismiss = () => {
-            toastEl.classList.add('is-leaving');
-            setTimeout(() => toastEl.remove(), 200);
-        };
-
-        closeBtn.addEventListener('click', dismiss);
-        toastEl.append(icon, text, closeBtn);
-
-        toastContainer.appendChild(toastEl);
-
-        setTimeout(dismiss, 4200);
+        const type = kind === true ? 'error' : (['success', 'error', 'warning', 'info'].includes(kind) ? kind : 'success');
+        window.AppToast?.show(message, type);
     };
 
     const setFlashToast = (message, kind = 'success') => {
@@ -75,7 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.showToast = showVisualToast;
     const toast = showVisualToast;
     consumeFlashToast();
     const tabs = [...workspace.querySelectorAll('[data-sw-tab]')];

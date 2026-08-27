@@ -269,6 +269,8 @@ y crear la cuenta administrativa inicial están disponibles en
 - Copiar `app/config/app.local.php.example` como `app/config/app.local.php`.
 - Copiar `app/config/database.local.php.example` como
   `app/config/database.local.php` y completar las credenciales locales.
+- Configurar `SMTP_PASSWORD=<valor configurado localmente>` en el entorno del
+  servidor para habilitar el envío SMTP; no guardar la contraseña en archivos.
 - Configurar `auth_required => true` antes de exponer el sistema.
 - Importar el `database/snapshot.sql` actualizado.
 

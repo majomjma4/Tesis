@@ -291,8 +291,6 @@
                 <footer class="ar-pagination" id="repositorySupportPagination" hidden><span id="repositorySupportPaginationSummary">Mostrando 0 de 0</span><label>Mostrar <select id="repositorySupportPageSize"><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="75">75</option><option value="100">100</option></select></label><nav id="repositorySupportPaginationPages" aria-label="Paginación de materiales de apoyo"></nav></footer>
             </section>
 
-            <!-- Toast de notificaciones de favorito -->
-            <div class="repository-toast" id="repositoryToast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
         </main>
     </div>
 </div>

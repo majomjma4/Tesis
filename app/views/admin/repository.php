@@ -487,7 +487,6 @@ $formatProjectType = static function (array $project): string {
             </div>
         </div>
     </div>
-    <div class="ar-toast-stack" id="arToastStack" role="region" aria-label="Notificaciones" aria-live="polite" aria-atomic="false"></div>
     <div class="ar-tooltip" id="arTooltip" role="tooltip" hidden></div>
     <div id="arConfig" data-endpoint="<?= e($repositoryPublishEndpoint) ?>" data-trash-endpoint="<?= e(route('admin-repository-trash')) ?>" data-material-save="<?= e($materialSaveEndpoint) ?>" data-material-status="<?= e($materialStatusEndpoint) ?>" data-material-file="<?= e($materialFileEndpoint) ?>" data-csrf="<?= e($repositoryCsrf) ?>"></div>
 </div>

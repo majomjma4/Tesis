@@ -18,6 +18,10 @@
 !/storage/private/project-previews/.gitkeep
 /app/config/database.local.php
 /app/config/app.local.php
+# Variables de entorno locales con secretos
+/.env
+/.env.*
+!/.env.example
 /database/snapshot.before-portability.local.sql
 /dist/
 storage/private/avatars/*

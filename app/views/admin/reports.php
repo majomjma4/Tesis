@@ -619,19 +619,19 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (!fromVal || !toVal) {
                 e.preventDefault();
-                alert('Por favor selecciona las fechas del rango.');
+                window.AppToast?.warning('Por favor selecciona las fechas del rango.');
                 return false;
             }
 
             if (fromVal > toVal) {
                 e.preventDefault();
-                alert('La fecha "Desde" no puede ser posterior a la fecha "Hasta".');
+                window.AppToast?.warning('La fecha "Desde" no puede ser posterior a la fecha "Hasta".');
                 return false;
             }
 
             if (toVal > todayStr && scopeSelect.value === 'custom') {
                 e.preventDefault();
-                alert('La fecha "Hasta" no puede ser posterior a la fecha actual.');
+                window.AppToast?.warning('La fecha "Hasta" no puede ser posterior a la fecha actual.');
                 return false;
             }
 
@@ -680,7 +680,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     emptyBanner.hidden = false;
                     emptyBanner.style.display = 'flex';
                 } else {
-                    alert(err.message);
+                    window.AppToast?.error(err.message);
                 }
             }).finally(function() {
                 if (submitBtn) submitBtn.disabled = false;

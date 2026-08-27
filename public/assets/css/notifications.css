@@ -966,26 +966,6 @@ html.theme-dark .notification-row.is-read .mark-notification {
     font-size:var(--font-sm)
 }
 
-.notification-toast {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px
-}
-
-.notification-toast button {
-    padding: 6px 9px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, .16);
-    color: #fff;
-    font-weight: 800;
-    cursor: pointer
-}
-
-.notification-toast button:hover {
-    background: rgba(255, 255, 255, .25)
-}
-
 @media(min-width:761px) {
     .notification-row {
         padding-top: 14px;
@@ -1451,25 +1431,6 @@ html.theme-dark .notification-row.is-unread {
     color: #fff
 }
 
-.notification-toast {
-    position: fixed;
-    right: 24px;
-    bottom: 24px;
-    z-index: 120;
-    max-width: 360px;
-    padding: 13px 17px;
-    border-radius: 13px;
-    background: var(--primary-dark);
-    color: #fff;
-    box-shadow: 0 14px 35px rgba(15, 23, 42, .22);
-    font-weight: 700;
-    font-size:var(--font-md)
-}
-
-.notification-toast.is-error {
-    background: #b91c1c
-}
-
 .is-spinning {
     animation: notificationSpin .7s linear infinite
 }
@@ -1488,13 +1449,6 @@ html.theme-dark .notification-row.is-unread {
         bottom: 16px;
         top: auto;
         width: auto
-    }
-
-    .notification-toast {
-        left: 16px;
-        right: 16px;
-        bottom: 16px;
-        max-width: none
     }
 
     .notification-detail-modal {
@@ -2459,62 +2413,6 @@ html.theme-dark .notification-date-input {
 
 .notification-active-filter .notification-filter-chip i {
     flex: 0 0 auto;
-}
-
-.notification-toast[hidden] {
-    display: none !important;
-}
-
-/* El feedback de envío debe quedar por encima de los overlays y del scroll. */
-.notification-toast:not([hidden]) {
-    position: fixed;
-    right: max(20px, env(safe-area-inset-right));
-    bottom: max(20px, env(safe-area-inset-bottom));
-    z-index: 3000;
-    display: flex;
-    visibility: visible;
-    opacity: 1;
-}
-
-@media(max-width:760px) {
-    .notification-toast:not([hidden]) {
-        right: 16px;
-        left: 16px;
-        bottom: max(16px, env(safe-area-inset-bottom));
-    }
-}
-
-/* Patrón de toast administrativo: éxito/error visibles y fuera del flujo. */
-.notification-toast:not([hidden]) {
-    right: max(24px, env(safe-area-inset-right));
-    bottom: max(24px, env(safe-area-inset-bottom));
-    top: auto;
-    z-index: 10010;
-    max-width: min(390px, calc(100vw - 32px));
-    padding: 12px 15px;
-    border: 1px solid rgba(16, 185, 129, .3);
-    border-radius: 13px;
-    background: #ecfdf5;
-    color: #047857;
-    box-shadow: 0 16px 40px rgba(15, 23, 42, .18);
-    font-size:var(--font-md);
-    font-weight: 850;
-}
-
-.notification-toast.is-error {
-    border-color: rgba(220, 38, 38, .3);
-    background: #fef2f2;
-    color: #b42318;
-}
-
-@media(max-width:760px) {
-    .notification-toast:not([hidden]) {
-        right: 14px;
-        bottom: max(14px, env(safe-area-inset-bottom));
-        top: auto;
-        left: 14px;
-        justify-content: center;
-    }
 }
 
 @media(max-width:600px) {

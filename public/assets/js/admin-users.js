@@ -3,10 +3,7 @@
     if(!modal||!form||!config)return;
     const dialogLayers=[modal,confirmBox,document.querySelector('#importUsersModal'),document.querySelector('#importConfirm')].filter(Boolean);
     dialogLayers.forEach(layer=>document.body.append(layer));
-    const refreshToast=document.createElement('div');refreshToast.className='users-refresh-toast';refreshToast.hidden=true;refreshToast.innerHTML='<i class="fa-solid fa-circle-check"></i><span>Usuarios actualizados</span>';document.body.append(refreshToast);
-    let refreshToastTimer;
-    const showRefreshToast=(text='Usuarios actualizados',type='success')=>{refreshToast.classList.toggle('is-error',type==='error');refreshToast.querySelector('span').textContent=text;clearTimeout(refreshToastTimer);refreshToast.hidden=false;requestAnimationFrame(()=>refreshToast.classList.add('is-visible'));refreshToastTimer=setTimeout(()=>{refreshToast.classList.remove('is-visible');setTimeout(()=>{refreshToast.hidden=true;},220);},2600);};
-    window.showAdminUsersToast=showRefreshToast;
+    const showRefreshToast=(text='Usuarios actualizados',type='success')=>window.AppToast?.show(text,type);
     const syncDialogState=()=>document.body.classList.toggle('user-dialog-open',dialogLayers.some(layer=>!layer.hidden));
     window.syncAdminUserDialogs=syncDialogState;
     let pending=null,formBaseline='';

@@ -326,8 +326,6 @@
     </form>
 </div>
 
-<!-- Sistema de Toast Reutilizable -->
-<div class="as-toast-container" id="asToastContainer" aria-live="polite" aria-atomic="true"></div>
 
 <!-- Modal de Confirmación Reutilizable -->
 <div class="as-modal-overlay" id="asConfirmModal" hidden>

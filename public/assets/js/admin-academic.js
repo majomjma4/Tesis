@@ -11,7 +11,6 @@
     const closurePendingList = confirmBox?.querySelector('[data-closure-pending-list]');
     const confirmAccept = confirmBox?.querySelector('[data-accept-confirm]');
     const confirmCancel = confirmBox?.querySelector('[data-cancel-confirm]');
-    const toast = document.querySelector('#aaToast');
     const tooltip = document.querySelector('#aaTooltip');
     const descriptionField = form?.querySelector('[data-fields="type_description"] textarea');
     const descriptionCounter = form?.querySelector('[data-description-counter]');
@@ -351,13 +350,7 @@
         return result;
     };
 
-    const showToast = text => {
-        if (!toast) return;
-        toast.textContent = text;
-        toast.hidden = false;
-        window.clearTimeout(showToast.timer);
-        showToast.timer = window.setTimeout(() => { toast.hidden = true; }, 4200);
-    };
+    const showToast = text => window.AppToast?.success(text);
     const refreshCatalog = async entity => {
         const selector = `[data-aa-accordion][data-catalog="${entity}"]`;
         const current = document.querySelector(selector);
@@ -645,10 +638,8 @@
     });
     syncDialogState();
     const savedToast = sessionStorage.getItem('academicToast');
-    if (savedToast && toast) {
+    if (savedToast) {
         sessionStorage.removeItem('academicToast');
-        toast.textContent = savedToast;
-        toast.hidden = false;
-        window.setTimeout(() => { toast.hidden = true; }, 4200);
+        window.AppToast?.success(savedToast);
     }
 })();

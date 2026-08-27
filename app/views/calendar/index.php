@@ -131,5 +131,4 @@
 
 <!-- Inicio de mensajes temporales -->
 <!-- Comunica resultados y aloja la acción para deshacer cuando corresponde. -->
-<div class="calendar-toast" id="calendarToast" role="status" aria-live="polite" hidden></div>
 <!-- Final de mensajes temporales -->

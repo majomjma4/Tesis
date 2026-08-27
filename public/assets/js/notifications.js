@@ -25,8 +25,6 @@ const refreshButton = document.querySelector("#refreshNotifications");
 const readAllButton = document.querySelector("#markAllNotificationsRead");
 const deleteModal = document.querySelector("#notificationDeleteModal");
 const detailModal = document.querySelector("#notificationDetailModal");
-const toast = document.querySelector("#notificationToast");
-if (toast?.parentElement !== document.body) document.body.append(toast);
 const dateTrigger = document.querySelector("#notificationDateTrigger");
 const datePopover = document.querySelector("#notificationDatePopover");
 const dateFromInput = document.querySelector("#notificationDateFrom");
@@ -144,28 +142,11 @@ function highlight(element, query) {
     element.replaceChildren(fragment);
 }
 
-function hideToast() {
-    window.clearTimeout(showToast.timer);
-    if (!toast) return;
-    toast.hidden = true;
-    toast.classList.remove("is-error");
-    toast.replaceChildren();
-}
-
 function showToast(message, error = false, action = null) {
-    if (!toast) return;
-    toast.replaceChildren(document.createTextNode(message));
-    if (action) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = action.label;
-        button.addEventListener("click", action.callback, { once: true });
-        toast.append(button);
-    }
-    toast.classList.toggle("is-error", error);
-    toast.hidden = false;
-    window.clearTimeout(showToast.timer);
-    showToast.timer = window.setTimeout(hideToast, 3400);
+    window.AppToast?.show(message, error ? "error" : "success", action ? {
+        duration: 6000,
+        action: { label: action.label, callback: action.callback }
+    } : {});
 }
 
 async function request(url, options = {}) {
@@ -502,7 +483,7 @@ filterControls.forEach((control) => {
     );
 
     if (!trigger || !menu) {
-        control.querySelector("select")?.addEventListener("change", () => { hideToast(); currentPage = 1; updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); });
+        control.querySelector("select")?.addEventListener("change", () => { currentPage = 1; updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); });
         return;
     }
 
@@ -621,7 +602,6 @@ selectAllTrash?.addEventListener("change", () => { document.querySelectorAll(".t
 groupsContainer?.addEventListener("change", (event) => { if (event.target.matches(".trash-notification-checkbox")) updateTrashSelection(); });
 refreshButton?.addEventListener("click", () => loadNotifications(true));
 document.querySelector("#retryNotifications")?.addEventListener("click", () => loadNotifications());
-window.addEventListener("resize", hideToast, { passive: true });
 
 async function postAction(endpoint, id, button, showSuccess = true) {
     button?.setAttribute("disabled", "");
@@ -978,8 +958,8 @@ dateTrigger?.addEventListener("click", () => {
     dateTrigger.setAttribute("aria-expanded", String(open));
     if (open) dateFromInput?.focus();
 });
-document.querySelector("#applyNotificationDate")?.addEventListener("click", () => { hideToast(); currentPage = 1; updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); if (datePopover) datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); });
-document.querySelector("#clearNotificationDate")?.addEventListener("click", () => { hideToast(); if (dateFromInput) dateFromInput.value = ""; if (dateToInput) dateToInput.value = ""; currentPage = 1; updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); if (datePopover) datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); });
+document.querySelector("#applyNotificationDate")?.addEventListener("click", () => { currentPage = 1; updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); if (datePopover) datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); });
+document.querySelector("#clearNotificationDate")?.addEventListener("click", () => { if (dateFromInput) dateFromInput.value = ""; if (dateToInput) dateToInput.value = ""; currentPage = 1; updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); if (datePopover) datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); });
 document.addEventListener("click", (event) => { if (!event.target.closest(".notification-date-filter") && datePopover && !datePopover.hidden) { datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); } });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && datePopover && !datePopover.hidden) { datePopover.hidden = true; dateTrigger?.setAttribute("aria-expanded", "false"); dateTrigger?.focus(); } });
 

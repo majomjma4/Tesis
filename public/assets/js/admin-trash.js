@@ -8,61 +8,12 @@
         if (overlay && overlay.parentElement !== document.body) {
             document.body.appendChild(overlay);
         }
-        const toastContainer = document.querySelector('#atToastContainer');
-        if (toastContainer && toastContainer.parentElement !== document.body) {
-            document.body.appendChild(toastContainer);
-        }
     };
 
-    // Sistema de Notificaciones Toast Flotantes (Texto Blanco Obligatorio)
-    const showToast = ({ type = 'info', title, message, duration = 4500 }) => {
-        ensureGlobalMounts();
-        const container = document.querySelector('#atToastContainer');
-        if (!container || !message) return;
-
-        const icons = {
-            success: 'fa-circle-check',
-            error: 'fa-circle-xmark',
-            info: 'fa-circle-info',
-            warning: 'fa-triangle-exclamation'
-        };
-
-        const defaultTitles = {
-            success: 'Éxito',
-            error: 'Error',
-            info: 'Información',
-            warning: 'Advertencia'
-        };
-
-        const toastType = ['success', 'error', 'info', 'warning'].includes(type) ? type : 'info';
-        const toastTitle = title || defaultTitles[toastType];
-
-        const toast = document.createElement('div');
-        toast.className = `at-toast-item is-${toastType}`;
-        toast.setAttribute('role', toastType === 'error' || toastType === 'warning' ? 'alert' : 'status');
-
-        toast.innerHTML = `
-            <div class="at-toast-icon"><i class="fa-solid ${icons[toastType]}" aria-hidden="true"></i></div>
-            <div class="at-toast-body">
-                <strong>${escapeHtml(toastTitle)}</strong>
-                <p>${escapeHtml(message)}</p>
-            </div>
-            <button type="button" class="at-toast-close" aria-label="Cerrar notificación">
-                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-            </button>
-        `;
-
-        const closeBtn = toast.querySelector('.at-toast-close');
-        const dismiss = () => {
-            toast.classList.add('is-hiding');
-            window.setTimeout(() => toast.remove(), 200);
-        };
-
-        closeBtn?.addEventListener('click', dismiss);
-        container.appendChild(toast);
-
-        const timer = window.setTimeout(dismiss, duration);
-        toast.addEventListener('mouseenter', () => window.clearTimeout(timer));
+    // Adapter local: conserva las llamadas del módulo y delega en el toast global.
+    const showToast = ({ type = 'info', message, duration } = {}) => {
+        if (!message) return;
+        window.AppToast?.show(message, type, { duration });
     };
 
     const escapeHtml = (str) => {

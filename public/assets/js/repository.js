@@ -34,7 +34,6 @@ if (repositorySupportStatus === "error") {
 }
 
 const repositoryCount = document.querySelector("#repositoryCount");
-const repositoryToast = document.querySelector("#repositoryToast");
 const repositorySupportCount = document.querySelector("#repositorySupportCount");
 const repositorySupportPagination = document.querySelector("#repositorySupportPagination");
 const repositorySupportPaginationSummary = document.querySelector("#repositorySupportPaginationSummary");
@@ -42,7 +41,6 @@ const repositorySupportPaginationPages = document.querySelector("#repositorySupp
 const repositorySupportPageSizeSelect = document.querySelector("#repositorySupportPageSize");
 
 const repositorySupportState = { page: 1, size: 10 };
-let repositoryToastTimer = null;
 let repositoryProjectSearchTimer = null;
 let repositoryProjectRequestController = null;
 const originalTextMap = new WeakMap();
@@ -472,19 +470,7 @@ function filterRepositoryProjects(resetPage = true) {
 */
 
 function showRepositoryToast(message) {
-    if (!repositoryToast) return;
-
-    window.clearTimeout(repositoryToastTimer);
-    repositoryToast.textContent = message;
-    repositoryToast.hidden = false;
-    requestAnimationFrame(() => repositoryToast.classList.add("show"));
-
-    repositoryToastTimer = window.setTimeout(() => {
-        repositoryToast.classList.remove("show");
-        window.setTimeout(() => {
-            repositoryToast.hidden = true;
-        }, 220);
-    }, 2200);
+    window.AppToast?.success(message);
 }
 
 window.showRepositoryToast = showRepositoryToast;

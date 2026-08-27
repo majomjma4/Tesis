@@ -125,8 +125,6 @@
 .aa-form-help{margin:7px 0 0;color:var(--muted);font-size:var(--font-sm);line-height:1.45}
 .aa-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .aa-form-wide{grid-column:1/-1}
-.aa-toast{position:fixed;right:22px;bottom:22px;z-index:2900;max-width:min(390px,calc(100vw - 32px));padding:12px 15px;border:1px solid rgba(16,185,129,.28);border-radius:12px;background:var(--surface);box-shadow:0 16px 42px rgba(15,23,42,.18);color:#047857;font-size:var(--font-md);font-weight:800}
-.aa-toast[hidden]{display:none!important}
 .aa-confirm .aa-primary{border:0;background:var(--blue);color:#fff}
 .aa-confirm .aa-danger{border:0;background:#dc2626;color:#fff}
 .aa-form-note{display:flex;align-items:flex-start;gap:8px;margin:15px 0 0;padding:10px 11px;border-radius:9px;background:rgba(37,99,235,.07);color:var(--muted);font-size:var(--font-sm)}

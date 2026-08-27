@@ -1,7 +1,6 @@
 // Inicio de interacciones del detalle del repositorio
 const repositoryDetailContent = document.querySelector("#repositoryDetailContent");
 const repositoryDetailFavorite = document.querySelector("#repositoryDetailFavorite");
-const repositoryDetailToast = document.querySelector("#repositoryDetailToast");
 const repositoryExplorerBreadcrumb = document.querySelector("#repositoryExplorerBreadcrumb");
 const repositoryFileList = document.querySelector("#repositoryFileList");
 const repositoryFileRows = document.querySelector("#repositoryFileRows");
@@ -28,7 +27,6 @@ const repositoryPreviewDocx = document.querySelector("#repositoryPreviewDocx");
 const repositoryImageZoomOut = document.querySelector("#repositoryImageZoomOut");
 const repositoryImageZoomReset = document.querySelector("#repositoryImageZoomReset");
 const repositoryImageZoomIn = document.querySelector("#repositoryImageZoomIn");
-let repositoryDetailToastTimer = null;
 let repositoryArchiveRequest = null;
 let repositoryPreviewRequest = null;
 let repositoryImageZoom = 1;
@@ -36,20 +34,9 @@ let repositoryPreviewReturnFocus = null;
 let repositoryPreviewModalPanel = null;
 let repositoryPreviewModalPlaceholder = null;
 
-function showRepositoryDetailToast(message) {
-    if (!repositoryDetailToast) return;
-
-    window.clearTimeout(repositoryDetailToastTimer);
-    repositoryDetailToast.textContent = message;
-    repositoryDetailToast.hidden = false;
-    requestAnimationFrame(() => repositoryDetailToast.classList.add("show"));
-
-    repositoryDetailToastTimer = window.setTimeout(() => {
-        repositoryDetailToast.classList.remove("show");
-        window.setTimeout(() => {
-            repositoryDetailToast.hidden = true;
-        }, 220);
-    }, 2400);
+function showRepositoryDetailToast(message, type = "success") {
+    const normalizedType = type === "success" && /no fue posible|error/i.test(String(message)) ? "error" : type;
+    window.AppToast?.show(message, normalizedType);
 }
 
 function setRepositoryExplorerState(status, message = "") {
@@ -2980,8 +2967,6 @@ const recordUploadSubmit = recordUploadDialog?.querySelector("[data-upload-submi
 const recordUploadSubmitLabel = recordUploadDialog?.querySelector("[data-upload-submit-label]");
 const recordUploadCancel = recordUploadDialog?.querySelector("[data-upload-cancel]");
 const recordUploadClose = recordUploadDialog?.querySelector("[data-upload-close]");
-const recordToastStack = document.querySelector("[data-record-toast-stack]");
-if (recordToastStack && recordToastStack.parentElement !== document.body) document.body.append(recordToastStack);
 let recordUploadEntries = [];
 let recordUploadState = "idle";
 let recordUploadReturnFocus = null;
@@ -2989,8 +2974,6 @@ let recordUploadBackgroundState = [];
 let recordUploadCloseTimer = null;
 let recordUploadDragDepth = 0;
 const recordUploadPickerState = { active: false, cleanup: null, fallbackTimer: null };
-const recordToastRegistry = new Map();
-const recordToastDurations = { success: 3800, info: 4000, warning: 5000, error: 5600 };
 
 function releaseRecordUploadPicker() {
     recordUploadPickerState.active = false;
@@ -3032,27 +3015,6 @@ function openRecordUploadPicker() {
         releaseRecordUploadPicker();
         throw error;
     }
-}
-
-function reflowRecordToasts(mutator) {
-    if (!recordToastStack) return;
-    const before = new Map(
-        [...recordToastStack.children].map((toast) => [toast, toast.getBoundingClientRect().top])
-    );
-    mutator();
-    [...recordToastStack.children].forEach((toast) => {
-        const previousTop = before.get(toast);
-        if (previousTop === undefined) return;
-        const delta = previousTop - toast.getBoundingClientRect().top;
-        if (!delta) return;
-        toast.style.transition = "none";
-        toast.style.transform = `translateY(${delta}px)`;
-        window.requestAnimationFrame(() => {
-            toast.style.transition = "transform 220ms ease";
-            toast.style.transform = "";
-            window.setTimeout(() => { toast.style.transition = ""; }, 230);
-        });
-    });
 }
 
 function recordUploadSize(bytes) {
@@ -3229,74 +3191,10 @@ function getNeutralFileVisualType(extension) {
 }
 
 function showRecordUploadToast(message, type = "success", options = {}) {
-    if (!recordToastStack || !message) return;
-    const normalizedType = ["success", "info", "warning", "error"].includes(type) ? type : "info";
-    if (normalizedType === "success") window.markRecordHistoryUnread?.();
-    const key = `${normalizedType}:${message}`;
-    let existing = recordToastRegistry.get(key);
-    if (options.freshAttempt && existing?.element?.isConnected) {
-        window.clearTimeout(existing.timer);
-        reflowRecordToasts(() => existing.element.remove());
-        recordToastRegistry.delete(key);
-        existing = null;
-    }
-    if (existing?.element?.isConnected) {
-        if (message === "Este archivo ya se encuentra disponible dentro del material.") {
-            existing.copy.textContent = message;
-            window.clearTimeout(existing.timer);
-            existing.timer = window.setTimeout(
-                () => dismissRecordToast(key),
-                recordToastDurations[normalizedType]
-            );
-            return;
-        }
-        existing.count += 1;
-        existing.copy.textContent = `${message} ×${existing.count}`;
-        window.clearTimeout(existing.timer);
-        existing.timer = window.setTimeout(
-            () => dismissRecordToast(key),
-            recordToastDurations[normalizedType]
-        );
-        return;
-    }
-    const element = document.createElement("div");
-    const icon = document.createElement("i");
-    const copy = document.createElement("span");
-    const close = document.createElement("button");
-    const icons = {
-        success: "fa-circle-check",
-        info: "fa-circle-info",
-        warning: "fa-triangle-exclamation",
-        error: "fa-circle-xmark",
-    };
-    element.className = `ed-upload-toast is-${normalizedType}`;
-    element.setAttribute("role", normalizedType === "error" ? "alert" : "status");
-    icon.className = `fa-solid ${icons[normalizedType]}`;
-    icon.setAttribute("aria-hidden", "true");
-    copy.textContent = message;
-    close.type = "button";
-    close.setAttribute("aria-label", "Cerrar mensaje");
-    close.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
-    element.append(icon, copy, close);
-    recordToastStack.prepend(element);
-    const entry = { element, copy, count: 1, timer: null };
-    entry.timer = window.setTimeout(
-        () => dismissRecordToast(key),
-        recordToastDurations[normalizedType]
-    );
-    recordToastRegistry.set(key, entry);
-    close.addEventListener("click", () => dismissRecordToast(key));
-}
-
-function dismissRecordToast(key) {
-    const entry = recordToastRegistry.get(key);
-    if (!entry) return;
-    window.clearTimeout(entry.timer);
-    entry.element.classList.add("is-leaving");
-    window.setTimeout(() => {
-        reflowRecordToasts(() => entry.element.remove());
-    }, 210);
-    recordToastRegistry.delete(key);
+    if (!message) return;
+    if (type === "success") window.markRecordHistoryUnread?.();
+    window.AppToast?.show(message, type, { fresh: options.freshAttempt });
+    return;
 }
 const pendingDigitalRecordToast = sessionStorage.getItem("digitalRecordToast");
 if (pendingDigitalRecordToast) {
