@@ -1891,11 +1891,9 @@ body.login-page{
     display:block;
     margin:0;
     width:100%;
+    min-height:0;
     overflow-x:hidden;
     overflow-y:auto;
-    min-height:100%;
-    min-height:100vh;
-    min-height:100dvh;
     background:
         linear-gradient(135deg,rgba(15,61,145,.94),rgba(13,47,112,.92)),
         var(--primary-dark);
@@ -1919,6 +1917,9 @@ html.login-root{
     width:min(1180px,100%);
     margin:0 auto;
     padding:42px 28px;
+}
+.login-primary-shell{
+    padding-block:clamp(28px,3.5vh,42px);
 }
 .login-intro{
     color:white;
@@ -2080,6 +2081,10 @@ html.login-root{
 .input-wrap input::placeholder{
     color:#94a3b8;
 }
+.login-primary-shell #user:placeholder-shown{
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
 .password-toggle{
     flex:0 0 38px;
     width:38px;
@@ -2184,6 +2189,10 @@ html.login-root{
     .login-intro{
         max-width:760px;
     }
+    .login-primary-shell .login-intro p{
+        width:100%;
+        max-width:760px;
+    }
     .login-intro p{
         font-size:16px;
     }
@@ -2225,6 +2234,51 @@ html.login-root{
     }
     .login-panel-header h2{
         font-size:25px;
+    }
+}
+@media(max-height:820px) and (min-width:901px){
+    .login-primary-shell{
+        gap:32px;
+        padding-block:24px;
+    }
+    .login-primary-shell .institution-brand{
+        margin-bottom:24px;
+    }
+    .login-primary-shell .role-list{
+        gap:10px;
+        margin-top:20px;
+    }
+    .login-primary-shell .role-list span{
+        padding-block:8px;
+    }
+    .login-primary-shell .login-panel{
+        padding:26px 30px;
+    }
+    .login-primary-shell .login-panel-header{
+        margin-bottom:20px;
+    }
+    .login-primary-shell .login-alert{
+        padding-block:10px;
+        margin-bottom:14px;
+    }
+    .login-primary-shell .login-form{
+        gap:14px;
+    }
+    .login-primary-shell .form-group{
+        gap:6px;
+    }
+    .login-primary-shell .input-wrap input{
+        min-height:46px;
+    }
+    .login-primary-shell .form-options{
+        margin-top:-4px;
+    }
+    .login-primary-shell .login-submit{
+        min-height:48px;
+    }
+    .login-primary-shell .access-note{
+        margin-top:16px;
+        padding-block:10px;
     }
 }
 /* Final de pantalla de inicio de sesion */

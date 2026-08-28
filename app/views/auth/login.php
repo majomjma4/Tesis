@@ -1,4 +1,4 @@
-<main class="login-shell">
+<main class="login-shell login-primary-shell">
     <!-- Inicio de presentacion institucional -->
     <section class="login-intro" aria-label="Informacion institucional">
         <!-- Inicio de marca institucional -->
@@ -31,7 +31,7 @@
         <header class="login-panel-header">
             <span>Acceso institucional</span>
             <h2>Iniciar sesión</h2>
-            <p>Ingresa con el correo y la contraseña asignada por el Instituto.</p>
+            <p>Accede a la plataforma para utilizar las herramientas y funciones disponibles.</p>
         </header>
         <!-- Final de encabezado del formulario -->
 
@@ -47,10 +47,10 @@
             <input type="hidden" name="_csrf" value="<?= e($loginCsrfToken ?? '') ?>">
             <!-- Inicio de campo de usuario -->
             <div class="form-group" id="userGroup">
-                <label for="user">Correo, usuario o cédula</label>
+                <label for="user">Identificación</label>
                 <div class="input-wrap">
                     <i class="fa-solid fa-user"></i>
-                    <input type="text" id="user" name="user" autocomplete="username" inputmode="text" placeholder="correo, usuario o cédula" value="<?= e($loginValue ?? '') ?>">
+                    <input type="text" id="user" name="user" autocomplete="username" inputmode="text" placeholder="correo, cédula o nombre de usuario" value="<?= e($loginValue ?? '') ?>">
                     <button class="login-user-clear" id="loginUserClear" type="button" aria-label="Limpiar usuario o correo" title="Limpiar usuario o correo" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
                 </div>
                 <span class="field-error">Este campo es obligatorio.</span>
@@ -59,10 +59,10 @@
 
             <!-- Inicio de campo de contrasena -->
             <div class="form-group" id="passwordGroup">
-                <label for="password">Contraseña asignada</label>
+                <label for="password">Contraseña</label>
                 <div class="input-wrap">
                     <i class="fa-solid fa-lock"></i>
-                    <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Ingresa tu contraseña asignada">
+                    <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Ingresa tu contraseña">
                     <button class="password-toggle" id="passwordToggle" type="button" aria-label="Mostrar contraseña" aria-pressed="false" title="Mostrar contraseña">
                         <i class="fa-regular fa-eye" aria-hidden="true"></i>
                     </button>
