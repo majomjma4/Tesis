@@ -38,3 +38,137 @@
 @media(max-width:680px){.project-wizard .wizard-icon-action{padding:.45rem}.project-wizard .wizard-member-picker{padding:.75rem}.project-wizard .wizard-dialog-card{width:min(100% - 1rem,34rem)}.project-wizard .wizard-register-summary div{align-items:flex-start;flex-direction:column;gap:.1rem}.project-wizard .wizard-register-summary dd{text-align:left}}
 .project-wizard .wizard-type-options{grid-template-columns:repeat(2,minmax(0,1fr))}.project-wizard .wizard-type-options label,.project-wizard .wizard-type-options label>span,.project-wizard .wizard-type-options b,.project-wizard .wizard-type-options small{min-width:0}.project-wizard .wizard-type-options label>span{grid-template-columns:38px minmax(0,1fr)}.project-wizard .wizard-type-options b,.project-wizard .wizard-type-options small{overflow-wrap:anywhere}
 .project-wizard .wizard-quick-tags button.is-selected,.project-wizard .wizard-quick-tags button:disabled{border-color:#9dbcf9;background:#edf4ff;color:#155eef;cursor:default;opacity:1}.project-wizard .wizard-members>legend[hidden],.project-wizard .wizard-members>p[hidden]{display:none}
+
+/* Tema oscuro completo del wizard. Mantiene intactas las reglas del tema claro. */
+.theme-dark .project-wizard{
+    color-scheme:dark;
+    --w-primary:var(--blue);
+    --w-ink:var(--text);
+    --w-muted:var(--muted);
+    --w-border:var(--line);
+    --w-surface:var(--surface);
+    --w-surface-soft:var(--surface-soft);
+    --w-primary-soft:color-mix(in srgb,var(--blue) 14%,var(--surface));
+    --w-success:var(--success);
+    --w-danger:color-mix(in srgb,var(--danger) 58%,var(--text));
+}
+.theme-dark .project-wizard :is(.wizard-main,.wizard-preview,.wizard-result,.wizard-denied){background:var(--w-surface);border-color:var(--w-border);color:var(--w-ink);box-shadow:none}
+.theme-dark .project-wizard .wizard-header>div>p:last-child,.theme-dark .project-wizard .wizard-breadcrumb,.theme-dark .project-wizard .wizard-progress>p,.theme-dark .project-wizard .wizard-step-help,.theme-dark .project-wizard .wizard-preview dt,.theme-dark .project-wizard .wizard-preview>small{color:var(--w-muted)}
+.theme-dark .project-wizard .wizard-progress li:not(:last-child):after{background:var(--w-border)}
+.theme-dark .project-wizard .wizard-progress li.is-complete:not(:last-child):after{background:color-mix(in srgb,var(--w-success) 70%,var(--w-border))}
+.theme-dark .project-wizard .wizard-progress li span{background:var(--w-surface);border-color:var(--w-border);color:var(--w-muted)}
+.theme-dark .project-wizard .wizard-progress li[aria-current=step] span{border-color:var(--w-primary);box-shadow:0 0 0 4px color-mix(in srgb,var(--w-primary) 24%,transparent);color:var(--w-primary)}
+.theme-dark .project-wizard .wizard-progress li.is-complete span{background:color-mix(in srgb,var(--w-success) 24%,var(--w-surface));border-color:var(--w-success);color:var(--w-success)}
+.theme-dark .project-wizard .wizard-progress li.is-skipped{opacity:1;color:var(--w-muted)}
+.theme-dark .project-wizard .wizard-progress li.is-skipped span{border-color:var(--w-muted);color:var(--w-muted)}
+
+/* Paso 1: tarjetas y estados del tipo de proyecto. */
+.theme-dark .project-wizard .wizard-type-options label>span{background:var(--w-surface-soft);border-color:var(--w-border);color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-type-options label:not(.is-disabled):hover>span{background:color-mix(in srgb,var(--w-primary) 8%,var(--w-surface-soft));border-color:var(--w-primary)}
+.theme-dark .project-wizard .wizard-type-options i{background:color-mix(in srgb,var(--w-primary) 18%,var(--w-surface-soft));color:var(--w-primary)}
+.theme-dark .project-wizard .wizard-type-options input:checked+span{background:var(--w-primary-soft);border-color:var(--w-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--w-primary) 24%,transparent)}
+.theme-dark .project-wizard .wizard-type-options label.is-disabled>span,.theme-dark .project-wizard .wizard-type-options input:disabled+span{opacity:1;background:color-mix(in srgb,var(--w-muted) 10%,var(--w-surface));border-color:color-mix(in srgb,var(--w-muted) 56%,var(--w-border));color:var(--w-muted)}
+.theme-dark .project-wizard .wizard-type-options label.is-disabled b,.theme-dark .project-wizard .wizard-type-options label.is-disabled small{color:var(--w-muted)}
+.theme-dark .project-wizard .wizard-type-options label.is-disabled i{background:color-mix(in srgb,var(--w-muted) 18%,var(--w-surface));color:var(--w-muted)}
+.theme-dark .project-wizard .wizard-denied a{color:var(--w-primary)}
+.theme-dark .project-wizard .wizard-denied a:hover{color:var(--blue-dark);text-decoration:underline}
+
+/* Pasos 2 y 3: campos, valores automáticos, equipo y etiquetas. */
+.theme-dark .project-wizard .wizard-fields :is(input,select,textarea),.theme-dark .project-wizard .wizard-tag-entry input{border-color:var(--w-border);background:var(--w-surface-soft);color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-fields :is(input,select,textarea)::placeholder,.theme-dark .project-wizard .wizard-tag-entry input::placeholder{color:color-mix(in srgb,var(--w-muted) 82%,var(--w-ink))}
+.theme-dark .project-wizard .wizard-fields :is(input,select,textarea):hover,.theme-dark .project-wizard .wizard-tag-entry input:hover{border-color:color-mix(in srgb,var(--w-primary) 60%,var(--w-border))}
+.theme-dark .project-wizard .wizard-fields :is(input,select,textarea):focus,.theme-dark .project-wizard .wizard-tag-entry input:focus{border-color:var(--w-primary);outline:3px solid color-mix(in srgb,var(--w-primary) 24%,transparent);outline-offset:0}
+.theme-dark .project-wizard .wizard-fields :is(input,select,textarea):disabled,.theme-dark .project-wizard .wizard-tag-entry input:disabled{background:color-mix(in srgb,var(--w-muted) 10%,var(--w-surface));border-color:color-mix(in srgb,var(--w-muted) 54%,var(--w-border));color:var(--w-muted);opacity:1;cursor:not-allowed}
+.theme-dark .project-wizard select option{background:var(--w-surface);color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-custom-select>button{border-color:var(--w-border);background:var(--w-surface-soft);color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-custom-select>button:hover{border-color:var(--w-primary);background:var(--w-primary-soft)}
+.theme-dark .project-wizard .wizard-readonly-field{background:var(--w-surface-soft);border-color:var(--w-border);color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-readonly-field small,.theme-dark .project-wizard .wizard-fields small,.theme-dark .project-wizard .wizard-members>p,.theme-dark .project-wizard .wizard-members legend small{color:var(--w-muted)}
+.theme-dark .project-wizard :is(.wizard-catalog-note,.wizard-file-warning,.wizard-code-preview,.wizard-result-note,.wizard-no-students){background:var(--w-surface-soft);border-color:var(--w-border);color:var(--w-muted)}
+.theme-dark .project-wizard .wizard-info-message,.theme-dark .project-wizard .wizard-registration-description{background:var(--w-primary-soft);color:var(--w-primary);border:1px solid color-mix(in srgb,var(--w-primary) 30%,var(--w-border))}
+.theme-dark .project-wizard .wizard-registration-description p{color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-auto-role{background:color-mix(in srgb,var(--w-success) 13%,var(--w-surface));border:1px solid color-mix(in srgb,var(--w-success) 30%,var(--w-border));color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-auto-role i,.theme-dark .project-wizard .wizard-auto-role em{color:var(--w-success)}
+.theme-dark .project-wizard .wizard-auto-role em{background:color-mix(in srgb,var(--w-success) 20%,var(--w-surface));}
+.theme-dark .project-wizard .wizard-members,.theme-dark .project-wizard .wizard-member-picker{background:color-mix(in srgb,var(--w-surface-soft) 58%,var(--w-surface));border-color:var(--w-border)}
+.theme-dark .project-wizard .wizard-student-results>label{background:var(--w-surface);border-color:var(--w-border);color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-student-results>label:hover,.theme-dark .project-wizard .wizard-student-results>label:focus-within{background:var(--w-primary-soft);border-color:color-mix(in srgb,var(--w-primary) 70%,var(--w-border))}
+.theme-dark .project-wizard .wizard-student-results>label:has(input:checked){background:var(--w-primary-soft);border-color:var(--w-primary)}
+.theme-dark .project-wizard .wizard-members input[type=checkbox]{accent-color:var(--w-primary)}
+.theme-dark .project-wizard .wizard-member-card{background:var(--w-surface);border-color:var(--w-border);color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-member-card em{background:color-mix(in srgb,var(--w-success) 20%,var(--w-surface));color:var(--w-success)}
+.theme-dark .project-wizard .wizard-member-card button{color:var(--w-danger)}
+.theme-dark .project-wizard .wizard-member-card button:hover{background:color-mix(in srgb,var(--w-danger) 15%,var(--w-surface))}
+.theme-dark .project-wizard .wizard-member-avatar{background:color-mix(in srgb,var(--w-primary) 20%,var(--w-surface));color:var(--w-primary)}
+.theme-dark .project-wizard .wizard-quick-tags button,.theme-dark .project-wizard .wizard-tag-entry button{border-color:var(--w-border);background:var(--w-surface);color:var(--w-primary)}
+.theme-dark .project-wizard .wizard-quick-tags button:hover,.theme-dark .project-wizard .wizard-quick-tags button:focus-visible,.theme-dark .project-wizard .wizard-tag-entry button:hover{background:var(--w-primary-soft);border-color:var(--w-primary);color:var(--w-primary)}
+.theme-dark .project-wizard .wizard-quick-tags button.is-selected,.theme-dark .project-wizard .wizard-quick-tags button:disabled{border-color:color-mix(in srgb,var(--w-primary) 70%,var(--w-border));background:var(--w-primary-soft);color:var(--w-primary);opacity:1}
+.theme-dark .project-wizard .wizard-tags>span{background:var(--w-primary-soft);color:var(--w-primary);border:1px solid color-mix(in srgb,var(--w-primary) 30%,var(--w-border))}
+.theme-dark .project-wizard .wizard-tags button{background:color-mix(in srgb,var(--w-primary) 20%,var(--w-surface));color:var(--w-primary)}
+
+/* Paso 4: carga, listado, estados y validaciones. */
+.theme-dark .project-wizard .wizard-dropzone{background:var(--w-surface-soft);border-color:color-mix(in srgb,var(--w-muted) 74%,var(--w-border));color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-dropzone:hover,.theme-dark .project-wizard .wizard-dropzone.is-dragging{background:var(--w-primary-soft);border-color:var(--w-primary)}
+.theme-dark .project-wizard .wizard-dropzone span,.theme-dark .project-wizard .wizard-file-list p,.theme-dark .project-wizard .wizard-file-list details,.theme-dark .project-wizard .wizard-file-limits{color:var(--w-muted)}
+.theme-dark .project-wizard .wizard-file-list div{border-color:var(--w-border);color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-file-list button{color:var(--w-danger)}
+.theme-dark .project-wizard .wizard-file-list button:hover{background:color-mix(in srgb,var(--w-danger) 15%,var(--w-surface));border-radius:6px}
+.theme-dark .project-wizard .wizard-file-list summary{color:var(--w-primary)}
+.theme-dark .project-wizard .wizard-field-error{color:var(--w-danger)}
+.theme-dark .project-wizard .wizard-fields :is(input,select,textarea):has(+small+.wizard-field-error),.theme-dark .project-wizard .wizard-fields :is(input,select,textarea)+.wizard-field-error{border-color:var(--w-danger)}
+.theme-dark .project-wizard .wizard-error-summary{background:color-mix(in srgb,var(--danger) 18%,var(--w-surface));border-left-color:var(--w-danger);color:color-mix(in srgb,var(--danger) 28%,var(--w-ink))}
+.theme-dark .project-wizard .wizard-error-summary p{color:inherit}
+
+/* Paso 5, acciones, resumen y foco accesible. */
+.theme-dark .project-wizard .wizard-confirmation div{border-color:var(--w-border);color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-confirmation dt,.theme-dark .project-wizard .wizard-confirmation span{color:var(--w-muted)}
+.theme-dark .project-wizard .wizard-actions{border-color:var(--w-border)}
+.theme-dark .project-wizard .wizard-primary{border-color:var(--w-primary);background:var(--w-primary);color:var(--bg)}
+.theme-dark .project-wizard .wizard-primary:hover{background:var(--blue-dark);border-color:var(--blue-dark);color:var(--bg)}
+.theme-dark .project-wizard .wizard-secondary{border-color:var(--w-border);background:var(--w-surface-soft);color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-secondary:hover{background:color-mix(in srgb,var(--w-primary) 13%,var(--w-surface-soft));border-color:var(--w-primary);color:var(--w-ink)}
+.theme-dark .project-wizard .wizard-text-action{color:var(--w-muted)}
+.theme-dark .project-wizard .wizard-text-action:hover{color:var(--w-ink);background:var(--w-surface-soft)}
+.theme-dark .project-wizard .wizard-autosave-status[data-state=saved]{color:var(--w-success)}
+.theme-dark .project-wizard .wizard-autosave-status[data-state=error]{color:var(--w-danger)}
+.theme-dark .project-wizard .wizard-icon-action{color:var(--w-danger)}
+.theme-dark .project-wizard .wizard-icon-action:hover,.theme-dark .project-wizard .wizard-icon-action:focus-visible{color:var(--w-danger);background:color-mix(in srgb,var(--w-danger) 15%,var(--w-surface-soft))}
+.theme-dark .project-wizard .wizard-result-icon{color:var(--w-success)}
+.theme-dark .project-wizard :is(button,input,select,textarea):focus-visible{outline:3px solid color-mix(in srgb,var(--w-primary) 42%,transparent);outline-offset:2px}
+.theme-dark .project-wizard button:disabled{opacity:1;color:var(--w-muted);border-color:color-mix(in srgb,var(--w-muted) 54%,var(--w-border));background:color-mix(in srgb,var(--w-muted) 10%,var(--w-surface));cursor:not-allowed}
+
+/* Modales propios del wizard, incluido el resumen de registro. */
+.theme-dark .project-wizard-page .wizard-dialog{background:rgba(3,8,18,.72)}
+.theme-dark .project-wizard-page .wizard-dialog-card{background:var(--surface-elevated);border:1px solid var(--line);color:var(--text)}
+.theme-dark .project-wizard-page .wizard-dialog-card p{color:var(--muted)}
+.theme-dark .project-wizard-page .wizard-dialog-actions .wizard-secondary{background:var(--surface-soft);border-color:var(--line);color:var(--text)}
+.theme-dark .project-wizard-page .wizard-dialog-actions .wizard-secondary:hover{background:color-mix(in srgb,var(--blue) 13%,var(--surface-soft));border-color:var(--blue);color:var(--text)}
+.theme-dark .project-wizard-page .wizard-dialog-actions .wizard-primary{background:var(--blue);border-color:var(--blue);color:var(--bg)}
+.theme-dark .project-wizard-page .wizard-dialog-actions .wizard-primary:hover{background:var(--blue-dark);border-color:var(--blue-dark);color:var(--bg)}
+.theme-dark .project-wizard-page .wizard-dialog-actions .wizard-danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.theme-dark .project-wizard-page .wizard-dialog-actions .wizard-danger:hover{background:color-mix(in srgb,var(--danger) 78%,var(--bg));border-color:color-mix(in srgb,var(--danger) 78%,var(--bg))}
+.theme-dark .project-wizard-page .wizard-register-summary{border-color:var(--line)}
+.theme-dark .project-wizard-page .wizard-dialog[data-draft-register-dialog] .wizard-register-summary div{background:var(--surface-soft);border-color:var(--line)}
+.theme-dark .project-wizard-page .wizard-dialog[data-draft-register-dialog] .wizard-register-summary dt{color:var(--muted)}
+.theme-dark .project-wizard-page .wizard-dialog[data-draft-register-dialog] .wizard-register-summary dd{color:var(--text)}
+.theme-dark .project-wizard-page .wizard-dialog[data-draft-register-dialog] .is-files-row .wizard-files-toggle{background:var(--surface-soft);color:var(--text)}
+.theme-dark .project-wizard-page .wizard-dialog[data-draft-register-dialog] .is-files-row .wizard-files-toggle>span:first-child{color:var(--muted)}
+.theme-dark .project-wizard-page .wizard-dialog[data-draft-register-dialog] .is-files-row>ul{background:var(--surface);border-color:var(--line)}
+.theme-dark .project-wizard-page .wizard-summary-toggle{color:var(--text)}
+.theme-dark .project-wizard-page .wizard-summary-toggle:not(:disabled)::after{color:var(--blue)}
+.theme-dark .project-wizard-page .wizard-register-summary ul{border-color:var(--line)}
+.theme-dark .project-wizard-page .wizard-register-summary .wizard-zip-entry{color:var(--muted)}
+.theme-dark .project-wizard .wizard-quick-tags button.is-selected:disabled,.theme-dark .project-wizard .wizard-quick-tags button:disabled[aria-pressed=true]{border-color:color-mix(in srgb,var(--w-primary) 70%,var(--w-border));background:var(--w-primary-soft);color:var(--w-primary);}
+
+.project-wizard .wizard-member-tools{grid-template-columns:minmax(0,1fr)}
+
+/* Altura uniforme de las tarjetas del Paso 1 sin alterar su contenido. */
+@media(min-width:681px){
+    .project-wizard .wizard-type-options{grid-auto-rows:minmax(128px,1fr);align-items:stretch}
+    .project-wizard .wizard-type-options label{display:flex;min-height:128px}
+    .project-wizard .wizard-type-options label>span{width:100%;height:100%;min-height:128px;align-content:center}
+}
+@media(max-width:680px){
+    .project-wizard .wizard-type-options label{display:flex;min-height:112px}
+    .project-wizard .wizard-type-options label>span{width:100%;min-height:112px;align-content:center}
+}

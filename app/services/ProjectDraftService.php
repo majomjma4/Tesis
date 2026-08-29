@@ -38,7 +38,7 @@ final class ProjectDraftService
             'modalities' => ['individual' => 'Individual', 'group' => 'Grupal'],
             'research_lines' => $student === null ? [] : $this->researchLines($db, (int) $student['career_id']),
             'teachers' => $this->teachers($db),
-            'students' => $activePeriod !== null && $student !== null ? $this->students($db, (int) $activePeriod['id'], (int) $student['career_id']) : [],
+            'students' => $activePeriod !== null && $student !== null ? $this->students($db, (int) $activePeriod['id'], (int) $student['career_id'], (int) $student['semester']) : [],
             'keywords' => $this->keywords($db),
             'keywords_by_type' => $this->keywordsByType($db),
         ];
@@ -54,7 +54,7 @@ final class ProjectDraftService
                 'uses_description' => true,
                 'default_title' => $type['default_title'] ?? '',
                 'registration_description' => (string) ($type['registration_description'] ?? ''),
-                'allows_cross_semester_members' => in_array($code, ['thesis', 'thesis_profile', 'community'], true),
+                'allows_cross_semester_members' => false,
                 'allows_additional_members' => !in_array($code, self::INDIVIDUAL_ONLY_TYPES, true),
             ];
         }
@@ -113,10 +113,10 @@ final class ProjectDraftService
             if (!isset($students[(int) $memberId])) { $errors['members'] = 'Uno o más integrantes ya no están disponibles para este proyecto.'; break; }
         }
         if ($policy['auto_leader'] && $student !== null && !in_array((string) $student['user_id'], $draft['members'], true)) $errors['members'] = 'La persona que crea el proyecto debe formar parte del equipo.';
-        if ($type !== null && !$this->allowsCrossSemester((string) $draft['type']) && $student !== null) {
+        if ($type !== null && $student !== null) {
             foreach ($draft['members'] as $memberId) {
                 $member = $students[(int) $memberId] ?? null;
-                if ($member !== null && (int) $member['semester'] !== (int) $student['semester']) { $errors['members'] = 'Este tipo de proyecto requiere integrantes del mismo semestre.'; break; }
+                if ($member !== null && (int) $member['semester'] !== (int) $student['semester']) { $errors['members'] = 'Los integrantes deben pertenecer al mismo semestre que la persona líder.'; break; }
             }
         }
         $errors += $this->validateTags($draft['tags'], $catalogs['keywords'], (int) $draft['raw_tag_count']);
@@ -142,7 +142,7 @@ final class ProjectDraftService
         $students = array_column($catalogs['students'], null, 'id');
         if ($draft['raw_member_count'] !== count($draft['members'])) $errors['members'] = 'No puedes agregar el mismo integrante más de una vez.';
         foreach ($draft['members'] as $memberId) if (!isset($students[(int) $memberId])) { $errors['members'] = 'Uno o más integrantes ya no están disponibles para este proyecto.'; break; }
-        if ($draft['type'] !== '' && !$this->allowsCrossSemester($draft['type']) && $student !== null) foreach ($draft['members'] as $memberId) { $member = $students[(int) $memberId] ?? null; if ($member !== null && (int) $member['semester'] !== (int) $student['semester']) { $errors['members'] = 'Este tipo de proyecto requiere integrantes del mismo semestre.'; break; } }
+        if ($draft['type'] !== '' && $student !== null) foreach ($draft['members'] as $memberId) { $member = $students[(int) $memberId] ?? null; if ($member !== null && (int) $member['semester'] !== (int) $student['semester']) { $errors['members'] = 'Los integrantes deben pertenecer al mismo semestre que la persona líder.'; break; } }
         return $errors + $this->validateTags($draft['tags'], $catalogs['keywords'], (int) $draft['raw_tag_count']);
     }
 
@@ -207,14 +207,15 @@ final class ProjectDraftService
             WHERE u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL AND tp.can_tutor=1 ORDER BY u.full_name")->fetchAll();
     }
 
-    private function students(PDO $db, int $periodId, int $careerId): array
+    private function students(PDO $db, int $periodId, int $careerId, int $semester): array
     {
         $q = $db->prepare("SELECT DISTINCT u.id,u.full_name name,u.email,se.semester FROM users u
             INNER JOIN student_profiles sp ON sp.user_id=u.id INNER JOIN student_enrollments se ON se.student_id=u.id
             INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id AND r.code='student'
             WHERE u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL AND se.status='active'
-              AND se.academic_period_id=:period AND se.career_id=:enrollment_career AND sp.career_id=:profile_career AND se.semester BETWEEN 1 AND 4 ORDER BY se.semester,u.full_name");
-        $q->execute(['period' => $periodId, 'enrollment_career' => $careerId, 'profile_career' => $careerId]); return $q->fetchAll();
+              AND se.academic_period_id=:period AND se.career_id=:enrollment_career AND sp.career_id=:profile_career
+              AND se.semester=:semester AND se.semester BETWEEN 1 AND 4 ORDER BY se.semester,u.full_name");
+        $q->execute(['period' => $periodId, 'enrollment_career' => $careerId, 'profile_career' => $careerId, 'semester' => $semester]); return $q->fetchAll();
     }
 
     private function researchLines(PDO $db, int $careerId): array
@@ -234,8 +235,6 @@ final class ProjectDraftService
             $out = []; foreach ($rows as $row) $out[(string) $row['code']][] = (string) $row['name']; return $out;
         } catch (Throwable) { return []; }
     }
-
-    private function allowsCrossSemester(string $type): bool { return in_array($type, ['thesis', 'thesis_profile', 'community'], true); }
 
     private function requiresIndividualTeam(string $type, string $modality): bool
     {
