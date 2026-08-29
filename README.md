@@ -271,6 +271,9 @@ y crear la cuenta administrativa inicial están disponibles en
   `app/config/database.local.php` y completar las credenciales locales.
 - Configurar `SMTP_PASSWORD=<valor configurado localmente>` en el entorno del
   servidor para habilitar el envío SMTP; no guardar la contraseña en archivos.
+- Configurar `APP_SETTINGS_ENCRYPTION_KEY` en el entorno del servidor como una
+  clave Base64 que decodifique exactamente 32 bytes. No guardar la clave real
+  en Git ni en archivos de configuración del proyecto.
 - Configurar `auth_required => true` antes de exponer el sistema.
 - Importar el `database/snapshot.sql` actualizado.
 

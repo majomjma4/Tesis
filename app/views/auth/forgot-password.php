@@ -17,7 +17,17 @@
             <p>Ingresa la cédula asociada a tu cuenta para enviarte las instrucciones.</p>
         </header>
 
-        <?php if (!empty($forgotError)): ?>
+        <?php if (isset($forgotCooldownSeconds) && (int) $forgotCooldownSeconds > 0): ?>
+            <div class="login-alert show" role="alert" aria-live="polite"
+                data-cooldown-seconds="<?= (int) $forgotCooldownSeconds ?>">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span data-cooldown-message>
+                    Ya existe una solicitud reciente. Inténtalo nuevamente en
+                    <span data-cooldown-remaining><?= (int) $forgotCooldownSeconds ?></span>
+                    <span data-cooldown-unit><?= (int) $forgotCooldownSeconds === 1 ? 'segundo' : 'segundos' ?></span>.
+                </span>
+            </div>
+        <?php elseif (!empty($forgotError)): ?>
             <div class="login-alert show" role="alert" aria-live="polite">
                 <i class="fa-solid fa-circle-exclamation"></i>
                 <span><?= e($forgotError) ?></span>

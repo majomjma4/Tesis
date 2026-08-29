@@ -5,6 +5,24 @@ final class PasswordResetModel
 {
     private const COOLDOWN_SECONDS = 60;
 
+    public static function tokenTtlMinutes(): int
+    {
+        $config = require APP_PATH . '/config/app.php';
+        return max(1, (int) $config['password_reset_ttl_minutes']);
+    }
+
+    public static function isTokenExpired(array $row): bool
+    {
+        $now = time();
+        $expiresAt = strtotime((string) ($row['expires_at'] ?? '') . ' UTC');
+        $createdAt = strtotime((string) ($row['created_at'] ?? '') . ' UTC');
+
+        return $expiresAt === false
+            || $createdAt === false
+            || $expiresAt <= $now
+            || $createdAt + (self::tokenTtlMinutes() * 60) <= $now;
+    }
+
     public function consumeIpRateLimit(string $ip): array
     {
         $ip = mb_substr(trim($ip), 0, 45);
@@ -106,8 +124,7 @@ final class PasswordResetModel
         $token = bin2hex(random_bytes(32));
         $hash = hash('sha256', $token);
 
-        $config = require APP_PATH . '/config/app.php';
-        $ttl = (int)($config['password_reset_ttl_minutes'] ?? 60);
+        $ttl = self::tokenTtlMinutes();
         $expiresAt = gmdate('Y-m-d H:i:s', time() + ($ttl * 60));
 
         $stmt = $db->prepare('INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, requested_ip) VALUES (:user_id, :token_hash, :expires_at, :requested_ip)');
@@ -147,7 +164,7 @@ final class PasswordResetModel
         $db = Database::connection();
         $hash = hash('sha256', $rawToken);
 
-        $stmt = $db->prepare('SELECT id, user_id, expires_at, used_at FROM password_reset_tokens WHERE token_hash = :hash LIMIT 1');
+        $stmt = $db->prepare('SELECT pr.id, pr.user_id, pr.created_at, pr.expires_at, pr.used_at, u.must_change_password FROM password_reset_tokens pr LEFT JOIN users u ON u.id = pr.user_id WHERE pr.token_hash = :hash LIMIT 1');
         $stmt->execute(['hash' => $hash]);
         $row = $stmt->fetch();
 
@@ -156,8 +173,7 @@ final class PasswordResetModel
         }
 
         // Verificar expiración y uso
-        $expired = strtotime((string)$row['expires_at'] . ' UTC') <= time();
-        if ($expired || $row['used_at'] !== null) {
+        if (self::isTokenExpired($row) || $row['used_at'] !== null) {
             return null;
         }
 
@@ -171,11 +187,11 @@ final class PasswordResetModel
     {
         return Database::transaction(function (PDO $db) use ($tokenId): bool {
             // Locking con SELECT FOR UPDATE
-            $stmt = $db->prepare('SELECT used_at, expires_at FROM password_reset_tokens WHERE id = :id FOR UPDATE');
+            $stmt = $db->prepare('SELECT used_at, created_at, expires_at FROM password_reset_tokens WHERE id = :id FOR UPDATE');
             $stmt->execute(['id' => $tokenId]);
             $row = $stmt->fetch();
 
-            if (!$row || $row['used_at'] !== null || strtotime((string)$row['expires_at'] . ' UTC') <= time()) {
+            if (!$row || $row['used_at'] !== null || self::isTokenExpired($row)) {
                 return false;
             }
 
@@ -190,18 +206,18 @@ final class PasswordResetModel
     public function resolveUserByInstitutionalCode(string $code): array
     {
         $db = Database::connection();
-        $code = trim($code);
+        $code = AuthModel::normalizeLoginIdentifier($code);
         if ($code === '') {
             return [];
         }
 
         $sql = "
-            SELECT u.id as user_id, u.email, u.status, u.deleted_at, u.purged_at, u.full_name
+            SELECT u.id as user_id, u.email, u.status, u.deleted_at, u.purged_at, u.full_name, u.must_change_password
             FROM student_profiles sp
             INNER JOIN users u ON u.id = sp.user_id
             WHERE sp.institutional_code = :code1
             UNION
-            SELECT u.id as user_id, u.email, u.status, u.deleted_at, u.purged_at, u.full_name
+            SELECT u.id as user_id, u.email, u.status, u.deleted_at, u.purged_at, u.full_name, u.must_change_password
             FROM teacher_profiles tp
             INNER JOIN users u ON u.id = tp.user_id
             WHERE tp.institutional_code = :code2

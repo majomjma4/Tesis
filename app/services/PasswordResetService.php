@@ -23,7 +23,7 @@ final class PasswordResetService
             return 'rate_limited:' . max(1, (int) $ipLimit['remaining_seconds']);
         }
 
-        $normalizedCode = trim($institutionalCode);
+        $normalizedCode = AuthModel::normalizeLoginIdentifier($institutionalCode);
         if ($normalizedCode === '' || !preg_match('/^\d{10}$/', $normalizedCode)) {
             // Aplicar rate limit por IP para evitar fuerza bruta en inputs inválidos
             return 'invalid';
@@ -66,6 +66,10 @@ final class PasswordResetService
             return 'no_email';
         }
 
+        if ((bool) ($user['must_change_password'] ?? false)) {
+            return 'temporary_password';
+        }
+
         // 5. Generar y persistir el nuevo token
         $tokenData = $this->model->createToken($userId, $ip);
 
@@ -73,7 +77,7 @@ final class PasswordResetService
         $config = require APP_PATH . '/config/app.php';
         $baseUrl = rtrim((string)($config['app_url'] ?? 'http://localhost/TESIS'), '/');
         $resetUrl = $baseUrl . '/index.php?page=reset-password&token=' . rawurlencode($tokenData['raw_token']);
-        $ttl = (int)($config['password_reset_ttl_minutes'] ?? 60);
+        $ttl = PasswordResetModel::tokenTtlMinutes();
 
         // 7. Intentar envío SMTP al correo registrado
         $sent = $this->mailer->sendResetLink($email, (string)$user['full_name'], $resetUrl, $ttl);

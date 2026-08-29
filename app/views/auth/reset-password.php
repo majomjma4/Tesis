@@ -2,8 +2,13 @@
     <section class="admin-access-card" role="dialog" aria-modal="true" aria-labelledby="resetPasswordTitle" tabindex="-1">
         <span class="admin-access-icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span>
         <p class="admin-access-eyebrow">Seguridad de la cuenta</p>
-        <h1 id="resetPasswordTitle">Restablecer contraseña</h1>
-        <p>Establece y confirma tu nueva contraseña institucional.</p>
+        <?php if (!empty($tokenError)): ?>
+            <h1 id="resetPasswordTitle">Enlace de recuperación no válido</h1>
+            <p>Este enlace no puede utilizarse para restablecer tu contraseña.</p>
+        <?php else: ?>
+            <h1 id="resetPasswordTitle">Restablecer contraseña</h1>
+            <p>Establece y confirma tu nueva contraseña institucional.</p>
+        <?php endif; ?>
 
         <?php if (!empty($tokenError)): ?>
             <div class="admin-access-alert is-error" role="alert" aria-live="polite">
@@ -28,6 +33,11 @@
                     <a class="admin-access-primary" href="<?= e(route('login')) ?>">Ir al inicio de sesión</a>
                 </div>
             <?php else: ?>
+                <?php if (!empty($hasTemporaryPassword)): ?>
+                    <div class="admin-access-alert is-success" role="status" aria-live="polite">
+                        <span>Tu cuenta utiliza actualmente una contraseña temporal. Al establecer una nueva contraseña, esta dejará de estar vigente.</span>
+                    </div>
+                <?php endif; ?>
                 <form class="admin-password-form" id="resetForm" method="post" action="<?= e(route('reset-password')) ?>" novalidate>
                     <input type="hidden" name="_csrf" value="<?= e($resetCsrfToken ?? '') ?>">
                     <input type="hidden" name="token" value="<?= e($tokenValue ?? '') ?>">

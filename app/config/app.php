@@ -25,7 +25,7 @@ $config = [
     'mail_password' => getenv('MAIL_PASSWORD') ?: '',
     'mail_from_address' => getenv('MAIL_FROM_ADDRESS') ?: '',
     'mail_from_name' => getenv('MAIL_FROM_NAME') ?: 'Gestión Documental Académica',
-    'password_reset_ttl_minutes' => (int) (getenv('PASSWORD_RESET_TTL_MINUTES') ?: 60),
+    'password_reset_ttl_minutes' => (int) (getenv('PASSWORD_RESET_TTL_MINUTES') ?: 15),
 ];
 
 $localFile = __DIR__ . '/app.local.php';

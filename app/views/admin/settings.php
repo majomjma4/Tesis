@@ -152,10 +152,10 @@
                     <div class="as-field-group">
                         <label for="input_temporary_password">
                             <span>Nueva contraseña temporal (opcional)</span>
-                            <span class="as-status-badge <?= !empty($temporaryPasswordConfigured) ? 'is-active' : 'is-warning' ?>" title="<?= !empty($temporaryPasswordConfigured) ? 'Hay una contraseña temporal activa almacenada de forma segura.' : 'Configura una contraseña temporal para habilitar nuevas altas y restablecimientos.' ?>"><i class="fa-solid <?= !empty($temporaryPasswordConfigured) ? 'fa-shield-halved' : 'fa-triangle-exclamation' ?>"></i> <?= !empty($temporaryPasswordConfigured) ? 'Configurada' : 'Requiere configuración' ?></span>
+                            <span id="temporaryPasswordStatus" class="as-status-badge <?= !empty($temporaryPasswordConfigured) ? 'is-active' : 'is-warning' ?>" title="<?= !empty($temporaryPasswordConfigured) ? 'Hay una contraseña temporal activa almacenada de forma segura.' : 'Configura una contraseña temporal para habilitar nuevas altas y restablecimientos.' ?>"><i class="fa-solid <?= !empty($temporaryPasswordConfigured) ? 'fa-shield-halved' : 'fa-triangle-exclamation' ?>"></i> <span class="as-status-text"><?= !empty($temporaryPasswordConfigured) ? 'Configurada' : 'Requiere configuración' ?></span></span>
                         </label>
-                        <input type="text" id="input_temporary_password" name="temporary_password" minlength="10" maxlength="128" autocomplete="off" placeholder="Escribe una nueva contraseña para reemplazar la actual" class="as-input">
-                        <span class="as-field-help">Si no deseas cambiarla, deja este campo vacío.</span>
+                        <input type="password" id="input_temporary_password" name="temporary_password" minlength="10" maxlength="128" autocomplete="new-password" placeholder="Escribe una nueva contraseña para reemplazar la actual" class="as-input">
+                        <span class="as-field-help">Si no deseas cambiarla, deja este campo vacío. Para registrarla, usa el botón global <strong>Guardar configuración</strong> al final de esta página.</span>
                     </div>
                     <div class="as-field-group">
                         <label for="input_temporary_password_days">
@@ -316,7 +316,7 @@
         </div>
 
         <!-- Acciones del Formulario -->
-        <div class="as-form-actions">
+        <div class="as-form-actions" aria-label="Acciones de configuración">
             <button type="submit" class="as-submit-btn" id="asSubmitBtn" disabled aria-disabled="true">
                 <i class="fa-solid fa-floppy-disk" id="asSubmitIcon"></i>
                 <span class="as-spinner" id="asSubmitSpinner" hidden></span>

@@ -228,12 +228,13 @@ final class SystemSettingModel
     {
         try {
             $secret=$this->secretValue('temporary_password_secret');
-            if($secret==='')throw new RuntimeException('Temporary password secret is not configured.');
+            if($secret==='')throw new TemporaryPasswordPolicyException('La política de contraseña temporal no está configurada. Configúrala en Admin > Configuración > Acceso inicial.');
             $password=$this->decryptSecret($secret);
             $settings=$this->all();
             return ['password'=>$password,'days'=>(int)$settings['temporary_password_days'],'force_change'=>(bool)$settings['temporary_password_force_change']];
         } catch (Throwable $exception) {
             error_log('Temporary password policy unavailable: '.$exception->getMessage());
+            if($exception instanceof TemporaryPasswordPolicyException)throw $exception;
             throw new TemporaryPasswordPolicyException('No fue posible obtener la política de contraseña temporal.',0,$exception);
         }
     }
@@ -266,9 +267,28 @@ final class SystemSettingModel
         return $toBytes($value);
     }
     private function secretValue(string $key):string{$q=Database::connection()->prepare('SELECT setting_value FROM system_settings WHERE setting_key=:key');$q->execute(['key'=>$key]);return (string)($q->fetchColumn()?:'');}
-    private function encryptionKey():string{$raw=(string)($GLOBALS['config']['settings_encryption_key']??'');$key=base64_decode($raw,true);if($key===false||strlen($key)!==32)throw new RuntimeException('Configura APP_SETTINGS_ENCRYPTION_KEY con una clave Base64 de 32 bytes para actualizar la contraseña temporal.');return $key;}
-    private function encryptSecret(string $value):string{$iv=random_bytes(12);$tag='';$cipher=openssl_encrypt($value,'aes-256-gcm',$this->encryptionKey(),OPENSSL_RAW_DATA,$iv,$tag);if($cipher===false)throw new RuntimeException('No fue posible proteger la contraseña temporal.');return base64_encode($iv.$tag.$cipher);}
-    private function decryptSecret(string $value):string{$raw=base64_decode($value,true);if($raw===false||strlen($raw)<29)throw new RuntimeException('La contraseña temporal almacenada no es válida.');$plain=openssl_decrypt(substr($raw,28),'aes-256-gcm',$this->encryptionKey(),OPENSSL_RAW_DATA,substr($raw,0,12),substr($raw,12,16));if(!is_string($plain)||$plain==='')throw new RuntimeException('No fue posible leer la contraseña temporal.');return $plain;}
+    private function encryptionKey():string
+    {
+        $raw=trim((string)($GLOBALS['config']['settings_encryption_key']??''));
+        if($raw==='')throw new SettingsEncryptionException('APP_SETTINGS_ENCRYPTION_KEY no está configurada en el entorno del servidor. Define una clave Base64 de exactamente 32 bytes.');
+        if(!preg_match('/\A[A-Za-z0-9+\/]{43}=\z/D',$raw))throw new SettingsEncryptionException('APP_SETTINGS_ENCRYPTION_KEY tiene un formato inválido. Debe ser Base64 de exactamente 32 bytes.');
+        $key=base64_decode($raw,true);
+        if($key===false||strlen($key)!==32)throw new SettingsEncryptionException('APP_SETTINGS_ENCRYPTION_KEY tiene un formato inválido. Debe ser Base64 de exactamente 32 bytes.');
+        if(!function_exists('openssl_encrypt')||!function_exists('openssl_decrypt'))throw new SettingsEncryptionException('La extensión OpenSSL no está habilitada en el servidor.');
+        return $key;
+    }
+    private function encryptSecret(string $value):string
+    {
+        $iv=random_bytes(12);$tag='';$cipher=openssl_encrypt($value,'aes-256-gcm', $this->encryptionKey(),OPENSSL_RAW_DATA,$iv,$tag);
+        if($cipher===false)throw new SettingsEncryptionException('No fue posible proteger la contraseña temporal con OpenSSL.');
+        return base64_encode($iv.$tag.$cipher);
+    }
+    private function decryptSecret(string $value):string
+    {
+        $raw=base64_decode($value,true);if($raw===false||strlen($raw)<29)throw new RuntimeException('La contraseña temporal almacenada no es válida.');
+        $plain=openssl_decrypt(substr($raw,28),'aes-256-gcm',$this->encryptionKey(),OPENSSL_RAW_DATA,substr($raw,0,12),substr($raw,12,16));
+        if(!is_string($plain)||$plain==='')throw new RuntimeException('No fue posible leer la contraseña temporal.');return $plain;
+    }
     private function label(string $key):string{return ['institution_name'=>'Nombre de la institución','file_max_mb'=>'Límite por archivo','file_total_max_mb'=>'Límite total por operación','file_extensions'=>'Formatos permitidos (Borrador)','file_extensions_private'=>'Formatos permitidos en Borrador','file_extensions_project'=>'Formatos permitidos en Proyecto','file_extensions_support'=>'Formatos permitidos en Materiales de apoyo','project_code_prefixes'=>'Prefijos de proyectos','project_code_digits'=>'Dígitos de códigos de proyectos','temporary_password_days'=>'Vigencia de contraseña temporal','temporary_password_force_change'=>'Cambio obligatorio de contraseña temporal','retention_users_days'=>'Retención de usuarios','retention_projects_days'=>'Retención de proyectos','retention_materials_days'=>'Retención de materiales','notification_trash_retention_days'=>'Retención de notificaciones','withdrawn_file_restore_hours'=>'Recuperación de archivos retirados','academic_period_reversal_hours'=>'Reversión de cierre de período','academic_period_reminder_days'=>'Aviso de período académico','calendar_reminder_days'=>'Recordatorios de calendario','session_inactivity_minutes'=>'Tiempo de inactividad de sesión'][$key]??$key;}
     private function formatChanges(string $key,string $old,string $new):array
     {

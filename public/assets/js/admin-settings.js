@@ -133,6 +133,7 @@
         const submitIcon = document.getElementById('asSubmitIcon');
         const submitSpinner = document.getElementById('asSubmitSpinner');
         const submitText = document.getElementById('asSubmitText');
+        const temporaryPasswordStatus = document.getElementById('temporaryPasswordStatus');
         const settingNames = {
             institution_name: 'Nombre de la institución', project_code_prefixes: 'Prefijos de proyectos',
             project_code_digits: 'Dígitos de códigos de proyectos', file_max_mb: 'Límite por archivo',
@@ -229,6 +230,7 @@
                 if (!changedKeys.length) {
                     return;
                 }
+                const hasTempPasswordChange = changedKeys.includes('temporary_password');
 
                 // Validación simple de UI antes de enviar
                 let isValid = true;
@@ -259,7 +261,6 @@
                 }
 
                 if (!confirmedSubmit) {
-                    const hasTempPasswordChange = changedKeys.includes('temporary_password');
                     const onlyInstitution = changedKeys.length === 1 && changedKeys[0] === 'institution_name';
 
                     let modalTitle = 'Confirmar cambios de configuración';
@@ -305,6 +306,18 @@
                     }
 
                     window.AppToast?.success(result.message || 'Configuración actualizada correctamente.');
+                    if (hasTempPasswordChange && temporaryPasswordStatus) {
+                        temporaryPasswordStatus.classList.remove('is-warning');
+                        temporaryPasswordStatus.classList.add('is-active');
+                        temporaryPasswordStatus.title = 'Hay una contraseña temporal activa almacenada de forma segura.';
+                        const statusIcon = temporaryPasswordStatus.querySelector('i');
+                        if (statusIcon) {
+                            statusIcon.classList.remove('fa-triangle-exclamation');
+                            statusIcon.classList.add('fa-shield-halved');
+                        }
+                        const statusText = temporaryPasswordStatus.querySelector('.as-status-text');
+                        if (statusText) statusText.textContent = 'Configurada';
+                    }
                     if (form.elements.temporary_password) form.elements.temporary_password.value = '';
                     initialSettings = settingSnapshot();
                     checkDirtyState();

@@ -415,9 +415,15 @@
 
 /* Botón Guardar y Acciones */
 .as-form-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
     display: flex;
     justify-content: flex-end;
     margin-top: 10px;
+    padding: 12px 0;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
 }
 
 .as-submit-btn {

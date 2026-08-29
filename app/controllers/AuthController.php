@@ -130,44 +130,36 @@ final class AuthController
         $error = null;
         $success = null;
         $code = '';
+        $remainingSeconds = null;
 
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             if (!$session->validateCsrf('forgot_password', (string)($_POST['_csrf'] ?? ''))) {
                 $error = 'La sesión del formulario venció. Inténtalo nuevamente.';
             } else {
-                $code = trim((string)($_POST['institutional_code'] ?? ''));
+                $code = AuthModel::normalizeLoginIdentifier((string)($_POST['institutional_code'] ?? ''));
                 if (!preg_match('/^\d{10}$/', $code)) {
-                    $error = 'La cédula debe contener exactamente 10 dígitos.';
+                    $error = 'Ingresa una cédula válida de 10 dígitos, sin letras ni símbolos.';
                 } else {
                     $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+                    $success = 'Si la cédula ingresada corresponde a una cuenta disponible con un correo registrado, recibirás las instrucciones de recuperación.';
                     try {
                         $result = (new PasswordResetService())->requestReset($code, $ip);
-                        $messages = [
-                            'not_found' => 'No encontramos una cuenta asociada a esta cédula. Verifica el número ingresado o comunícate con el administrador del sistema.',
-                            'duplicate' => 'No fue posible identificar una cuenta única con esta cédula. Comunícate con el administrador del sistema.',
-                            'no_email' => 'Tu cuenta no tiene un correo electrónico registrado para recuperación. Comunícate con el administrador del sistema.',
-                            'unavailable' => 'No es posible recuperar esta cuenta por este medio. Comunícate con el administrador del sistema.',
-                            'smtp_failed' => 'Encontramos tu cuenta, pero no pudimos enviar el correo de recuperación en este momento. Inténtalo nuevamente más tarde o comunícate con el administrador.',
-                            'sent' => 'Encontramos tu cuenta y enviamos las instrucciones al correo registrado.',
-                        ];
-                        if (isset($messages[$result])) {
-                            if ($result === 'smtp_failed') {
-                                $error = $messages[$result];
-                            } else {
-                                $success = $messages[$result];
-                            }
-                        } elseif ($result === 'rate_limited_hour') {
+                        if ($result === 'rate_limited_hour') {
+                            $success = null;
                             $error = 'Has realizado varias solicitudes de recuperación. Inténtalo nuevamente más tarde.';
                         } elseif (str_starts_with($result, 'rate_limited:')) {
+                            $success = null;
                             $remainingSeconds = max(1, (int) substr($result, strlen('rate_limited:')));
                             $unit = $remainingSeconds === 1 ? 'segundo' : 'segundos';
                             $error = "Ya existe una solicitud reciente. Inténtalo nuevamente en {$remainingSeconds} {$unit}.";
-                        } else {
-                            $error = 'La cédula debe contener exactamente 10 dígitos.';
+                        } elseif ($result === 'temporary_password') {
+                            $success = null;
+                            $error = 'Tu cuenta utiliza una contraseña temporal. Inicia sesión con la contraseña proporcionada por la institución y establece una nueva contraseña para continuar.';
+                        } elseif (!in_array($result, ['sent', 'not_found', 'duplicate', 'no_email', 'unavailable', 'smtp_failed', 'temporary_password'], true)) {
+                            error_log('ForgotPassword: resultado interno inesperado: ' . $result);
                         }
                     } catch (Throwable $e) {
                         error_log('ForgotPassword Error: ' . $e->getMessage());
-                        $error = 'Ocurrió un error al procesar tu solicitud. Inténtalo de nuevo más tarde.';
                     }
                 }
             }
@@ -179,7 +171,9 @@ final class AuthController
             'forgotCsrfToken' => $session->csrfToken('forgot_password'),
             'forgotError' => $error,
             'forgotSuccess' => $success,
-            'codeValue' => $code
+            'codeValue' => $code,
+            'forgotCooldownSeconds' => $remainingSeconds,
+            'pageScript' => asset('js/forgot-password.js')
         ], 'auth');
     }
 
@@ -203,6 +197,7 @@ final class AuthController
 
         $error = null;
         $success = null;
+        $hasTemporaryPassword = $tokenData !== null && (bool) ($tokenData['must_change_password'] ?? false);
 
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && !$tokenError) {
             if (!$session->validateCsrf('reset_password', (string)($_POST['_csrf'] ?? ''))) {
@@ -248,7 +243,8 @@ final class AuthController
             'tokenValue' => $token,
             'tokenError' => $tokenError,
             'resetError' => $error,
-            'resetSuccess' => $success
+            'resetSuccess' => $success,
+            'hasTemporaryPassword' => $hasTemporaryPassword
         ], 'auth');
     }
 

@@ -6,7 +6,7 @@ final class AuthModel
 {
     public function profile(int $userId):array
     {
-        $q=Database::connection()->prepare("SELECT u.id,u.username,u.full_name,u.email,u.profile_version,u.created_at,u.last_login_at,u.password_changed_at,u.avatar_path,u.avatar_updated_at,u.is_admin,u.is_initial_admin,sp.institutional_code student_institutional_code,tp.institutional_code teacher_institutional_code,se.semester current_semester FROM users u LEFT JOIN student_profiles sp ON sp.user_id=u.id LEFT JOIN teacher_profiles tp ON tp.user_id=u.id LEFT JOIN (SELECT id FROM academic_periods WHERE status='active' ORDER BY starts_on DESC,id DESC LIMIT 1) ap ON 1=1 LEFT JOIN student_enrollments se ON se.student_id=u.id AND se.academic_period_id=ap.id AND se.status='active' WHERE u.id=:id AND u.deleted_at IS NULL AND u.purged_at IS NULL");$q->execute(['id'=>$userId]);$profile=$q->fetch();if(!$profile)throw new RuntimeException('La cuenta no existe.');$profile['roles']=$this->effectiveRoles((int)$profile['id'],(bool)$profile['is_admin']);$profile['institutional_code']=in_array('student',$profile['roles'],true)?($profile['student_institutional_code']??null):(in_array('teacher',$profile['roles'],true)?($profile['teacher_institutional_code']??null):null);return $profile;
+        $q=Database::connection()->prepare("SELECT u.id,u.username,u.full_name,u.email,u.profile_version,u.created_at,u.last_login_at,u.password_changed_at,u.must_change_password,u.avatar_path,u.avatar_updated_at,u.is_admin,u.is_initial_admin,sp.institutional_code student_institutional_code,tp.institutional_code teacher_institutional_code,se.semester current_semester FROM users u LEFT JOIN student_profiles sp ON sp.user_id=u.id LEFT JOIN teacher_profiles tp ON tp.user_id=u.id LEFT JOIN (SELECT id FROM academic_periods WHERE status='active' ORDER BY starts_on DESC,id DESC LIMIT 1) ap ON 1=1 LEFT JOIN student_enrollments se ON se.student_id=u.id AND se.academic_period_id=ap.id AND se.status='active' WHERE u.id=:id AND u.deleted_at IS NULL AND u.purged_at IS NULL");$q->execute(['id'=>$userId]);$profile=$q->fetch();if(!$profile)throw new RuntimeException('La cuenta no existe.');$profile['roles']=$this->effectiveRoles((int)$profile['id'],(bool)$profile['is_admin']);$profile['institutional_code']=in_array('student',$profile['roles'],true)?($profile['student_institutional_code']??null):(in_array('teacher',$profile['roles'],true)?($profile['teacher_institutional_code']??null):null);return $profile;
     }
 
     public function updateProfile(int $userId,string $name,string $email,string $username,int $profileVersion,string $avatarAction='none',?string $avatarPath=null): array
@@ -224,9 +224,19 @@ final class AuthModel
         return array_values(array_unique($result));
     }
 
+    private function assertNewPasswordDiffersFromCurrent(int $userId,string $current,string $new):void
+    {
+        $read=Database::connection()->prepare('SELECT password_hash FROM users WHERE id=:id AND status=\'active\' AND deleted_at IS NULL AND purged_at IS NULL');
+        $read->execute(['id'=>$userId]);
+        $hash=$read->fetchColumn();
+        if(!$hash||!password_verify($current,(string)$hash))return;
+        if($hash&&password_verify($new,(string)$hash))throw new InvalidArgumentException('La nueva contraseña debe ser diferente de tu contraseña actual.');
+    }
+
     public function changePassword(int $userId,string $current,string $new): bool
     {
         $this->assertPasswordPolicy($new);
+        $this->assertNewPasswordDiffersFromCurrent($userId,$current,$new);
         return Database::transaction(function(PDO $db)use($userId,$current,$new):bool{$read=$db->prepare('SELECT password_hash FROM users WHERE id=:id AND status=\'active\' AND deleted_at IS NULL AND purged_at IS NULL FOR UPDATE');$read->execute(['id'=>$userId]);$hash=$read->fetchColumn();if(!$hash||!password_verify($current,(string)$hash))return false;$update=$db->prepare('UPDATE users SET password_hash=:hash,must_change_password=0,password_warning_count=0,temporary_password_expires_at=NULL,temporary_password_last_warning_at=NULL,password_changed_at=CURRENT_TIMESTAMP,session_version=session_version+1 WHERE id=:id');$update->execute(['hash'=>password_hash($new,PASSWORD_DEFAULT),'id'=>$userId]);(new AdminActivityService($db))->record($userId,'password_changed','Contraseña actualizada','Cuenta','user',$userId,'Cuenta personal','correct',[]);return true;});
     }
 
@@ -246,7 +256,7 @@ final class AuthModel
 
         return Database::transaction(function (PDO $db) use ($tokenId, $newPassword): string {
             $read = $db->prepare(
-                'SELECT pr.user_id, pr.expires_at, pr.used_at, u.status, u.deleted_at, u.purged_at
+                'SELECT pr.user_id, pr.created_at, pr.expires_at, pr.used_at, u.password_hash, u.status, u.deleted_at, u.purged_at
                  FROM password_reset_tokens pr
                  INNER JOIN users u ON u.id = pr.user_id
                  WHERE pr.id = :token_id
@@ -256,13 +266,17 @@ final class AuthModel
             $read->execute(['token_id' => $tokenId]);
             $row = $read->fetch();
 
-            if (!$row || $row['used_at'] !== null || strtotime((string) $row['expires_at'] . ' UTC') <= time()) {
+            if (!$row || $row['used_at'] !== null || PasswordResetModel::isTokenExpired($row)) {
                 return 'invalid_token';
             }
 
             if ($row['status'] !== 'active' || $row['deleted_at'] !== null || $row['purged_at'] !== null) {
                 $db->prepare('DELETE FROM password_reset_tokens WHERE id = :token_id')->execute(['token_id' => $tokenId]);
                 return 'account_unavailable';
+            }
+
+            if (password_verify($newPassword, (string) $row['password_hash'])) {
+                throw new InvalidArgumentException('La nueva contraseña debe ser diferente de tu contraseña actual.');
             }
 
             $update = $db->prepare(

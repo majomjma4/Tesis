@@ -23,9 +23,13 @@ final class MailService
             return false;
         }
 
-        $mail = new PHPMailer(true);
-
         try {
+            if (!class_exists(PHPMailer::class)) {
+                error_log('MailService Error: Dependencia PHPMailer no disponible.');
+                return false;
+            }
+
+            $mail = new PHPMailer(true);
             $mail->isSMTP();
             $mail->SMTPDebug = 0;
             $mail->Host = $host;

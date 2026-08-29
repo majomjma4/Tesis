@@ -59,7 +59,7 @@ $avatarUrl = $hasAvatar ? (route('profile-avatar') . '&v=' . rawurlencode((strin
                 <div><dt>Último acceso</dt><dd><?= e($formatDate($profile['last_login_at'],'Aún no disponible')) ?></dd></div>
                 <div><dt>Último cambio de contraseña</dt><dd><?= e($formatDate($profile['password_changed_at'],'Sin cambios registrados')) ?></dd></div>
             </dl>
-            <?php if (!empty($layoutHasTemporaryPassword) && empty($layoutIsAdmin)): ?>
+            <?php if (!empty($profile['must_change_password']) && empty($layoutIsAdmin)): ?>
                 <div class="profile-message" role="alert" style="display:flex;align-items:flex-start;gap:8px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);color:#92400e;">
                     <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
                     <span>Tu cuenta todavía utiliza una contraseña temporal. Cámbiala para mantener el acceso seguro a la plataforma.</span>
