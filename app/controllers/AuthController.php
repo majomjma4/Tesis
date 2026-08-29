@@ -20,7 +20,7 @@ final class AuthController
         $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
 
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
-            $login = trim((string) ($_POST['user'] ?? ''));
+            $login = AuthModel::normalizeLoginIdentifier((string) ($_POST['user'] ?? ''));
             $lockState = $auth->checkLoginLockout($login, $ip);
             if ($lockState['is_locked']) {
                 $lockoutSeconds = (int) $lockState['remaining_seconds'];
@@ -110,7 +110,7 @@ final class AuthController
     private function redirectAfterLogin(array $user): never
     {
         $requiresTemporaryPasswordChange = (bool) ($user['must_change_password'] ?? false) && !(bool) ($user['is_admin'] ?? false);
-        $expired = !empty($user['temporary_password_expires_at']) && strtotime((string) $user['temporary_password_expires_at']) <= time();
+        $expired = AuthSessionService::isTemporaryPasswordExpired($user['temporary_password_expires_at'] ?? null);
         header('Location: ' . ($requiresTemporaryPasswordChange && $expired ? route('change-password') : route('dashboard'))); exit;
     }
 

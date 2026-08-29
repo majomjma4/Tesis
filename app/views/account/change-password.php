@@ -75,6 +75,12 @@
                 <i class="fa-solid fa-key" aria-hidden="true"></i> Actualizar contraseña
             </button>
         </form>
+        <?php if ($forcedPasswordChange): ?>
+            <form method="post" action="<?= e(route('logout')) ?>" class="forced-password-logout-form">
+                <input type="hidden" name="_csrf" value="<?= e($logoutCsrfToken ?? '') ?>">
+                <button type="submit" class="admin-access-secondary"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Cerrar sesión</button>
+            </form>
+        <?php endif; ?>
         <?php endif; ?>
     </section>
 </main>

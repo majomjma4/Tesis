@@ -83,8 +83,9 @@ final class AuthModel
         $statement = Database::connection()->prepare(
             "SELECT DISTINCT u.id, u.email, u.username, u.password_hash, u.full_name, u.is_admin, u.is_initial_admin, u.must_change_password, u.password_warning_count, u.temporary_password_expires_at, u.temporary_password_last_warning_at, u.session_version, u.avatar_path, u.avatar_updated_at FROM users u LEFT JOIN student_profiles sp ON sp.user_id=u.id LEFT JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.status = 'active' AND u.deleted_at IS NULL AND u.purged_at IS NULL AND ((u.email IS NOT NULL AND LOWER(u.email)=:identifier_email) OR (u.username IS NOT NULL AND LOWER(u.username)=:identifier_username) OR sp.institutional_code=:identifier_code_student OR tp.institutional_code=:identifier_code_teacher) LIMIT 1"
         );
-        $normalizedLogin = mb_strtolower(trim($login));
-        $statement->execute(['identifier_email'=>$normalizedLogin,'identifier_username'=>$normalizedLogin,'identifier_code_student'=>trim($login),'identifier_code_teacher'=>trim($login)]);
+        $normalizedLogin = self::normalizeLoginIdentifier($login);
+        $normalizedLoginLower = mb_strtolower($normalizedLogin);
+        $statement->execute(['identifier_email'=>$normalizedLoginLower,'identifier_username'=>$normalizedLoginLower,'identifier_code_student'=>$normalizedLogin,'identifier_code_teacher'=>$normalizedLogin]);
         $user = $statement->fetch();
         if (!$user) return null;
         $user['roles'] = $this->effectiveRoles((int)$user['id'],(bool)$user['is_admin']);
@@ -108,7 +109,7 @@ final class AuthModel
     public function checkLoginLockout(string $login, string $ip): array
     {
         $db = Database::connection();
-        $key = 'lockout:' . md5(mb_strtolower(trim($login)) . ':' . $ip);
+        $key = 'lockout:' . md5(mb_strtolower(self::normalizeLoginIdentifier($login)) . ':' . $ip);
         $q = $db->prepare('SELECT attempts, locked_until FROM login_security_locks WHERE lock_key = :key');
         $q->execute(['key' => $key]);
         $row = $q->fetch();
@@ -130,7 +131,7 @@ final class AuthModel
     public function recordFailedLogin(string $login, string $ip): array
     {
         $db = Database::connection();
-        $key = 'lockout:' . md5(mb_strtolower(trim($login)) . ':' . $ip);
+        $key = 'lockout:' . md5(mb_strtolower(self::normalizeLoginIdentifier($login)) . ':' . $ip);
         $db->prepare(
             'INSERT INTO login_security_locks (lock_key, attempts, updated_at)
              VALUES (:key, 1, CURRENT_TIMESTAMP)
@@ -153,8 +154,14 @@ final class AuthModel
 
     public function clearFailedLogins(string $login, string $ip): void
     {
-        $key = 'lockout:' . md5(mb_strtolower(trim($login)) . ':' . $ip);
+        $key = 'lockout:' . md5(mb_strtolower(self::normalizeLoginIdentifier($login)) . ':' . $ip);
         Database::connection()->prepare('DELETE FROM login_security_locks WHERE lock_key = :key')->execute(['key' => $key]);
+    }
+
+    public static function normalizeLoginIdentifier(string $value): string
+    {
+        $normalized = preg_replace('/^[\s\p{Z}\x{FEFF}]+|[\s\p{Z}\x{FEFF}]+$/u', '', $value);
+        return is_string($normalized) ? $normalized : '';
     }
 
     public function sessionIdentity(int $userId): ?array

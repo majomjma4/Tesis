@@ -177,7 +177,13 @@ final class AuthSessionService
         $this->start();
         if (!(bool) ($_SESSION['must_change_password'] ?? false)) return false;
         $expires = $_SESSION['temporary_password_expires_at'] ?? null;
-        return is_string($expires) && $expires !== '' && strtotime($expires) <= time();
+        return self::isTemporaryPasswordExpired($expires);
+    }
+    public static function isTemporaryPasswordExpired(mixed $expires): bool
+    {
+        if (!is_string($expires) || $expires === '') return false;
+        $expiresAt = utc_datetime($expires);
+        return $expiresAt === null || $expiresAt->getTimestamp() <= time();
     }
     public function hasTemporaryPassword(): bool { $this->start(); return (bool) ($_SESSION['must_change_password'] ?? false); }
     public function temporaryPasswordExpiresAt(): ?string { $this->start(); return isset($_SESSION['temporary_password_expires_at']) ? (string)$_SESSION['temporary_password_expires_at'] : null; }
@@ -185,7 +191,9 @@ final class AuthSessionService
     {
         $expires = $this->temporaryPasswordExpiresAt();
         if (!$expires) return null;
-        $diff = strtotime($expires) - time();
+        $expiresAt = utc_datetime($expires);
+        if ($expiresAt === null) return 0;
+        $diff = $expiresAt->getTimestamp() - time();
         if ($diff <= 0) return 0;
         return (int) ceil($diff / 86400);
     }

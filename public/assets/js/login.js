@@ -115,6 +115,7 @@ passwordToggle?.addEventListener("click", () => {
 
 // Inicio de envio del formulario
 loginForm?.addEventListener("submit", (event) => {
+    userInput.value = userInput.value.trim();
     updateFieldState(userInput);
     updateFieldState(passwordInput);
 

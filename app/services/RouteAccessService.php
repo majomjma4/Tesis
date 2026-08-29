@@ -25,7 +25,7 @@ final class RouteAccessService
             header('Location: '.route('login'));exit;
         }
         $session->refresh($identity);
-        $expired=!empty($identity['temporary_password_expires_at'])&&strtotime((string)$identity['temporary_password_expires_at'])<=time();
+        $expired=AuthSessionService::isTemporaryPasswordExpired($identity['temporary_password_expires_at']??null);
         $requiresTemporaryPasswordChange=(bool)$identity['must_change_password']&&!(bool)$identity['is_admin'];
         if($requiresTemporaryPasswordChange&&$expired&&!in_array($page,['change-password','logout'],true)){header('Location: '.route('change-password'));exit;}
         if((in_array($page,self::ADMIN_ROUTES,true)||$page==='admin-repository-trash')&&(!(bool)$identity['is_admin']||!$session->isAdminModeActive())){
