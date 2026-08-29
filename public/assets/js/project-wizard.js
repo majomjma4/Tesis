@@ -15,14 +15,16 @@
     let current = 0, uploading = 0, pendingReplace = null, dirty = false, dialogOpener = null, previousType = form.elements.type?.value || '', pendingType = '', previousModality = form.elements.modality?.value || '', preflightInFlight = false;
     let draftFiles = [...(config.storedDraft?.files || [])];
 
-    const announce = (message, error = false) => {
+    const announce = (message, kind = 'success') => {
         if (!summary) return;
+        const state = kind === true ? 'error' : kind === false ? 'success' : ['success', 'info', 'warning', 'error'].includes(kind) ? kind : 'error';
         summary.hidden = false;
+        summary.dataset.state = state;
         summary.replaceChildren();
-        const title = document.createElement('strong'); title.textContent = error ? 'Revisa este paso' : 'Listo';
+        const title = document.createElement('strong'); title.textContent = state === 'error' ? 'Revisa este paso' : state === 'warning' ? 'Atención' : 'Listo';
         const text = document.createElement('p'); text.textContent = message;
         summary.append(title, text);
-        if (!error) window.setTimeout(() => { summary.hidden = true; }, 4200);
+        if (state === 'success' || state === 'info') window.setTimeout(() => { summary.hidden = true; }, 4200);
     };
     const setSaveStatus = (state) => {
         if (!status) return;
@@ -33,7 +35,12 @@
     const selectedType = () => form.elements.type?.value || '';
     const actorId = () => String(config.student?.user_id || '');
     const tags = () => [...form.querySelectorAll('[name="tags[]"]')].map((item) => item.value);
-    const bytes = (value) => `${(Number(value || 0) / 1048576).toFixed(1)} MB`;
+    const formatFileSize = (value) => {
+        const size = Math.max(0, Number(value) || 0);
+        if (size < 1024) return `${Math.round(size)} B`;
+        if (size < 1048576) return `${Math.round(size / 1024)} KB`;
+        return `${Number((size / 1048576).toFixed(1))} MB`;
+    };
     const request = async (url, body, signal) => {
         const response = await fetch(url, { method: 'POST', body, signal, credentials: 'same-origin', headers: { Accept: 'application/json' } });
         const result = await response.json().catch(() => null);
@@ -118,7 +125,7 @@
         if (active === 'confirm') renderConfirmation(); updatePreview(); syncResetVisibility(); if (focus) sections[active].querySelector('h2')?.focus({ preventScroll: true });
     }
     function validateClient(target) {
-        if (config.availabilityMessage) return announce(config.availabilityMessage, true), false;
+        if (config.availabilityMessage) return announce(config.availabilityMessage, 'warning'), false;
         const type = selectedType(); if (!type) return announce('Selecciona un tipo de proyecto disponible.', true), false;
         if (target !== 'type') {
             if (form.elements.title.value.trim().length < 5) return announce('El título debe tener al menos 5 caracteres.', true), false;
@@ -133,7 +140,7 @@
             if (!members.includes(actorId())) return announce('La persona creadora debe permanecer como líder del equipo.', true), false;
             if (type === 'thesis' && form.elements.modality.value === 'individual' && members.length > 1) return announce('La modalidad individual solo admite un estudiante.', true), false;
         }
-        if (['files', 'confirm'].includes(target) && uploading > 0) return announce('Espera a que finalicen las cargas de archivos.', true), false;
+        if (['files', 'confirm'].includes(target) && uploading > 0) return announce('Espera a que finalicen las cargas de archivos.', 'warning'), false;
         if (target === 'confirm' && draftFiles.some((file) => file.available === false)) return announce('Quita o vuelve a subir los archivos no disponibles.', true), false;
         return true;
     }
@@ -158,11 +165,13 @@
     document.querySelector('[data-add-tag]')?.addEventListener('click', () => addTag()); tagInput?.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); addTag(); } });
 
     function firstLevelZipEntries(file) { const entries = file.zip_meta?.entries; if (!file.zip_meta?.valid || !Array.isArray(entries)) return []; const technical = new Set(['.git', '.svn', '.hg', '__macosx', '.ds_store']); const items = new Map(); entries.forEach((entry) => { const path = String(entry.name || '').replace(/^\/+|\/+$/g, ''); if (!path) return; const parts = path.split('/').filter(Boolean); const first = parts[0]; if (!first || technical.has(first.toLowerCase())) return; const folder = parts.length > 1 || Boolean(entry.is_dir); const current = items.get(first); items.set(first, { name: first, folder: folder || Boolean(current?.folder) }); }); return [...items.values()]; }
-    function renderFiles() { fileList.replaceChildren(); if (!draftFiles.length) { const empty = document.createElement('p'); empty.textContent = uploading ? 'Subiendo archivos…' : 'No hay archivos seleccionados.'; fileList.append(empty); syncResetVisibility(); return; } draftFiles.forEach((file) => { const row = document.createElement('div'); const text = document.createElement('span'); const zip = file.zip_meta; text.textContent = zip?.valid ? `${file.original_name} · ${bytes(file.size_bytes)} · ${zip.files_count} archivos · ${zip.folders_count} carpetas · ZIP válido` : `${file.original_name} · ${bytes(file.size_bytes)}${file.available === false ? ' · No disponible' : ''}`; const remove = document.createElement('button'); remove.type = 'button'; remove.title = 'Quitar archivo'; remove.setAttribute('aria-label', `Quitar archivo ${file.original_name}`); remove.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>'; remove.addEventListener('click', () => void removeFile(file)); row.append(text, remove); if (zip?.valid && Array.isArray(zip.entries)) { const details = document.createElement('details'); const title = document.createElement('summary'); title.textContent = 'Ver contenido'; const list = document.createElement('ul'); firstLevelZipEntries(file).forEach((entry) => { const item = document.createElement('li'); item.textContent = `${entry.folder ? '📁' : '📄'} ${entry.name}`; list.append(item); }); details.append(title, list); row.append(details); } fileList.append(row); }); syncResetVisibility(); }
+    function renderFiles() { fileList.replaceChildren(); if (!draftFiles.length) { const empty = document.createElement('p'); empty.textContent = uploading ? 'Subiendo archivos…' : 'No hay archivos seleccionados.'; fileList.append(empty); syncResetVisibility(); return; } draftFiles.forEach((file) => { const row = document.createElement('div'); const text = document.createElement('span'); const zip = file.zip_meta; text.textContent = zip?.valid ? `${file.original_name} · ${formatFileSize(file.size_bytes)} · ${zip.files_count} archivos · ${zip.folders_count} carpetas · ZIP válido` : `${file.original_name} · ${formatFileSize(file.size_bytes)}${file.available === false ? ' · No disponible' : ''}`; const remove = document.createElement('button'); remove.type = 'button'; remove.title = 'Quitar archivo'; remove.setAttribute('aria-label', `Quitar archivo ${file.original_name}`); remove.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>'; remove.addEventListener('click', () => void removeFile(file)); row.append(text, remove); if (zip?.valid && Array.isArray(zip.entries)) { const details = document.createElement('details'); const title = document.createElement('summary'); title.textContent = 'Ver contenido'; const list = document.createElement('ul'); firstLevelZipEntries(file).forEach((entry) => { const item = document.createElement('li'); item.textContent = `${entry.folder ? '📁' : '📄'} ${entry.name}`; list.append(item); }); details.append(title, list); row.append(details); } fileList.append(row); }); syncResetVisibility(); }
     async function removeFile(file) { const body = new FormData(); body.set('_csrf', config.draftCsrf || ''); body.set('file_id', String(file.id)); try { const result = await request(endpoints.remove, body); draftFiles = result.data?.draft?.files || []; renderFiles(); updatePreview(); announce('Archivo eliminado.'); } catch (error) { announce(error.message || 'No se pudo eliminar el archivo.', true); } }
     async function uploadFiles(files, replace = false) { if (!files.length) return; uploading++; renderFiles(); updatePreview(); const body = new FormData(); body.set('_csrf', config.draftCsrf || ''); if (replace) body.set('replace', '1'); files.forEach((file) => body.append('files[]', file, file.name)); try { const result = await request(endpoints.upload, body); draftFiles = result.data?.draft?.files || draftFiles; if (result.data?.failed?.length) result.data.failed.forEach((failure) => { const original = files.find((file) => file.name === failure.name); if (failure.replace_file_id && original) { pendingReplace = { file: original }; openDialog(document.querySelector('[data-draft-replace-dialog]')); } else announce(`${failure.name}: ${failure.message}`, true); }); if (result.data?.added?.length) announce(result.data.added.length === 1 ? 'Archivo temporal agregado.' : 'Archivos temporales agregados.'); } catch (error) { announce(error.message || 'No se pudo subir el archivo.', true); } finally { uploading--; renderFiles(); updatePreview(); } }
     fileInput?.addEventListener('change', () => { const files = [...fileInput.files]; fileInput.value = ''; void uploadFiles(files); });
     const dropzone = document.querySelector('[data-file-dropzone]'); ['dragenter', 'dragover'].forEach((type) => dropzone?.addEventListener(type, (event) => { event.preventDefault(); dropzone.classList.add('is-dragging'); })); ['dragleave', 'drop'].forEach((type) => dropzone?.addEventListener(type, (event) => { event.preventDefault(); dropzone.classList.remove('is-dragging'); })); dropzone?.addEventListener('drop', (event) => void uploadFiles([...event.dataTransfer.files]));
+
+    dropzone?.addEventListener('click', (event) => { if (event.target === fileInput) return; event.preventDefault(); fileInput?.click(); });
 
     function tutorLabel() {
         const rawOption = form.elements.tutor_id?.selectedOptions?.[0]?.textContent?.trim() || '';
@@ -171,7 +180,7 @@
         return raw;
     }
     const lookup = (name) => name === 'tutor_id' ? tutorLabel() : form.elements[name]?.selectedOptions?.[0]?.textContent?.trim() || 'Sin seleccionar';
-    function previewData() { const members = new Set([...form.querySelectorAll('[name="members[]"]:checked,[name="members[]"][type="hidden"]')].map((field) => field.value)).size; const total = draftFiles.reduce((sum, file) => sum + Number(file.size_bytes || 0), 0); return [['Tipo', typeData().label || 'Sin seleccionar'], ['Título', form.elements.title?.value || 'Sin seleccionar'], ['Periodo', config.activePeriod?.code || 'Pendiente'], ['Carrera', config.student?.career_name || 'Sin seleccionar'], ['Semestre', config.student ? `${config.student.semester}.º semestre` : 'Pendiente'], ['Tutor', lookup('tutor_id')], ['Integrantes', String(members)], ['Etiquetas', String(tags().length)], ['Archivos', `${draftFiles.length} · ${bytes(total)}`]]; }
+    function previewData() { const members = new Set([...form.querySelectorAll('[name="members[]"]:checked,[name="members[]"][type="hidden"]')].map((field) => field.value)).size; const total = draftFiles.reduce((sum, file) => sum + Number(file.size_bytes || 0), 0); const filesLabel = draftFiles.length === 0 ? 'Sin archivos' : draftFiles.length === 1 ? formatFileSize(total) : `${formatFileSize(total)} en total`; return [['Tipo', typeData().label || 'Sin seleccionar'], ['Título', form.elements.title?.value || 'Sin seleccionar'], ['Periodo', config.activePeriod?.code || 'Pendiente'], ['Carrera', config.student?.career_name || 'Sin seleccionar'], ['Semestre', config.student ? `${config.student.semester}.º semestre` : 'Pendiente'], ['Tutor', lookup('tutor_id')], ['Integrantes', String(members)], ['Etiquetas', String(tags().length)], ['Archivos', filesLabel]]; }
     function fillSummary(target, data) { target.replaceChildren(...data.map(([label, value]) => { const row = document.createElement('div'); row.dataset.summaryField = label.toLocaleLowerCase(); const key = document.createElement('dt'); const content = document.createElement('dd'); key.textContent = label; content.textContent = value; row.append(key, content); return row; })); }
     function updatePreview() { const preview = document.querySelector('[data-preview]'); if (preview) fillSummary(preview, previewData()); }
     function renderConfirmation() { const box = document.querySelector('[data-confirmation]'); if (box) fillSummary(box, previewData()); }

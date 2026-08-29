@@ -161,6 +161,7 @@
 .theme-dark .project-wizard .wizard-quick-tags button.is-selected:disabled,.theme-dark .project-wizard .wizard-quick-tags button:disabled[aria-pressed=true]{border-color:color-mix(in srgb,var(--w-primary) 70%,var(--w-border));background:var(--w-primary-soft);color:var(--w-primary);}
 
 .project-wizard .wizard-member-tools{grid-template-columns:minmax(0,1fr)}
+.project-wizard .wizard-dropzone>label{display:grid;justify-items:center;gap:8px;width:100%;cursor:pointer}
 
 /* Altura uniforme de las tarjetas del Paso 1 sin alterar su contenido. */
 @media(min-width:681px){
@@ -172,3 +173,17 @@
     .project-wizard .wizard-type-options label{display:flex;min-height:112px}
     .project-wizard .wizard-type-options label>span{width:100%;min-height:112px;align-content:center}
 }
+
+/* Semántica visual de avisos y estados del wizard. */
+.project-wizard .wizard-error-summary[data-state="success"]{border-left-color:var(--success,#087443);background:color-mix(in srgb,var(--success,#087443) 14%,var(--w-surface));color:color-mix(in srgb,var(--success,#087443) 64%,var(--w-ink))}
+.project-wizard .wizard-error-summary[data-state="info"]{border-left-color:var(--blue,#155eef);background:color-mix(in srgb,var(--blue,#155eef) 12%,var(--w-surface));color:color-mix(in srgb,var(--blue,#155eef) 64%,var(--w-ink))}
+.project-wizard .wizard-error-summary[data-state="warning"]{border-left-color:var(--warning,#f59e0b);background:color-mix(in srgb,var(--warning,#f59e0b) 14%,var(--w-surface));color:color-mix(in srgb,var(--warning-text,#b54708) 68%,var(--w-ink))}
+.project-wizard .wizard-error-summary[data-state="error"],.project-wizard .wizard-error-summary:not([data-state]){border-left-color:var(--danger,#b42318);background:color-mix(in srgb,var(--danger,#b42318) 14%,var(--w-surface));color:color-mix(in srgb,var(--danger,#b42318) 66%,var(--w-ink))}
+.project-wizard :is(.wizard-catalog-note,.wizard-file-warning),.theme-dark .project-wizard :is(.wizard-catalog-note,.wizard-file-warning){border:1px solid color-mix(in srgb,var(--warning,#f59e0b) 34%,var(--w-border));background:color-mix(in srgb,var(--warning,#f59e0b) 10%,var(--w-surface));color:color-mix(in srgb,var(--warning-text,#b54708) 68%,var(--w-ink))}
+.project-wizard :is(.wizard-info-message,.wizard-registration-description),.theme-dark .project-wizard :is(.wizard-info-message,.wizard-registration-description){border:1px solid color-mix(in srgb,var(--blue,#155eef) 30%,var(--w-border));background:color-mix(in srgb,var(--blue,#155eef) 10%,var(--w-surface));color:color-mix(in srgb,var(--blue,#155eef) 68%,var(--w-ink))}
+.project-wizard :is(.wizard-code-preview,.wizard-result-note,.wizard-no-students),.theme-dark .project-wizard :is(.wizard-code-preview,.wizard-result-note,.wizard-no-students){border:1px solid color-mix(in srgb,var(--blue,#155eef) 30%,var(--w-border));background:color-mix(in srgb,var(--blue,#155eef) 8%,var(--w-surface));color:color-mix(in srgb,var(--blue,#155eef) 62%,var(--w-ink))}
+.project-wizard .wizard-autosave-status[data-state="saving"]{color:var(--blue,#155eef)}
+.project-wizard .wizard-autosave-status[data-state="saved"]{color:var(--success,#087443)}
+.project-wizard .wizard-autosave-status[data-state="error"]{color:var(--danger,#b42318)}
+.project-wizard :is(.wizard-preview,.wizard-confirmation) dd{margin:3px 0 0;min-width:0;font-weight:700;line-height:1.35}
+.project-wizard .wizard-confirmation dd{overflow-wrap:anywhere}
