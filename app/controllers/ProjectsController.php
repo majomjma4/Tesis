@@ -1116,7 +1116,10 @@ final class ProjectsController
     private function docxPreviewStream(array $project, array $file, array $entry, string $identity, string $url, bool $forceRetry = false): array
     {
         try {
-            return $this->docxPreviewFailure(['original_name'=>$entry['name'],'size_bytes'=>$entry['size']], 'La vista previa aún no está preparada.');
+            $service = new DocumentPreviewConversionService();
+            if ($forceRetry) { $service->clearFailure((int)$project['id'], (int)$file['id'], $identity); }
+            $result = $service->convertStream($entry['stream'], (int)$project['id'], (int)$file['id'], $identity);
+            return $this->docxPdfPayload(['original_name'=>$entry['name'],'size_bytes'=>$entry['size']], $url, $result);
         }
         catch (Throwable $error) {
             error_log('Project ZIP DOCX preview: project='.(int)$project['id'].' file='.(int)$file['id'].' entry='.$entry['path'].' error='.$error->getMessage());
