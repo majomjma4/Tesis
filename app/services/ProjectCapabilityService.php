@@ -389,6 +389,26 @@ final class ProjectCapabilityService
         return (bool) $statement->fetchColumn();
     }
 
+    /** Revalida en datos persistidos la identidad Student y su participación activa. */
+    public function canStudentEditProjectInTransaction(PDO $db, int $projectId, int $userId): bool
+    {
+        if ($projectId < 1 || $userId < 1) return false;
+        $statement = $db->prepare(
+            "SELECT 1
+             FROM users u
+             INNER JOIN user_roles ur ON ur.user_id=u.id
+             INNER JOIN roles r ON r.id=ur.role_id AND r.code='student'
+             INNER JOIN student_profiles sp ON sp.user_id=u.id
+             INNER JOIN project_participants pp ON pp.user_id=u.id
+             WHERE u.id=:user AND pp.project_id=:project
+               AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL
+               AND LOWER(pp.role_code)='student' AND pp.status='active' AND pp.removed_at IS NULL
+             LIMIT 1 FOR UPDATE"
+        );
+        $statement->execute(['user'=>$userId, 'project'=>$projectId]);
+        return (bool) $statement->fetchColumn();
+    }
+
     /** @return array<string,bool> Capacidades de ajustes recalculadas con identidad persistida. */
     public function adjustmentCapabilitiesInTransaction(PDO $db, array $project, int $userId, string $context): array
     {

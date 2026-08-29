@@ -653,12 +653,17 @@ final class ProjectsController
             $this->json(['success' => false, 'message' => 'Método no permitido.', 'data' => []]);
         }
         $session = new AuthSessionService();
+        $actorId = (int) ($session->userId() ?? 0);
+        if (!$session->isAuthenticated() || $actorId < 1) {
+            http_response_code(401);
+            $this->json(['success' => false, 'message' => 'Tu sesión expiró. Inicia sesión nuevamente para continuar.', 'data' => []]);
+        }
         if (!$session->validateCsrf('project_description', (string) ($_POST['_csrf'] ?? ''))) {
             http_response_code(403);
             $this->json(['success' => false, 'message' => 'La sesión del formulario venció.', 'data' => []]);
         }
         try {
-            (new ProjectDescriptionService())->saveForStudent((int) ($_POST['project_id'] ?? 0), (int) $session->userId(), (string) ($_POST['description'] ?? ''));
+            (new ProjectDescriptionService())->saveForStudent((int) ($_POST['project_id'] ?? 0), $actorId, (string) ($_POST['description'] ?? ''));
             $this->json(['success' => true, 'message' => 'Descripción guardada correctamente.', 'data' => []]);
         } catch (InvalidArgumentException $exception) {
             http_response_code(422);
@@ -834,9 +839,7 @@ final class ProjectsController
         if (!$session->isAuthenticated()||$projectId<1||$versionId<1) throw new InvalidArgumentException('Solicitud no válida.');
         $context=$session->isAdminModeActive()?'academic_management':'academic';
         if (!(new ProjectCapabilityService())->canViewProjectResource($projectId, $context)) throw new RuntimeException('No tienes autorización para consultar esta versión.');
-        $version=(new ProjectFileVersionHistoryService())->accessibleVersion($projectId,$versionId,(new ProjectAccessService())->currentUserId(),$context);
-        $v=(string)($_GET['v']??''); if ($v!==''&&!hash_equals(substr((string)$version['checksum_sha256'],0,16),$v)) throw new InvalidArgumentException('Versión no válida.');
-        return $version;
+        throw new InvalidArgumentException('Las versiones historicas no estan disponibles para archivos.');
     }
 
     public function fileContent(): void
@@ -1002,6 +1005,27 @@ final class ProjectsController
     }
     private function failProjectArchive(int $status,string $message,bool $json):never{http_response_code($status);if($json)$this->json(['success'=>false,'message'=>$message,'data'=>[]]);header('Content-Type: text/plain; charset=UTF-8');exit($message);}
 
+    private function currentFileVersionRequestIsValid(string $currentChecksum): bool
+    {
+        $currentChecksum = strtolower(trim($currentChecksum));
+        if (!preg_match('/\A[a-f0-9]{64}\z/', $currentChecksum)) return false;
+        if (array_key_exists('version_id', $_GET)) return false;
+        foreach (['v', 'checksum'] as $key) {
+            if (!array_key_exists($key, $_GET)) continue;
+            $requested = strtolower(trim((string) $_GET[$key]));
+            if (!preg_match('/\A[a-f0-9]{16,64}\z/', $requested)
+                || !hash_equals(substr($currentChecksum, 0, strlen($requested)), $requested)) return false;
+        }
+        return true;
+    }
+
+    private function rejectHistoricalFileRequest(bool $json): never
+    {
+        http_response_code(404);
+        if ($json) $this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);
+        exit('El archivo solicitado no está disponible.');
+    }
+
     private function resolveFile(bool $json=false, bool $allowInstitutionalRead=false): array
     {
         if (session_status()!==PHP_SESSION_ACTIVE) session_start();
@@ -1033,6 +1057,7 @@ final class ProjectsController
                 exit('No tienes autorización para consultar este archivo.');
             }
             if (!$privateAccess) {
+                if (!$this->currentFileVersionRequestIsValid((string) ($institutionalFile['checksum_sha256'] ?? ''))) $this->rejectHistoricalFileRequest($json);
                 $institutionalProject = $access->can('project.view')
                     ? $model->find($institutionalProjectId, $access->currentUserId(), $admin, false, true)
                     : null;
@@ -1047,15 +1072,6 @@ final class ProjectsController
                     if ($json) $this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);
                     exit('El archivo solicitado no está disponible.');
                 }
-                $requestedVersionId = filter_var($_GET['version_id'] ?? null, FILTER_VALIDATE_INT);
-                $requestedV = trim((string) ($_GET['v'] ?? $_GET['checksum'] ?? ''));
-                $currentChecksum = (string) ($institutionalFile['checksum_sha256'] ?? '');
-                if ($requestedVersionId > 0 || ($requestedV !== '' && !hash_equals(substr($currentChecksum, 0, strlen($requestedV)), $requestedV))) {
-                    fclose($institutionalStream);
-                    http_response_code(403);
-                    if ($json) $this->json(['success'=>false,'message'=>'Las versiones históricas no están disponibles en la lectura institucional.','data'=>[]]);
-                    exit('Las versiones históricas no están disponibles en la lectura institucional.');
-                }
                 return [$institutionalProject, $institutionalFile, $institutionalStream, $institutionalPath, true];
             }
         }
@@ -1065,29 +1081,7 @@ final class ProjectsController
         $project=($projectId && $access->can('project.view'))?$model->find((int)$projectId,$access->currentUserId(),$admin,$repositoryScope):null;
         $file=($project && $fileId)?$model->findFile((int)$projectId,(int)$fileId):null;
         if(!$project||!$file){http_response_code(404);if($json)$this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);exit('El archivo solicitado no está disponible.');}
-        $requestedVersionId = filter_var($_GET['version_id'] ?? null, FILTER_VALIDATE_INT);
-        $requestedV = trim((string)($_GET['v'] ?? $_GET['checksum'] ?? ''));
-        if ($requestedVersionId > 0 || ($requestedV !== '' && !hash_equals(substr((string)$file['checksum_sha256'], 0, strlen($requestedV)), $requestedV))) {
-            $db = Database::connection();
-            $verQuery = null;
-            if ($requestedVersionId > 0) {
-                $verQuery = $db->prepare('SELECT * FROM project_file_versions WHERE id = :vid AND file_id = :fid AND project_id = :pid LIMIT 1');
-                $verQuery->execute(['vid' => $requestedVersionId, 'fid' => (int)$fileId, 'pid' => (int)$projectId]);
-            } else if ($requestedV !== '') {
-                $verQuery = $db->prepare('SELECT * FROM project_file_versions WHERE file_id = :fid AND project_id = :pid AND (checksum_sha256 = :v1 OR checksum_sha256 LIKE :v2) ORDER BY id DESC LIMIT 1');
-                $verQuery->execute(['fid' => (int)$fileId, 'pid' => (int)$projectId, 'v1' => $requestedV, 'v2' => $requestedV . '%']);
-            }
-            $hist = $verQuery ? $verQuery->fetch(PDO::FETCH_ASSOC) : null;
-            if ($hist) {
-                $file['storage_name'] = $hist['storage_name'];
-                $file['storage_path'] = $hist['storage_path'];
-                $file['checksum_sha256'] = $hist['checksum_sha256'];
-                $file['original_name'] = $hist['original_name'];
-                $file['extension'] = $hist['extension'];
-                $file['mime_type'] = $hist['mime_type'];
-                $file['size_bytes'] = $hist['size_bytes'];
-            }
-        }
+        if (!$this->currentFileVersionRequestIsValid((string) ($file['checksum_sha256'] ?? ''))) $this->rejectHistoricalFileRequest($json);
         try{$fileStorage=$admin||$teacher||$repositoryScope?new ProjectDocumentFileService():new PrivateProjectFileService();$path=$fileStorage->resolveStoredFile((int)$projectId,(string)$file['storage_name']);$stream=fopen($path,'rb');}catch(Throwable){$stream=false;}
         if($stream===false){http_response_code(404);if($json)$this->json(['success'=>false,'message'=>'El archivo solicitado no está disponible.','data'=>[]]);exit('El archivo solicitado no está disponible.');}
         return [$project,$file,$stream,$path,false];

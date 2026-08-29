@@ -20,14 +20,16 @@ final class ProjectAccessService
     {
         $roles = $this->currentRoles();
         foreach (['administrator', 'teacher', 'student'] as $priority) if (in_array($priority, $roles, true)) return $priority;
-        return 'student';
+        return 'restricted';
     }
 
     public function currentRoles(): array
     {
-        $roles = (new AuthSessionService())->roles();
+        $session = new AuthSessionService();
+        if (!$session->isAuthenticated() || (int) ($session->userId() ?? 0) < 1) return [];
+        $roles = $session->roles();
         $valid = array_values(array_filter(array_map('strtolower', $roles), static fn (string $role): bool => isset(self::PERMISSIONS[$role])));
-        return $valid ?: ['student'];
+        return $valid;
     }
 
     public function can(string $permission): bool
