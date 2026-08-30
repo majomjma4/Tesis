@@ -7,6 +7,7 @@ if (isset($historicalVersion) && is_array($historicalVersion)) {
 }
 $canManageFiles = !$historical && !empty($projectCapabilities['manage_workspace_files']);
 $canSendForReview = !$historical && !empty($projectCapabilities['send_for_review']);
+$canPublishProject = !$historical && !empty($projectCapabilities['publish_project']);
 $canReviewDocuments = !$historical && !empty($projectCapabilities['review_documents']);
 $reviewCategories = ['General', 'Contenido', 'Formato', 'Redacción', 'Referencias'];
 $reviewFiles = array_map(static fn(array $file): array => [
@@ -171,6 +172,7 @@ $getFileIconClass = static function (?string $extension, ?string $mimeType = nul
         <div data-sw-file-observations><p class="sw-empty-state">Selecciona un archivo para consultar sus observaciones.</p></div>
         <footer class="sw-obs-footer">
             <?php if ($canSendForReview): ?><button type="button" class="sw-obs-action-btn" data-sw-submit-review><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Enviar a revisión</button><?php endif; ?>
+            <?php if ($canPublishProject): ?><button type="button" class="sw-obs-action-btn" data-project-publish data-project-id="<?= (int) $projectId ?>"><i class="fa-solid fa-upload" aria-hidden="true"></i> Publicar</button><?php endif; ?>
         </footer>
     </aside>
     <?php if ($canReviewDocuments): ?>

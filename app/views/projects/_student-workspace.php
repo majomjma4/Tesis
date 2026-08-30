@@ -140,4 +140,7 @@ $formatDate = static fn (?string $date, bool $time = false): string => format_ut
     <?php if (!empty($projectCapabilities['edit_information'])): ?>
         <?php require __DIR__ . '/student-workspace/_edit-information-modal.php'; ?>
     <?php endif; ?>
+    <?php if (!empty($projectCapabilities['publish_project'])): ?>
+        <?php require __DIR__ . '/_student-project-publish.php'; ?>
+    <?php endif; ?>
 </div>

@@ -16,6 +16,7 @@ final class ProjectReviewSituationService
     {
         $db = $connection ?? Database::connection();
         $activeCondition = $activeOnly ? " AND p.status<>'published'" : '';
+        $pendingCondition = $this->actionablePendingObservationCondition('review_observation');
         $row = $db->query(
             "SELECT
              COALESCE(SUM(COALESCE(review.pending_count,0)>0),0) pending,
@@ -24,9 +25,9 @@ final class ProjectReviewSituationService
              FROM projects p
              LEFT JOIN (
                SELECT project_id,COUNT(*) observation_count,
-                 SUM(status='pending') pending_count,
+                 SUM(CASE WHEN {$pendingCondition} THEN 1 ELSE 0 END) pending_count,
                  SUM(status IN ('addressed','resolved')) addressed_count
-               FROM project_observations GROUP BY project_id
+               FROM project_observations review_observation GROUP BY project_id
              ) review ON review.project_id=p.id
              WHERE p.deleted_at IS NULL{$activeCondition}"
         )->fetch() ?: [];
@@ -40,9 +41,10 @@ final class ProjectReviewSituationService
         if ($ids === []) return [];
         $db = $connection ?? Database::connection();
         $marks = implode(',', array_fill(0, count($ids), '?'));
+        $pendingCondition = $this->actionablePendingObservationCondition('o');
         $statement = $db->prepare(
             "SELECT p.id,
-             COUNT(DISTINCT CASE WHEN o.status='pending' THEN o.id END) pending_count,
+             COUNT(DISTINCT CASE WHEN {$pendingCondition} THEN o.id END) pending_count,
              COUNT(DISTINCT CASE WHEN o.status IN ('addressed','resolved') THEN o.id END)>0 has_addressed,
              MAX(CASE WHEN a.action='project_corrections_requested' THEN a.created_at END) corrections_at,
              MAX(d.submitted_at) latest_delivery_at
@@ -165,9 +167,10 @@ final class ProjectReviewSituationService
     {
         if ($projectId < 1) return $this->emptySituation();
         $db = $connection ?? Database::connection();
+        $pendingCondition = $this->actionablePendingObservationCondition('o');
         $statement = $db->prepare(
             "SELECT
-             (SELECT COUNT(*) FROM project_observations WHERE project_id=:pending_project AND status='pending') pending_count,
+             (SELECT COUNT(*) FROM project_observations o WHERE o.project_id=:pending_project AND {$pendingCondition}) pending_count,
              EXISTS(SELECT 1 FROM project_observations WHERE project_id=:addressed_project AND status IN ('addressed','resolved')) has_addressed,
              (SELECT MAX(created_at) FROM project_audit_log WHERE project_id=:audit_project AND action='project_corrections_requested') corrections_at,
              (SELECT MAX(submitted_at) FROM project_deliveries WHERE project_id=:delivery_project) latest_delivery_at"
@@ -185,12 +188,35 @@ final class ProjectReviewSituationService
     public function filterCondition(string $situation, string $projectAlias = 'p'): ?string
     {
         if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $projectAlias)) throw new InvalidArgumentException('Alias de proyecto no válido.');
+        $pendingCondition = $this->actionablePendingObservationCondition('review_observation');
         return match ($situation) {
-            'pending' => "EXISTS(SELECT 1 FROM project_observations review_observation WHERE review_observation.project_id={$projectAlias}.id AND review_observation.status='pending')",
-            'none' => "NOT EXISTS(SELECT 1 FROM project_observations review_observation WHERE review_observation.project_id={$projectAlias}.id AND review_observation.status='pending')",
-            'addressed' => "NOT EXISTS(SELECT 1 FROM project_observations pending_observation WHERE pending_observation.project_id={$projectAlias}.id AND pending_observation.status='pending') AND EXISTS(SELECT 1 FROM project_observations addressed_observation WHERE addressed_observation.project_id={$projectAlias}.id AND addressed_observation.status IN ('addressed','resolved'))",
+            'pending' => "EXISTS(SELECT 1 FROM project_observations review_observation WHERE review_observation.project_id={$projectAlias}.id AND {$pendingCondition})",
+            'none' => "NOT EXISTS(SELECT 1 FROM project_observations review_observation WHERE review_observation.project_id={$projectAlias}.id AND {$pendingCondition})",
+            'addressed' => "NOT EXISTS(SELECT 1 FROM project_observations pending_observation WHERE pending_observation.project_id={$projectAlias}.id AND ".$this->actionablePendingObservationCondition('pending_observation').") AND EXISTS(SELECT 1 FROM project_observations addressed_observation WHERE addressed_observation.project_id={$projectAlias}.id AND addressed_observation.status IN ('addressed','resolved'))",
             default => null,
         };
+    }
+
+    private function actionablePendingObservationCondition(string $alias): string
+    {
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $alias)) throw new InvalidArgumentException('Alias de observaciÃ³n no vÃ¡lido.');
+        return "{$alias}.status='pending' AND (
+            {$alias}.file_id IS NULL
+            OR EXISTS (
+                SELECT 1
+                FROM project_files current_file
+                LEFT JOIN project_file_review_states current_state
+                  ON current_state.project_id=current_file.project_id
+                 AND current_state.file_id=current_file.id
+                 AND current_state.checksum_sha256=current_file.checksum_sha256
+                WHERE current_file.project_id={$alias}.project_id
+                  AND current_file.id={$alias}.file_id
+                  AND current_file.deleted_at IS NULL
+                  AND current_file.purged_at IS NULL
+                  AND current_file.checksum_sha256={$alias}.file_checksum_sha256
+                  AND COALESCE(current_state.status,'development') IN ('development','corrections_requested')
+            )
+        )";
     }
 
     private function normalizeRow(array $row): array

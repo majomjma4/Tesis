@@ -5965,12 +5965,12 @@ canvas.hiddenCanvasElement {
 :is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-viewer-action.is-file-download:not(:disabled),.sw-viewer-action.is-primary:not(:disabled),.sw-obs-action-btn) {
     background:var(--blue);
     border-color:var(--blue);
-    color:#07111f;
+    color:#fff;
 }
 :is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-viewer-action.is-file-download:not(:disabled):hover,.sw-viewer-action.is-primary:not(:disabled):hover,.sw-obs-action-btn:hover:not(:disabled)) {
     background:var(--blue-dark);
     border-color:var(--blue-dark);
-    color:#07111f;
+    color:#fff;
 }
 :is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-viewer-action:disabled,.sw-viewer-action[disabled]) {
     background:var(--surface-soft) !important;
