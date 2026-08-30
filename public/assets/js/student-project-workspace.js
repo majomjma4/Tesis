@@ -2676,7 +2676,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Envío formal a revisión: usa únicamente el endpoint y las capacidades emitidas por el servidor.
     const initStudentProjectSubmission = () => {
-        const trigger = manager.querySelector('[data-sw-submit-review]');
+        const triggers = [...manager.querySelectorAll('[data-sw-submit-review]')];
+        const trigger = triggers[0] || null;
+        const mobilePrimaryAction = manager.querySelector('[data-sw-mobile-primary-action]');
         const submitModal = manager.querySelector('[data-sw-submit-modal]');
         const confirmButton = submitModal?.querySelector('[data-sw-submit-confirm]');
         const cancelButtons = submitModal?.querySelectorAll('[data-sw-submit-cancel]');
@@ -2754,7 +2756,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 manager.querySelectorAll('[data-sw-menu-trigger]').forEach((button) => button.remove());
                 manager.querySelectorAll('[data-sw-file-menu]').forEach((menu) => { menu.hidden = true; });
             }
-            if (capabilities.send_for_review === false || status === 'under_review') trigger.remove();
+            if (capabilities.send_for_review === false || status === 'under_review') {
+                triggers.forEach((button) => button.remove());
+                if (mobilePrimaryAction) mobilePrimaryAction.hidden = true;
+            }
             const historyPane = workspace.querySelector('#swTab-history');
             if (!historyPane) return;
             let list = historyPane.querySelector('.sw-history-list');
@@ -2772,7 +2777,7 @@ document.addEventListener('DOMContentLoaded', () => {
             main.append(title, description);
             event.append(main); list.prepend(event);
         };
-        const openSubmitModal = (e) => {
+        const openSubmitModal = (e, source = trigger) => {
             if (e && typeof e.preventDefault === 'function') e.preventDefault();
             const res = canResubmitCorrections();
             if (res.hasDeliveries && !res.eligible) {
@@ -2780,14 +2785,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 showVisualToast(message, 'warning', 'Correcciones pendientes');
                 return false;
             }
-            lastFocus = trigger;
+            lastFocus = source;
             clearError(); setSubmitting(false);
             submitModal.hidden = false;
             submitModal.querySelector('[data-sw-submit-cancel]')?.focus();
             return true;
         };
 
-        trigger.addEventListener('click', openSubmitModal);
+        triggers.forEach((button) => button.addEventListener('click', (event) => openSubmitModal(event, button)));
         cancelButtons?.forEach((button) => button.addEventListener('click', close));
         submitModal.addEventListener('click', (event) => { if (event.target === submitModal) close(); });
         document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !submitModal.hidden && !submitting) { event.preventDefault(); close(); } });

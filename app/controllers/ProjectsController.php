@@ -246,7 +246,9 @@ final class ProjectsController
         $requestedTab = strtolower(trim((string) ($_GET['tab'] ?? 'summary')));
         $access = new ProjectAccessService();
         $isAdministrator = $session->isAdminModeActive();
-        $isTeacher = in_array('teacher', array_map('strtolower', array_map('strval', $access->currentRoles())), true);
+        $roles = array_map('strtolower', array_map('strval', $access->currentRoles()));
+        $isTeacher = in_array('teacher', $roles, true);
+        $isStudent = in_array('student', $roles, true);
         $resourceContext = $isAdministrator ? 'academic_management' : 'academic';
         $policy = new ProjectCapabilityService();
         $canViewPrivateResource = $id !== false && $id !== null
@@ -264,6 +266,14 @@ final class ProjectsController
         if ($project === null) {
             (new ErrorController())->notFound();
             return;
+        }
+
+        if (!$isAdministrator && !$isTeacher && $isStudent && (string) ($project['status'] ?? '') === 'published') {
+            $publishedProject = (new ProjectRecordModel())->find((int) $project['id'], null, false, true);
+            if ($publishedProject !== null) {
+                header('Location: ' . route('repository-detail') . '&id=' . (int) $project['id']);
+                exit;
+            }
         }
 
         /* Legacy visual demo intentionally disabled from the real project route. */
@@ -1286,6 +1296,7 @@ final class ProjectsController
             if ($mode === 'prepare-cancel') {$preparations->cancel((int)$projectId,$access->currentUserId(),$preparationId);$this->json(['success'=>true,'message'=>'Preparación cancelada.','data'=>[]]);}
             if ($mode !== 'publish') throw new ProjectStudentPublicationException('La operación de publicación no es válida.', 422);
             $data=$preparationId!==''?$service->publishPrepared((int)$projectId,$access->currentUserId(),$preparationId):$service->publish((int)$projectId, $access->currentUserId());
+            $data['detail_url'] = route('repository-detail') . '&id=' . (int) $projectId;
             $this->json(['success'=>true,'message'=>'Proyecto publicado correctamente.','data'=>$data]);
         } catch (ProjectStudentPublicationException $exception) {
             http_response_code($exception->getCode() >= 400 && $exception->getCode() < 600 ? $exception->getCode() : 422);

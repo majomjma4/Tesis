@@ -259,6 +259,17 @@ final class RepositoryController
         }
         $adjustmentData = ['items' => [], 'summary' => ['has_pending_adjustments' => false, 'pending_count' => 0, 'latest' => null]];
         $adjustmentContext = $isAdministratorView ? 'academic_management' : 'repository';
+        $hasPendingModificationRequest = false;
+        if ($project !== null && !empty($projectCapabilities['create_adjustment_request']) && !$isAdministratorView) {
+            try {
+                $hasPendingModificationRequest = (new ProjectAdjustmentRequestService())->hasPendingForRequester(
+                    (int) $project['id'],
+                    (int) ($session->userId() ?? 0)
+                );
+            } catch (Throwable $e) {
+                error_log('Repository detail pending modification request: ' . $e->getMessage());
+            }
+        }
         if ($project !== null && !empty($projectCapabilities['view_adjustment_requests'])) {
             try {
                 $adjustmentData = (new ProjectAdjustmentRequestService())->listForProject(
@@ -282,12 +293,12 @@ final class RepositoryController
             'title' => $project === null ? 'Proyecto no encontrado | Repositorio' : $project['title'] . ' | Repositorio',
             'pageStyles' => array_values(array_filter([
                 $isAdministratorView ? asset('css/admin-projects.css') : null,
-                !empty($projectCapabilities['view_adjustment_requests']) ? asset('css/project-adjustments.css') : null,
+                (!empty($projectCapabilities['view_adjustment_requests']) || !empty($projectCapabilities['create_adjustment_request'])) ? asset('css/project-adjustments.css') : null,
             ])),
             'pageScript' => $isAdministratorView ? asset('js/admin-projects.js') : asset('js/repository-detail.js'),
             'pageScripts' => array_values(array_filter([
                 $isAdministratorView ? asset('js/material-admin-actions.js') : null,
-                !empty($projectCapabilities['view_adjustment_requests']) ? asset('js/project-adjustments.js') : null,
+                (!empty($projectCapabilities['view_adjustment_requests']) || !empty($projectCapabilities['create_adjustment_request'])) ? asset('js/project-adjustments.js') : null,
             ])),
             'project' => $project,
             'activeTab' => $activeTab,
@@ -301,6 +312,7 @@ final class RepositoryController
             'adjustmentData' => $adjustmentData,
             'adjustmentCsrf' => $session->csrfToken('project_adjustment'),
             'adjustmentContext' => $adjustmentContext,
+            'hasPendingModificationRequest' => $hasPendingModificationRequest,
             'adjustmentEndpoints' => $adjustmentEndpoints,
             'projectEditUrl' => '',
             'detailUrl' => route('repository-detail') . '&id=' . (int)($project['id'] ?? 0),

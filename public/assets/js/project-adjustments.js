@@ -20,6 +20,40 @@
   if (createDialog) createDialog.hidden = true;
   document.body.classList.remove("project-adjustment-dialog-open");
   const createForm = createDialog?.querySelector("[data-adjustment-create-form]");
+  const isPublishedModification = createForm?.querySelector('input[name="request_type"][value="published_modification"]') !== null;
+  const createTitle = createDialog?.querySelector("#projectModificationTitle");
+  const createFormBody = createForm?.querySelector("[data-adjustment-form-body]");
+  const createConfirmation = createForm?.querySelector("[data-adjustment-confirmation]");
+  const createFormFooter = createForm?.querySelector("[data-adjustment-form-footer]");
+  const createConfirmationFooter = createForm?.querySelector("[data-adjustment-confirmation-footer]");
+  const createConfirmationSubmit = createForm?.querySelector("[data-adjustment-confirmation-submit]");
+  const createConfirmationMessage = createForm?.querySelector("[data-adjustment-confirmation-message]");
+  const originalCreateTitle = createTitle?.textContent || "Solicitar modificación";
+  let pendingCreateData = null;
+  const setPublishedConfirmation = visible => {
+    if (!isPublishedModification) return;
+    if (createFormBody) createFormBody.hidden = visible;
+    if (createConfirmation) createConfirmation.hidden = !visible;
+    if (createFormFooter) createFormFooter.hidden = visible;
+    if (createConfirmationFooter) createConfirmationFooter.hidden = !visible;
+    if (createTitle) createTitle.textContent = visible ? "¿Enviar solicitud de modificación?" : originalCreateTitle;
+    if (visible && createConfirmationMessage) {
+      createConfirmationMessage.textContent = "";
+      createConfirmationMessage.hidden = true;
+      createConfirmationMessage.classList.remove("is-error");
+    }
+  };
+  const resetCreateState = () => {
+    if (!isPublishedModification) return;
+    pendingCreateData = null;
+    setPublishedConfirmation(false);
+    const formMessage = createForm?.querySelector("[data-adjustment-form-body] [data-adjustment-message]");
+    if (formMessage) {
+      formMessage.textContent = "";
+      formMessage.hidden = true;
+      formMessage.classList.remove("is-error");
+    }
+  };
   let returnFocus = null;
   let responseRequest = null;
   let lockedScrollX = 0;
@@ -45,7 +79,7 @@
     window.scrollTo(lockedScrollX,lockedScrollY);
   };
   const open = (dialog, trigger) => { if (!dialog) return; returnFocus = trigger; lockDocumentScroll(); dialog.hidden = false; focusable(dialog)[0]?.focus(); };
-  const close = dialog => { if (!dialog) return; dialog.hidden = true; if (![createDialog,responseDialog].some(item => item && !item.hidden)) restoreDocumentScroll(); returnFocus?.focus(); };
+  const close = dialog => { if (!dialog) return; if (dialog === createDialog) resetCreateState(); dialog.hidden = true; if (![createDialog,responseDialog].some(item => item && !item.hidden)) restoreDocumentScroll(); returnFocus?.focus(); };
   const trap = (event, dialog) => { if (event.key === "Escape") { close(dialog); return; } if (event.key !== "Tab") return; const items=focusable(dialog); if (!items.length) return; const first=items[0],last=items.at(-1); if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();} };
   [createDialog,responseDialog].filter(Boolean).forEach(dialog => { dialog.addEventListener("keydown", event => trap(event,dialog)); dialog.addEventListener("click", event => { if(event.target===dialog) close(dialog); }); });
   createDialog?.addEventListener("click", event => {
@@ -62,12 +96,48 @@
     if(!response.ok||!result.success) throw new Error(result.message||"No fue posible completar la operación.");
     return result;
   };
-  const show = (form, message, error=false) => { const node=form.querySelector("[data-adjustment-message]"); if(!node)return; node.textContent=message;node.hidden=false;node.classList.toggle("is-error",error); };
-  const submit = async (form, endpoint, data) => { const button=form.querySelector('button[type="submit"]');button.disabled=true;try{const result=await request(endpoint,data);show(form,result.message);window.location.reload();}catch(error){show(form,error.message,true);button.disabled=false;} };
+  const show = (form, message, error=false, target=null) => { const node=target || form.querySelector("[data-adjustment-message]"); if(!node)return; node.textContent=message;node.hidden=false;node.classList.toggle("is-error",error); };
+  const markModificationPending = () => {
+    if (!isPublishedModification) return;
+    const trigger = returnFocus?.matches?.('a[href="#projectAdjustmentDialog"]') ? returnFocus : document.querySelector('a[href="#projectAdjustmentDialog"]');
+    if (!trigger?.parentElement) return;
+    const pending = document.createElement("button");
+    pending.type = "button";
+    pending.disabled = true;
+    pending.className = trigger.className;
+    pending.setAttribute("aria-label", "Solicitud pendiente");
+    pending.title = "Ya existe una solicitud de modificación pendiente.";
+    pending.innerHTML = '<i class="fa-regular fa-clock" aria-hidden="true"></i><span>Solicitud pendiente</span>';
+    trigger.replaceWith(pending);
+    returnFocus = null;
+  };
+  const submit = async (form, endpoint, data, submitButton=null) => {
+    const button=submitButton || form.querySelector('button[type="submit"]');
+    if (button) button.disabled=true;
+    try {
+      const result=await request(endpoint,data);
+      if (isPublishedModification) {
+        markModificationPending();
+        close(createDialog);
+        window.AppToast?.success("Solicitud enviada correctamente.");
+        return;
+      }
+      show(form,result.message);
+      window.location.reload();
+    } catch(error) {
+      show(form,error.message,true,isPublishedModification ? createConfirmationMessage : null);
+      if (isPublishedModification) window.AppToast?.error(error.message);
+      if (button) button.disabled=false;
+    }
+  };
 
   document.addEventListener("click", async event => {
     const createTrigger=event.target.closest('a[href="#projectAdjustmentDialog"]');
     if(createTrigger){event.preventDefault();open(createDialog,createTrigger);return;}
+    const confirmationBack=event.target.closest("[data-adjustment-confirmation-back]");
+    if(confirmationBack){setPublishedConfirmation(false);createForm?.querySelector('textarea[name="message"]')?.focus();return;}
+    const confirmationSubmit=event.target.closest("[data-adjustment-confirmation-submit]");
+    if(confirmationSubmit && pendingCreateData){submit(createForm,config.dataset.create,pendingCreateData,confirmationSubmit);return;}
     if(event.target.closest("[data-adjustment-cancel]")){close(createDialog);return;}
     if(event.target.closest("[data-adjustment-response-cancel]")){close(responseDialog);return;}
     const respond=event.target.closest("[data-adjustment-respond]");
@@ -78,6 +148,28 @@
     action.disabled=true;
     try{await request(config.dataset[operation],{...common(),request_id:action.dataset.requestId,lock_version:action.dataset.lockVersion});window.location.reload();}catch(error){action.disabled=false;window.AppToast?.error(error.message);}
   });
-  createForm?.addEventListener("submit", event => { event.preventDefault();const form=event.currentTarget;const values=Object.fromEntries(new FormData(form));submit(form,config.dataset.create,{...values,project_id:Number(values.project_id),file_id:values.file_id?Number(values.file_id):null}); });
+  const createData = form => { const values=Object.fromEntries(new FormData(form)); return {...values,project_id:Number(values.project_id),file_id:values.file_id?Number(values.file_id):null}; };
+  const validatePublishedModification = form => {
+    const field=form.querySelector('textarea[name="message"]');
+    if (!form.checkValidity()) { form.reportValidity(); return false; }
+    if (!field || field.value.trim().length < 10) {
+      show(form,"El motivo de la solicitud debe contener entre 10 y 2000 caracteres.",true);
+      field?.focus();
+      return false;
+    }
+    return true;
+  };
+  createForm?.addEventListener("submit", event => {
+    event.preventDefault();
+    const form=event.currentTarget;
+    if (isPublishedModification) {
+      if (!validatePublishedModification(form)) return;
+      pendingCreateData=createData(form);
+      setPublishedConfirmation(true);
+      createConfirmationSubmit?.focus();
+      return;
+    }
+    submit(form,config.dataset.create,createData(form));
+  });
   responseDialog?.querySelector("form")?.addEventListener("submit", event => { event.preventDefault();const form=event.currentTarget;const message=String(new FormData(form).get("message")||"").trim();submit(form,config.dataset.respond,{...common(),...responseRequest,message}); });
 })();

@@ -52,6 +52,15 @@ $packageAvailable = !empty(($studentAcademicPackage ?? [])['available']);
             <span class="sw-mobile-badge" data-sw-mobile-obs-badge hidden>0</span>
         </button>
     </nav>
+    <?php if ($canSendForReview || $canPublishProject): ?>
+    <div class="sw-mobile-primary-action" data-sw-mobile-primary-action>
+        <?php if ($canSendForReview): ?>
+            <button type="button" class="sw-obs-action-btn" data-sw-submit-review><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Enviar a revisión</button>
+        <?php elseif ($canPublishProject): ?>
+            <button type="button" class="sw-obs-action-btn" data-project-publish data-project-id="<?= (int) $projectId ?>"><i class="fa-solid fa-upload" aria-hidden="true"></i> Publicar</button>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
     <aside class="sw-explorer-panel" data-sw-explorer id="swExplorerPanel">
         <button type="button" class="sw-panel-reopen-btn" data-sw-open-explorer hidden aria-label="Abrir panel de archivos" title="Abrir panel de archivos"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
         <header class="sw-explorer-header"><span class="sw-explorer-title"><i class="fa-solid fa-folder-open" aria-hidden="true"></i> Archivos</span><button type="button" class="sw-panel-toggle" data-sw-toggle-explorer aria-controls="swExplorerPanel" aria-label="Contraer panel de archivos" aria-expanded="true"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button></header>

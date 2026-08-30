@@ -1972,6 +1972,31 @@ body > .sw-file-menu button,body > .sw-file-menu a { border:0;background:transpa
 @media (prefers-reduced-motion: reduce) {
     .student-workspace * { transition:none !important; }
 }
+
+/* CTA principal persistente para el workspace móvil del estudiante. */
+.sw-mobile-primary-action {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .student-workspace .sw-doc-workspace:not(.is-teacher-review) .sw-mobile-primary-action {
+        display: block;
+        width: 100%;
+        margin: 0 0 0.75rem;
+        padding: 0 0.75rem;
+        box-sizing: border-box;
+    }
+
+    .student-workspace .sw-doc-workspace:not(.is-teacher-review) .sw-mobile-primary-action .sw-obs-action-btn {
+        width: 100%;
+        margin: 0;
+    }
+
+    .student-workspace .sw-doc-workspace:not(.is-teacher-review) .sw-obs-footer {
+        display: none !important;
+    }
+}
+
 .student-workspace .sw-historical-banner { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; margin-bottom:1rem; padding:.7rem .9rem; border:1px solid var(--line,#cbd5e1); border-left:4px solid var(--primary,#2563eb); border-radius:.6rem; background:var(--surface-soft,#f8fafc); color:var(--text,#334155); }
 .student-workspace .sw-historical-banner span { flex:1 1 220px; }
 .student-workspace .sw-historical-banner a { font-weight:700; color:var(--primary,#2563eb); white-space:nowrap; }

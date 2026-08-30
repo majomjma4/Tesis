@@ -216,7 +216,12 @@ if ($project === null): ?>
         $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
     }
     if (!$isAdministrator && !empty($projectCapabilities['create_adjustment_request'])) {
-        $actions[] = ['id' => 'adjustment', 'label' => 'Solicitar cambios', 'kind' => 'secondary', 'icon' => 'fa-comment-dots', 'enabled' => true, 'url' => '#projectAdjustmentDialog'];
+        $isPublishedStudentRequest = $publicContext && $projectContext === 'repository';
+        if ($isPublishedStudentRequest && !empty($hasPendingModificationRequest)) {
+            $actions[] = ['id' => 'modification-pending', 'label' => 'Solicitud pendiente', 'kind' => 'secondary', 'icon' => 'fa-clock', 'enabled' => false];
+        } else {
+            $actions[] = ['id' => $isPublishedStudentRequest ? 'modification-request' : 'adjustment', 'label' => $isPublishedStudentRequest ? 'Solicitar modificación' : 'Solicitar cambios', 'kind' => 'secondary', 'icon' => 'fa-comment-dots', 'enabled' => true, 'url' => '#projectAdjustmentDialog'];
+        }
     } elseif (!$publicContext && !empty($projectCapabilities['register_delivery']) && $canDeliver) {
         $actions[] = ['id' => 'delivery', 'label' => 'Registrar entrega', 'kind' => 'primary', 'icon' => 'fa-upload', 'url' => $detailUrl . '&tab=review', 'enabled' => true];
     }

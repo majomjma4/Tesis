@@ -1686,3 +1686,9 @@ body.dark-mode:not(.account-page) {
     outline: 3px solid color-mix(in srgb, var(--blue) 48%, transparent) !important;
     outline-offset: 2px;
 }
+
+/* El grupo Tutor debe compartir la superficie neutra del grupo Autores. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .digital-record[data-entity-type="project"][data-record-context="repository"] .ed-participant-group.is-tutoring {
+    background: var(--surface-soft);
+    border-color: var(--line);
+}

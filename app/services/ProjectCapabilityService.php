@@ -290,6 +290,13 @@ final class ProjectCapabilityService
             $capabilities['download_files'] = true;
             $capabilities['download_academic_package'] = true;
             $capabilities['view_institutional_files'] = true;
+            $studentParticipant = in_array('student', $roles, true)
+                && count(array_filter($participants, static fn (array $participant): bool =>
+                    (int) ($participant['user_id'] ?? 0) === $userId
+                    && strtolower((string) ($participant['role_code'] ?? '')) === 'student'
+                    && (!array_key_exists('is_student', $participant) || !empty($participant['is_student']))
+                )) > 0;
+            if (!$administrator && $studentParticipant) $capabilities['create_adjustment_request'] = true;
             return $capabilities;
         }
 
@@ -329,12 +336,13 @@ final class ProjectCapabilityService
             (int) ($participant['user_id'] ?? 0) === $userId && strtolower((string) ($participant['role_code'] ?? '')) === 'student'
         )) > 0;
         if ($isOwnerStudent) {
-            $capabilities['edit_information'] = (string) ($project['status'] ?? '') === 'development';
-            $capabilities['view_adjustment_requests'] = true;
-            $capabilities['respond_adjustment_request'] = true;
-            $capabilities['address_adjustment_request'] = true;
-            $type = (string) ($project['type_code'] ?? '');
             $status = (string) ($project['status'] ?? '');
+            $capabilities['edit_information'] = $status === 'development';
+            $capabilities['view_adjustment_requests'] = true;
+            // Un expediente publicado conserva lectura, pero no permite mutaciones.
+            $capabilities['respond_adjustment_request'] = $status !== 'published';
+            $capabilities['address_adjustment_request'] = $status !== 'published';
+            $type = (string) ($project['type_code'] ?? '');
             $capabilities['publish_project'] = ($type === 'thesis' && $status === 'tribunal_approved')
                 || ($type !== 'thesis' && $status === 'approved');
             $capabilities['manage_workspace_files'] = $status === 'development';
@@ -400,8 +408,10 @@ final class ProjectCapabilityService
              INNER JOIN roles r ON r.id=ur.role_id AND r.code='student'
              INNER JOIN student_profiles sp ON sp.user_id=u.id
              INNER JOIN project_participants pp ON pp.user_id=u.id
+             INNER JOIN projects p ON p.id=pp.project_id AND p.status='development'
              WHERE u.id=:user AND pp.project_id=:project
                AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL
+               AND p.deleted_at IS NULL AND p.withdrawn_at IS NULL
                AND LOWER(pp.role_code)='student' AND pp.status='active' AND pp.removed_at IS NULL
              LIMIT 1 FOR UPDATE"
         );
@@ -413,7 +423,7 @@ final class ProjectCapabilityService
     public function adjustmentCapabilitiesInTransaction(PDO $db, array $project, int $userId, string $context): array
     {
         $result = $this->none();
-        if ($userId < 1 || !in_array($context, ['academic_management', 'academic'], true)) return $result;
+        if ($userId < 1 || !in_array($context, ['academic_management', 'academic', 'repository'], true)) return $result;
         $identity = $db->prepare(
             "SELECT u.is_admin,r.code FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id
              WHERE u.id=:user AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL"
@@ -426,7 +436,6 @@ final class ProjectCapabilityService
             foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request'] as $key) $result[$key] = true;
             return $result;
         }
-        if ($context !== 'academic' || $isAdmin) return $result;
         $roles = array_map(static fn(array $row): string => strtolower((string)$row['code']), $rows);
         $assignment = $db->prepare(
             "SELECT LOWER(role_code) FROM project_participants WHERE project_id=:project AND user_id=:user
@@ -437,9 +446,21 @@ final class ProjectCapabilityService
         $isTutor = ((int)($project['tutor_id'] ?? 0) === $userId) || count(array_intersect(['tutor', 'co_tutor', 'cotutor', 'co-tutor'], $projectRoles)) > 0;
         $teacher = in_array('teacher', $roles, true) && $isTutor;
         $student = in_array('student', $roles, true) && in_array('student', $projectRoles, true);
+        $studentProfile = false;
+        if ($student) {
+            $profile = $db->prepare('SELECT 1 FROM student_profiles WHERE user_id=:user LIMIT 1');
+            $profile->execute(['user' => $userId]);
+            $studentProfile = (bool) $profile->fetchColumn();
+        }
+        if ($context === 'repository') {
+            if ($isAdmin || (string) ($project['status'] ?? '') !== 'published' || empty($project['is_available'])) return $result;
+            if ($student && $studentProfile) $result['create_adjustment_request'] = true;
+            return $result;
+        }
+        if ($context !== 'academic' || $isAdmin) return $result;
         if ($teacher || $student) $result['view_adjustment_requests'] = true;
         if (in_array('teacher', $roles, true) && (string) ($project['status'] ?? '') === 'development') $result['create_adjustment_request'] = true;
-        if ($student) {
+        if ($student && (string) ($project['status'] ?? '') !== 'published') {
             $result['respond_adjustment_request'] = true;
             $result['address_adjustment_request'] = true;
         }

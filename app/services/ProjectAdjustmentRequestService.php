@@ -5,7 +5,7 @@ declare(strict_types=1);
 /** Única vía de escritura para las solicitudes administrativas de ajuste. */
 final class ProjectAdjustmentRequestService
 {
-    private const TYPES = ['incomplete_information','incorrect_data','inconsistency','other'];
+    private const TYPES = ['incomplete_information','incorrect_data','inconsistency','other','published_modification'];
 
     public function create(int $projectId, string $expectedStatus, int $actorId, string $context, array $data): array
     {
@@ -33,7 +33,14 @@ final class ProjectAdjustmentRequestService
         $this->requireCapability($db, $project, $actorId, $context, 'create_adjustment_request');
         $type = strtolower(trim((string)($data['request_type'] ?? '')));
         if (!in_array($type, self::TYPES, true)) throw new ProjectAdjustmentRequestException('El tipo de solicitud administrativa no es válido.');
-        $message = $this->message((string)($data['message'] ?? ''));
+        if ($context === 'repository' && $type !== 'published_modification') throw new ProjectAdjustmentRequestException('El tipo de solicitud no es válido para un proyecto publicado.');
+        if ($context !== 'repository' && $type === 'published_modification') throw new ProjectAdjustmentRequestException('El tipo de solicitud no es válido en este contexto.');
+        if ($context === 'repository') {
+            $duplicate = $db->prepare("SELECT id FROM project_adjustment_requests WHERE project_id=:project AND requested_by=:actor AND status='pending' ORDER BY id DESC LIMIT 1 FOR UPDATE");
+            $duplicate->execute(['project'=>$projectId,'actor'=>$actorId]);
+            if ($duplicate->fetchColumn()) throw new ProjectAdjustmentRequestException('Ya existe una solicitud de modificación pendiente para este proyecto.', 409);
+        }
+        $message = $this->message((string)($data['message'] ?? ''), $context === 'repository' ? 10 : 1);
         $section = $this->optionalText($data['related_section'] ?? null, 100);
         $field = null;
         $fileId = empty($data['file_id']) ? null : (int)$data['file_id'];
@@ -117,16 +124,24 @@ final class ProjectAdjustmentRequestService
 
     public function summaryForProject(int $projectId): array { return (new ProjectAdjustmentSituationService())->forProject($projectId); }
 
+    public function hasPendingForRequester(int $projectId, int $requesterId): bool
+    {
+        if ($projectId < 1 || $requesterId < 1) return false;
+        $query = Database::connection()->prepare("SELECT 1 FROM project_adjustment_requests WHERE project_id=:project AND requested_by=:requester AND status='pending' LIMIT 1");
+        $query->execute(['project'=>$projectId,'requester'=>$requesterId]);
+        return (bool) $query->fetchColumn();
+    }
+
     private function lockProject(PDO $db, int $id, string $expected): array
     {
-        $query=$db->prepare('SELECT id,tutor_id,status,deleted_at,withdrawn_at FROM projects WHERE id=:id FOR UPDATE'); $query->execute(['id'=>$id]);
+        $query=$db->prepare('SELECT id,tutor_id,status,is_available,deleted_at,withdrawn_at FROM projects WHERE id=:id FOR UPDATE'); $query->execute(['id'=>$id]);
         $project=$query->fetch(); if(!$project||!empty($project['deleted_at'])||!empty($project['withdrawn_at'])) throw new ProjectAdjustmentRequestException('El proyecto solicitado no está disponible.',404);
         if ($expected === '' || $project['status'] !== $expected) throw new ProjectAdjustmentRequestException('El estado del proyecto cambió. Recarga el expediente antes de continuar.',409);
         return $project;
     }
     private function findProject(PDO $db, int $id, string $expected): array
     {
-        $query=$db->prepare('SELECT id,tutor_id,status,deleted_at FROM projects WHERE id=:id'); $query->execute(['id'=>$id]);
+        $query=$db->prepare('SELECT id,tutor_id,status,is_available,deleted_at FROM projects WHERE id=:id'); $query->execute(['id'=>$id]);
         $project=$query->fetch(); if(!$project||!empty($project['deleted_at'])) throw new ProjectAdjustmentRequestException('El proyecto solicitado no existe.',404);
         if ($expected === '' || $project['status'] !== $expected) throw new ProjectAdjustmentRequestException('El estado del proyecto cambió. Recarga el expediente antes de continuar.',409);
         return $project;
@@ -138,7 +153,7 @@ final class ProjectAdjustmentRequestService
     private function incrementVersion(PDO $db,int $id,int $version): void
     { $q=$db->prepare('UPDATE project_adjustment_requests SET updated_at=NOW(),lock_version=lock_version+1 WHERE id=:id AND lock_version=:version');$q->execute(['id'=>$id,'version'=>$version]);if($q->rowCount()!==1)$this->conflict(); }
     private function conflict(): never { throw new ProjectAdjustmentRequestException('La solicitud fue modificada mientras trabajabas. Recarga el expediente antes de continuar.',409); }
-    private function message(string $value): string { $value=trim($value);if($value===''||mb_strlen($value)>2000)throw new ProjectAdjustmentRequestException('El mensaje es obligatorio y no puede superar 2000 caracteres.');return $value; }
+    private function message(string $value, int $minimum = 1): string { $value=trim($value);if($value===''||mb_strlen($value)<$minimum||mb_strlen($value)>2000)throw new ProjectAdjustmentRequestException($minimum>1?'El motivo de la solicitud debe contener entre '.$minimum.' y 2000 caracteres.':'El mensaje es obligatorio y no puede superar 2000 caracteres.');return $value; }
     private function optionalText(mixed $value,int $max): ?string { $value=trim((string)$value);if($value==='')return null;if(mb_strlen($value)>$max)throw new ProjectAdjustmentRequestException('Una referencia administrativa supera la longitud permitida.');return $value; }
     private function result(PDO $db,int $project,int $id,string $message): array
     { $q=$db->prepare('SELECT * FROM project_adjustment_requests WHERE id=:id');$q->execute(['id'=>$id]);$item=$q->fetch();$item['id']=(int)$item['id'];$item['lock_version']=(int)$item['lock_version'];return ['request'=>$item,'summary'=>(new ProjectAdjustmentSituationService($db))->forProject($project),'message'=>$message]; }
