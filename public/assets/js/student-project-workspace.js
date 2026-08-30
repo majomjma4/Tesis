@@ -1010,7 +1010,7 @@ document.addEventListener('DOMContentLoaded', () => {
     printButton?.addEventListener('click',printPreview);
     let projectActions=manager.querySelector('.sw-project-actions');
     if (!projectActions) {
-        projectActions=document.createElement('div'); projectActions.className='sw-project-actions'; const packageUrl=manager.dataset.packageUrl||''; const packageAction=packageUrl?`<a class="sw-viewer-action" data-sw-original-download data-sw-download-kind="package" href="${packageUrl}"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</a>`:'<span class="sw-viewer-action is-disabled" aria-disabled="true"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</span>'; projectActions.innerHTML=`<div class="sw-project-actions-group">${packageAction}</div><div class="sw-project-actions-file"><a class="sw-viewer-action is-file-download" data-sw-viewer-download aria-label="Descargar documento original" hidden><i class="fa-solid fa-download" aria-hidden="true"></i> Descargar original</a><button type="button" class="sw-viewer-action" data-sw-print disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Imprimir</button></div>`; manager.querySelector('.sw-viewer-panel')?.prepend(projectActions);
+        projectActions=document.createElement('div'); projectActions.className='sw-project-actions'; const packageUrl=manager.dataset.packageUrl||''; const packageAction=packageUrl?`<a class="sw-viewer-action" data-sw-original-download data-sw-download-kind="package" href="${packageUrl}"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</a>`:'<span class="sw-viewer-action is-disabled" aria-disabled="true"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i> Descargar todo (.zip)</span>'; projectActions.innerHTML=`<div class="sw-project-actions-group">${packageAction}</div><div class="sw-project-actions-file"><a class="sw-viewer-action is-file-download" data-sw-viewer-download aria-label="Descargar documento" hidden><i class="fa-solid fa-download" aria-hidden="true"></i> Descargar</a><button type="button" class="sw-viewer-action" data-sw-print disabled><i class="fa-solid fa-print" aria-hidden="true"></i> Imprimir</button></div>`; manager.querySelector('.sw-viewer-panel')?.prepend(projectActions);
     }
     const modal=manager.querySelector('[data-sw-operation-modal]'), modalTitle=manager.querySelector('[data-sw-modal-title]'), modalMessage=manager.querySelector('[data-sw-modal-message]'), modalSummary=manager.querySelector('[data-sw-modal-summary]'), modalConfirm=manager.querySelector('[data-sw-modal-confirm]'); let modalAction=null;
     const closeMenus=()=>{
@@ -1035,8 +1035,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const downloadConfirmMessage=downloadConfirmModal?.querySelector('[data-sw-download-message]');
     const downloadConfirmButton=downloadConfirmModal?.querySelector('[data-sw-download-confirm]');
     const downloadCopy={
-        file:{title:'Descargar documento original',message:'Las observaciones y correcciones de la revisión no se incorporan al archivo descargado. Se descargará el documento original que fue enviado.',confirm:'Descargar original'},
-        package:{title:'Descargar paquete de archivos originales',message:'Las observaciones y correcciones de la revisión no se incorporan a los archivos descargados. El paquete contiene los archivos originales actualmente disponibles del proyecto.',confirm:'Descargar paquete'},
+        file:hasPreviousReview
+            ? {title:'Descargar documento',message:'Las observaciones y correcciones registradas durante la revisión no se incorporan al archivo descargado. Se descargará el documento original actualmente disponible.',confirm:'Descargar'}
+            : {title:'Descargar documento',message:'Se descargará el archivo original actualmente disponible del proyecto.',confirm:'Descargar'},
+        package:hasPreviousReview
+            ? {title:'Descargar archivos del proyecto',message:'El paquete contiene los archivos originales actualmente disponibles del proyecto. Las observaciones y correcciones registradas durante la revisión no se incorporan a los documentos descargados.',confirm:'Descargar archivos'}
+            : {title:'Descargar archivos del proyecto',message:'Se descargarán en un archivo ZIP los documentos actualmente disponibles en el proyecto.',confirm:'Descargar archivos'},
         representation:{title:'Descargar vista previa de la versión',message:'Esta versión histórica no tiene un endpoint de descarga del binario original. Se descargará la representación disponible para vista previa.',confirm:'Descargar vista previa'}
     };
     let pendingDownloadUrl='';
@@ -1997,8 +2001,8 @@ document.addEventListener('DOMContentLoaded', () => {
             viewerDownload.hidden = false;
             viewerDownload.disabled = !downloadUrl;
             viewerDownload.dataset.downloadKind = 'file';
-            viewerDownload.setAttribute('aria-label', 'Descargar documento original');
-            viewerDownload.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Descargar original';
+            viewerDownload.setAttribute('aria-label', 'Descargar documento');
+            viewerDownload.innerHTML = '<i class="fa-solid fa-download" aria-hidden="true"></i> Descargar';
             if (downloadUrl) {
                 viewerDownload.dataset.downloadUrl = downloadUrl;
             } else {
