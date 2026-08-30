@@ -395,7 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initFileLockTooltips();
 
     const manager=workspace.querySelector('[data-sw-document-manager]'); if (!manager) return;
-    const endpoint=manager.dataset.endpoint, csrf=manager.dataset.csrf, reviewRepresentationEndpoint=manager.dataset.reviewRepresentationEndpoint||'', reviewRepresentationCsrf=manager.dataset.reviewRepresentationCsrf||'', projectId=manager.dataset.projectId, historicalPreview=manager.dataset.historicalPreview||'';
+    const endpoint=manager.dataset.endpoint, csrf=manager.dataset.csrf, reviewRepresentationEndpoint=manager.dataset.reviewRepresentationEndpoint||'', reviewRepresentationCsrf=manager.dataset.reviewRepresentationCsrf||'', projectId=manager.dataset.projectId, historicalPreview=manager.dataset.historicalPreview||'', hasPreviousReview=manager.dataset.swHasPreviousReview==='true';
     let pdfjsPromise=null, pdfDocument=null, pdfDocumentKey='', pdfDocumentLoading=null, pdfDocumentGeneration=0, previewGeneration=0, previewController=null, currentPreviewUrl='', pdfScale=1, pdfFitScale=1, activePdfPreview=null, pocAnnotations=[], annotationsVisible=true;
     const pdfjs=async()=>{if(!pdfjsPromise)pdfjsPromise=import(manager.dataset.pdfjsUrl).then((module)=>{module.GlobalWorkerOptions.workerSrc=manager.dataset.pdfjsWorker;return module;});return pdfjsPromise;};
     const jsonRequestInit=(options={})=>({...options,credentials:'same-origin',headers:{Accept:'application/json',...(options.headers||{})}});
@@ -1242,22 +1242,25 @@ document.addEventListener('DOMContentLoaded', () => {
         closeReasonPortal();
         if (replaceOtherDetail) replaceOtherDetail.value = '';
 
-        if (!isNameOrExtChanged) {
-            if (replaceNewLabel) replaceNewLabel.textContent = 'Nueva versión:';
-            if (replaceNotice) replaceNotice.textContent = 'Se cargará una nueva versión de este documento. La versión anterior permanecerá registrada en el historial.';
+        if (!hasPreviousReview) {
+            if (replaceNewLabel) replaceNewLabel.textContent = isNameOrExtChanged ? 'Nuevo archivo:' : 'Nueva versión:';
+            if (replaceNotice) replaceNotice.textContent = 'El archivo será reemplazado durante la preparación del proyecto.';
             if (replaceReasonGroup) replaceReasonGroup.hidden = true;
             if (replaceOtherGroup) replaceOtherGroup.hidden = true;
             if (replaceConfirmBtn) replaceConfirmBtn.disabled = false;
         } else {
-            if (replaceNewLabel) replaceNewLabel.textContent = 'Nuevo archivo:';
-            if (replaceNotice) replaceNotice.textContent = 'El nombre o formato del archivo seleccionado es diferente. Indica el motivo del cambio para continuar.';
+            if (replaceNewLabel) replaceNewLabel.textContent = isNameOrExtChanged ? 'Nuevo archivo:' : 'Nueva versión:';
+            if (replaceNotice) replaceNotice.textContent = isNameOrExtChanged
+                ? 'El nombre o formato del archivo seleccionado es diferente. Indica el motivo del cambio para continuar.'
+                : 'Se cargará una nueva versión de este documento. Indica el motivo del cambio para continuar.';
+            if (replaceNotice) replaceNotice.textContent += ' La versión anterior se conservará en el historial.';
             if (replaceReasonGroup) replaceReasonGroup.hidden = false;
             if (replaceOtherGroup) replaceOtherGroup.hidden = true;
             if (replaceConfirmBtn) replaceConfirmBtn.disabled = true;
         }
 
         const updateValidation = () => {
-            if (!isNameOrExtChanged) {
+            if (!hasPreviousReview) {
                 if (replaceConfirmBtn) replaceConfirmBtn.disabled = false;
                 return;
             }
@@ -1291,7 +1294,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 expected_checksum: checksum,
             };
 
-            if (isNameOrExtChanged) {
+            if (hasPreviousReview) {
                 payload.reason_type = replaceReasonSelect?.value || '';
                 if (payload.reason_type === 'other') {
                     payload.reason_detail = replaceOtherDetail?.value.trim() || '';

@@ -10,6 +10,7 @@ final class ProjectReviewReadinessService
         $query = Database::connection()->prepare("SELECT f.id,f.project_id,f.original_name,f.storage_name,f.extension,f.size_bytes,f.checksum_sha256,f.deleted_at,f.purged_at
             FROM project_files f
             LEFT JOIN project_file_review_states s ON s.project_id=f.project_id AND s.file_id=f.id AND s.checksum_sha256=f.checksum_sha256
+                AND EXISTS (SELECT 1 FROM project_deliveries d WHERE d.project_id=f.project_id)
             WHERE f.project_id=:project AND f.deleted_at IS NULL AND f.purged_at IS NULL
               AND COALESCE(s.status,'development') IN ('development','corrections_requested')
             ORDER BY f.sort_order,f.id");

@@ -78,6 +78,7 @@ SELECT CONCAT('document-status:',s.id),'document_status_recorded','project_file_
        JSON_OBJECT('file_id',s.file_id,'file_name',f.original_name,'checksum',s.checksum_sha256,'status',s.status)
 FROM project_file_review_states s JOIN project_files f ON f.id=s.file_id LEFT JOIN users u ON u.id=s.reviewed_by
 WHERE s.project_id=?
+  AND EXISTS(SELECT 1 FROM project_deliveries d WHERE d.project_id=s.project_id)
   AND NOT (s.status='under_review' AND EXISTS(SELECT 1 FROM project_deliveries d WHERE d.project_id=s.project_id))
   AND NOT EXISTS(SELECT 1 FROM project_audit_log l WHERE l.project_id=s.project_id AND l.action='project_document_review_completed' AND JSON_SEARCH(l.new_state,'one',s.checksum_sha256) IS NOT NULL)
 UNION ALL
@@ -85,7 +86,7 @@ SELECT CONCAT('document-version:',c.id),'document_version_uploaded','project_fil
        JSON_OBJECT('checksum',c.previous_checksum,'version_number',c.previous_version_number,'document_status',c.previous_document_status),
        JSON_OBJECT('checksum',c.new_checksum,'version_number',c.new_version_number,'document_status',c.new_document_status),
        JSON_OBJECT('file_id',c.file_id,'file_name',f.original_name,'previous_file_name',v.original_name,'previous_version_number',c.previous_version_number,'new_version_number',c.new_version_number,'previous_checksum',c.previous_checksum,'new_checksum',c.new_checksum,'reason',c.reason,'declared_summary',c.declared_summary,'sections_json',c.sections_json,'previous_document_status',c.previous_document_status,'new_document_status',c.new_document_status,'addressed_observation_count',(SELECT COUNT(*) FROM project_file_version_addressed_observations link WHERE link.change_id=c.id))
-FROM project_file_version_changes c JOIN project_files f ON f.id=c.file_id LEFT JOIN project_file_versions v ON v.id=c.previous_version_id LEFT JOIN users u ON u.id=c.changed_by WHERE c.project_id=?
+FROM project_file_version_changes c JOIN project_files f ON f.id=c.file_id LEFT JOIN project_file_versions v ON v.id=c.previous_version_id LEFT JOIN users u ON u.id=c.changed_by WHERE c.project_id=? AND EXISTS(SELECT 1 FROM project_deliveries d WHERE d.project_id=c.project_id AND d.submitted_at<=c.changed_at)
 UNION ALL
 SELECT CONCAT('document-archive:',l.id),'document_version_archived','project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason,'archived_count',JSON_VALUE(l.new_state,'$.archived_count'),'unavailable_count',JSON_VALUE(l.new_state,'$.unavailable_count'))
@@ -93,7 +94,7 @@ FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=
 UNION ALL
 SELECT CONCAT('file-version:',v.id),'file_version_registered','project_file_version',v.id,v.replaced_at,u.id,u.full_name,NULL,NULL,
        JSON_OBJECT('file_id',v.file_id,'file_name',v.original_name,'version_number',v.version_number,'checksum',v.checksum_sha256,'reason',v.replacement_reason)
-FROM project_file_versions v LEFT JOIN users u ON u.id=v.replaced_by WHERE v.project_id=? AND NOT EXISTS(SELECT 1 FROM project_file_version_changes c WHERE c.previous_version_id=v.id)
+FROM project_file_versions v LEFT JOIN users u ON u.id=v.replaced_by WHERE v.project_id=? AND EXISTS(SELECT 1 FROM project_deliveries d WHERE d.project_id=v.project_id AND d.submitted_at<=v.replaced_at) AND NOT EXISTS(SELECT 1 FROM project_file_version_changes c WHERE c.previous_version_id=v.id)
 UNION ALL
 SELECT CONCAT('file-change:',l.id),l.action,'project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason,'entity_id',l.entity_id)

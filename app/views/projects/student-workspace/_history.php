@@ -4,6 +4,10 @@
 /** @var \Closure(?string, bool=): string $formatDate */
 $events = (array) ($project['academic_history'] ?? []);
 $versions = (array) ($studentVersions ?? []);
+$pagination = (array) ($project['academic_history_pagination'] ?? []);
+$historyTotal = array_key_exists('total', $pagination)
+    ? (int) $pagination['total']
+    : count($events);
 $groupedVersions = [];
 foreach ($versions as $ver) {
     $fileId = (int) ($ver['file_id'] ?? 0);
@@ -80,11 +84,12 @@ foreach ($versions as $ver) {
     <?php endif; ?>
 
     <section class="sw-card">
-        <header class="sw-section-heading">
+        <header class="sw-section-heading sw-history-section-heading">
             <div>
                 <h2><i class="fa-solid fa-list-check" aria-hidden="true"></i> Historial académico</h2>
                 <p>Trazabilidad y eventos registrados durante el ciclo de vida del proyecto.</p>
             </div>
+            <span class="sw-history-total" aria-label="Total de eventos del historial">Total: <?= $historyTotal ?></span>
         </header>
 
         <?php if (!$events): ?>
@@ -167,8 +172,9 @@ foreach ($versions as $ver) {
                 <?php endforeach; ?>
             </div>
             <?php
-            $pagination = (array) ($project['academic_history_pagination'] ?? []);
-            if (!empty($pagination) && ($pagination['total'] ?? 0) > 0):
+            if ($historyTotal > 10):
+                $pagination['summary_only'] = false;
+                $pagination['hide_summary'] = true;
                 require APP_PATH . '/views/components/pagination.php';
             endif;
             ?>

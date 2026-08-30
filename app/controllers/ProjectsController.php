@@ -390,7 +390,7 @@ final class ProjectsController
                 (int) $project['id'], (array) $project['files'], $isTeacher, $isTeacher
             );
             $project['files'] = $studentDocumentReview['files'];
-            $studentVersions = (new ProjectDocumentModel())->versions((int) $project['id']);
+            $studentVersions = (new ProjectDocumentModel())->academicVersions((int) $project['id']);
             $historicalId = (int)($_GET['version_id'] ?? 0);
             if ($historicalId > 0) {
                 try { $historicalVersion = (new ProjectFileVersionHistoryService())->accessibleVersion((int)$project['id'], $historicalId, $access->currentUserId(), 'academic'); }

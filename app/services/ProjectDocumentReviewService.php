@@ -35,9 +35,12 @@ final class ProjectDocumentReviewService
              FROM project_files f
              LEFT JOIN project_file_review_states s
                ON s.file_id=f.id AND s.project_id=f.project_id AND s.checksum_sha256=f.checksum_sha256
+              AND EXISTS (SELECT 1 FROM project_deliveries d WHERE d.project_id=f.project_id)
              LEFT JOIN (
-               SELECT file_id,MAX(version_number) latest_version FROM project_file_versions
-               WHERE file_id IN ($placeholders) GROUP BY file_id
+               SELECT v.file_id,MAX(v.version_number) latest_version FROM project_file_versions v
+               WHERE v.file_id IN ($placeholders)
+                 AND EXISTS (SELECT 1 FROM project_deliveries d WHERE d.project_id=v.project_id AND d.submitted_at<=v.replaced_at)
+               GROUP BY v.file_id
              ) v ON v.file_id=f.id
              WHERE f.project_id=? AND f.id IN ($placeholders)
                AND f.deleted_at IS NULL AND f.purged_at IS NULL"
@@ -47,7 +50,7 @@ final class ProjectDocumentReviewService
         foreach ($query->fetchAll() as $row) $states[(int)$row['id']] = $row;
 
         $closedMap = [];
-        if ($forTeacherReview && !$this->isProjectUnderActiveReview($projectId)) {
+        if ($forTeacherReview && $this->usesModernDeliveries($projectId) && !$this->isProjectUnderActiveReview($projectId)) {
             $closedMap = $this->getHistoricalClosedReviewMap($projectId);
         }
 

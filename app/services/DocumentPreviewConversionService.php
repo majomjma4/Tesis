@@ -39,6 +39,15 @@ final class DocumentPreviewConversionService
         return $this->validPdf($path) ? $path : null;
     }
 
+    public function discardCached(int $projectId, int $fileId, string $identity): void
+    {
+        if ($projectId < 1 || $fileId < 1 || !preg_match('/^[a-f0-9]{64}$/', $identity)) return;
+        $cached = $this->finalPath($projectId, $fileId, $identity);
+        $failure = $this->failurePath($projectId, $fileId, $identity);
+        if (is_file($cached)) @unlink($cached);
+        if (is_file($failure)) @unlink($failure);
+    }
+
     public function isAvailable(): bool
     {
         if (self::$availability !== null) return self::$availability;

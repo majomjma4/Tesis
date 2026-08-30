@@ -14,6 +14,7 @@ $reviewFiles = array_map(static fn(array $file): array => [
 ], $files);
 $documentEndpoint = (string) ($studentDocumentEndpoint ?? '');
 $documentCsrf = (string) ($studentDocumentCsrf ?? '');
+$hasPreviousReviewForReplacement = !empty((array) ($project['deliveries'] ?? []));
 $historicalPreviewUrl = $historical ? route('project-file-version-preview').'&project_id='.$projectId.'&version_id='.(int)$historical['id'] : '';
 $docLimits = (new ProjectDocumentFileService())->limits();
 $packageUrl = route('project-package-download') . '&id=' . (int)$projectId;
@@ -33,7 +34,7 @@ $packageAvailable = !empty(($studentAcademicPackage ?? [])['available']);
     'limits' => ['body_min' => 5, 'body_max' => 2000, 'category_max' => 60, 'location_max' => 180],
 ], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
 <?php endif; ?>
-<section class="sw-doc-workspace<?= $historical ? ' is-historical' : '' ?><?= $canReviewDocuments ? ' is-teacher-review' : '' ?>" data-sw-document-manager data-sw-active-tab="explorer"<?= $canReviewDocuments ? ' data-sw-review-mode="draft"' : '' ?> data-endpoint="<?= e($documentEndpoint) ?>" data-csrf="<?= e($documentCsrf) ?>" data-submit-endpoint="<?= e((string) ($studentProjectSubmitEndpoint ?? '')) ?>" data-submit-csrf="<?= e((string) ($studentProjectSubmitCsrf ?? '')) ?>" data-correction-readiness="<?= e(json_encode($correctionReadiness ?? ['has_deliveries'=>false,'source'=>'legacy','required'=>[],'total_needed'=>0,'completed'=>0,'pending'=>[],'eligible'=>true], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)) ?>" data-max-file-bytes="<?= (int) $docLimits['max_file_bytes'] ?>" data-max-file-mb="<?= (int) $docLimits['max_file_mb'] ?>" data-review-representation-endpoint="<?= e(route('student-project-review-representation')) ?>" data-review-representation-csrf="<?= e((new AuthSessionService())->csrfToken('student_project_review_representation')) ?>" data-project-id="<?= (int) $projectId ?>"<?= $packageAvailable ? ' data-package-url="'.e($packageUrl).'"' : '' ?> data-project-status="<?= e((string)($status ?? '')) ?>" data-historical-preview="<?= e($historicalPreviewUrl) ?>" data-pdfjs-url="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.mjs')) ?>" data-pdfjs-worker="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.worker.mjs')) ?>" data-pdfjs-fonts="<?= e(asset('vendor/pdfjs/4.10.38/web/standard_fonts/')) ?>">
+<section class="sw-doc-workspace<?= $historical ? ' is-historical' : '' ?><?= $canReviewDocuments ? ' is-teacher-review' : '' ?>" data-sw-document-manager data-sw-active-tab="explorer"<?= $canReviewDocuments ? ' data-sw-review-mode="draft"' : '' ?> data-endpoint="<?= e($documentEndpoint) ?>" data-csrf="<?= e($documentCsrf) ?>" data-submit-endpoint="<?= e((string) ($studentProjectSubmitEndpoint ?? '')) ?>" data-submit-csrf="<?= e((string) ($studentProjectSubmitCsrf ?? '')) ?>" data-correction-readiness="<?= e(json_encode($correctionReadiness ?? ['has_deliveries'=>false,'source'=>'legacy','required'=>[],'total_needed'=>0,'completed'=>0,'pending'=>[],'eligible'=>true], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)) ?>" data-max-file-bytes="<?= (int) $docLimits['max_file_bytes'] ?>" data-max-file-mb="<?= (int) $docLimits['max_file_mb'] ?>" data-review-representation-endpoint="<?= e(route('student-project-review-representation')) ?>" data-review-representation-csrf="<?= e((new AuthSessionService())->csrfToken('student_project_review_representation')) ?>" data-project-id="<?= (int) $projectId ?>" data-sw-has-previous-review="<?= $hasPreviousReviewForReplacement ? 'true' : 'false' ?>"<?= $packageAvailable ? ' data-package-url="'.e($packageUrl).'"' : '' ?> data-project-status="<?= e((string)($status ?? '')) ?>" data-historical-preview="<?= e($historicalPreviewUrl) ?>" data-pdfjs-url="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.mjs')) ?>" data-pdfjs-worker="<?= e(asset('vendor/pdfjs/4.10.38/build/pdf.worker.mjs')) ?>" data-pdfjs-fonts="<?= e(asset('vendor/pdfjs/4.10.38/web/standard_fonts/')) ?>">
     <?php if ($historical): ?><div class="sw-historical-banner" role="status"><strong>Versión <?= (int)$historical['version_number'] ?> · Historial</strong><span>Estás consultando una versión anterior de este documento.</span><a href="<?= e($detailUrl.'&tab=documents') ?>">Volver a versión actual</a></div><?php endif; ?>
     <nav class="sw-mobile-switcher" data-sw-mobile-switcher aria-label="Navegación móvil del espacio de trabajo">
         <button type="button" class="sw-mobile-tab is-active" data-sw-mobile-tab="explorer">
@@ -191,7 +192,9 @@ $getFileIconClass = static function (?string $extension, ?string $mimeType = nul
                 </div>
 
                 <div class="sw-replace-notice" data-sw-replace-notice style="font-size: 0.83rem; color: #334155; line-height: 1.45; margin-bottom: 12px;">
-                    Se cargará una nueva versión de este documento. La versión anterior permanecerá registrada en el historial.
+                    <?= $hasPreviousReviewForReplacement
+                        ? 'Se cargará una nueva versión de este documento. La versión anterior se conservará en el historial. Indica el motivo del cambio para continuar.'
+                        : 'El archivo será reemplazado durante la preparación del proyecto.' ?>
                 </div>
 
                 <div class="sw-replace-reason-group" data-sw-replace-reason-group hidden style="width: 100%; box-sizing: border-box; margin-bottom: 12px; position: relative;">

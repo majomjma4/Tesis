@@ -29,6 +29,12 @@ final class ProjectStudentDocumentController
             $result = $action === 'add'
                 ? Database::transaction(fn(PDO $db): array => $this->add($db, $projectId, $stored, $actor))
                 : Database::transaction(fn(PDO $db): array => $this->replace($db, $projectId, (int) ($_POST['file_id'] ?? 0), (string) ($_POST['expected_checksum'] ?? ''), $stored, $actor, $_POST));
+            if ($action === 'replace') {
+                $obsoleteStorageName = (string) ($result['_obsolete_storage_name'] ?? '');
+                $obsoleteChecksum = (string) ($result['_obsolete_checksum'] ?? '');
+                unset($result['_obsolete_storage_name'], $result['_obsolete_checksum']);
+                $this->cleanupPreparationArtifacts($projectId, (int) ($_POST['file_id'] ?? 0), $obsoleteStorageName, $obsoleteChecksum);
+            }
             $stored = [];
             $result['academic_package'] = $this->prepareAcademicPackage($projectId);
             $this->json(true, $action === 'add' ? 'Archivo agregado correctamente.' : 'Archivo reemplazado correctamente.', $result);
@@ -72,14 +78,9 @@ final class ProjectStudentDocumentController
             throw new InvalidArgumentException('El archivo seleccionado tiene el mismo contenido que la versión actual. Realiza las correcciones necesarias antes de reemplazarlo.', 422);
         }
 
-        $currentName = (string) ($current['original_name'] ?? '');
-        $newName = (string) ($stored['original_name'] ?? '');
-        $currentExt = strtolower((string) ($current['extension'] ?? ''));
-        $newExt = strtolower((string) ($stored['extension'] ?? ''));
-
-        $isNameOrExtChanged = ($currentName !== $newName) || ($currentExt !== $newExt);
         $reasonType = trim((string) ($input['reason_type'] ?? ''));
         $reasonDetail = trim((string) ($input['reason_detail'] ?? $input['reason_other_detail'] ?? ''));
+        $hasPreviousReview = $this->hasPreviousReview($db, $projectId);
 
         $allowedReasonTypes = [
             'name_change' => 'Cambio de nombre del documento',
@@ -90,11 +91,11 @@ final class ProjectStudentDocumentController
             'other' => 'Otro',
         ];
 
-        $finalReason = 'Reemplazo de archivo observada';
+        $finalReason = '';
 
-        if ($isNameOrExtChanged) {
+        if ($hasPreviousReview) {
             if ($reasonType === '' || !isset($allowedReasonTypes[$reasonType])) {
-                throw new InvalidArgumentException('El motivo del cambio es obligatorio cuando cambia el nombre o formato del archivo.', 422);
+                throw new InvalidArgumentException('El motivo del cambio es obligatorio después de la primera revisión.', 422);
             }
 
             if ($reasonType === 'other') {
@@ -108,6 +109,43 @@ final class ProjectStudentDocumentController
         }
 
         return (new ProjectFileVersionChangeService())->replaceWorkspaceInTransaction($db, $projectId, $fileId, $checksum, $stored, $actor, $finalReason);
+    }
+
+    private function hasPreviousReview(PDO $db, int $projectId): bool
+    {
+        $query = $db->prepare('SELECT 1 FROM project_deliveries WHERE project_id=:project LIMIT 1');
+        $query->execute(['project' => $projectId]);
+        return (bool) $query->fetchColumn();
+    }
+
+    private function cleanupPreparationArtifacts(int $projectId, int $fileId, string $storageName, string $checksum): void
+    {
+        if ($storageName === '' || $fileId < 1) return;
+        $db = Database::connection();
+        try {
+            $current = $db->prepare('SELECT storage_name FROM project_files WHERE id=:file AND project_id=:project AND deleted_at IS NULL AND purged_at IS NULL');
+            $current->execute(['file' => $fileId, 'project' => $projectId]);
+            if ((string) $current->fetchColumn() === $storageName) return;
+            $historical = $db->prepare('SELECT 1 FROM project_file_versions WHERE project_id=:project AND file_id=:file AND storage_name=:storage LIMIT 1');
+            $historical->execute(['project'=>$projectId,'file'=>$fileId,'storage'=>$storageName]);
+            if ($historical->fetchColumn()) return;
+        } catch (Throwable $error) {
+            error_log('Student preparation file cleanup: ' . $error->getMessage());
+            return;
+        }
+        try {
+            $storage = new ProjectDocumentFileService();
+            $storage->discardStored(['absolute_path' => $storage->resolveStoredFile($projectId, $storageName)]);
+        } catch (Throwable $error) {
+            error_log('Student preparation source cleanup: ' . $error->getMessage());
+        }
+        if ($checksum !== '') {
+            try {
+                (new ProjectReviewRepresentationService())->discardPreparationRepresentations($projectId, $fileId, $checksum);
+            } catch (Throwable $error) {
+                error_log('Student preparation representation cleanup: ' . $error->getMessage());
+            }
+        }
     }
 
     private function remove(PDO $db, int $projectId, int $fileId, int $actor): array
@@ -156,6 +194,9 @@ final class ProjectStudentDocumentController
 
     private function assertEditableFile(PDO $db, int $projectId, array $file): void
     {
+        $delivery=$db->prepare('SELECT 1 FROM project_deliveries WHERE project_id=:project LIMIT 1');
+        $delivery->execute(['project'=>$projectId]);
+        if(!$delivery->fetchColumn())return;
         $state=$db->prepare('SELECT status FROM project_file_review_states WHERE project_id=:project AND file_id=:file AND checksum_sha256=:checksum');
         $state->execute(['project'=>$projectId,'file'=>(int)$file['id'],'checksum'=>(string)$file['checksum_sha256']]);
         if (($state->fetchColumn() ?: 'development') !== 'development') throw new ProjectDocumentVersionException('Este archivo está protegido por una revisión previa y no puede modificarse en esta fase.', 409);

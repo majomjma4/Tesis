@@ -48,6 +48,14 @@ final class ProjectDocumentModel
         $q->execute(['name'=>$stored['original_name'],'storage'=>$stored['storage_name'],'path'=>$stored['storage_path'],'extension'=>$stored['extension'],'mime'=>$stored['mime_type'],'size'=>$stored['size_bytes'],'checksum'=>$stored['checksum_sha256'],'actor'=>$actor,'file'=>$fileId,'project'=>$projectId]);
         return ['file'=>$this->findActiveFile($projectId,$fileId),'version_number'=>$version,'previous_version_id'=>$previousVersionId,'old'=>$old];
     }
+    public function replaceDuringPreparation(int $projectId,int $fileId,array $stored,int $actor):array
+    {
+        $old=$this->findActiveFile($projectId,$fileId,true);
+        $q=$this->db->prepare('UPDATE project_files SET original_name=:name,storage_name=:storage,storage_path=:path,extension=:extension,mime_type=:mime,size_bytes=:size,checksum_sha256=:checksum,uploaded_by=:actor,created_at=UTC_TIMESTAMP() WHERE id=:file AND project_id=:project');
+        $q->execute(['name'=>$stored['original_name'],'storage'=>$stored['storage_name'],'path'=>$stored['storage_path'],'extension'=>$stored['extension'],'mime'=>$stored['mime_type'],'size'=>$stored['size_bytes'],'checksum'=>$stored['checksum_sha256'],'actor'=>$actor,'file'=>$fileId,'project'=>$projectId]);
+        if($q->rowCount()!==1)throw new RuntimeException('No fue posible reemplazar el archivo durante la preparación.');
+        return ['file'=>$this->findActiveFile($projectId,$fileId),'old'=>$old];
+    }
     public function setPresentation(int $projectId,?int $fileId,int $actor):array
     {
         $project=$this->lockProject($projectId);if($fileId!==null){$file=$this->findActiveFile($projectId,$fileId,true);if(!in_array(strtolower((string)$file['extension']),['pdf','docx','png','jpg','jpeg','webp','txt'],true))throw new InvalidArgumentException('El archivo seleccionado no es compatible con la vista de presentación.');}
@@ -92,6 +100,11 @@ final class ProjectDocumentModel
     public function versions(int $projectId):array
     {
         $q=$this->db->prepare('SELECT v.*,u.full_name responsible FROM project_file_versions v LEFT JOIN users u ON u.id=v.replaced_by WHERE v.project_id=:id ORDER BY v.replaced_at DESC,v.id DESC');$q->execute(['id'=>$projectId]);return $q->fetchAll();
+    }
+    public function academicVersions(int $projectId):array
+    {
+        $q=$this->db->prepare('SELECT v.*,u.full_name responsible FROM project_file_versions v LEFT JOIN users u ON u.id=v.replaced_by WHERE v.project_id=:id AND EXISTS (SELECT 1 FROM project_deliveries d WHERE d.project_id=v.project_id AND d.submitted_at<=v.replaced_at) ORDER BY v.replaced_at DESC,v.id DESC');
+        $q->execute(['id'=>$projectId]);return $q->fetchAll();
     }
     private function normalizeRestoreName(string $name):string{return mb_strtolower(trim($name),'UTF-8');}
     private function suggestRestoredName(string $originalName,array $activeFiles):string

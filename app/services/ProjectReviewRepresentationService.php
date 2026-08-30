@@ -108,6 +108,33 @@ final class ProjectReviewRepresentationService
         return ['file_id'=>$fileId,'checksum_sha256'=>$checksum,'representation_source'=>'supplemental_pdf'];
     }
 
+    public function discardPreparationRepresentations(int $projectId, int $fileId, string $checksum): void
+    {
+        if ($projectId < 1 || $fileId < 1 || !preg_match('/^[a-f0-9]{64}$/', $checksum)) return;
+        $rows = Database::transaction(function (PDO $db) use ($projectId, $fileId, $checksum): array {
+            $project = $db->prepare('SELECT id FROM projects WHERE id=:project FOR UPDATE');
+            $project->execute(['project'=>$projectId]);
+            if (!$project->fetchColumn()) return [];
+            $version = $db->prepare('SELECT 1 FROM project_file_versions v WHERE v.project_id=:project AND v.file_id=:file AND v.checksum_sha256=:checksum AND EXISTS (SELECT 1 FROM project_deliveries d WHERE d.project_id=v.project_id AND d.submitted_at<=v.replaced_at) LIMIT 1');
+            $version->execute(['project'=>$projectId,'file'=>$fileId,'checksum'=>$checksum]);
+            if ($version->fetchColumn()) return [];
+            $query = $db->prepare('SELECT id,storage_path,storage_name,representation_type FROM project_review_representations WHERE project_id=:project AND file_id=:file AND checksum_sha256=:checksum FOR UPDATE');
+            $query->execute(['project'=>$projectId,'file'=>$fileId,'checksum'=>$checksum]);
+            $representations = $query->fetchAll();
+            if ($representations !== []) {
+                $delete = $db->prepare('DELETE FROM project_review_representations WHERE project_id=:project AND file_id=:file AND checksum_sha256=:checksum');
+                $delete->execute(['project'=>$projectId,'file'=>$fileId,'checksum'=>$checksum]);
+            }
+            return $representations;
+        });
+        (new DocumentPreviewConversionService())->discardCached($projectId, $fileId, $checksum);
+        foreach ($rows as $row) {
+            if ((string)($row['representation_type'] ?? '') !== 'supplemental_pdf') continue;
+            $path = $this->resolveRepresentationPath((string)($row['storage_path'] ?? ''), (string)($row['storage_name'] ?? ''));
+            if ($path !== '' && is_file($path) && !@unlink($path)) error_log('Student preparation representation cleanup failed.');
+        }
+    }
+
     private function recordGenerated(array $file, string $path): void
     {
         if (!$this->validPdf($path)) return;
