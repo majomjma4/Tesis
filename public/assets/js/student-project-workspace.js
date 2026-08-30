@@ -2809,7 +2809,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const submissionMessage = submittedFileCount === 1
                     ? '1 documento fue enviado al tutor para su revisión.'
                     : `${submittedFileCount} documentos fueron enviados al tutor para su revisión.`;
-                showVisualToast(submissionMessage, 'success', 'Proyecto enviado a revisión');
+                setFlashToast(submissionMessage, 'success');
+                reloadDocuments();
             } catch (error) {
                 const isNetworkError = error instanceof TypeError || error.name === 'TypeError' || (error.message || '').includes('fetch') || (error.message || '').includes('NetworkError');
                 const status = Number(error.status || 0);

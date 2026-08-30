@@ -139,10 +139,12 @@ $getFileIconClass = static function (?string $extension, ?string $mimeType = nul
                 </div>
             </div>
         </header>
+        <?php if (!$canReviewDocuments): ?>
         <div class="sw-viewer-download-note" role="note">
             <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
             <span>Las observaciones y correcciones de esta revisión se almacenan en el sistema y no modifican el archivo original. La descarga corresponde al documento originalmente enviado.</span>
         </div>
+        <?php endif; ?>
         <?php if ($canReviewDocuments): ?>
         <div class="sw-viewer-help-banner">
             <i class="fa-solid fa-circle-info" aria-hidden="true"></i>

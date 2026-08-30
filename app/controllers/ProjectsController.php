@@ -401,13 +401,12 @@ final class ProjectsController
         $returnUrl = ($isAdministrator || $isTeacher)
             ? $this->academicManagementReturnUrl((string) ($_GET['return'] ?? ''))
             : route('projects');
-        $returnParts = parse_url($returnUrl);
-        $returnQuery = [];
-        if (is_array($returnParts)) parse_str((string) ($returnParts['query'] ?? ''), $returnQuery);
+        // La variante fullscreen pertenece a la capacidad efectiva de revisión,
+        // no al lugar desde el que se abrió el expediente. Así Dashboard y
+        // Proyectos asignados comparten exactamente el mismo workspace.
         $projectReviewFullscreen = !$isAdministrator
             && $isTeacher
-            && !empty($projectCapabilities['review_documents'])
-            && strtolower(trim((string) ($returnQuery['page'] ?? ''))) === 'assigned-projects';
+            && !empty($projectCapabilities['review_documents']);
         $studentBackUrl = route('dashboard');
         $studentBackLabel = 'Volver al inicio';
         if (!$isAdministrator && !$isTeacher && $isStudentParticipant) {

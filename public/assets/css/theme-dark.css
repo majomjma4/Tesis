@@ -28,6 +28,16 @@ body.dark-mode:not(.account-page) {
     color: var(--text);
 }
 
+/* Tokens globales de scrollbars y skeletons. No se usa blanco puro en dark. */
+:is(html.theme-dark, body.dark-mode) {
+    --scrollbar-track:color-mix(in srgb,var(--bg) 72%,var(--surface));
+    --scrollbar-thumb:color-mix(in srgb,var(--muted) 58%,transparent);
+    --scrollbar-thumb-hover:color-mix(in srgb,var(--blue) 62%,var(--muted));
+    --scrollbar-corner:var(--scrollbar-track);
+    --skeleton-base:color-mix(in srgb,var(--surface) 72%,var(--line));
+    --skeleton-highlight:color-mix(in srgb,var(--surface-elevated) 72%,var(--surface-soft));
+}
+
 :is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .topbar {
     background: var(--surface);
     border-color: var(--line);
@@ -1231,7 +1241,7 @@ body.dark-mode:not(.account-page) {
     .admin-history-drawer__body,
     .ed-history-drawer__body
 ) {
-    scrollbar-color: color-mix(in srgb, var(--muted) 55%, transparent) transparent;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 :is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
@@ -1243,7 +1253,7 @@ body.dark-mode:not(.account-page) {
     .admin-history-drawer__body,
     .ed-history-drawer__body
 )::-webkit-scrollbar-thumb {
-    background: color-mix(in srgb, var(--muted) 55%, transparent);
+    background: var(--scrollbar-thumb);
     border-color: transparent;
 }
 

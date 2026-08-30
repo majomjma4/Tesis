@@ -57,6 +57,11 @@
     --shadow:0 12px 30px rgba(15,23,42,.07);
     --shadow-soft:var(--shadow);
     --radius:18px;
+    --scrollbar-track:color-mix(in srgb,var(--surface-soft) 82%,var(--line));
+    --scrollbar-thumb:color-mix(in srgb,var(--muted) 58%,transparent);
+    --scrollbar-thumb-hover:color-mix(in srgb,var(--blue) 58%,var(--muted));
+    --scrollbar-corner:var(--scrollbar-track);
+    --scrollbar-size:10px;
 }
 html.dashboard-root{
     font-size:var(--app-root-font-size);
@@ -1604,9 +1609,6 @@ body.modal-open{
     border-radius:999px;
     position:relative;
     overflow:hidden;
-    background:linear-gradient(105deg,var(--skeleton-base) 0%,var(--skeleton-base) 38%,var(--skeleton-highlight) 50%,var(--skeleton-base) 62%,var(--skeleton-base) 100%);
-    background-size:220% 100%;
-    animation:skeletonShimmer var(--skeleton-speed) ease-in-out infinite;
 }
 .skeleton-line{
     width:100%;
@@ -4217,25 +4219,46 @@ body.dark-mode .calendar-priority-filter[data-priority="high"].active{background
 :root{
     --skeleton-base:color-mix(in srgb,var(--surface-soft) 78%,var(--line));
     --skeleton-highlight:color-mix(in srgb,var(--surface-elevated) 86%,white);
+    --skeleton-gradient:linear-gradient(105deg,var(--skeleton-base) 0%,var(--skeleton-base) 38%,var(--skeleton-highlight) 50%,var(--skeleton-base) 62%,var(--skeleton-base) 100%);
     --skeleton-radius:8px;
     --skeleton-speed:1.5s;
 }
-html.theme-dark,body.dark-mode{
-    --skeleton-base:color-mix(in srgb,var(--surface) 72%,var(--line));
-    --skeleton-highlight:color-mix(in srgb,var(--surface-elevated) 72%,var(--surface-soft));
-}
 .skeleton,
+.skeleton-block,
 .skeleton-line,
+.skeleton-title,
+.skeleton-text,
 .skeleton-pill,
+.skeleton-avatar,
+.skeleton-icon,
+.skeleton-button-shape,
+.skeleton-table-cell,
+.skeleton-image,
 .notification-skeleton,
-.app-skeleton-block{
+.app-skeleton-block,
+.is-media-loading{
     position:relative;
     overflow:hidden;
-    background:linear-gradient(105deg,var(--skeleton-base) 0%,var(--skeleton-base) 38%,var(--skeleton-highlight) 50%,var(--skeleton-base) 62%,var(--skeleton-base) 100%);
+    background:var(--skeleton-gradient);
+    background-size:220% 100%;
+    animation:skeletonShimmer var(--skeleton-speed) ease-in-out infinite;
+}
+body:not(.auth-page):not(.login-page) :is(
+    .project-skeleton-line,
+    .project-skeleton-button,
+    .project-skeleton-tabs span,
+    .project-skeleton-content section,
+    .project-skeleton-content aside,
+    .tm-proposal-loading > span
+) {
+    position:relative;
+    overflow:hidden;
+    background:var(--skeleton-gradient);
     background-size:220% 100%;
     animation:skeletonShimmer var(--skeleton-speed) ease-in-out infinite;
 }
 .skeleton{display:block;min-height:12px;border-radius:var(--skeleton-radius)}
+.skeleton-block{display:block;min-height:12px;border-radius:var(--skeleton-radius)}
 .skeleton-line,.skeleton-title,.skeleton-text{display:block;min-height:12px;border-radius:var(--skeleton-radius)}
 .skeleton-title{width:min(360px,72%);height:28px}
 .skeleton-text{width:100%;height:13px}
@@ -4252,7 +4275,7 @@ html.theme-dark,body.dark-mode{
 .ed-viewer-loading-skeleton .skeleton-title{width:min(250px,78%);height:22px}
 .ed-viewer-loading-skeleton .skeleton-text{height:12px}
 .ed-history-skeleton{display:block;width:34px;height:34px;border-radius:10px}
-.is-media-loading{background:var(--skeleton-base)!important}
+.is-media-loading{background:var(--skeleton-gradient)!important}
 .is-media-loading>img{opacity:0;transition:opacity .16s ease}
 .is-media-loading>img{min-height:inherit}
 .app-skeleton{display:grid;gap:0;width:100%;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
@@ -4266,9 +4289,58 @@ html.theme-dark,body.dark-mode{
 .skeleton-table-cell.short{width:42%}
 @keyframes skeletonShimmer{from{background-position:100% 0}to{background-position:-100% 0}}
 @media(prefers-reduced-motion:reduce){
-    .skeleton,.skeleton-line,.skeleton-pill,.notification-skeleton,.app-skeleton-block{animation:none}
+    .skeleton,.skeleton-block,.skeleton-line,.skeleton-title,.skeleton-text,.skeleton-pill,.skeleton-avatar,.skeleton-icon,.skeleton-button-shape,.skeleton-table-cell,.skeleton-image,.notification-skeleton,.app-skeleton-block,.is-media-loading{animation:none}
+    body:not(.auth-page):not(.login-page) :is(.project-skeleton-line,.project-skeleton-button,.project-skeleton-tabs span,.project-skeleton-content section,.project-skeleton-content aside,.tm-proposal-loading > span){animation:none}
     .app-skeleton.is-leaving{transition:none}
     .is-media-loading>img{transition:none}
+}
+
+/* Scrollbar global: colores compartidos para pagina, paneles y overlays.
+   Los carruseles que ocultan intencionalmente su barra conservan su display. */
+html:not(.auth-root):not(.login-root),
+body:not(.auth-page):not(.login-page),
+body:not(.auth-page):not(.login-page) * {
+    scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+html:not(.auth-root):not(.login-root),
+body:not(.auth-page):not(.login-page) {
+    scrollbar-width:auto;
+}
+
+html:not(.auth-root):not(.login-root)::-webkit-scrollbar,
+body:not(.auth-page):not(.login-page)::-webkit-scrollbar,
+body:not(.auth-page):not(.login-page) *::-webkit-scrollbar {
+    width:var(--scrollbar-size);
+    height:var(--scrollbar-size);
+    background:var(--scrollbar-track);
+}
+
+html:not(.auth-root):not(.login-root)::-webkit-scrollbar-track,
+body:not(.auth-page):not(.login-page)::-webkit-scrollbar-track,
+body:not(.auth-page):not(.login-page) *::-webkit-scrollbar-track {
+    background:var(--scrollbar-track);
+}
+
+html:not(.auth-root):not(.login-root)::-webkit-scrollbar-thumb,
+body:not(.auth-page):not(.login-page)::-webkit-scrollbar-thumb,
+body:not(.auth-page):not(.login-page) *::-webkit-scrollbar-thumb {
+    background:var(--scrollbar-thumb);
+    border:2px solid var(--scrollbar-track);
+    border-radius:999px;
+    background-clip:padding-box;
+}
+
+html:not(.auth-root):not(.login-root)::-webkit-scrollbar-thumb:hover,
+body:not(.auth-page):not(.login-page)::-webkit-scrollbar-thumb:hover,
+body:not(.auth-page):not(.login-page) *::-webkit-scrollbar-thumb:hover {
+    background:var(--scrollbar-thumb-hover);
+}
+
+html:not(.auth-root):not(.login-root)::-webkit-scrollbar-corner,
+body:not(.auth-page):not(.login-page)::-webkit-scrollbar-corner,
+body:not(.auth-page):not(.login-page) *::-webkit-scrollbar-corner {
+    background:var(--scrollbar-corner);
 }
 
 /* Selectores consistentes: el panel se monta fuera de cards y modales para evitar recortes. */
