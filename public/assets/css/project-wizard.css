@@ -187,3 +187,44 @@
 .project-wizard .wizard-autosave-status[data-state="error"]{color:var(--danger,#b42318)}
 .project-wizard :is(.wizard-preview,.wizard-confirmation) dd{margin:3px 0 0;min-width:0;font-weight:700;line-height:1.35}
 .project-wizard .wizard-confirmation dd{overflow-wrap:anywhere}
+
+/* Acciones explícitas para guardar el borrador o enviarlo a revisión. */
+.project-wizard .wizard-actions [data-submit-preparation]{margin-left:auto}
+.project-wizard .wizard-actions [data-submit-review]{margin-left:0}
+.project-wizard .wizard-actions :is([data-submit-preparation],[data-submit-review]):not([hidden]){display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+.project-wizard .wizard-actions [data-submit-preparation] i,.project-wizard .wizard-actions [data-submit-review] i{flex:0 0 auto}
+.project-wizard .wizard-actions [data-submit-preparation],.project-wizard-page .wizard-dialog-actions .wizard-primary{color:#fff}
+.project-wizard .wizard-actions :is([data-next],[data-submit-preparation]).wizard-primary,.project-wizard .wizard-actions :is([data-next],[data-submit-preparation]).wizard-primary i,.project-wizard-page .wizard-dialog-actions .wizard-primary,.project-wizard-page .wizard-dialog-actions .wizard-primary i,.project-wizard-page .wizard-dialog-actions .wizard-primary:hover,.project-wizard-page .wizard-dialog-actions .wizard-primary:hover i{color:#fff}
+.theme-dark .project-wizard .wizard-actions :is([data-next],[data-submit-preparation]).wizard-primary:hover,.theme-dark .project-wizard .wizard-actions :is([data-next],[data-submit-preparation]).wizard-primary:hover i{color:#fff}
+.project-wizard .wizard-review-action{border-color:var(--w-primary);color:var(--w-primary)}
+.project-wizard .wizard-review-action:hover{background:color-mix(in srgb,var(--w-primary) 9%,var(--w-surface));border-color:var(--w-primary)}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-dialog-card{border-top:4px solid var(--w-primary);max-width:680px;padding:26px 28px 24px}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-dialog-card h2{font-size:var(--font-2xl);letter-spacing:-.01em}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-dialog-card>p{margin-bottom:18px}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-register-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0;padding:0;border:0;overflow:visible}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-register-summary div{display:grid;gap:5px;align-content:start;padding:11px 12px;border:1px solid var(--w-border);border-radius:10px;background:#f8fafc;min-width:0}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-register-summary div.is-wide,.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-register-summary div.is-files-row{grid-column:1/-1}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-register-summary dt{font-size:var(--font-sm);font-weight:800;color:var(--w-muted);text-transform:uppercase;letter-spacing:.04em}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-register-summary dd{max-width:none;min-width:0;font-weight:750;color:var(--w-ink);text-align:left;white-space:normal;overflow-wrap:anywhere;line-height:1.35}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-dialog-actions{margin-top:22px;padding-top:18px;border-top:1px solid var(--w-border)}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .is-files-row{display:flex!important;flex-direction:column;align-items:stretch;gap:0;padding:0!important;overflow:hidden}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .is-files-row .wizard-files-toggle{display:flex;width:100%;min-height:3.8rem;padding:11px 12px;align-items:center;border:0;border-radius:10px;background:#f8fafc;color:var(--w-ink);cursor:pointer}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .is-files-row .wizard-files-toggle>span:first-child{font-size:var(--font-sm);font-weight:800;color:var(--w-muted);letter-spacing:.04em;text-transform:uppercase}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .is-files-row .wizard-files-toggle>span:nth-child(2){margin-left:auto;font-size:var(--font-lg)}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .is-files-row>ul{display:block;width:100%;margin:0;padding:12px;border-top:1px solid var(--w-border);background:#fff;text-align:left}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .is-files-row>ul[hidden]{display:none}
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-dialog-error{margin:0 0 16px;padding:10px 12px;border-left:4px solid var(--danger,#b42318);border-radius:8px;background:color-mix(in srgb,var(--danger,#b42318) 12%,var(--w-surface));color:var(--danger,#b42318)}
+.wizard-dialog-hero-review{display:grid;place-items:center;width:42px;height:42px;margin-bottom:12px;border-radius:12px;background:color-mix(in srgb,var(--w-primary) 12%,var(--w-surface));color:var(--w-primary)}
+.project-wizard-page .wizard-dialog[data-draft-review-dialog] .wizard-dialog-card h3{margin:0 0 8px;font-size:var(--font-lg)}
+.theme-dark .project-wizard .wizard-actions :is([data-submit-preparation],[data-submit-review]).wizard-primary,.theme-dark .project-wizard-page .wizard-dialog-actions .wizard-primary{color:#fff}
+.theme-dark .project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-register-summary div{background:var(--surface-soft);border-color:var(--line)}
+.theme-dark .project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .is-files-row .wizard-files-toggle{background:var(--surface-soft);color:var(--text)}
+.theme-dark .project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .is-files-row>ul{background:var(--surface-elevated)}
+@media(max-width:680px){
+    .project-wizard .wizard-actions :is([data-submit-preparation],[data-submit-review]){width:100%;margin-left:0}
+    .project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-register-summary{grid-template-columns:1fr}
+    .project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-register-summary div.is-wide,.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-register-summary div.is-files-row{grid-column:auto}
+}
+
+.project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-register-summary .is-files-row .wizard-files-toggle>span:first-child{font-size:var(--font-lg);font-weight:750;color:var(--w-ink);text-transform:none;letter-spacing:normal}
+.theme-dark .project-wizard-page .wizard-dialog:is([data-draft-preparation-dialog],[data-draft-review-dialog]) .wizard-register-summary .is-files-row .wizard-files-toggle>span:first-child{color:var(--text)}

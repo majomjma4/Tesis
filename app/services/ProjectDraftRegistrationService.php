@@ -5,10 +5,10 @@ declare(strict_types=1);
 /** Convierte un borrador validado en un proyecto definitivo de forma atómica. */
 final class ProjectDraftRegistrationService
 {
-    public function register(int $userId,array $policy,string $draftId): array
+    public function register(int $userId,array $policy,string $draftId,bool $submitForReview=false): array
     {
         if($userId<1||!preg_match('/^[a-f0-9-]{36}$/i',$draftId))throw new ProjectDraftRegistrationException('El borrador ya no está disponible.');
-        $db=Database::connection();$moved=[];$projectId=0;$code='';$draftStorage=new ProjectDraftStorageService($db);$fileStorage=new PrivateProjectFileService();
+        $db=Database::connection();$moved=[];$projectId=0;$code='';$submission=null;$draftStorage=new ProjectDraftStorageService($db);$fileStorage=new PrivateProjectFileService();
         try {
             $db->beginTransaction();
             $draftRow=$this->lockedDraft($db,$userId,$draftId);
@@ -29,6 +29,7 @@ final class ProjectDraftRegistrationService
                 'code'=>$code,'type'=>(string)$type['label'],'tutor_id'=>(int)$draft['tutor_id'],'participants'=>count($draft['members']),'files'=>count($files),
                 'academic_period_id'=>(int)$catalogs['active_period']['id'],'status'=>'development','current_stage'=>'registration',
             ]);
+            if($submitForReview)$submission=(new StudentProjectSubmissionService())->submitForReviewInTransaction($db,$projectId,$userId);
             $db->prepare('DELETE FROM project_draft_files WHERE draft_id=:draft AND user_id=:user')->execute(['draft'=>$draftId,'user'=>$userId]);
             $delete=$db->prepare('DELETE FROM project_drafts WHERE id=:draft AND user_id=:user');$delete->execute(['draft'=>$draftId,'user'=>$userId]);
             if($delete->rowCount()!==1)throw new RuntimeException('No fue posible consumir el borrador.');
@@ -37,7 +38,7 @@ final class ProjectDraftRegistrationService
             if($db->inTransaction())$db->rollBack();$this->restoreMovedFiles($moved);throw $exception;
         }
         try {$draftStorage->cleanupConsumedDirectory($userId,$draftId);}catch(Throwable $exception){error_log('Project registration temporary cleanup: '.$exception->getMessage());}
-        return ['project_id'=>$projectId,'project_code'=>$code,'redirect_url'=>route('project-detail').'&id='.$projectId];
+        return array_merge(['project_id'=>$projectId,'project_code'=>$code,'redirect_url'=>route('project-detail').'&id='.$projectId],$submission??[]);
     }
 
     private function lockedDraft(PDO $db,int $userId,string $draftId):array

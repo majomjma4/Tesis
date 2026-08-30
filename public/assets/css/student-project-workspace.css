@@ -5780,3 +5780,275 @@ canvas.hiddenCanvasElement {
 :is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-submit-modal-header,.sw-submit-modal-footer) { background:var(--surface); border-color:var(--line); }
 :is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-submit-cancel-btn,.sw-operation-modal section footer button:not(.is-primary):not(.sw-submit-confirm-btn)) { background:var(--surface-soft); border-color:var(--line); color:var(--text); }
 :is(html.theme-dark body.project-review-fullscreen,body.dark-mode.project-review-fullscreen) .student-workspace :is(.sw-review-confirm-stats [data-sw-review-approved-count],.sw-review-confirm-stats [data-sw-review-corrections-count],.sw-review-confirm-stats [data-sw-review-observations-count],.sw-review-confirm-error) { background:var(--surface-soft) !important; border-color:var(--line) !important; color:var(--text) !important; }
+
+/* Student workspace: completar la tematización oscura. El workspace Student
+   usa app-student-workspace-fullscreen, separado del contexto de revisión docente. */
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace {
+    --sw-primary:var(--blue);
+    --sw-primary-hover:var(--blue-dark);
+    --sw-teal:#5eead4;
+    --sw-teal-soft:color-mix(in srgb,var(--sw-teal) 14%,var(--surface-soft));
+    --sw-amber:#fbbf24;
+    --sw-amber-soft:color-mix(in srgb,var(--sw-amber) 14%,var(--surface-soft));
+    --sw-violet:#c4b5fd;
+    --sw-violet-soft:color-mix(in srgb,var(--sw-violet) 14%,var(--surface-soft));
+    --sw-green:#6ee7b7;
+    --sw-green-soft:color-mix(in srgb,var(--sw-green) 14%,var(--surface-soft));
+    --sw-surface:var(--surface);
+    --sw-text:var(--text);
+    --sw-text-muted:var(--muted);
+    --sw-bg-soft:var(--surface-soft);
+    --sw-border:var(--line);
+    color:var(--text);
+}
+
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-header-card,.sw-card,.sw-explorer-panel,.sw-viewer-panel,.sw-observations-panel) {
+    background:var(--surface);
+    border-color:var(--line);
+    color:var(--text);
+}
+
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-header-people-grid,.sw-summary-grid div,.sw-history-event,.sw-history-accordion,.sw-obs-footer,.sw-project-actions,.sw-viewer-toolbar,.sw-viewer-download-note) {
+    background:var(--surface-soft);
+    border-color:var(--line);
+    color:var(--text);
+}
+
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-panel-toggle,.sw-toggle-btn,.sw-ct-expand-btn) {
+    background:var(--surface-soft);
+    border-color:var(--line);
+    color:var(--text);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-panel-toggle,.sw-toggle-btn,.sw-ct-expand-btn):hover,
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-ct-expand-btn:focus-visible {
+    background:var(--surface-elevated);
+    border-color:var(--blue);
+    color:var(--blue);
+}
+
+/* Cabecera, recorrido y estados */
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-edit-info-btn {
+    background:color-mix(in srgb,var(--blue) 14%,var(--surface-soft));
+    border-color:color-mix(in srgb,var(--blue) 42%,var(--line));
+    color:var(--blue);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-edit-info-btn:hover {
+    background:color-mix(in srgb,var(--blue) 22%,var(--surface-soft));
+    border-color:var(--blue);
+    color:var(--blue);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-ct-step.is-completed .sw-ct-node {
+    background:var(--sw-green-soft);
+    border-color:color-mix(in srgb,var(--sw-green) 42%,var(--line));
+    color:var(--sw-green);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-ct-step.is-current .sw-ct-node {
+    background:color-mix(in srgb,var(--blue) 16%,var(--surface-soft));
+    border-color:color-mix(in srgb,var(--blue) 45%,var(--line));
+    color:var(--blue);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-badge-status.is-development,.sw-badge-status.is-under_review,.sw-badge-status.is-approved,.sw-badge-status.is-defense,.sw-badge-status.is-tribunal_approved,.sw-badge-status.is-published) {
+    border-color:color-mix(in srgb,currentColor 42%,var(--line));
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-badge-status.is-development { background:color-mix(in srgb,#38bdf8 18%,var(--surface-soft)); color:#7dd3fc; }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-badge-status.is-under_review { background:color-mix(in srgb,var(--sw-amber) 18%,var(--surface-soft)); color:var(--sw-amber); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-badge-status.is-approved { background:var(--sw-green-soft); color:var(--sw-green); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-badge-status.is-defense,.sw-badge-status.is-tribunal_approved) { background:color-mix(in srgb,var(--sw-violet) 18%,var(--surface-soft)); color:var(--sw-violet); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-badge-status.is-published { background:color-mix(in srgb,var(--sw-teal) 18%,var(--surface-soft)); color:var(--sw-teal); }
+
+/* Navegación móvil, archivos, árboles y menús */
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-mobile-tab {
+    background:var(--surface);
+    border-color:var(--line);
+    color:var(--muted);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-mobile-tab.is-active {
+    background:color-mix(in srgb,var(--blue) 16%,var(--surface-soft));
+    border-color:var(--blue);
+    color:var(--blue);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-tree-item.is-selected,.sw-zip-entry.is-selected) {
+    background:color-mix(in srgb,var(--blue) 16%,var(--surface-soft));
+    border-color:color-mix(in srgb,var(--blue) 45%,var(--line));
+    color:var(--text);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-tree-item:hover,.sw-zip-entry:hover,.sw-zip-folder-btn:hover) {
+    background:color-mix(in srgb,var(--blue) 10%,var(--surface-soft));
+    color:var(--text);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-file-menu,.sw-tabs-more>div),
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen)>.sw-file-menu {
+    background:var(--surface-elevated);
+    border-color:var(--line);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-file-menu button,.sw-file-menu a,.sw-tabs-more a),
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen)>.sw-file-menu :is(button,a) {
+    color:var(--text);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-file-menu button:hover,.sw-file-menu a:hover,.sw-tabs-more a:hover,.sw-tabs-more a:focus),
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen)>.sw-file-menu :is(button:hover,a:hover) {
+    background:var(--surface-soft);
+    color:var(--text);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-file-lock-badge {
+    background:var(--sw-amber-soft);
+    color:var(--sw-amber);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-file-lock-badge:hover,.sw-file-lock-badge:focus-visible) {
+    background:color-mix(in srgb,var(--sw-amber) 24%,var(--surface-soft));
+    color:var(--sw-amber);
+    outline-color:var(--sw-amber);
+}
+
+/* Visor, acciones, controles y superficies de previsualización */
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-viewer-action,.sw-viewer-zoom) {
+    background:var(--surface-elevated);
+    border-color:var(--line);
+    color:var(--text);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-viewer-action:hover:not(:disabled),.sw-viewer-zoom button:hover) {
+    background:color-mix(in srgb,var(--blue) 14%,var(--surface-elevated));
+    border-color:var(--blue);
+    color:var(--text);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-viewer-action.is-file-download:not(:disabled),.sw-viewer-action.is-primary:not(:disabled),.sw-obs-action-btn) {
+    background:var(--blue);
+    border-color:var(--blue);
+    color:#07111f;
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-viewer-action.is-file-download:not(:disabled):hover,.sw-viewer-action.is-primary:not(:disabled):hover,.sw-obs-action-btn:hover:not(:disabled)) {
+    background:var(--blue-dark);
+    border-color:var(--blue-dark);
+    color:#07111f;
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-viewer-action:disabled,.sw-viewer-action[disabled]) {
+    background:var(--surface-soft) !important;
+    border-color:var(--line) !important;
+    color:var(--muted) !important;
+    opacity:1 !important;
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-viewer-canvas,.sw-preview-stage,.sw-preview-docx,.sw-poc-pages) {
+    background:var(--surface-soft);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-preview-pdf { background:var(--surface-soft); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-viewer-download-note {
+    color:var(--muted);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-viewer-download-note i { color:var(--muted); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-viewer-help-banner {
+    background:color-mix(in srgb,var(--blue) 14%,var(--surface-soft));
+    border-color:color-mix(in srgb,var(--blue) 42%,var(--line));
+    color:var(--text);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-viewer-help-banner i,.sw-viewer-help-content strong:first-child) { color:var(--blue); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-viewer-help-content span,.sw-viewer-help-content span strong) { color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-viewer-zoom button,.sw-poc-pdf-controls button,.sw-poc-control,.sw-poc-observation) {
+    background:var(--surface-soft);
+    border-color:var(--line);
+    color:var(--text);
+}
+
+/* Estados del visor y avisos */
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-state-title,.sw-review-representation-pending,.sw-preview-message) { color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-state-message,.sw-review-representation-pending p) { color:var(--muted); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-state-icon-badge .sub-icon {
+    background:var(--surface-elevated);
+    color:var(--blue);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-preview-state-card.is-empty .sw-state-icon-badge { background:color-mix(in srgb,var(--blue) 18%,var(--surface-elevated)); border-color:color-mix(in srgb,var(--blue) 42%,var(--line)); color:var(--blue); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-preview-state-card.is-loading .sw-state-icon-badge,.sw-preview-state-card.is-processing .sw-state-icon-badge) { background:var(--sw-violet-soft); border-color:color-mix(in srgb,var(--sw-violet) 42%,var(--line)); color:var(--sw-violet); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-preview-state-card.is-unsupported .sw-state-icon-badge { background:var(--sw-amber-soft); border-color:color-mix(in srgb,var(--sw-amber) 42%,var(--line)); color:var(--sw-amber); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-preview-state-card.is-forbidden .sw-state-icon-badge,.sw-preview-state-card.is-error .sw-state-icon-badge) { background:color-mix(in srgb,#fb7185 16%,var(--surface-elevated)); border-color:color-mix(in srgb,#fb7185 42%,var(--line)); color:#fb7185; }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-preview-error-wrapper .sw-retry-preview-btn { background:var(--surface-elevated); border-color:var(--line); color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-preview-error-wrapper .sw-retry-preview-btn:hover:not(:disabled) { background:var(--surface-soft); border-color:var(--blue); color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-preview-message.is-error { color:#fb7185; }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-docx-notice {
+    background:color-mix(in srgb,var(--blue) 14%,var(--surface-soft));
+    border-color:color-mix(in srgb,var(--blue) 42%,var(--line));
+    color:var(--blue);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-preview-docx-content { background:var(--surface-soft); color:var(--text); }
+
+/* Observaciones, filtros, tarjetas e historial */
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-obs-filter {
+    background:var(--surface);
+    border-color:var(--line);
+    color:var(--muted);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-obs-filter.is-all:hover:not(.is-active) { background:color-mix(in srgb,var(--blue) 14%,var(--surface-soft)); border-color:var(--blue); color:var(--blue); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-obs-filter.is-pending:hover:not(.is-active) { background:var(--sw-amber-soft); border-color:var(--sw-amber); color:var(--sw-amber); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-obs-filter.is-addressed:hover:not(.is-active) { background:var(--sw-green-soft); border-color:var(--sw-green); color:var(--sw-green); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-obs-filter.is-all.is-active { background:color-mix(in srgb,var(--blue) 22%,var(--surface-elevated)) !important; border-color:var(--blue) !important; color:var(--blue) !important; }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-obs-filter.is-pending.is-active { background:color-mix(in srgb,var(--sw-amber) 20%,var(--surface-elevated)) !important; border-color:var(--sw-amber) !important; color:var(--sw-amber) !important; }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-obs-filter.is-addressed.is-active { background:color-mix(in srgb,var(--sw-green) 20%,var(--surface-elevated)) !important; border-color:var(--sw-green) !important; color:var(--sw-green) !important; }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-obs-card,.sw-historical-obs-card) { background:var(--surface-soft); border-color:var(--line); color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-obs-card.is-selected,.sw-obs-card.is-active) { background:color-mix(in srgb,var(--sw-amber) 14%,var(--surface-soft)) !important; border-color:var(--sw-amber) !important; }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-obs-card-body,.sw-obs-card p,.sw-obs-text,.sw-obs-card-header,.sw-obs-card-footer) { color:var(--text); border-color:var(--line); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-obs-cat-tag,.sw-obs-card-footer,.sw-obs-quote-toggle) { color:var(--muted); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-obs-zip-ref,.sw-obs-loc-ref,.sw-obs-context-ref) { background:var(--surface); border-color:var(--line); color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-history-accordion[open],.sw-history-accordion-body) { background:var(--surface); border-color:var(--line); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-history-count-badge { background:color-mix(in srgb,#38bdf8 18%,var(--surface-soft)) !important; border-color:color-mix(in srgb,#38bdf8 42%,var(--line)) !important; color:#7dd3fc !important; }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-protected-label { background:var(--surface-soft) !important; border-color:var(--line) !important; color:var(--text) !important; }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-obs-num { color:var(--sw-amber); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-obs-type-badge.is-contextual { background:var(--sw-amber-soft); color:var(--sw-amber); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-obs-type-badge.is-zip { background:var(--sw-violet-soft); color:var(--sw-violet); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-obs-type-badge.is-general { background:var(--surface); color:var(--muted); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-obs-type-badge.is-project { background:var(--sw-green-soft); color:var(--sw-green); }
+
+/* Modales y desplegables del workspace */
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-modal-dialog,.sw-operation-modal section,.sw-edit-project-dialog,.sw-confirm-dialog,.sw-submit-modal-card,.sw-review-confirm-card) {
+    background:var(--surface-elevated);
+    border-color:var(--line);
+    color:var(--text);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-modal-header,.sw-modal-footer,.sw-operation-modal header,.sw-operation-modal footer,.sw-edit-project-header,.sw-edit-project-footer,.sw-submit-modal-header,.sw-submit-modal-footer,.sw-review-confirm-header,.sw-review-confirm-footer) {
+    background:var(--surface);
+    border-color:var(--line);
+    color:var(--text);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-modal-header h3,.sw-operation-modal header h2,.sw-edit-project-header-title,.sw-edit-project-header-title h2,.sw-submit-modal-header h2,.sw-review-confirm-header h2,.sw-review-confirm-copy strong) { color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-modal-body,.sw-operation-modal>section>div,.sw-edit-project-body,.sw-submit-modal-body,.sw-review-confirm-body) { color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-modal-header button,.sw-operation-modal header button,.sw-edit-project-close-btn,.sw-submit-modal-close-btn,.sw-review-confirm-header button) { color:var(--muted); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-modal-header button:hover,.sw-edit-project-close-btn:hover,.sw-submit-modal-close-btn:hover) { background:var(--surface-soft); color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-operation-modal footer button,.sw-edit-project-cancel-btn,.sw-confirm-btn.secondary,.sw-submit-cancel-btn,.sw-review-confirm-cancel) { background:var(--surface-soft); border-color:var(--line); color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-operation-modal footer button:hover,.sw-edit-project-cancel-btn:hover,.sw-confirm-btn.secondary:hover,.sw-submit-cancel-btn:hover:not(:disabled),.sw-review-confirm-cancel:hover) { background:var(--surface-elevated); border-color:var(--blue); color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-edit-project-input,.sw-edit-project-textarea,.sw-edit-project-search-box,.sw-replace-reason-native,.sw-replace-other-group textarea) { background:var(--surface-soft); border-color:var(--line); color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-edit-project-input::placeholder,.sw-edit-project-textarea::placeholder,.sw-edit-project-search-box input::placeholder) { color:var(--muted); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-edit-project-card,.sw-edit-project-picker-panel,.sw-edit-project-picker-option,.sw-replace-file-info) { background:var(--surface-soft) !important; border-color:var(--line) !important; color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-edit-project-card-details strong,[data-sw-replace-current-name],[data-sw-replace-new-name]) { color:var(--text) !important; }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-edit-project-card-details small,.sw-edit-project-hint,.sw-edit-project-picker-option small,.sw-replace-notice) { color:var(--muted) !important; }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-edit-project-picker-option:hover,.sw-edit-project-btn-icon:hover) { background:color-mix(in srgb,var(--blue) 14%,var(--surface-soft)); color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-reason-portal-listbox {
+    background:var(--surface-elevated) !important;
+    border-color:var(--line) !important;
+    color:var(--text) !important;
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-submit-restriction-box,.sw-review-confirm-stats,.sw-review-confirm-status) { background:var(--surface-soft); border-color:var(--line); color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is([data-sw-submit-error],.sw-review-confirm-error) { background:color-mix(in srgb,#fb7185 12%,var(--surface-soft)); border-color:#fb7185; color:#fecdd3; }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-edit-project-label,.sw-edit-project-picker-option strong) { color:var(--text); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-edit-project-add-btn {
+    background:var(--surface-soft);
+    border-color:var(--line);
+    color:var(--text);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-edit-project-add-btn:hover,.sw-edit-project-picker-hide-btn:hover) {
+    background:color-mix(in srgb,var(--blue) 14%,var(--surface-soft));
+    border-color:var(--blue);
+    color:var(--blue);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace :is(.sw-edit-project-picker-list,.sw-edit-project-search-box input,.sw-edit-project-picker-hide-btn) {
+    background:var(--surface-soft);
+    border-color:var(--line);
+    color:var(--text);
+}
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-edit-project-picker-option:hover { background:color-mix(in srgb,var(--blue) 14%,var(--surface-soft)); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-edit-project-search-box i { color:var(--muted); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-edit-project-picker-hide-btn { color:var(--muted); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-edit-project-avatar { background:color-mix(in srgb,var(--blue) 16%,var(--surface-soft)); color:var(--blue); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-edit-project-btn-icon { color:var(--muted); }
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen) .student-workspace .sw-reason-portal-listbox,
+:is(html.theme-dark body.app-student-workspace-fullscreen,body.dark-mode.app-student-workspace-fullscreen)>.sw-reason-portal-listbox {
+    background:var(--surface-elevated) !important;
+    border-color:var(--line) !important;
+    color:var(--text) !important;
+}

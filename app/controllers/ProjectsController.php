@@ -1221,12 +1221,20 @@ final class ProjectsController
         [, $access] = $this->draftRequest();
         $userId = $access->currentUserId();
         try {
+            $action = (string) ($_POST['action'] ?? 'save');
+            if (!in_array($action, ['save', 'submit'], true)) {
+                http_response_code(422);
+                $this->json(['success'=>false,'message'=>'La acción solicitada no es válida.','data'=>[]]);
+            }
             if (session_status() === PHP_SESSION_ACTIVE) { session_write_close(); }
-            $result = (new ProjectDraftRegistrationService())->register($userId, $access->projectCreationPolicy(), (string) ($_POST['draft_id'] ?? ''));
-            $this->json(['success'=>true,'message'=>'Proyecto registrado correctamente.','data'=>$result]);
+            $result = (new ProjectDraftRegistrationService())->register($userId, $access->projectCreationPolicy(), (string) ($_POST['draft_id'] ?? ''), $action === 'submit');
+            $this->json(['success'=>true,'message'=>$action === 'submit' ? 'Proyecto enviado a revisión correctamente.' : 'Proyecto guardado en preparación correctamente.','data'=>$result]);
         } catch (ProjectDraftRegistrationException $exception) {
             http_response_code(422);
             $this->json(['success'=>false,'message'=>$exception->getMessage(),'data'=>['errors'=>$exception->errors]]);
+        } catch (StudentProjectSubmissionException $exception) {
+            http_response_code($exception->httpStatus());
+            $this->json(['success'=>false,'message'=>$exception->getMessage(),'data'=>$exception->data()]);
         } catch (Throwable $exception) {
             error_log('Project draft registration: '.$exception->getMessage());
             http_response_code(500);

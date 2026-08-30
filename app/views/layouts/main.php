@@ -16,6 +16,7 @@
     <?php endforeach; ?>
     <link rel="stylesheet" href="<?= e(asset('css/admin-controls.css')) ?>">
     <link rel="stylesheet" href="<?= e(asset('css/card-accents.css')) ?>">
+    <link rel="stylesheet" href="<?= e(asset('css/theme-dark.css')) ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <?php

@@ -12,7 +12,7 @@
     const tagList = document.querySelector('[data-tag-list]');
     const tagInput = document.querySelector('#tagInput');
     const quickTags = document.querySelector('[data-quick-tags]');
-    let current = 0, uploading = 0, pendingReplace = null, dirty = false, dialogOpener = null, previousType = form.elements.type?.value || '', pendingType = '', previousModality = form.elements.modality?.value || '', preflightInFlight = false;
+    let current = 0, uploading = 0, pendingReplace = null, dirty = false, dialogOpener = null, previousType = form.elements.type?.value || '', pendingType = '', previousModality = form.elements.modality?.value || '', preflightInFlight = false, registrationInFlight = false;
     let draftFiles = [...(config.storedDraft?.files || [])];
 
     const announce = (message, kind = 'success') => {
@@ -41,6 +41,7 @@
         if (size < 1048576) return `${Math.round(size / 1024)} KB`;
         return `${Number((size / 1048576).toFixed(1))} MB`;
     };
+    const fileTotalBytes = () => draftFiles.reduce((total, file) => total + Math.max(0, Number(file.size_bytes) || 0), 0);
     const request = async (url, body, signal) => {
         const response = await fetch(url, { method: 'POST', body, signal, credentials: 'same-origin', headers: { Accept: 'application/json' } });
         const result = await response.json().catch(() => null);
@@ -48,7 +49,7 @@
         if (!response.ok && !result?.data?.failed) { const error = new Error(result?.message || 'No se pudo completar la operación.'); error.data = result?.data; throw error; }
         return result;
     };
-    const resetPreflightButton = (button = document.querySelector('[data-submit]')) => { if (!button) return; preflightInFlight = false; button.disabled = false; button.removeAttribute('aria-disabled'); button.innerHTML = 'Registrar proyecto <i class="fa-solid fa-check" aria-hidden="true"></i>'; };
+    const resetPreflightButton = () => { preflightInFlight = false; document.querySelectorAll('[data-submit-preparation],[data-submit-review]').forEach((button) => { button.disabled = false; button.removeAttribute('aria-disabled'); button.innerHTML = button.matches('[data-submit-review]') ? '<i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Enviar a revisión' : '<i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Guardar en preparación'; }); };
     const formPayload = () => {
         const data = new FormData(form);
         data.set('_csrf', config.draftCsrf || '');
@@ -121,7 +122,7 @@
         const active = steps[current]; Object.entries(sections).forEach(([key, section]) => { section.hidden = key !== active; section.classList.toggle('is-active', key === active); });
         document.querySelectorAll('[data-step-indicator]').forEach((node, position) => { node.classList.toggle('is-complete', position < current); node.toggleAttribute('aria-current', position === current); });
         document.querySelector('#wizardProgressText').textContent = `Paso ${current + 1} de 5`;
-        document.querySelector('[data-previous]').hidden = current === 0; document.querySelector('[data-next]').hidden = current === steps.length - 1; document.querySelector('[data-submit]').hidden = current !== steps.length - 1;
+        document.querySelector('[data-previous]').hidden = current === 0; document.querySelector('[data-next]').hidden = current === steps.length - 1; document.querySelectorAll('[data-submit-preparation],[data-submit-review]').forEach((button) => { button.hidden = current !== steps.length - 1; });
         if (active === 'confirm') renderConfirmation(); updatePreview(); syncResetVisibility(); if (focus) sections[active].querySelector('h2')?.focus({ preventScroll: true });
     }
     function validateClient(target) {
@@ -180,7 +181,7 @@
         return raw;
     }
     const lookup = (name) => name === 'tutor_id' ? tutorLabel() : form.elements[name]?.selectedOptions?.[0]?.textContent?.trim() || 'Sin seleccionar';
-    function previewData() { const members = new Set([...form.querySelectorAll('[name="members[]"]:checked,[name="members[]"][type="hidden"]')].map((field) => field.value)).size; const total = draftFiles.reduce((sum, file) => sum + Number(file.size_bytes || 0), 0); const filesLabel = draftFiles.length === 0 ? 'Sin archivos' : draftFiles.length === 1 ? formatFileSize(total) : `${formatFileSize(total)} en total`; return [['Tipo', typeData().label || 'Sin seleccionar'], ['Título', form.elements.title?.value || 'Sin seleccionar'], ['Periodo', config.activePeriod?.code || 'Pendiente'], ['Carrera', config.student?.career_name || 'Sin seleccionar'], ['Semestre', config.student ? `${config.student.semester}.º semestre` : 'Pendiente'], ['Tutor', lookup('tutor_id')], ['Integrantes', String(members)], ['Etiquetas', String(tags().length)], ['Archivos', filesLabel]]; }
+    function previewData() { const members = new Set([...form.querySelectorAll('[name="members[]"]:checked,[name="members[]"][type="hidden"]')].map((field) => field.value)).size; const total = fileTotalBytes(); const filesLabel = draftFiles.length === 0 ? 'Sin archivos' : draftFiles.length === 1 ? formatFileSize(total) : `${formatFileSize(total)} en total`; return [['Tipo', typeData().label || 'Sin seleccionar'], ['Título', form.elements.title?.value || 'Sin seleccionar'], ['Periodo', config.activePeriod?.code || 'Pendiente'], ['Carrera', config.student?.career_name || 'Sin seleccionar'], ['Semestre', config.student ? `${config.student.semester}.º semestre` : 'Pendiente'], ['Tutor', lookup('tutor_id')], ['Integrantes', String(members)], ['Etiquetas', String(tags().length)], ['Archivos', filesLabel]]; }
     function fillSummary(target, data) { target.replaceChildren(...data.map(([label, value]) => { const row = document.createElement('div'); row.dataset.summaryField = label.toLocaleLowerCase(); const key = document.createElement('dt'); const content = document.createElement('dd'); key.textContent = label; content.textContent = value; row.append(key, content); return row; })); }
     function updatePreview() { const preview = document.querySelector('[data-preview]'); if (preview) fillSummary(preview, previewData()); }
     function renderConfirmation() { const box = document.querySelector('[data-confirmation]'); if (box) fillSummary(box, previewData()); }
@@ -189,19 +190,17 @@
         target.replaceChildren();
         const addRow = (label, value, className = '') => { const row = document.createElement('div'); row.className = className; const key = document.createElement('dt'); const content = document.createElement('dd'); key.textContent = label; content.textContent = value; row.append(key, content); target.append(row); return { row, content }; };
         addRow('Título', summary.title, 'is-wide'); addRow('Tipo', summary.type, 'is-wide'); addRow('Tutor', summary.tutor);
-        const memberRow = document.createElement('div'); memberRow.className = 'is-toggle-row'; const memberKey = document.createElement('dt'); memberKey.textContent = 'Integrantes'; const memberValue = document.createElement('dd'); const memberNames = [...form.querySelectorAll('[name="members[]"]:checked')].map((field) => field.closest('label')?.querySelector('b')?.textContent?.trim()).filter(Boolean);
-        if (memberNames.length <= 1) memberValue.textContent = memberNames[0] || 'Sin integrantes';
-        else { const button = document.createElement('button'); button.type = 'button'; button.className = 'wizard-summary-toggle'; button.setAttribute('aria-expanded', 'false'); button.setAttribute('aria-label', 'Mostrar integrantes'); button.textContent = `${memberNames[0]} · ${memberNames.length - 1} más`; const list = document.createElement('ul'); list.hidden = true; memberNames.forEach((name) => { const item = document.createElement('li'); item.textContent = name; list.append(item); }); button.addEventListener('click', () => { const expanded = button.getAttribute('aria-expanded') === 'true'; button.setAttribute('aria-expanded', String(!expanded)); button.setAttribute('aria-label', expanded ? 'Mostrar integrantes' : 'Ocultar integrantes'); list.hidden = expanded; }); memberValue.append(button, list); }
-        memberRow.append(memberKey, memberValue); target.append(memberRow);
-        const fileRow = document.createElement('div'); fileRow.className = 'is-toggle-row is-files-row'; const fileButton = document.createElement('button'); fileButton.type = 'button'; fileButton.className = 'wizard-summary-toggle wizard-files-toggle'; fileButton.setAttribute('aria-expanded', 'false'); fileButton.setAttribute('aria-label', draftFiles.length ? 'Mostrar archivos' : 'No hay archivos para mostrar'); fileButton.disabled = !draftFiles.length; const fileLabel = document.createElement('span'); fileLabel.textContent = 'Archivos'; const fileCount = document.createElement('span'); fileCount.textContent = String(draftFiles.length); fileButton.append(fileLabel, fileCount); const fileList = document.createElement('ul'); fileList.hidden = true;
-        draftFiles.forEach((file) => { const item = document.createElement('li'); const name = document.createElement('strong'); name.textContent = file.original_name || 'Archivo sin nombre'; item.append(name); firstLevelZipEntries(file).forEach((entry) => { const nested = document.createElement('li'); nested.className = 'wizard-zip-entry'; nested.textContent = `${entry.folder ? '📁' : '📄'} ${entry.name}`; item.append(nested); }); fileList.append(item); });
+        const memberRow = document.createElement('div'); memberRow.className = 'is-toggle-row'; const memberKey = document.createElement('dt'); memberKey.textContent = 'Integrantes'; const memberValue = document.createElement('dd'); const memberNames = [...form.querySelectorAll('[name="members[]"]:checked')].map((field) => field.closest('label')?.querySelector('b')?.textContent?.trim()).filter(Boolean); const memberCount = document.createElement('button'); memberCount.type = 'button'; memberCount.className = 'wizard-summary-toggle'; memberCount.setAttribute('aria-expanded', 'false'); memberCount.setAttribute('aria-label', memberNames.length ? 'Mostrar integrantes' : 'No hay integrantes'); memberCount.disabled = memberNames.length === 0; memberCount.textContent = memberNames.length ? String(memberNames.length) + ' integrante' + (memberNames.length === 1 ? '' : 's') : 'Sin integrantes'; const memberList = document.createElement('ul'); memberList.hidden = true; memberNames.forEach((name) => { const item = document.createElement('li'); item.textContent = name; memberList.append(item); }); memberCount.addEventListener('click', () => { const expanded = memberCount.getAttribute('aria-expanded') === 'true'; memberCount.setAttribute('aria-expanded', String(!expanded)); memberCount.setAttribute('aria-label', expanded ? 'Mostrar integrantes' : 'Ocultar integrantes'); memberList.hidden = expanded; }); memberValue.append(memberCount, memberList); memberRow.append(memberKey, memberValue); target.append(memberRow);
+        const fileRow = document.createElement('div'); fileRow.className = 'is-toggle-row is-files-row'; const fileButton = document.createElement('button'); fileButton.type = 'button'; fileButton.className = 'wizard-summary-toggle wizard-files-toggle'; fileButton.setAttribute('aria-expanded', 'false'); fileButton.setAttribute('aria-label', draftFiles.length ? 'Mostrar archivos' : 'No hay archivos para mostrar'); fileButton.disabled = !draftFiles.length; const fileLabel = document.createElement('span'); const totalBytes = fileTotalBytes(); fileLabel.textContent = draftFiles.length === 0 ? 'Sin archivos' : String(draftFiles.length) + ' archivo' + (draftFiles.length === 1 ? '' : 's') + ' · ' + formatFileSize(totalBytes) + (draftFiles.length > 1 ? ' en total' : ''); fileButton.append(fileLabel); const fileList = document.createElement('ul'); fileList.hidden = true;
+        draftFiles.forEach((file) => { const item = document.createElement('li'); const name = document.createElement('strong'); name.textContent = file.original_name || 'Archivo sin nombre'; item.append(name); firstLevelZipEntries(file).forEach((entry) => { const nested = document.createElement('li'); nested.className = 'wizard-zip-entry'; nested.textContent = (entry.folder ? '📁' : '📄') + ' ' + entry.name; item.append(nested); }); fileList.append(item); });
         fileButton.addEventListener('click', () => { const expanded = fileButton.getAttribute('aria-expanded') === 'true'; fileButton.setAttribute('aria-expanded', String(!expanded)); fileButton.setAttribute('aria-label', expanded ? 'Mostrar archivos' : 'Ocultar archivos'); fileList.hidden = expanded; }); fileRow.append(fileButton, fileList); target.append(fileRow);
     }
 
     function openDialog(dialog, opener = document.activeElement) { if (!dialog) return; document.querySelectorAll('.wizard-dialog:not([hidden])').forEach((item) => { if (item !== dialog) closeDialog(item, false); }); dialogOpener = opener instanceof HTMLElement ? opener : null; dialog.hidden = false; dialog.setAttribute('aria-hidden', 'false'); document.body.classList.add('wizard-modal-open'); dialog.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')?.focus(); }
     function closeDialog(dialog, restoreFocus = true) { if (!dialog) return; dialog.hidden = true; dialog.setAttribute('aria-hidden', 'true'); const open = document.querySelector('.wizard-dialog:not([hidden])'); if (!open) { document.body.classList.remove('wizard-modal-open'); const target = restoreFocus ? dialogOpener : null; dialogOpener = null; if (target && document.contains(target) && !target.hidden) target.focus(); } }
-    const resumeDialog = document.querySelector('[data-draft-resume-dialog]'); const resetDialog = document.querySelector('[data-draft-reset-dialog]'); const replaceDialog = document.querySelector('[data-draft-replace-dialog]'); const typeChangeDialog = document.querySelector('[data-type-change-dialog]'); const modalityChangeDialog = document.querySelector('[data-modality-change-dialog]'); const registerDialog = document.querySelector('[data-draft-register-dialog]');
-    const registerSummary = document.querySelector('[data-register-summary]'); registerSummary && new MutationObserver(() => { const row = registerSummary.querySelector('.is-toggle-row:not(.is-files-row)'); const button = row?.querySelector('.wizard-summary-toggle'); const list = row?.querySelector('ul'); if (button && list) button.disabled = list.children.length < 2; }).observe(registerSummary, { childList: true, subtree: true });
+    const resumeDialog = document.querySelector('[data-draft-resume-dialog]'); const resetDialog = document.querySelector('[data-draft-reset-dialog]'); const replaceDialog = document.querySelector('[data-draft-replace-dialog]'); const typeChangeDialog = document.querySelector('[data-type-change-dialog]'); const modalityChangeDialog = document.querySelector('[data-modality-change-dialog]'); const preparationDialog = document.querySelector('[data-draft-preparation-dialog]'); const reviewDialog = document.querySelector('[data-draft-review-dialog]'); const registrationDialogs = [preparationDialog, reviewDialog].filter(Boolean); const registrationSummaryTargets = [...document.querySelectorAll('[data-register-summary]')];
+    const observeRegisterSummary = (target) => new MutationObserver(() => { const row = target.querySelector('.is-toggle-row:not(.is-files-row)'); const button = row?.querySelector('.wizard-summary-toggle'); const list = row?.querySelector('ul'); if (button && list) button.disabled = list.children.length === 0; }).observe(target, { childList: true, subtree: true });
+    registrationSummaryTargets.forEach(observeRegisterSummary);
     document.addEventListener('keydown', (event) => { const dialog = document.querySelector('.wizard-dialog:not([hidden])'); if (!dialog) return; if (event.key === 'Escape') { event.preventDefault(); if (dialog === resetDialog) returnToDraftResume(); else closeDialog(dialog); return; } if (event.key !== 'Tab') return; const focusable = [...dialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((item) => !item.disabled && !item.hidden); if (!focusable.length) return; const first = focusable[0], last = focusable[focusable.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); } });
     function restoreServerDraft() { const payload = config.storedDraft?.payload; if (!payload) return; Object.entries(payload).forEach(([name, value]) => [...form.elements].filter((field) => field.name === name || field.name === `${name}[]`).forEach((field) => { if (field.disabled) return; if (field.type === 'checkbox' || field.type === 'radio') field.checked = (Array.isArray(value) ? value : [value]).map(String).includes(field.value); else if (!Array.isArray(value)) field.value = value == null ? '' : String(value); })); previousType = selectedType(); previousModality = form.elements.modality?.value || ''; renderTags((payload.tags || []).filter(Boolean)); dirty = false; updateConditionalFields(); showStep(Math.max(0, steps.indexOf(payload.current_step)), false); renderFiles(); announce('Borrador recuperado.'); }
     function returnToDraftResume() { closeDialog(resetDialog, false); openDialog(resumeDialog, document.querySelector('[data-draft-start-new]')); }
@@ -210,26 +209,55 @@
     document.querySelector('[data-draft-replace-cancel]')?.addEventListener('click', () => { pendingReplace = null; closeDialog(replaceDialog); }); document.querySelector('[data-draft-replace-confirm]')?.addEventListener('click', () => { const pending = pendingReplace; pendingReplace = null; closeDialog(replaceDialog); if (pending) void uploadFiles([pending.file], true); });
     document.querySelector('[data-type-change-cancel]')?.addEventListener('click', () => { pendingType = ''; closeDialog(typeChangeDialog); }); document.querySelector('[data-type-change-confirm]')?.addEventListener('click', () => { const nextType = pendingType; pendingType = ''; closeDialog(typeChangeDialog); if (nextType) { selectType(nextType); applyTypeChange(nextType); } });
     document.querySelector('[data-modality-change-cancel]')?.addEventListener('click', () => closeDialog(modalityChangeDialog)); document.querySelector('[data-modality-change-confirm]')?.addEventListener('click', () => { form.elements.modality.value = 'individual'; previousModality = 'individual'; form.querySelectorAll('[name="members[]"][type="checkbox"]').forEach((input) => { if (input.value !== actorId()) input.checked = false; }); closeDialog(modalityChangeDialog); updateConditionalFields(); updatePreview(); scheduleSave(); syncResetVisibility(); });
-    document.querySelector('[data-submit]')?.addEventListener('click', async (event) => { const button = event.currentTarget; if (preflightInFlight || button.disabled) return; if (!validateClient('confirm') || !await saveDraft()) return; preflightInFlight = true; button.disabled = true; button.setAttribute('aria-disabled', 'true'); button.textContent = 'Validando…'; const body = new FormData(); body.set('_csrf', config.draftCsrf || ''); const controller = new AbortController(); const timeout = window.setTimeout(() => controller.abort(), 20000); try { const result = await request(endpoints.preflight, body, controller.signal); if (!result.success) { const error = new Error(result.message || 'No fue posible validar el borrador.'); error.data = result.data; throw error; } config.storedDraft = result.data?.draft || config.storedDraft; renderRegisterSummary(document.querySelector('[data-register-summary]'), { title: result.data?.summary?.title || form.elements.title.value || 'Sin seleccionar', type: result.data?.summary?.type_label || typeData().label || 'Sin seleccionar', tutor: lookup('tutor_id') }); openDialog(registerDialog); } catch (error) { announce(error.name === 'AbortError' ? 'La validación tardó demasiado. Inténtalo nuevamente.' : (error.message || 'No fue posible validar el borrador.'), true); const target = stepForPreflightErrors(error.data?.errors); if (target < 4) showStep(target); } finally { window.clearTimeout(timeout); resetPreflightButton(button); } });
-    document.querySelector('[data-draft-register-cancel]')?.addEventListener('click', () => closeDialog(registerDialog));
-    document.querySelector('[data-draft-register-confirm]')?.addEventListener('click', async (event) => {
-        const button = event.currentTarget;
-        if (button.disabled) return;
+    const setDialogError = (dialog, message = '') => { const node = dialog?.querySelector('[data-draft-action-error]'); if (!node) return; node.textContent = message; node.hidden = message === ''; };
+    const registrationActionButtons = () => registrationDialogs.flatMap((dialog) => [...dialog.querySelectorAll('button')]);
+    const executeRegistration = async (action, button, dialog) => {
+        if (registrationInFlight || button.disabled) return;
         const draftId = config.storedDraft?.id;
-        if (!draftId) { announce('El borrador ya no está disponible. Recarga la página e inténtalo nuevamente.', true); return; }
-        button.disabled = true; button.setAttribute('aria-disabled', 'true'); button.textContent = 'Registrando…';
-        const body = new FormData(); body.set('_csrf', config.draftCsrf || ''); body.set('draft_id', draftId);
+        if (!draftId) { setDialogError(dialog, 'El borrador ya no está disponible. Recarga la página e inténtalo nuevamente.'); return; }
+        registrationInFlight = true; setDialogError(dialog); registrationActionButtons().forEach((item) => { item.disabled = true; item.setAttribute('aria-disabled', 'true'); }); button.textContent = action === 'submit' ? 'Enviando…' : 'Guardando…';
+        const body = new FormData(); body.set('_csrf', config.draftCsrf || ''); body.set('draft_id', draftId); body.set('action', action);
         try {
             const result = await request(endpoints.register, body);
-            if (!result.success || !result.data?.redirect_url) throw new Error(result.message || 'No fue posible registrar el proyecto.');
+            if (!result.success || !result.data?.redirect_url) throw new Error(result.message || 'No fue posible completar la operación.');
             config.storedDraft = null; draftFiles = []; dirty = false; sessionStorage.removeItem(config.storageKey || '');
             window.location.assign(result.data.redirect_url);
         } catch (error) {
-            announce(error.message || 'No fue posible registrar el proyecto. Tu borrador continúa disponible.', true);
-            const target = stepForPreflightErrors(error.data?.errors); if (target < 4) { closeDialog(registerDialog); showStep(target); }
-            button.disabled = false; button.removeAttribute('aria-disabled'); button.textContent = 'Registrar proyecto';
+            const message = error.message || 'No fue posible completar la operación. Tu borrador continúa disponible.';
+            setDialogError(dialog, message); announce(message, true);
+            const target = stepForPreflightErrors(error.data?.errors); if (target < 4) { closeDialog(dialog); showStep(target); }
+        } finally {
+            registrationInFlight = false;
+            registrationActionButtons().forEach((item) => { item.disabled = false; item.removeAttribute('aria-disabled'); });
+            if (dialog?.querySelector('[data-draft-preparation-confirm]')) dialog.querySelector('[data-draft-preparation-confirm]').textContent = 'Guardar en preparación';
+            if (dialog?.querySelector('[data-draft-review-preparation]')) dialog.querySelector('[data-draft-review-preparation]').textContent = 'Guardar en preparación';
+            if (dialog?.querySelector('[data-draft-review-confirm]')) dialog.querySelector('[data-draft-review-confirm]').textContent = 'Enviar a revisión';
         }
-    });
+    };
+    const startRegistrationPreflight = async (action, button) => {
+        if (preflightInFlight || registrationInFlight || button.disabled) return;
+        if (!validateClient('confirm')) return;
+        preflightInFlight = true; document.querySelectorAll('[data-submit-preparation],[data-submit-review]').forEach((item) => { item.disabled = true; item.setAttribute('aria-disabled', 'true'); }); button.textContent = 'Validando…';
+        if (!await saveDraft()) { resetPreflightButton(); return; }
+        const body = new FormData(); body.set('_csrf', config.draftCsrf || ''); const controller = new AbortController(); const timeout = window.setTimeout(() => controller.abort(), 20000);
+        try {
+            const result = await request(endpoints.preflight, body, controller.signal);
+            if (!result.success) { const error = new Error(result.message || 'No fue posible validar el borrador.'); error.data = result.data; throw error; }
+            config.storedDraft = result.data?.draft || config.storedDraft;
+            const data = { title: result.data?.summary?.title || form.elements.title.value || 'Sin seleccionar', type: result.data?.summary?.type_label || typeData().label || 'Sin seleccionar', tutor: lookup('tutor_id') };
+            registrationSummaryTargets.forEach((target) => renderRegisterSummary(target, data));
+            registrationDialogs.forEach((dialog) => setDialogError(dialog));
+            openDialog(action === 'submit' ? reviewDialog : preparationDialog, button);
+        } catch (error) { announce(error.name === 'AbortError' ? 'La validación tardó demasiado. Inténtalo nuevamente.' : (error.message || 'No fue posible validar el borrador.'), true); const target = stepForPreflightErrors(error.data?.errors); if (target < 4) showStep(target); }
+        finally { window.clearTimeout(timeout); resetPreflightButton(); }
+    };
+    document.querySelector('[data-submit-preparation]')?.addEventListener('click', (event) => void startRegistrationPreflight('save', event.currentTarget));
+    document.querySelector('[data-submit-review]')?.addEventListener('click', (event) => void startRegistrationPreflight('submit', event.currentTarget));
+    document.querySelector('[data-draft-preparation-cancel]')?.addEventListener('click', () => closeDialog(preparationDialog));
+    document.querySelector('[data-draft-preparation-confirm]')?.addEventListener('click', (event) => void executeRegistration('save', event.currentTarget, preparationDialog));
+    document.querySelector('[data-draft-review-back]')?.addEventListener('click', () => closeDialog(reviewDialog));
+    document.querySelector('[data-draft-review-preparation]')?.addEventListener('click', (event) => void executeRegistration('save', event.currentTarget, reviewDialog));
+    document.querySelector('[data-draft-review-confirm]')?.addEventListener('click', (event) => void executeRegistration('submit', event.currentTarget, reviewDialog));
 
     form.querySelectorAll('[name="type"]:disabled:checked').forEach((input) => { input.checked = false; }); resetPreflightButton(); renderTags((config.storedDraft?.payload?.tags || []).filter(Boolean)); updateConditionalFields(); showStep(0, false); renderFiles(); updatePreview(); syncResetVisibility(); if (config.storedDraft?.id) { const navigation = performance.getEntriesByType?.('navigation')?.[0]; const isReload = navigation?.type === 'reload' || (!navigation && performance.navigation?.type === performance.navigation.TYPE_RELOAD); if (isReload) restoreServerDraft(); else openDialog(resumeDialog); }
 })();

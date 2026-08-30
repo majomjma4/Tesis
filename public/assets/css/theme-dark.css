@@ -1,0 +1,1525 @@
+/*
+ * Capa cromática común para las pantallas del layout principal.
+ *
+ * Esta hoja sólo se carga desde layouts/main.php. El layout de autenticación
+ * no la incluye y account-page queda fuera para conservar el flujo de cambio
+ * de contraseña en claro. No cambia geometría ni comportamiento.
+ */
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) {
+    color-scheme: dark;
+    --theme-info-bg: color-mix(in srgb, var(--blue) 14%, var(--surface));
+    --theme-info-border: color-mix(in srgb, var(--blue) 38%, var(--line));
+    --theme-info-text: #bfdbfe;
+    --theme-success-bg: color-mix(in srgb, var(--success) 14%, var(--surface));
+    --theme-success-border: color-mix(in srgb, var(--success) 38%, var(--line));
+    --theme-success-text: #a7f3d0;
+    --theme-warning-bg: color-mix(in srgb, var(--warning) 15%, var(--surface));
+    --theme-warning-border: color-mix(in srgb, var(--warning) 42%, var(--line));
+    --theme-warning-text: #fcd34d;
+    --theme-error-bg: color-mix(in srgb, var(--danger) 15%, var(--surface));
+    --theme-error-border: color-mix(in srgb, var(--danger) 42%, var(--line));
+    --theme-error-text: #fda4af;
+}
+
+html.theme-dark body:not(.account-page),
+body.dark-mode:not(.account-page) {
+    background: linear-gradient(90deg, var(--primary-dark) 0 var(--app-shell-gutter), var(--bg) var(--app-shell-gutter) 100%);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .topbar {
+    background: var(--surface);
+    border-color: var(--line);
+    box-shadow: var(--shadow);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .topbar-mode-pill {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .topbar-mode-pill.is-teacher,
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .topbar-mode-pill.is-admin {
+    background: color-mix(in srgb, var(--blue) 14%, var(--surface));
+    border-color: color-mix(in srgb, var(--blue) 38%, var(--line));
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .topbar-mode-pill.is-admin {
+    background: color-mix(in srgb, var(--danger) 14%, var(--surface));
+    border-color: color-mix(in srgb, var(--danger) 38%, var(--line));
+    color: var(--theme-error-text);
+}
+
+/* Controles nativos: una sola superficie para inputs, selects y textareas. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    input:not([type]),
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    input[type="month"],
+    input[type="password"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    select,
+    textarea
+) {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) input[type="file"] {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) input[type="file"]::file-selector-button {
+    margin-right: 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    input:not([type]),
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    input[type="month"],
+    input[type="password"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    select,
+    textarea
+)::placeholder {
+    color: var(--muted);
+    opacity: 1;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    input:not([type]),
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    input[type="month"],
+    input[type="password"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    select,
+    textarea
+):disabled {
+    background: color-mix(in srgb, var(--surface-soft) 65%, var(--bg));
+    border-color: var(--line);
+    color: var(--muted);
+    opacity: .78;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) select option,
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) select optgroup {
+    background: var(--surface-elevated);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    input:not([type]),
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    input[type="month"],
+    input[type="password"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    select,
+    textarea
+):focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 1px;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(input, select, textarea):-webkit-autofill {
+    -webkit-text-fill-color: var(--text);
+    -webkit-box-shadow: 0 0 0 1000px var(--surface-soft) inset;
+    caret-color: var(--text);
+}
+
+/* Selectores, dropdowns y paginación compartidos. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .custom-select-trigger,
+    .calendar-select-wrap,
+    .calendar-date-time-trigger,
+    .repository-dropdown-trigger,
+    .projects-dropdown-trigger,
+    .detail-dropdown-trigger,
+    .notification-filter-trigger,
+    .ap-quick-trigger,
+    .teacher-direct-project-keyword-trigger,
+    .ap-tutor-picker-trigger,
+    .ap-keyword-trigger
+) {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .custom-select-panel,
+    .calendar-select-menu,
+    .repository-dropdown-menu,
+    .projects-dropdown-menu,
+    .detail-dropdown-menu,
+    .notification-filter-menu,
+    .ap-quick-menu,
+    .teacher-direct-project-keyword-panel,
+    .user-actions,
+    .projects-publish-file-menu-list,
+    .sw-file-menu,
+    .rp-popover-panel
+) {
+    background: var(--surface-elevated);
+    border-color: var(--line);
+    color: var(--text);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, .34);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .custom-select-option,
+    .calendar-select-option,
+    .repository-dropdown-option,
+    .projects-dropdown-option,
+    .detail-dropdown-option,
+    .notification-filter-option,
+    .ap-quick-menu button,
+    .teacher-direct-project-keyword-options > label,
+    .user-actions button,
+    .projects-publish-file-menu-list button,
+    .sw-file-menu button
+) {
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .custom-select-option:hover,
+    .custom-select-option:focus-visible,
+    .calendar-select-option:hover,
+    .calendar-select-option:focus-visible,
+    .repository-dropdown-option:hover,
+    .repository-dropdown-option:focus-visible,
+    .projects-dropdown-option:hover,
+    .projects-dropdown-option:focus-visible,
+    .detail-dropdown-option:hover,
+    .detail-dropdown-option:focus-visible,
+    .notification-filter-option:hover,
+    .notification-filter-option:focus-visible,
+    .ap-quick-menu button:hover,
+    .teacher-direct-project-keyword-options > label:hover,
+    .user-actions button:hover,
+    .projects-publish-file-menu-list button:hover,
+    .sw-file-menu button:hover
+) {
+    background: color-mix(in srgb, var(--blue) 14%, var(--surface-elevated));
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .custom-select-option[aria-selected="true"],
+    .calendar-select-option.selected,
+    .repository-dropdown-option.is-selected,
+    .projects-dropdown-option.is-selected,
+    .detail-dropdown-option.is-selected,
+    .notification-filter-option.is-selected
+) {
+    background: color-mix(in srgb, var(--blue) 23%, var(--surface-elevated));
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .data-pagination {
+    background: var(--surface);
+    border-color: var(--line);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .data-pagination-pages a,
+    .projects-pagination-pages button
+) {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .data-pagination-pages a:hover:not(.is-active),
+    .projects-pagination-pages button:hover:not(.is-current):not(:disabled)
+) {
+    background: var(--surface);
+    border-color: var(--blue);
+    color: var(--blue);
+}
+
+/* Superficies de tarjetas y paneles compartidos. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .app-page-content :is(
+    .status-card,
+    .projects-card,
+    .projects-metric,
+    .projects-section,
+    .user-record,
+    .users-table-card,
+    .student-context,
+    .student-project-focus,
+    .student-upcoming,
+    .student-observations,
+    .student-delivery,
+    .student-process,
+    .student-notifications,
+    .student-resources,
+    .student-empty,
+    .teacher-dashboard-header,
+    .teacher-projects-section,
+    .teacher-agenda,
+    .teacher-follow-up,
+    .teacher-notifications,
+    .teacher-repository,
+    .teacher-project-card,
+    .teacher-follow-up-card,
+    .teacher-repository-card,
+    .admin-dashboard-panel,
+    .admin-institutional-hero,
+    .v4-summary-strip,
+    .ap-list > article,
+    .ap-stats > article,
+    .an-stats > article,
+    .an-compose,
+    .an-history,
+    .rp-stats > article,
+    .rp-grid > section,
+    .rp-activity,
+    .rp-exports,
+    .aa-section,
+    .aa-catalog-accordion,
+    .at-list-controls,
+    .at-item-card,
+    .ar-catalog,
+    .ar-stat,
+    .ar-project-card,
+    .ar-material-card,
+    .assigned-project-card,
+    .profile-card,
+    .calendar-board,
+    .calendar-agenda,
+    .calendar-week-column,
+    .calendar-agenda-item
+) {
+    background-color: var(--surface);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .app-page-content :is(
+    .projects-metric,
+    .student-context__period,
+    .teacher-project-card,
+    .teacher-follow-up-card,
+    .teacher-repository-card,
+    .at-empty,
+    .ar-tools,
+    .ar-search,
+    .ar-fixed-filter > div,
+    .ar-material-files-list article,
+    .projects-section-empty,
+    .teacher-empty-state,
+    .calendar-week-heading
+) {
+    background-color: var(--surface-soft);
+    border-color: var(--line);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .app-page-content :is(
+    .status-card,
+    .projects-card,
+    .projects-metric,
+    .user-record,
+    .users-table-card,
+    .student-context,
+    .student-project-focus,
+    .student-upcoming,
+    .student-observations,
+    .student-delivery,
+    .student-process,
+    .student-notifications,
+    .student-resources,
+    .student-empty,
+    .teacher-dashboard-header,
+    .teacher-projects-section,
+    .teacher-agenda,
+    .teacher-follow-up,
+    .teacher-notifications,
+    .teacher-repository,
+    .admin-dashboard-panel,
+    .admin-institutional-hero,
+    .v4-summary-strip,
+    .ap-list > article,
+    .ap-stats > article,
+    .an-stats > article,
+    .an-compose,
+    .an-history,
+    .rp-stats > article,
+    .rp-grid > section,
+    .rp-activity,
+    .rp-exports,
+    .aa-section,
+    .aa-catalog-accordion,
+    .at-list-controls,
+    .at-item-card,
+    .ar-catalog,
+    .ar-stat,
+    .ar-project-card,
+    .ar-material-card,
+    .assigned-project-card,
+    .profile-card,
+    .calendar-board,
+    .calendar-agenda,
+    .calendar-week-column,
+    .calendar-agenda-item
+) {
+    border-color: var(--line);
+}
+
+/* Tablas de reportes/importación y filas de datos. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .rp-roles-table-wrapper,
+    .import-table-wrap
+) {
+    background: var(--surface);
+    border-color: var(--line);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .rp-roles-table,
+    .import-table-wrap table
+) {
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .rp-roles-table th,
+    .rp-roles-table td,
+    .import-table-wrap th,
+    .import-table-wrap td
+) {
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .rp-roles-table th,
+    .import-table-wrap th
+) {
+    background: var(--surface-soft);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .rp-roles-table tbody tr:hover,
+    .import-table-wrap tbody tr:hover
+) {
+    background: color-mix(in srgb, var(--blue) 8%, var(--surface));
+}
+
+/* Estados semánticos: el fondo y el texto conservan la misma lectura en dark. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .info,
+    .is-info,
+    .projects-demo-notice,
+    .projects-publish-warning,
+    .teacher-direct-project-step__help,
+    .calendar-filter-status,
+    .repository-explorer-notice,
+    .form-note,
+    .rp-active-filter-badge
+) {
+    background: var(--theme-info-bg);
+    border-color: var(--theme-info-border);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .profile-message.success,
+    .users-message.success,
+    .import-row-valid,
+    .aa-status.active,
+    .status-chip.active
+) {
+    color: var(--theme-success-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .project-adjustment-banner,
+    .project-adjustment-status,
+    .calendar-load-error,
+    .aa-warning,
+    .ar-confirm button.warning,
+    .projects-publish-remove-confirm
+) {
+    background: var(--theme-warning-bg);
+    border-color: var(--theme-warning-border);
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .profile-message.error,
+    .users-message.error,
+    .projects-publish-error,
+    .ar-error,
+    .ar-file-error,
+    .an-error,
+    .aa-error,
+    .rp-error,
+    .at-error,
+    .teacher-material-error-message,
+    .project-description-error,
+    .v4-alert-banner,
+    #anMessage,
+    .status-chip.blocked
+) {
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .projects-publish-error,
+    .ar-file-error,
+    .teacher-material-error-message,
+    .aa-error,
+    .ar-error,
+    .users-message.error,
+    .v4-alert-banner
+) {
+    background: var(--theme-error-bg);
+    border-color: var(--theme-error-border);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .profile-message.success,
+    .users-message.success,
+    .aa-status.active,
+    .status-chip.active
+) {
+    background: var(--theme-success-bg);
+    border-color: var(--theme-success-border);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .projects-publish-warning,
+    .projects-publish-error,
+    .project-description-error
+) {
+    color: var(--theme-info-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .projects-publish-error {
+    color: var(--theme-error-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .project-description-error {
+    color: var(--theme-error-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .student-dashboard .is-warning .student-status,
+    .student-dashboard .student-status.is-warning,
+    .projects-card .projects-status.is-review,
+    .workspace-status.status-warning
+) {
+    background: var(--theme-warning-bg);
+    border-color: var(--theme-warning-border);
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .student-dashboard .is-success .student-status,
+    .student-dashboard .student-status.is-success,
+    .workspace-status.status-success
+) {
+    background: var(--theme-success-bg);
+    border-color: var(--theme-success-border);
+    color: var(--theme-success-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .student-dashboard .is-violet .student-status,
+    .projects-card .projects-status.is-defense,
+    .workspace-status.status-muted
+) {
+    background: color-mix(in srgb, #c084fc 16%, var(--surface));
+    border-color: color-mix(in srgb, #c084fc 40%, var(--line));
+    color: #e9d5ff;
+}
+
+/* Badges y filtros que todavía conservaban paletas claras locales. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .projects-review-situation,
+    .projects-card .projects-status.is-development,
+    .ap-list > article[data-project-status="development"] .ap-status,
+    .assigned-status.is-development
+) {
+    background: color-mix(in srgb, var(--blue) 17%, var(--surface));
+    border-color: color-mix(in srgb, var(--blue) 40%, var(--line));
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .projects-card[data-status="under_review"] .projects-status,
+    .ap-list > article[data-project-status="under_review"] .ap-status,
+    .assigned-status.is-under_review,
+    .priority-badge.medium
+) {
+    background: var(--theme-warning-bg);
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .projects-card[data-status="approved"] .projects-status,
+    .projects-card[data-status="published"] .projects-status,
+    .ap-list > article[data-project-status="approved"] .ap-status,
+    .ap-list > article[data-project-status="published"] .ap-status,
+    .assigned-status.is-approved,
+    .assigned-status.is-published,
+    .priority-badge.low
+) {
+    background: color-mix(in srgb, var(--success) 15%, var(--surface));
+    color: var(--theme-success-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .priority-badge.high,
+    .overdue-badge,
+    .ar-list > article:has(button:disabled) .ar-status
+) {
+    background: var(--theme-error-bg);
+    color: var(--theme-error-text);
+}
+
+/* Modales, confirmaciones, drawers y formularios flotantes. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .logout-modal,
+    .calendar-modal,
+    .calendar-confirm-modal,
+    .calendar-detail-modal,
+    .rp-modal,
+    .notification-detail-modal,
+    .repository-preview-modal-dialog,
+    .project-file-modal > *,
+    .ap-modal > *,
+    .ap-confirm > *,
+    .aa-modal > *,
+    .aa-confirm > *,
+    .user-modal > *,
+    .user-confirm > *,
+    .notification-modal-overlay > *,
+    .calendar-modal-overlay > *,
+    .rp-modal-overlay > *,
+    .at-modal-overlay > *,
+    .as-modal-overlay > *,
+    .sw-modal-overlay > *,
+    .sw-operation-modal section,
+    .teacher-direct-project-modal__card,
+    .ar-confirm > *,
+    .ar-withdrawn-modal > section,
+    .ar-material-modal > section,
+    .projects-publish-dialog,
+    .project-description-dialog,
+    .project-adjustment-dialog > section,
+    .profile-confirm > section,
+    .profile-avatar-edit-modal > section
+) {
+    background-color: var(--surface-elevated);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .calendar-modal header,
+    .calendar-modal-actions,
+    .notification-detail-modal header,
+    .notification-detail-modal footer,
+    .as-modal-header,
+    .as-modal-footer,
+    .profile-avatar-modal-header,
+    .profile-avatar-modal-footer,
+    .projects-publish-header,
+    .projects-publish-footer,
+    .project-adjustment-dialog header,
+    .project-adjustment-dialog footer
+) {
+    background: var(--surface-elevated);
+    border-color: var(--line);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .as-help-btn[data-tooltip]::after,
+    .ap-tutor-action[data-tooltip]::after
+) {
+    background: #172033;
+    border-color: var(--line);
+    color: #f8fafc;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .calendar-confirm-icon,
+    .project-description-icon,
+    .ar-confirm > div > span,
+    .profile-confirm > section > span
+) {
+    background: color-mix(in srgb, var(--blue) 14%, var(--surface));
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .at-modal-icon {
+    background: var(--theme-error-bg);
+    border-color: var(--theme-error-border);
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .at-modal-icon.is-info {
+    background: var(--theme-info-bg);
+    border-color: var(--theme-info-border);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .at-modal-warning,
+    .project-adjustment-dialog [data-adjustment-message],
+    .projects-publish-context-note
+) {
+    background: var(--theme-warning-bg);
+    border-color: var(--theme-warning-border);
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .at-modal-warning.is-info,
+    .project-adjustment-dialog [data-adjustment-message].is-info
+) {
+    background: var(--theme-info-bg);
+    border-color: var(--theme-info-border);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .rp-modal-warning-banner,
+    .tm-defense-warning,
+    .tm-attempt-confirm .tm-defense-warning,
+    .tm-reason-gate .tm-defense-warning,
+    .ed-review-notice
+) {
+    background: var(--theme-warning-bg);
+    border-color: var(--theme-warning-border);
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .rp-modal-empty-banner,
+    .risk-zone
+) {
+    background: var(--theme-error-bg);
+    border-color: var(--theme-error-border);
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .rp-modal-warning-banner i,
+    .ed-review-notice > i,
+    .tm-defense-warning i
+) {
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .modal-cancel-btn,
+    .calendar-cancel-btn,
+    .admin-access-secondary,
+    .secondary,
+    .profile-btn-secondary,
+    .profile-password-btn,
+    .at-btn-modal-cancel,
+    .ar-confirm button:not(.danger):not(.warning),
+    .ar-material-modal form > footer button:not([type="submit"]),
+    .project-description-skip,
+    .sw-operation-modal footer button:not(.is-primary)
+) {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .modal-cancel-btn:hover,
+    .calendar-cancel-btn:hover,
+    .admin-access-secondary:hover,
+    .secondary:hover,
+    .profile-btn-secondary:hover,
+    .profile-password-btn:hover,
+    .at-btn-modal-cancel:hover,
+    .ar-confirm button:not(.danger):not(.warning):hover,
+    .project-description-skip:hover,
+    .sw-operation-modal footer button:not(.is-primary):hover
+) {
+    background: var(--surface);
+    border-color: var(--blue);
+    color: var(--blue);
+}
+
+/* Calendar: chips, filtros, semana y agenda. La cabecera azul conserva su diseño. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .calendar-stat-icon.blue,
+    .calendar-stat-icon.orange,
+    .calendar-stat-icon.green,
+    .calendar-event-chip.delivery,
+    .calendar-week-card.delivery,
+    .calendar-filter-status,
+    .calendar-detail-project
+) {
+    background: var(--theme-info-bg);
+    border-color: var(--theme-info-border);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .calendar-event-chip.meeting,
+    .calendar-week-card.meeting
+) {
+    background: color-mix(in srgb, #c084fc 17%, var(--surface));
+    color: #e9d5ff;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .calendar-event-chip.review,
+    .calendar-week-card.review
+) {
+    background: var(--theme-success-bg);
+    color: var(--theme-success-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .calendar-event-chip.deadline,
+    .calendar-week-card.deadline
+) {
+    background: var(--theme-warning-bg);
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .calendar-priority-filter[data-priority="high"].active,
+    .calendar-priority-filter[data-priority="medium"].active,
+    .calendar-priority-filter[data-priority="low"].active,
+    .calendar-filter-status button
+) {
+    background: color-mix(in srgb, var(--blue) 18%, var(--surface));
+    border-color: var(--theme-info-border);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .calendar-detail-project strong {
+    color: var(--theme-info-text);
+}
+
+/* Repositorio y visor: las hojas de papel PDF siguen siendo blancas por diseño. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .teacher-direct-project-summary,
+    .teacher-direct-project-file-list li,
+    .teacher-direct-project-keyword-options > label,
+    .teacher-direct-project-dropzone,
+    .ar-readonly-value,
+    .ar-presentation-option,
+    .ar-material-files-list article,
+    .repository-file-preview-action,
+    .repository-file-action button
+) {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .teacher-direct-project-modal__body,
+    .teacher-direct-project-modal__footer,
+    .ed-edit-modal-card,
+    .ed-edit-modal-header,
+    .ed-edit-modal-body,
+    .ed-form-card,
+    .tm-catalog,
+    .tm-project,
+    .tm-global-defense-schedule,
+    .tm-history,
+    .tm-available-panel,
+    .tm-tribunal-workspace > section[data-tribunal-dialog],
+    .tm-tribunal-proposal-surface,
+    .tm-attempt-confirm > section,
+    .tm-replacement-popover,
+    .tm-proposal,
+    .tm-modal > section,
+    .tm-result-option,
+    .tm-result-modal form label:has(input[value="approved"]),
+    .tm-result-modal form label:has(input[value="rejected"])
+) {
+    background: var(--surface-elevated);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .tm-member-stepper,
+    .tm-proposal-empty,
+    .tm-proposal-loading,
+    .tm-available-card,
+    .tm-attempt-transition > div,
+    .tm-custom-select-trigger,
+    .tm-custom-select-menu,
+    .tm-replacement-option,
+    .tm-result-option,
+    .tm-result-modal form label:has(input[value="approved"]),
+    .tm-result-modal form label:has(input[value="rejected"])
+) {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .tm-custom-select-menu [role="option"]:hover,
+    .tm-custom-select-menu [role="option"]:focus,
+    .tm-custom-select-menu [role="option"][aria-selected="true"],
+    .tm-replacement-option:hover,
+    .tm-result-option:has(input:checked),
+    .tm-result-modal form label:has(input:checked),
+    .tm-result-effect,
+    .tm-attempt-info
+) {
+    background: var(--theme-info-bg);
+    border-color: var(--theme-info-border);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .tm-custom-select-menu [role="option"]:not(:hover):not(:focus):not([aria-selected="true"]) {
+    background: transparent;
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .tm-result-option[data-result="approved"]:has(input:checked),
+    .tm-result-modal form label:has(input[value="approved"]:checked)
+) {
+    background: var(--theme-success-bg);
+    border-color: var(--theme-success-border);
+    color: var(--theme-success-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .tm-result-option[data-result="rejected"]:has(input:checked),
+    .tm-result-modal form label:has(input[value="rejected"]:checked)
+) {
+    background: var(--theme-warning-bg);
+    border-color: var(--theme-warning-border);
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .tm-modal footer > button:not(.tm-primary-action),
+    .tm-member-stepper button,
+    .tm-member-actions button,
+    .tm-modal.is-expanded .tm-regenerate,
+    .tm-link
+) {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .tm-member-avatar,
+    .tm-proposal-loading span,
+    .tm-modal.is-expanded .tm-proposal,
+    .tm-modal.is-expanded .tm-modal-body
+) {
+    background: var(--surface-soft);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .teacher-direct-project-dropzone.is-dragover,
+    .repository-file-preview-action:hover,
+    .repository-file-action button:hover
+) {
+    background: color-mix(in srgb, var(--blue) 15%, var(--surface));
+    border-color: var(--blue);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .sw-toggle-btn,
+    .sw-panel-toggle,
+    .sw-viewer-zoom,
+    .sw-viewer-action,
+    .sw-retry-preview-btn,
+    .sw-project-actions,
+    .sw-operation-modal footer button,
+    .sw-preview-stage,
+    .sw-preview-docx,
+    .sw-preview-docx-content,
+    .ed-viewer-loading-skeleton,
+    .ed-preview-docx,
+    .admin-history-drawer,
+    .ed-history-item,
+    .ed-history-footer
+) {
+    background-color: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .sw-preview-stage,
+    .sw-preview-docx,
+    .ed-preview-docx
+) {
+    background: color-mix(in srgb, var(--bg) 78%, var(--surface));
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .sw-preview-docx-content {
+    background: var(--surface);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .repository-preview-modal-body,
+    .repository-preview-modal--pdf .repository-preview-modal-body
+) {
+    background: var(--surface-soft);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .ar-tooltip {
+    background: #172033;
+    border-color: var(--line);
+    color: #f8fafc;
+}
+
+/* Perfil y estados de validación que aún usaban texto de paleta clara. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .profile-avatar-action-btn.danger {
+    background: var(--theme-error-bg);
+    border-color: var(--theme-error-border);
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .profile-avatar-action-btn.danger:hover {
+    background: color-mix(in srgb, var(--danger) 24%, var(--surface));
+    border-color: var(--theme-error-text);
+    color: #fecdd3;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .user-actions button.success,
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .user-actions button.success i {
+    color: var(--theme-success-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .user-actions button.warning,
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .user-actions button.warning i {
+    color: var(--theme-warning-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .user-actions button.danger,
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .user-actions button.danger i {
+    color: var(--theme-error-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .as-status-badge.is-warning,
+    .as-policy-pending,
+    .aa-status.closed,
+    .at-retention-label.is-expired,
+    .password-req-list li.is-invalid,
+    .password-match-status .is-invalid
+) {
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .as-status-badge.is-warning,
+    .as-policy-pending
+) {
+    background: var(--theme-warning-bg);
+    border-color: var(--theme-warning-border);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .as-field-error,
+    .aa-form-message,
+    .at-retention-label.is-expired,
+    .password-match-status .is-invalid,
+    .import-row-invalid
+) {
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .as-format-policy,
+    .as-code-grid,
+    .import-verification
+) {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .as-storage-protected,
+    .as-format-flow,
+    .aa-current-period,
+    .aa-reversal,
+    .aa-next-period,
+    .at-global-badge,
+    .rp-modal-static-type,
+    .rp-format-option,
+    .risk-zone button,
+    .simple-summary-item > i,
+    .detail-section-picker > div > i,
+    .document-format,
+    .project-file-modal-body
+) {
+    background-color: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .simple-summary-item > i,
+    .detail-section-picker > div > i,
+    .document-format.is-docx,
+    .document-format.is-pdf,
+    .document-format.is-zip
+) {
+    background: var(--theme-info-bg);
+    border-color: var(--theme-info-border);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .risk-zone button {
+    background: var(--surface);
+    border-color: var(--theme-error-border);
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .simple-focus-card,
+    .simple-summary-pair,
+    .simple-activity,
+    .information-section,
+    .administration-list > div,
+    .conversation-readonly,
+    .document-open-real,
+    .document-row,
+    .project-docx-preview,
+    .workspace-header,
+    .workspace-section,
+    .summary-situation,
+    .summary-facts,
+    .summary-recent,
+    .information-section,
+    .conversation-view,
+    .activity-view,
+    .final-documents-v2
+) {
+    background-color: var(--surface);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .risk-zone strong,
+    .risk-zone p
+) {
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .strip-card-icon.is-total,
+    .strip-card-icon.is-active,
+    .strip-card-icon.is-approved,
+    .strip-card-icon.is-published,
+    .strip-card-icon.is-users,
+    .v4-row-badge,
+    .simple-summary-item > i,
+    .detail-section-picker > div > i
+) {
+    background: color-mix(in srgb, var(--blue) 15%, var(--surface));
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .attention-v4-row.is-critical .v4-row-badge,
+    .risk-zone,
+    .projects-publish-error
+) {
+    background: var(--theme-error-bg);
+    border-color: var(--theme-error-border);
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .attention-v4-row.is-high .v4-row-badge,
+    .projects-review-situation,
+    .project-adjustment-status
+) {
+    background: var(--theme-warning-bg);
+    border-color: var(--theme-warning-border);
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .attention-v4-row.is-approved .v4-row-badge,
+    .projects-card .projects-status.is-approved,
+    .projects-card .projects-status.is-published
+) {
+    background: var(--theme-success-bg);
+    color: var(--theme-success-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    #apForm input[name="title"],
+    #apForm textarea[name="summary"],
+    #apForm .ap-card-field select[name="tutor_id"],
+    #apForm .ap-card-field .custom-select-trigger,
+    #apForm .ap-keyword-trigger,
+    .ap-tutor-picker-trigger
+) {
+    background: var(--surface-soft) !important;
+    border-color: var(--line) !important;
+    color: var(--text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .tm-result-option,
+    .tm-result-modal form label:has(input[value="approved"]),
+    .tm-result-modal form label:has(input[value="rejected"]),
+    .tm-replacement-option,
+    .tm-member-actions button
+) {
+    border-color: var(--line);
+}
+
+/* Scrollbars de paneles propios: mantienen una pista visible sin crear franjas blancas. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .custom-select-panel,
+    .calendar-select-menu,
+    .rp-popover-panel,
+    .sw-preview-stage,
+    .sw-preview-docx,
+    .admin-history-drawer__body,
+    .ed-history-drawer__body
+) {
+    scrollbar-color: color-mix(in srgb, var(--muted) 55%, transparent) transparent;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .custom-select-panel,
+    .calendar-select-menu,
+    .rp-popover-panel,
+    .sw-preview-stage,
+    .sw-preview-docx,
+    .admin-history-drawer__body,
+    .ed-history-drawer__body
+)::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--muted) 55%, transparent);
+    border-color: transparent;
+}
+
+/* El estado deshabilitado sigue diferenciándose sin convertirse en una superficie blanca. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    button:disabled,
+    input:disabled,
+    select:disabled,
+    textarea:disabled,
+    [aria-disabled="true"]
+) {
+    opacity: .68;
+}
+
+/* Componentes heredados con colores inline: se tematizan sólo en dark mode. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .sw-replace-error-alert,
+    .sw-review-confirm-error
+) {
+    background: var(--theme-error-bg);
+    border-color: var(--theme-error-border);
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .profile-card-summary .profile-message[role="alert"],
+    .all-users-warning
+) {
+    background: var(--theme-warning-bg);
+    border-color: var(--theme-warning-border);
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .sw-replace-file-info
+) {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .sw-replace-error-alert,
+    .sw-review-confirm-error
+) {
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .profile-card-summary .profile-message[role="alert"] {
+    background: var(--theme-warning-bg) !important;
+    border-color: var(--theme-warning-border) !important;
+    color: var(--theme-warning-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .all-users-warning {
+    background: var(--theme-warning-bg) !important;
+    border-color: var(--theme-warning-border) !important;
+    color: var(--theme-warning-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .rp-popover-error,
+    .sw-replace-error-alert,
+    .sw-review-confirm-error
+) {
+    color: var(--theme-error-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .sw-replace-file-info,
+    .sw-custom-select-trigger,
+    .sw-replace-other-group textarea
+) {
+    background: var(--surface-soft) !important;
+    border-color: var(--line) !important;
+    color: var(--text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .sw-replace-file-info > div,
+    .sw-replace-file-info [data-sw-replace-current-name],
+    .sw-replace-file-info [data-sw-replace-new-name],
+    .sw-replace-notice,
+    .sw-replace-reason-group > label,
+    .sw-replace-other-group > label,
+    .sw-replace-other-group > span,
+    [data-sw-review-confirm-message],
+    .sw-review-confirm-status
+) {
+    color: var(--muted) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .sw-replace-file-info [data-sw-replace-new-name],
+    .sw-replace-reason-group > label > span,
+    .sw-replace-other-group > label > span
+) {
+    color: var(--theme-info-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .sw-custom-select-trigger [data-sw-reason-trigger-text],
+    .sw-custom-select-trigger > i
+) {
+    color: var(--muted) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .sw-review-confirm-stats [data-sw-review-approved-count],
+    .sw-review-confirm-stats [data-sw-review-corrections-count],
+    .sw-review-confirm-stats [data-sw-review-observations-count]
+) {
+    border-color: var(--line) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .sw-review-confirm-stats [data-sw-review-approved-count] {
+    background: var(--theme-success-bg) !important;
+    border-color: var(--theme-success-border) !important;
+    color: var(--theme-success-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .sw-review-confirm-stats [data-sw-review-corrections-count] {
+    background: var(--theme-error-bg) !important;
+    border-color: var(--theme-error-border) !important;
+    color: var(--theme-error-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .sw-review-confirm-stats [data-sw-review-observations-count] {
+    background: var(--theme-info-bg) !important;
+    border-color: var(--theme-info-border) !important;
+    color: var(--theme-info-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .rp-format-option strong i {
+    color: var(--theme-info-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .sw-protected-label {
+    background: var(--surface-soft) !important;
+    color: var(--text) !important;
+}
+
+/* Remaining local light palettes are mapped to the shared semantic tokens. */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .tone-blue .notification-stat-icon,
+    .notification-row[data-tab-context="sent"] .notification-type-icon,
+    .detail-dropdown-menu a.is-selected,
+    .projects-dropdown-option.is-selected,
+    .summary-card-link > i,
+    .project-adjustment-list blockquote,
+    .tm-schedule-modal .tm-info-notice,
+    .tm-attempt-info,
+    .teacher-repository-content-option:hover,
+    .teacher-direct-project-results button:hover,
+    .teacher-direct-project-chip,
+    .teacher-direct-project-keywords input:checked + span,
+    .projects-publish-file-badge.is-updated
+) {
+    background: var(--theme-info-bg);
+    border-color: var(--theme-info-border);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .tone-green .notification-stat-icon,
+    .project-adjustment-status.is-addressed,
+    .final-publication,
+    .attention-v4-row.is-approved .v4-row-badge
+) {
+    background: var(--theme-success-bg);
+    border-color: var(--theme-success-border);
+    color: var(--theme-success-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .tone-purple .notification-stat-icon,
+    .tone-slate .notification-stat-icon,
+    .side-panel-heading.compact > span,
+    .tm-project mark,
+    .tm-proposal-loading span
+) {
+    background: color-mix(in srgb, var(--blue) 14%, var(--surface-soft));
+    border-color: var(--line);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .clear-filter:hover,
+    .rp-popover-clear:hover:not(:disabled),
+    .at-btn-action.is-danger:hover:not(:disabled),
+    .at-btn-delete-single:hover:not(:disabled),
+    .teacher-material-selected-list li button:hover
+) {
+    background: var(--theme-error-bg);
+    border-color: var(--theme-error-border);
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .teacher-direct-project-errors,
+    .teacher-material-error-message,
+    .project-description-error,
+    .ed-version-badge.is-unavailable
+) {
+    background: var(--theme-error-bg);
+    border-color: var(--theme-error-border);
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .ed-version-badge.is-archived,
+    .workspace-status.status-muted
+) {
+    background: color-mix(in srgb, var(--muted) 18%, var(--surface-soft));
+    border-color: var(--line);
+    color: var(--muted);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .workspace-status.status-success,
+    .workspace-status.status-info,
+    .workspace-status.status-danger,
+    .workspace-status.status-warning,
+    .document-format.is-pdf,
+    .document-format.is-docx,
+    .document-format.is-zip
+) {
+    border-color: var(--line);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .workspace-status.status-success {
+    background: var(--theme-success-bg);
+    color: var(--theme-success-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .workspace-status.status-info,
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .document-format.is-docx
+) {
+    background: var(--theme-info-bg);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .document-format.is-pdf {
+    background: var(--theme-error-bg);
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .document-format.is-zip {
+    background: var(--theme-warning-bg);
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .workspace-status.status-warning {
+    background: var(--theme-warning-bg);
+    color: var(--theme-warning-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .workspace-status.status-danger {
+    background: var(--theme-error-bg);
+    color: var(--theme-error-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .detail-section > header > a:hover,
+    .detail-summary-side a:hover,
+    .workspace-section button:not(.workspace-primary):not(:disabled):hover,
+    .document-open-real:hover
+) {
+    background: var(--theme-info-bg);
+    border-color: var(--theme-info-border);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .detail-notice {
+    background: var(--theme-info-bg);
+    border-color: var(--theme-info-border);
+    color: var(--theme-info-text);
+}
