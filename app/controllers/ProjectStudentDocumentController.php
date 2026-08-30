@@ -80,10 +80,8 @@ final class ProjectStudentDocumentController
 
         $reasonType = trim((string) ($input['reason_type'] ?? ''));
         $reasonDetail = trim((string) ($input['reason_detail'] ?? $input['reason_other_detail'] ?? ''));
-        $hasPreviousReview = $this->hasPreviousReview($db, $projectId);
-
         $allowedReasonTypes = [
-            'name_change' => 'Cambio de nombre del documento',
+            'name_change' => 'Cambio de nombre del archivo',
             'format_change' => 'Cambio de formato',
             'restructuring' => 'Reestructuración del documento',
             'substitution' => 'Sustitución por versión actualizada',
@@ -93,11 +91,10 @@ final class ProjectStudentDocumentController
 
         $finalReason = '';
 
-        if ($hasPreviousReview) {
-            if ($reasonType === '' || !isset($allowedReasonTypes[$reasonType])) {
-                throw new InvalidArgumentException('El motivo del cambio es obligatorio después de la primera revisión.', 422);
+        if ($reasonType !== '') {
+            if (!isset($allowedReasonTypes[$reasonType])) {
+                throw new InvalidArgumentException('El motivo del cambio no es válido.', 422);
             }
-
             if ($reasonType === 'other') {
                 if (mb_strlen($reasonDetail) < 5) {
                     throw new InvalidArgumentException('Describe el motivo del cambio (mínimo 5 caracteres).', 422);
@@ -109,13 +106,6 @@ final class ProjectStudentDocumentController
         }
 
         return (new ProjectFileVersionChangeService())->replaceWorkspaceInTransaction($db, $projectId, $fileId, $checksum, $stored, $actor, $finalReason);
-    }
-
-    private function hasPreviousReview(PDO $db, int $projectId): bool
-    {
-        $query = $db->prepare('SELECT 1 FROM project_deliveries WHERE project_id=:project LIMIT 1');
-        $query->execute(['project' => $projectId]);
-        return (bool) $query->fetchColumn();
     }
 
     private function cleanupPreparationArtifacts(int $projectId, int $fileId, string $storageName, string $checksum): void

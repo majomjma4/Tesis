@@ -2416,7 +2416,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (file.status === 'approved') {
             const approved = document.createElement('div');
             approved.className = 'sw-review-persisted-approved';
-            approved.innerHTML = '<i class="fa-solid fa-circle-check" aria-hidden="true"></i><div><strong>Documento aprobado</strong><span>Este checksum ya fue aprobado y no requiere una nueva decision.</span></div>';
+            approved.innerHTML = '<i class="fa-solid fa-circle-check" aria-hidden="true"></i><div><strong style="display:block;margin-bottom:4px;">Documento aprobado</strong><span style="display:block;">Este checksum ya fue aprobado y no requiere una nueva decisi\u00f3n.</span></div>';
             const existingSection = createExistingSection(file);
             scrollBody.append(approved);
             if (existingSection) scrollBody.append(existingSection);

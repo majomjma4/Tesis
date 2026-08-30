@@ -1213,7 +1213,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', closeReplaceModal);
     });
 
-    const openReplaceModal = (file, fileId, checksum, currentFileName) => {
+    const openReplaceModal = (file, fileId, checksum, currentFileName, manualReasonRequired = hasPreviousReview) => {
         if (!validateFileClient(file)) return;
         if (!replaceModal) {
             void replaceFile(file, fileId, checksum);
@@ -1221,6 +1221,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         document.body.classList.add('sw-modal-open');
+        const requiresManualReason = manualReasonRequired === true || manualReasonRequired === 'true';
+        const correctionRequested = hasPreviousReview && !requiresManualReason;
 
         const newFileName = file.name;
         const currentExt = currentFileName.split('.').pop().toLowerCase();
@@ -1246,9 +1248,11 @@ document.addEventListener('DOMContentLoaded', () => {
         closeReasonPortal();
         if (replaceOtherDetail) replaceOtherDetail.value = '';
 
-        if (!hasPreviousReview) {
+        if (!requiresManualReason) {
             if (replaceNewLabel) replaceNewLabel.textContent = isNameOrExtChanged ? 'Nuevo archivo:' : 'Nueva versión:';
-            if (replaceNotice) replaceNotice.textContent = 'El archivo será reemplazado durante la preparación del proyecto.';
+            if (replaceNotice) replaceNotice.textContent = correctionRequested
+                ? 'El documento tiene correcciones solicitadas. Se registrará automáticamente que esta nueva versión atiende una corrección solicitada por el docente. La versión anterior se conservará en el historial.'
+                : 'El archivo será reemplazado durante la preparación del proyecto.';
             if (replaceReasonGroup) replaceReasonGroup.hidden = true;
             if (replaceOtherGroup) replaceOtherGroup.hidden = true;
             if (replaceConfirmBtn) replaceConfirmBtn.disabled = false;
@@ -1264,7 +1268,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const updateValidation = () => {
-            if (!hasPreviousReview) {
+            if (!requiresManualReason) {
                 if (replaceConfirmBtn) replaceConfirmBtn.disabled = false;
                 return;
             }
@@ -1298,7 +1302,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 expected_checksum: checksum,
             };
 
-            if (hasPreviousReview) {
+            if (requiresManualReason) {
                 payload.reason_type = replaceReasonSelect?.value || '';
                 if (payload.reason_type === 'other') {
                     payload.reason_detail = replaceOtherDetail?.value.trim() || '';
@@ -1359,7 +1363,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(error.status===409&&existing&&/existe/i.test(error.message)&&!/idéntico/i.test(error.message)){
                 const replace=existing.closest('.sw-file-row')?.querySelector('[data-sw-replace]');
                 if(replace){
-                    openReplaceModal(file, replace.dataset.fileId, replace.dataset.fileChecksum, replace.dataset.fileName);
+                    openReplaceModal(file, replace.dataset.fileId, replace.dataset.fileChecksum, replace.dataset.fileName, replace.dataset.reasonRequired === 'true');
                     return false;
                 }
             }
@@ -1429,7 +1433,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click',(event)=>{if(!event.target.closest('[data-sw-menu-trigger]')&&!event.target.closest('[data-sw-file-menu]'))closeMenus();});
     window.addEventListener('scroll',closeMenus,{passive:true,capture:true});
     window.addEventListener('resize',closeMenus,{passive:true});
-    manager.querySelectorAll('[data-sw-replace]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();const chooser=document.createElement('input');chooser.type='file';chooser.hidden=true;document.body.appendChild(chooser);chooser.addEventListener('change',()=>{const file=chooser.files?.[0];chooser.remove();if(!file)return;openReplaceModal(file,button.dataset.fileId,button.dataset.fileChecksum,button.dataset.fileName);});chooser.click();}));
+    manager.querySelectorAll('[data-sw-replace]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();const chooser=document.createElement('input');chooser.type='file';chooser.hidden=true;document.body.appendChild(chooser);chooser.addEventListener('change',()=>{const file=chooser.files?.[0];chooser.remove();if(!file)return;openReplaceModal(file,button.dataset.fileId,button.dataset.fileChecksum,button.dataset.fileName,button.dataset.reasonRequired === 'true');});chooser.click();}));
     manager.querySelectorAll('[data-sw-remove]').forEach((button)=>button.addEventListener('click',()=>{closeMenus();confirm('Quitar archivo','Este archivo dejará de formar parte del espacio de trabajo actual.',button.dataset.fileName,true,async()=>{try{await request('remove',null,{file_id:button.dataset.fileId});closeModal();setFlashToast('Archivo quitado.','success');reloadDocuments();}catch(error){toast(error.message||'No fue posible completar la operación.',true);}});}));
 
     const objectUrls=new Set();

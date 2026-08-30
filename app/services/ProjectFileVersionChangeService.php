@@ -5,7 +5,7 @@ declare(strict_types=1);
 /** Caso de uso transaccional para reemplazos académicos con declaración estructurada. */
 final class ProjectFileVersionChangeService
 {
-    /** Reemplazo técnico durante la preparación: no crea entrega ni notificaciones. */
+    /** Reemplazo estudiantil: in-place antes de la primera entrega y versionado después. */
     public function replaceWorkspaceInTransaction(PDO $db,int $projectId,int $fileId,string $expectedChecksum,array $stored,int $actor,string $customReason=''):array
     {
         $model=new ProjectDocumentModel($db);$project=$model->lockProject($projectId);
@@ -13,9 +13,9 @@ final class ProjectFileVersionChangeService
         $current=$model->findActiveFile($projectId,$fileId,true);
         if(!preg_match('/^[a-f0-9]{64}$/',$expectedChecksum)||!hash_equals((string)$current['checksum_sha256'],$expectedChecksum))$this->conflict();
         $hasPreviousReview=$this->hasPreviousReview($db,$projectId);
-        if($hasPreviousReview&&trim($customReason)==='')throw new ProjectDocumentVersionException('El motivo del cambio es obligatorio después de la primera revisión.',422);
         $previousStatus=$hasPreviousReview?$this->documentStatus($db,$projectId,$fileId,$expectedChecksum):'development';
-        if(!in_array($previousStatus,['development','corrections_requested'],true))throw new ProjectDocumentVersionException('Este archivo está protegido por una revisión previa y no puede modificarse en esta fase.',409);
+        if($hasPreviousReview&&$previousStatus!=='corrections_requested'&&trim($customReason)==='')throw new ProjectDocumentVersionException('El motivo del cambio es obligatorio después de la primera revisión.',422);
+        if(!in_array($previousStatus,['development','corrections_requested','approved'],true))throw new ProjectDocumentVersionException('Este archivo está protegido por una revisión previa y no puede modificarse en esta fase.',409);
         $newChecksum=(string)($stored['checksum_sha256']??'');
         if(!preg_match('/^[a-f0-9]{64}$/',$newChecksum))throw new ProjectDocumentVersionException('No fue posible validar la integridad del archivo nuevo.');
         if(hash_equals($expectedChecksum,$newChecksum))throw new ProjectDocumentVersionException('El archivo seleccionado tiene el mismo contenido que la versión actual. Realiza las correcciones necesarias antes de reemplazarlo.',422);
@@ -27,12 +27,12 @@ final class ProjectFileVersionChangeService
             (new ProjectAuditService($db))->record($projectId,$actor,'project_workspace_file_replaced','project_file',(int)$fileId,['checksum'=>$expectedChecksum],['file_id'=>$fileId,'previous_checksum'=>$expectedChecksum,'new_checksum'=>$newChecksum,'academic_history'=>false],$reason);
             return ['change_id'=>null,'file'=>$replacement['file'],'previous_version_id'=>null,'previous_version_number'=>null,'new_version_number'=>null,'preparation_replacement'=>true,'_obsolete_storage_name'=>(string)($replacement['old']['storage_name']??''),'_obsolete_checksum'=>$expectedChecksum];
         }
-        $reason=trim($customReason);$replacement=$model->replace($projectId,$fileId,$stored,$actor,$reason);
+        $reason=$previousStatus==='corrections_requested'?'Corrección solicitada por el docente.':trim($customReason);$summary=$previousStatus==='corrections_requested'?'Nueva versión cargada para atender las correcciones solicitadas por el docente.':'Archivo actualizado después de una revisión documental.';$replacement=$model->replace($projectId,$fileId,$stored,$actor,$reason);
         $previousNumber=(int)$replacement['version_number'];$newNumber=$previousNumber+1;
         $insert=$db->prepare("INSERT INTO project_file_version_changes(project_id,file_id,previous_version_id,previous_checksum,new_checksum,previous_version_number,new_version_number,changed_by,reason,declared_summary,sections_json,previous_document_status,new_document_status) VALUES(:project,:file,:previous_version,:previous_checksum,:new_checksum,:previous_number,:new_number,:actor,:reason,:summary,NULL,:previous_status,'development')");
-        $insert->execute(['project'=>$projectId,'file'=>$fileId,'previous_version'=>(int)$replacement['previous_version_id'],'previous_checksum'=>$expectedChecksum,'new_checksum'=>$newChecksum,'previous_number'=>$previousNumber,'new_number'=>$newNumber,'actor'=>$actor,'reason'=>$reason,'summary'=>'Archivo actualizado durante la preparación documental.','previous_status'=>$previousStatus]);$changeId=(int)$db->lastInsertId();
+        $insert->execute(['project'=>$projectId,'file'=>$fileId,'previous_version'=>(int)$replacement['previous_version_id'],'previous_checksum'=>$expectedChecksum,'new_checksum'=>$newChecksum,'previous_number'=>$previousNumber,'new_number'=>$newNumber,'actor'=>$actor,'reason'=>$reason,'summary'=>$summary,'previous_status'=>$previousStatus]);$changeId=(int)$db->lastInsertId();
         (new ProjectDocumentReviewService($db))->recordCurrentStatus($projectId,$fileId,$newChecksum,'development',$actor);
-        (new ProjectAuditService($db))->record($projectId,$actor,'project_workspace_file_replaced','project_file_version_change',$changeId,['checksum'=>$expectedChecksum,'version_number'=>$previousNumber],['change_id'=>$changeId,'file_id'=>$fileId,'previous_checksum'=>$expectedChecksum,'new_checksum'=>$newChecksum,'previous_version_number'=>$previousNumber,'new_version_number'=>$newNumber,'reason'=>$reason,'previous_status'=>$previousStatus],$reason);
+        (new ProjectAuditService($db))->record($projectId,$actor,'project_workspace_file_replaced','project_file_version_change',$changeId,['checksum'=>$expectedChecksum,'version_number'=>$previousNumber],['change_id'=>$changeId,'file_id'=>$fileId,'previous_checksum'=>$expectedChecksum,'new_checksum'=>$newChecksum,'previous_version_number'=>$previousNumber,'new_version_number'=>$newNumber,'reason'=>$reason,'summary'=>$summary,'previous_status'=>$previousStatus,'new_status'=>'development'],$reason);
         return ['change_id'=>$changeId,'file'=>$replacement['file'],'previous_version_id'=>(int)$replacement['previous_version_id'],'previous_version_number'=>$previousNumber,'new_version_number'=>$newNumber];
     }
 
