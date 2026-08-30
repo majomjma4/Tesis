@@ -65,10 +65,17 @@ UNION ALL
 SELECT CONCAT('adjustment-addressed:',a.id),'adjustment_addressed','project_adjustment_request',a.id,a.addressed_at,NULL,NULL,JSON_OBJECT('status','pending'),JSON_OBJECT('status','addressed'),
        JSON_OBJECT('request_type',a.request_type,'message',a.message)
 FROM project_adjustment_requests a WHERE a.project_id=? AND a.addressed_at IS NOT NULL
+  AND NOT EXISTS(SELECT 1 FROM project_audit_log l WHERE l.entity_type='project_adjustment_request' AND l.entity_id=a.id AND l.action='project_adjustment_request_approved')
 UNION ALL
 SELECT CONCAT('adjustment-closed:',a.id),'adjustment_closed','project_adjustment_request',a.id,a.closed_at,u.id,u.full_name,JSON_OBJECT('status','addressed'),JSON_OBJECT('status','closed'),
        JSON_OBJECT('request_type',a.request_type,'message',a.message)
 FROM project_adjustment_requests a LEFT JOIN users u ON u.id=a.closed_by WHERE a.project_id=? AND a.closed_at IS NOT NULL
+  AND NOT EXISTS(SELECT 1 FROM project_audit_log l WHERE l.entity_type='project_adjustment_request' AND l.entity_id=a.id AND l.action='project_adjustment_request_rejected')
+UNION ALL
+SELECT CONCAT('adjustment-decision:',l.id),CASE WHEN l.action='project_adjustment_request_approved' THEN 'adjustment_approved' ELSE 'adjustment_rejected' END,'project_adjustment_request',l.entity_id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
+       JSON_OBJECT('adjustment_id',l.entity_id,'request_type',a.request_type,'message',a.message,'decision',CASE WHEN l.action='project_adjustment_request_approved' THEN 'approved' ELSE 'rejected' END)
+FROM project_audit_log l JOIN project_adjustment_requests a ON a.id=l.entity_id LEFT JOIN users u ON u.id=l.user_id
+WHERE l.project_id=? AND l.entity_type='project_adjustment_request' AND l.action IN ('project_adjustment_request_approved','project_adjustment_request_rejected')
 UNION ALL
 SELECT CONCAT('document-review:',l.id),'document_review_completed','project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason)
@@ -103,7 +110,7 @@ UNION ALL
 SELECT CONCAT('academic:',l.id),l.action,'project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason)
 FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=? AND (
-  (l.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished','project_publication_reverted','project_status_changed','project_participants_updated','tribunal_assigned','tribunal_updated','thesis_defense_information_updated','tribunal_result_registered','defense_attempt_started')
+  (l.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished','project_publication_reverted','project_status_changed','project_reopened_for_adjustment','project_participants_updated','tribunal_assigned','tribunal_updated','thesis_defense_information_updated','tribunal_result_registered','defense_attempt_started')
    AND NOT (l.action='project_unpublished' AND EXISTS(SELECT 1 FROM project_audit_log semantic WHERE semantic.project_id=l.project_id AND semantic.action='project_publication_reverted' AND semantic.created_at=l.created_at)))
   OR (l.action='project_corrections_requested'
    AND NOT EXISTS(SELECT 1 FROM project_observations obs WHERE obs.project_id=l.project_id AND DATE_FORMAT(obs.created_at,'%Y-%m-%d %H:%i:%s')=DATE_FORMAT(l.created_at,'%Y-%m-%d %H:%i:%s')))
@@ -152,6 +159,9 @@ SQL;
             'adjustment_responded'=>['Estudiante respondió la solicitud',(string)($p['message']??''),'adjustment'],
             'adjustment_addressed'=>['Solicitud marcada como atendida',(string)($p['message']??''),'adjustment'],
             'adjustment_closed'=>['Solicitud de ajuste cerrada',(string)($p['message']??''),'adjustment'],
+            'adjustment_approved'=>['Solicitud de modificación aprobada','La solicitud fue aprobada y el proyecto volvió a estar disponible para edición.','adjustment'],
+            'adjustment_rejected'=>['Solicitud de modificación rechazada','La solicitud fue rechazada y el proyecto permanece publicado.','adjustment'],
+            'project_reopened_for_adjustment'=>['Proyecto reabierto para modificación','El proyecto publicado volvió a preparación por una solicitud aprobada.','status'],
             'document_review_completed'=>['Revisión documental confirmada',$this->reviewDescription($new),'document-review'],
             'document_status_recorded'=>['Estado documental registrado',$this->documentStatusLabel((string)($p['status']??'')),'document-review'],
             'file_version_registered'=>['Nueva versión documental registrada',!empty($p['reason'])?(string)$p['reason']:'Archivo actualizado durante la preparación documental.','file'],

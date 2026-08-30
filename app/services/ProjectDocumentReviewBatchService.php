@@ -46,6 +46,8 @@ final class ProjectDocumentReviewBatchService
         $normalized = $this->normalizeDecisions($decisions);
         $files = (new ProjectDocumentReviewService($db))->loadFilesInReviewScope($db, $projectId, true);
         if ($files === []) throw new ProjectStatusTransitionException('El proyecto no puede revisarse porque no contiene documentos activos.');
+        $delivery = $this->lockCurrentReviewDelivery($db, $projectId);
+        $deliveryId = (int) $delivery['id'];
         $byId = [];
         foreach ($files as $file) $byId[(int)$file['id']] = $file;
 
@@ -99,6 +101,20 @@ final class ProjectDocumentReviewBatchService
 
         $after = $reviewService->describeCurrentFiles($projectId, $files, true);
         $summary = $after['summary'];
+        $deliveryStatus = $summary['corrections_requested'] > 0
+            ? ProjectDeliveryStatusService::correctionsRequested($db)
+            : (!empty($summary['all_active_documents_approved']) ? 'approved' : 'under_review');
+        if ($deliveryStatus !== (string) $delivery['status']) {
+            $deliveryUpdate = $db->prepare(
+                'UPDATE project_deliveries SET status=:status
+                 WHERE id=:id AND project_id=:project AND status=:expected'
+            );
+            $deliveryUpdate->execute([
+                'status' => $deliveryStatus, 'id' => $deliveryId,
+                'project' => $projectId, 'expected' => (string) $delivery['status'],
+            ]);
+            if ($deliveryUpdate->rowCount() !== 1) throw new ProjectStatusTransitionException('La entrega cambió mientras se confirmaba la revisión. Recarga el expediente antes de continuar.', 409);
+        }
         $finalProjectStatus = $summary['corrections_requested'] > 0
             ? 'development'
             : (!empty($summary['all_active_documents_approved']) ? 'approved' : 'under_review');
@@ -125,6 +141,7 @@ final class ProjectDocumentReviewBatchService
                 'approved'=>(int)$summary['approved'], 'under_review'=>(int)$summary['under_review'],
                 'corrections_requested'=>(int)$summary['corrections_requested'],
                 'observation_count'=>$observationCount, 'documents'=>$auditDocuments,
+                'delivery_id'=>$deliveryId, 'delivery_status'=>$deliveryStatus,
             ],
             'Revisión documental confirmada.'
         );
@@ -146,12 +163,28 @@ final class ProjectDocumentReviewBatchService
                 'status'=>(string)$file['document_status'], 'status_label'=>(string)$file['document_status_label'],
             ], $after['files'])),
             'summary'=>$summary,
+            'delivery_id'=>$deliveryId,
+            'delivery_status'=>$deliveryStatus,
             'all_active_documents_approved'=>(bool)$summary['all_active_documents_approved'],
             'observations_created'=>$observationCount,
             'message'=>$finalProjectStatus === 'development'
                 ? 'La revisión documental fue confirmada y se solicitaron correcciones.'
                 : 'La revisión documental fue confirmada correctamente.',
         ];
+    }
+
+    /** Bloquea la entrega vigente más reciente para evitar completar una revisión sin actualizarla. */
+    private function lockCurrentReviewDelivery(PDO $db, int $projectId): array
+    {
+        $query = $db->prepare(
+            "SELECT id,status FROM project_deliveries
+             WHERE project_id=:project AND status='under_review'
+             ORDER BY submitted_at DESC,id DESC LIMIT 1 FOR UPDATE"
+        );
+        $query->execute(['project' => $projectId]);
+        $delivery = $query->fetch();
+        if (!$delivery) throw new ProjectStatusTransitionException('La entrega vigente no está disponible para actualizar su resultado.', 409);
+        return $delivery;
     }
 
     /** @return array<int,array<string,mixed>> */

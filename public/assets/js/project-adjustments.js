@@ -142,11 +142,13 @@
     if(event.target.closest("[data-adjustment-response-cancel]")){close(responseDialog);return;}
     const respond=event.target.closest("[data-adjustment-respond]");
     if(respond){responseRequest={request_id:respond.dataset.requestId,lock_version:respond.dataset.lockVersion};open(responseDialog,respond);return;}
-    const action=event.target.closest("[data-adjustment-address],[data-adjustment-close]");
+    const action=event.target.closest("[data-adjustment-address],[data-adjustment-close],[data-adjustment-approve],[data-adjustment-reject]");
     if(!action)return;
-    const operation=action.hasAttribute("data-adjustment-close")?"close":"address";
+    const operation=action.hasAttribute("data-adjustment-close")?"close":(action.hasAttribute("data-adjustment-approve")?"approve":(action.hasAttribute("data-adjustment-reject")?"reject":"address"));
+    if (operation === "approve" && !window.confirm("¿Aprobar esta solicitud? El proyecto dejará de estar publicado temporalmente y volverá a estar disponible para edición.")) return;
+    if (operation === "reject" && !window.confirm("¿Rechazar esta solicitud? El proyecto permanecerá publicado y bloqueado para edición.")) return;
     action.disabled=true;
-    try{await request(config.dataset[operation],{...common(),request_id:action.dataset.requestId,lock_version:action.dataset.lockVersion});window.location.reload();}catch(error){action.disabled=false;window.AppToast?.error(error.message);}
+    try{const result=await request(config.dataset[operation],{...common(),request_id:action.dataset.requestId,lock_version:action.dataset.lockVersion});window.AppToast?.success(result.message);window.location.reload();}catch(error){action.disabled=false;window.AppToast?.error(error.message);}
   });
   const createData = form => { const values=Object.fromEntries(new FormData(form)); return {...values,project_id:Number(values.project_id),file_id:values.file_id?Number(values.file_id):null}; };
   const validatePublishedModification = form => {

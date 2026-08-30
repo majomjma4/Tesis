@@ -111,7 +111,13 @@ final class AdminRepositoryModel
                     SELECT GROUP_CONCAT(DISTINCT UPPER(f.extension) ORDER BY f.extension SEPARATOR ', ')
                     FROM project_files f
                     WHERE f.project_id=p.id AND f.deleted_at IS NULL AND f.purged_at IS NULL
-                ) formats"
+                ) formats,
+                (
+                    SELECT COUNT(*) FROM project_adjustment_requests ar
+                    WHERE ar.project_id=p.id
+                      AND ar.status='pending'
+                      AND ar.request_type='published_modification'
+                ) pending_adjustment_count"
             . $from
             . " ORDER BY COALESCE(p.published_at,p.updated_at) DESC";
 

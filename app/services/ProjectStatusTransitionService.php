@@ -170,6 +170,58 @@ final class ProjectStatusTransitionService
             ];
     }
 
+    /**
+     * Reabre un proyecto publicado por una solicitud administrativa aprobada.
+     * Es una transición excepcional y explícita: conserva published_at y deja
+     * el proyecto fuera del repositorio mientras vuelve a preparación.
+     */
+    public function reopenPublishedForAdjustmentInTransaction(PDO $db, int $projectId, int $actor, int $requestId): array
+    {
+        if ($projectId < 1 || $actor < 1 || $requestId < 1) {
+            throw new ProjectStatusTransitionException('La reapertura administrativa no es válida.');
+        }
+
+        $query = $db->prepare(
+            'SELECT id,code,title,status,published_at,is_available,deleted_at,withdrawn_at
+             FROM projects WHERE id=:id FOR UPDATE'
+        );
+        $query->execute(['id' => $projectId]);
+        $project = $query->fetch();
+        if (!$project || !empty($project['deleted_at']) || !empty($project['withdrawn_at'])) {
+            throw new ProjectStatusTransitionException('El proyecto publicado no está disponible.', 404);
+        }
+        if ((string) $project['status'] !== 'published') {
+            throw new ProjectStatusTransitionException('El proyecto ya no está publicado. Actualiza el expediente antes de continuar.', 409);
+        }
+
+        $update = $db->prepare(
+            "UPDATE projects SET status='development',is_available=0,updated_at=CURRENT_TIMESTAMP
+             WHERE id=:id AND status='published'"
+        );
+        $update->execute(['id' => $projectId]);
+        if ($update->rowCount() !== 1) {
+            throw new ProjectStatusTransitionException('El estado del proyecto cambió mientras se aprobaba la solicitud.', 409);
+        }
+
+        (new ProjectAuditService($db))->record(
+            $projectId,
+            $actor,
+            'project_reopened_for_adjustment',
+            'project',
+            $projectId,
+            ['status' => 'published', 'is_available' => (int) $project['is_available']],
+            ['status' => 'development', 'is_available' => 0, 'request_id' => $requestId],
+            'Solicitud de modificación aprobada.'
+        );
+
+        return [
+            'id' => $projectId,
+            'previous_status' => 'published',
+            'status' => 'development',
+            'published_at' => $project['published_at'],
+        ];
+    }
+
     private function appliesToType(array $definition, string $type): bool
     {
         if (!empty($definition['thesis_only']) && $type !== 'thesis') return false;

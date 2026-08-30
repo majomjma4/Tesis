@@ -383,6 +383,8 @@ final class ProjectsController
             $projectCapabilities['respond_adjustment_request'] ?? false,
             $projectCapabilities['address_adjustment_request'] ?? false,
             $projectCapabilities['close_adjustment_request'] ?? false,
+            $projectCapabilities['approve_adjustment_request'] ?? false,
+            $projectCapabilities['reject_adjustment_request'] ?? false,
         ]);
         $documentReview = null;
         if ($projectContext === 'academic_management' && (string)$project['status'] === 'development') {
@@ -544,6 +546,7 @@ final class ProjectsController
             'adjustmentEndpoints' => [
                 'create' => route('project-adjustment-create'), 'respond' => route('project-adjustment-respond'),
                 'address' => route('project-adjustment-address'), 'close' => route('project-adjustment-close'),
+                'approve' => route('project-adjustment-approve'), 'reject' => route('project-adjustment-reject'),
             ],
         ]);
     }

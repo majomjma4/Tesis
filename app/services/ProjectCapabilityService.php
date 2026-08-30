@@ -93,6 +93,7 @@ final class ProjectCapabilityService
         'manage_workspace_files', 'send_for_review',
         'create_adjustment_request', 'view_adjustment_requests', 'respond_adjustment_request',
         'address_adjustment_request', 'close_adjustment_request',
+        'approve_adjustment_request', 'reject_adjustment_request',
     ];
 
     /** @return array<string,bool> */
@@ -274,7 +275,7 @@ final class ProjectCapabilityService
         if ($context === 'academic_management') {
             if (!$administrator) return $capabilities;
             foreach (['view_project','edit_information','manage_files','view_academic_history','view_admin_history','change_status','request_corrections','manage_participants','manage_tutoring','manage_tribunal','manage_publication','download_files','download_academic_package','view_institutional_files'] as $key) $capabilities[$key] = true;
-            foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request'] as $key) $capabilities[$key] = true;
+            foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request','approve_adjustment_request','reject_adjustment_request'] as $key) $capabilities[$key] = true;
             if ((string)($project['status'] ?? '') === 'development') $capabilities['manage_files'] = false;
             return $capabilities;
         }
@@ -290,6 +291,7 @@ final class ProjectCapabilityService
             $capabilities['download_files'] = true;
             $capabilities['download_academic_package'] = true;
             $capabilities['view_institutional_files'] = true;
+            if ($administrator) $capabilities['view_admin_history'] = true;
             $studentParticipant = in_array('student', $roles, true)
                 && count(array_filter($participants, static fn (array $participant): bool =>
                     (int) ($participant['user_id'] ?? 0) === $userId
@@ -433,7 +435,7 @@ final class ProjectCapabilityService
         if ($rows === []) return $result;
         $isAdmin = count(array_filter($rows, static fn(array $row): bool => !empty($row['is_admin']) || strtolower((string)$row['code']) === 'administrator')) > 0;
         if ($context === 'academic_management' && $isAdmin) {
-            foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request'] as $key) $result[$key] = true;
+            foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request','approve_adjustment_request','reject_adjustment_request'] as $key) $result[$key] = true;
             return $result;
         }
         $roles = array_map(static fn(array $row): string => strtolower((string)$row['code']), $rows);

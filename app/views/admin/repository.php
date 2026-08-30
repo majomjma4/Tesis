@@ -213,6 +213,14 @@ $formatProjectType = static function (array $project): string {
                                 <div><dt><i class="fa-regular fa-calendar"></i> Período</dt><dd><?= e($project['period_name']) ?></dd></div>
                             </dl>
                         </div>
+                        <?php if ((int) ($project['pending_adjustment_count'] ?? 0) > 0): ?>
+                            <?php $pendingModificationCount = (int) $project['pending_adjustment_count']; ?>
+                            <div class="ar-project-adjustment-notice" role="status">
+                                <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+                                <span><?= $pendingModificationCount ?> solicitud<?= $pendingModificationCount === 1 ? '' : 'es' ?> de modificación pendiente<?= $pendingModificationCount === 1 ? '' : 's' ?></span>
+                                <a href="<?= e(route('repository-detail') . '&id=' . (int) $project['id'] . '&tab=information#projectAdjustmentListTitle') ?>">Gestionar</a>
+                            </div>
+                        <?php endif; ?>
                         <div class="ar-card-meta">
                             <span><i class="fa-regular fa-file-lines"></i> <?= (int) $project['file_count'] ?> documentos</span>
                             <span><i class="fa-solid fa-globe"></i> <?= e($formatDate($project['published_at'])) ?></span>

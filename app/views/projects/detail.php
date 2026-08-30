@@ -212,13 +212,13 @@ if ($project === null): ?>
         ],static fn(?array $section):bool=>$section!==null));
     }
     $actions=[];
-    if ($publicContext && !empty($projectCapabilities['edit_information'])) {
+    if (($publicContext || $isAcademicManagement) && !empty($projectCapabilities['edit_information'])) {
         $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
     }
     if (!$isAdministrator && !empty($projectCapabilities['create_adjustment_request'])) {
         $isPublishedStudentRequest = $publicContext && $projectContext === 'repository';
         if ($isPublishedStudentRequest && !empty($hasPendingModificationRequest)) {
-            $actions[] = ['id' => 'modification-pending', 'label' => 'Solicitud pendiente', 'kind' => 'secondary', 'icon' => 'fa-clock', 'enabled' => false];
+            $actions[] = ['id' => 'modification-pending', 'label' => 'Solicitud pendiente', 'kind' => 'secondary', 'icon' => 'fa-clock', 'enabled' => false, 'title' => 'Ya existe una solicitud de modificación pendiente de revisión.'];
         } else {
             $actions[] = ['id' => $isPublishedStudentRequest ? 'modification-request' : 'adjustment', 'label' => $isPublishedStudentRequest ? 'Solicitar modificación' : 'Solicitar cambios', 'kind' => 'secondary', 'icon' => 'fa-comment-dots', 'enabled' => true, 'url' => '#projectAdjustmentDialog'];
         }
@@ -229,7 +229,6 @@ if ($project === null): ?>
     if($isAcademicManagement&&(string)$project['status']==='published')$actions[]=['id'=>'repository','label'=>'Ver en Repositorio','kind'=>'secondary','icon'=>'fa-book-open','url'=>route('repository-detail').'&id='.$projectId,'enabled'=>true];
     $statusActionCount=$isAcademicManagement&&!empty($projectCapabilities['change_status'])?count($projectStatusTransitions):0;
     foreach($statusActionCount>0?$projectStatusTransitions:[] as $transition)$actions[]=['id'=>'status-'.$transition['target'],'label'=>(string)$transition['label'],'kind'=>'secondary','icon'=>(string)$transition['icon'],'icon_style'=>'fa-solid','enabled'=>true,'trigger'=>'status-transition','transition'=>$transition];
-    if($isAcademicManagement)$actions=array_values(array_filter($actions,static fn(array $action):bool=>($action['id']??'')==='adjustment'));
     $menuActions=[];
     if($publicContext&&!empty($projectCapabilities['manage_publication'])){
         $menuActions[]=['label'=>$project['is_available']?'Marcar como no disponible':'Marcar como disponible','icon'=>$project['is_available']?'fa-ban':'fa-circle-check','enabled'=>true,'action'=>'availability'];

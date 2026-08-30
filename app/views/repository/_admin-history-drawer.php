@@ -11,22 +11,25 @@ $historyIsProject=(string)($digitalRecord['entity']['type']??'')==='project';
 $historyContext=(string)($digitalRecord['context']??'repository');
 $historyIsAcademicManagement=$historyIsProject&&$historyContext==='academic_management';
 $historyEyebrow=$historyIsAcademicManagement?'Proyecto académico':($historyIsProject?'Proyecto publicado':'Material de apoyo');
-$historyTitle=$historyIsAcademicManagement?'Historial administrativo del proyecto':'Historial administrativo';
-$historyDescription=$historyIsAcademicManagement?'Registro de acciones realizadas en Gestión académica.':'Registro de acciones realizadas sobre este '.($historyIsProject?'proyecto':'material').'.';
-$historyEmpty=$historyIsAcademicManagement?'No hay modificaciones administrativas registradas.':'Aún no existen acciones administrativas registradas para este '.($historyIsProject?'proyecto':'material').'.';
+$historyTitle='Historial administrativo';
+$historyDescription=$historyIsProject?'Registro de acciones administrativas realizadas sobre este proyecto.':'Registro de acciones realizadas sobre este material.';
+$historyEmpty=$historyIsProject?'No existen acciones administrativas registradas para este proyecto.':'Aún no existen acciones administrativas registradas para este material.';
+$historyCloseLabel='Cerrar historial administrativo';
+$historyLoadingLabel='Cargando historial administrativo…';
+$historyError='No fue posible cargar el historial administrativo.';
 ?>
 <div class="admin-history-overlay" hidden data-record-history-overlay data-context="<?=e($historyContext)?>" data-entity-type="<?=e((string)($digitalRecord['entity']['type']??''))?>" data-endpoint="<?= e((string) $digitalRecord['endpoints']['admin_history']) ?>" data-cleanup-endpoint="<?= e((string) ($digitalRecord['endpoints']['admin_history_cleanup'] ?? '')) ?>" data-material-id="<?= (int) ($digitalRecord['entity']['id'] ?? 0) ?>" data-csrf="<?= e((string) ($digitalRecord['form']['csrf_token'] ?? '')) ?>">
     <aside class="admin-history-drawer" role="dialog" aria-modal="true" aria-labelledby="recordHistoryTitle" aria-describedby="recordHistoryDescription" data-record-history-drawer>
         <header class="admin-history-drawer__header">
             <div><span class="ed-history-eyebrow"><?=e($historyEyebrow)?></span><h2 id="recordHistoryTitle" tabindex="-1"><?=e($historyTitle)?></h2><p id="recordHistoryDescription"><?=e($historyDescription)?></p></div>
-            <button class="ed-history-close" type="button" aria-label="Cerrar historial administrativo" data-record-history-close><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            <button class="ed-history-close" type="button" aria-label="<?=e($historyCloseLabel)?>" data-record-history-close><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
         </header>
         <div class="admin-history-drawer__body" tabindex="0" data-admin-history-drawer-body>
             <p class="ed-history-notice" role="status" aria-live="polite" hidden data-record-history-notice></p>
             <p class="ed-history-progress" aria-live="polite" hidden data-record-history-progress></p>
-            <div class="ed-history-state" role="status" aria-live="polite" hidden data-record-history-loading><span class="skeleton ed-history-skeleton" aria-hidden="true"></span><span>Cargando historial administrativo…</span></div>
+            <div class="ed-history-state" role="status" aria-live="polite" hidden data-record-history-loading><span class="skeleton ed-history-skeleton" aria-hidden="true"></span><span><?=e($historyLoadingLabel)?></span></div>
             <div class="ed-history-state" hidden data-record-history-empty><i class="fa-regular fa-clock" aria-hidden="true"></i><span><?=e($historyEmpty)?></span></div>
-            <div class="ed-history-state is-error" role="alert" hidden data-record-history-error><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>No fue posible cargar el historial administrativo.</span></div>
+            <div class="ed-history-state is-error" role="alert" hidden data-record-history-error><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span><?=e($historyError)?></span></div>
             <div class="ed-history-list" role="list" hidden data-record-history-list></div>
         </div>
         <footer class="ed-history-footer" hidden data-record-history-footer>

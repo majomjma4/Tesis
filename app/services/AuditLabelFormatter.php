@@ -23,6 +23,8 @@ final class AuditLabelFormatter
             'thesis_defense_information_updated', 'defense_attempt_started',
             'project_adjustment_request_created', 'project_adjustment_request_responded',
             'project_adjustment_request_addressed', 'project_adjustment_request_closed',
+            'project_adjustment_request_approved', 'project_adjustment_request_rejected',
+            'project_reopened_for_adjustment',
             'support_material_created', 'support_material_published', 'support_material_withdrawn',
             'support_material_restored', 'support_material_availability_changed', 'support_material.created',
             'support_material.published', 'support_material.withdrawn', 'support_material.restored',
@@ -49,6 +51,9 @@ final class AuditLabelFormatter
     ];
 
     private const ACTIONS = [
+        'project_adjustment_request_approved' => 'Solicitud de modificación aprobada',
+        'project_adjustment_request_rejected' => 'Solicitud de modificación rechazada',
+        'project_reopened_for_adjustment' => 'Proyecto reabierto para modificación',
         'admin_access_granted' => 'Acceso administrativo otorgado',
         'avatar_updated' => 'Imagen de perfil actualizada',
         'delivery_submitted' => 'Entrega académica registrada',
@@ -73,7 +78,75 @@ final class AuditLabelFormatter
         'user_updated' => 'Información de usuario actualizada',
     ];
 
+    /** Labels safe for the project audit drawer; raw action codes must never reach its UI. */
+    private const PROJECT_ACTIONS = [
+        'project_created' => 'Registró el proyecto',
+        'project_updated' => 'Actualizó la información del proyecto',
+        'project_description_updated' => 'Actualizó la descripción del proyecto',
+        'project_authors_updated' => 'Actualizó los integrantes del proyecto',
+        'project_published' => 'Publicó el proyecto',
+        'project_republished' => 'Volvió a publicar el proyecto',
+        'project_unpublished' => 'Retiró el proyecto del repositorio',
+        'project_withdrawn' => 'Retiró el proyecto del repositorio',
+        'project_reincorporated' => 'Reincorporó el proyecto al repositorio',
+        'project_availability_changed' => 'Cambió la disponibilidad del proyecto',
+        'project_publication_reverted' => 'Revirtió la publicación del proyecto',
+        'project_qa_prepared' => 'Preparó el proyecto para Gestión académica',
+        'project_trashed' => 'Envió el proyecto a la Papelera',
+        'project_restored' => 'Restauró el proyecto',
+        'project.file_added' => 'Agregó un archivo al proyecto',
+        'project.file_replaced' => 'Reemplazó un archivo del proyecto',
+        'project.file_removed' => 'Retiró un archivo del proyecto',
+        'project.file_restored' => 'Restauró un archivo del proyecto',
+        'project.file_purged' => 'Eliminó definitivamente un archivo del proyecto',
+        'project_file_added' => 'Agregó un archivo al proyecto',
+        'project_file_replaced' => 'Reemplazó un archivo del proyecto',
+        'project_file_removed' => 'Retiró un archivo del proyecto',
+        'project_file_restored' => 'Restauró un archivo del proyecto',
+        'project_file_purged' => 'Eliminó definitivamente un archivo del proyecto',
+        'project_workspace_file_added' => 'Agregó un archivo al proyecto',
+        'project_workspace_file_replaced' => 'Reemplazó un archivo del proyecto',
+        'project_workspace_file_removed' => 'Retiró un archivo del proyecto',
+        'project_workspace_file_restored' => 'Restauró un archivo del proyecto',
+        'project_publication_file_added' => 'Agregó un archivo a la publicación',
+        'project_publication_file_replaced' => 'Reemplazó un archivo de la publicación',
+        'project_publication_file_excluded' => 'Excluyó un archivo de la publicación',
+        'project_document_version_created' => 'Creó una nueva versión documental',
+        'project_document_versions_archived' => 'Archivó versiones documentales',
+        'project.presentation_selected' => 'Seleccionó el archivo de presentación',
+        'project.presentation_changed' => 'Cambió el archivo de presentación',
+        'project.presentation_removed' => 'Retiró el archivo de presentación',
+        'project_submitted_for_review' => 'Envió el proyecto a revisión',
+        'delivery_submitted' => 'Envió el proyecto a revisión',
+        'project_document_review_completed' => 'Completó la revisión documental',
+        'project_corrections_requested' => 'Solicitó correcciones',
+        'review_requested_changes' => 'Solicitó correcciones',
+        'project_approved' => 'Aprobó la revisión',
+        'review_approved' => 'Aprobó la revisión',
+        'project_tribunal_approved' => 'Registró la aprobación del tribunal',
+        'tribunal_approved' => 'Registró la aprobación del tribunal',
+        'project_adjustment_request_created' => 'Solicitó una modificación',
+        'adjustment_requested' => 'Solicitó una modificación',
+        'project_adjustment_request_responded' => 'Respondió la solicitud de modificación',
+        'project_adjustment_request_addressed' => 'Atendió la solicitud de modificación',
+        'project_adjustment_request_closed' => 'Cerró la solicitud de modificación',
+        'project_adjustment_request_approved' => 'Aprobó la solicitud de modificación',
+        'adjustment_approved' => 'Aprobó la solicitud de modificación',
+        'project_adjustment_request_rejected' => 'Rechazó la solicitud de modificación',
+        'adjustment_rejected' => 'Rechazó la solicitud de modificación',
+        'project_reopened_for_adjustment' => 'Reabrió el proyecto para modificación',
+        'project_legacy_status_migrated' => 'Normalizó un estado académico heredado',
+        'project_status_changed' => 'Cambió el estado del proyecto',
+        'tribunal_assigned' => 'Asignó el tribunal',
+        'tribunal_updated' => 'Actualizó el tribunal',
+        'tribunal_result_registered' => 'Registró el resultado del tribunal',
+        'thesis_defense_information_updated' => 'Actualizó la información de la defensa',
+        'defense_attempt_started' => 'Inició un intento de defensa',
+        'repository_direct_publish' => 'Publicó el proyecto en el repositorio',
+    ];
+
     private const CONTEXTS = [
+        'project_adjustment_request' => 'Solicitud de modificación',
         'delivery' => 'Entrega del proyecto',
         'project' => 'Proyecto',
         'project_delivery' => 'Entrega del proyecto',
@@ -91,6 +164,11 @@ final class AuditLabelFormatter
     public static function action(string $code, string $storedLabel = ''): string
     {
         return self::ACTIONS[$code] ?? (trim($storedLabel) !== '' ? trim($storedLabel) : 'Actividad auditada (evento no catalogado)');
+    }
+
+    public static function projectAction(string $code): string
+    {
+        return self::PROJECT_ACTIONS[$code] ?? 'Registró una actividad en el proyecto';
     }
 
     public static function context(string $code): string

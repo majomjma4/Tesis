@@ -120,6 +120,8 @@ match ($page) {
     'project-adjustment-respond' => (new ProjectAdjustmentController())->respond(),
     'project-adjustment-address' => (new ProjectAdjustmentController())->address(),
     'project-adjustment-close' => (new ProjectAdjustmentController())->close(),
+    'project-adjustment-approve' => (new ProjectAdjustmentController())->approve(),
+    'project-adjustment-reject' => (new ProjectAdjustmentController())->reject(),
     'project-adjustment-list' => (new ProjectAdjustmentController())->listing(),
     'project-description-save' => (new ProjectsController())->saveDescription(),
     'project-draft-save' => (new ProjectsController())->saveProjectDraft(),

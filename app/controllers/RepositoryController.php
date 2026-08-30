@@ -287,6 +287,8 @@ final class RepositoryController
             'respond' => route('project-adjustment-respond'),
             'address' => route('project-adjustment-address'),
             'close' => route('project-adjustment-close'),
+            'approve' => route('project-adjustment-approve'),
+            'reject' => route('project-adjustment-reject'),
         ];
         View::render('projects/detail', [
             'currentPage' => 'repository',
@@ -295,9 +297,10 @@ final class RepositoryController
                 $isAdministratorView ? asset('css/admin-projects.css') : null,
                 (!empty($projectCapabilities['view_adjustment_requests']) || !empty($projectCapabilities['create_adjustment_request'])) ? asset('css/project-adjustments.css') : null,
             ])),
-            'pageScript' => $isAdministratorView ? asset('js/admin-projects.js') : asset('js/repository-detail.js'),
+            'pageScript' => $isAdministratorView ? asset('js/material-admin-actions.js') : asset('js/repository-detail.js'),
             'pageScripts' => array_values(array_filter([
-                $isAdministratorView ? asset('js/material-admin-actions.js') : null,
+                $isAdministratorView ? asset('js/repository-detail.js') : null,
+                $isAdministratorView ? asset('js/admin-projects.js') : null,
                 (!empty($projectCapabilities['view_adjustment_requests']) || !empty($projectCapabilities['create_adjustment_request'])) ? asset('js/project-adjustments.js') : null,
             ])),
             'project' => $project,

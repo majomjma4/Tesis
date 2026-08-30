@@ -8,8 +8,6 @@ final class ProjectReviewService
     private const MIN_OBSERVATION_LENGTH = 5;
     private const MAX_OBSERVATION_LENGTH = 2000;
 
-    private const DELIVERY_CORRECTIONS_RESULT = 'corrections_requested';
-
     /** Contrato visual de la acción excepcional de revisión; no duplica la política de estados. */
     public function availableCorrectionAction(array $project): ?array
     {
@@ -218,7 +216,7 @@ final class ProjectReviewService
     private function markDeliveryCorrectionsRequested(PDO $db, int $deliveryId): void
     {
         $statement = $db->prepare('UPDATE project_deliveries SET status=:status WHERE id=:id');
-        $statement->execute(['status' => self::DELIVERY_CORRECTIONS_RESULT, 'id' => $deliveryId]);
+        $statement->execute(['status' => ProjectDeliveryStatusService::correctionsRequested($db), 'id' => $deliveryId]);
     }
 
     private function notifyAuthors(PDO $db, int $projectId, int $count, int $auditId): void

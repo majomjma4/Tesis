@@ -16,7 +16,7 @@ if (in_array('--migrate', $argv, true)) {
 }
 $passed = 0;
 $failed = 0;
-$trackedTables = ['projects','project_participants','project_files','project_file_review_states','project_observations','project_audit_log','notifications'];
+$trackedTables = ['projects','project_participants','project_files','project_deliveries','project_file_review_states','project_observations','project_audit_log','notifications'];
 
 function tableCounts(PDO $db, array $tables): array
 {
@@ -75,15 +75,18 @@ function fixture(PDO $db, int $number, bool $withFiles = true): array
     $insert = $db->prepare("INSERT INTO projects(code,project_type_id,career_id,academic_period_id,title,tutor_id,status,current_stage,created_by) VALUES(:code,:type,:career,:period,'Prueba revisión documental',:tutor,'under_review','review',:creator)");
     $insert->execute(['code'=>$code, 'type'=>$type, 'career'=>$career, 'period'=>$period, 'tutor'=>$teacher, 'creator'=>$teacher]);
     $project = (int)$db->lastInsertId();
+    $deliveryInsert = $db->prepare("INSERT INTO project_deliveries(project_id,version_number,title,comment,status,submitted_by) VALUES(:project,1,'Entrega de prueba','Documentos enviados a revisión.','under_review',:student)");
+    $deliveryInsert->execute(['project'=>$project, 'student'=>$student]);
+    $delivery = (int)$db->lastInsertId();
     $participant = $db->prepare("INSERT INTO project_participants(project_id,user_id,role_code,permission_level,is_leader,status) VALUES(:project,:user,:role,:permission,:leader,'active')");
     $participant->execute(['project'=>$project, 'user'=>$teacher, 'role'=>'tutor', 'permission'=>'review', 'leader'=>0]);
     $participant->execute(['project'=>$project, 'user'=>$student, 'role'=>'student', 'permission'=>'contribute', 'leader'=>1]);
     $files = [];
     if ($withFiles) {
-        $fileInsert = $db->prepare("INSERT INTO project_files(project_id,category,original_name,storage_name,storage_path,mime_type,extension,size_bytes,checksum_sha256,uploaded_by,sort_order) VALUES(:project,'document','documento.pdf',:storage,:path,'application/pdf','pdf',10,:checksum,:actor,:sort)");
+        $fileInsert = $db->prepare("INSERT INTO project_files(project_id,delivery_id,category,original_name,storage_name,storage_path,mime_type,extension,size_bytes,checksum_sha256,uploaded_by,sort_order) VALUES(:project,:delivery,'document','documento.pdf',:storage,:path,'application/pdf','pdf',10,:checksum,:actor,:sort)");
         foreach ([1, 2] as $position) {
             $checksum = hash('sha256', $code . '-' . $position);
-            $fileInsert->execute(['project'=>$project, 'storage'=>$code.'-'.$position.'.pdf', 'path'=>'tests/'.$code.'-'.$position.'.pdf', 'checksum'=>$checksum, 'actor'=>$student, 'sort'=>$position]);
+            $fileInsert->execute(['project'=>$project, 'delivery'=>$delivery, 'storage'=>$code.'-'.$position.'.pdf', 'path'=>'tests/'.$code.'-'.$position.'.pdf', 'checksum'=>$checksum, 'actor'=>$student, 'sort'=>$position]);
             $files[] = ['file_id'=>(int)$db->lastInsertId(), 'expected_checksum'=>$checksum];
         }
     }
@@ -118,6 +121,7 @@ try {
         $result = (new ProjectDocumentReviewBatchService())->confirmInTransaction($db, $f['project'], 'under_review', $decisions, $f['teacher']);
         check($result['project_status'] === 'approved', 'La aprobacion total no cambio el proyecto a aprobado.');
         $project = $db->query("SELECT status,approved_at FROM projects WHERE id={$f['project']}")->fetch();
+        check((string)$db->query("SELECT status FROM project_deliveries WHERE id={$result['delivery_id']}")->fetchColumn() === 'approved', 'La entrega no quedó aprobada.');
         check(($project['status'] ?? '') === 'approved' && !empty($project['approved_at']), 'approved_at no fue establecido en la aprobacion total.');
         check($result['all_active_documents_approved'] === true, 'El resumen no marcó todos aprobados.');
         check((int)$db->query("SELECT COUNT(*) FROM project_audit_log WHERE project_id={$f['project']} AND action='project_document_review_completed'")->fetchColumn() === 1, 'La auditoría no es única.');
@@ -135,6 +139,7 @@ try {
         ];
         (new ProjectDocumentReviewBatchService())->confirmInTransaction($db, $f['project'], 'under_review', $decisions, $f['teacher']);
         $rows = $db->query("SELECT file_id,file_checksum_sha256,author_id,delivery_id,body FROM project_observations WHERE project_id={$f['project']} ORDER BY id")->fetchAll();
+        check(in_array((string)$db->query("SELECT status FROM project_deliveries WHERE project_id={$f['project']} ORDER BY id DESC LIMIT 1")->fetchColumn(), ['corrections_requested','changes_required'], true), 'La entrega no quedó marcada con correcciones solicitadas.');
         check(count($rows) === 2, 'No se crearon las dos observaciones esperadas.');
         $byBody = array_column($rows, null, 'body');
         $rowA = $byBody['Observación específica del archivo A.'] ?? [];

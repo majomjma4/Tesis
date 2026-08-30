@@ -8,6 +8,8 @@ final class ProjectAdjustmentController
     public function respond(): void { $this->write('respond'); }
     public function address(): void { $this->write('address'); }
     public function close(): void { $this->write('close'); }
+    public function approve(): void { $this->write('approve'); }
+    public function reject(): void { $this->write('reject'); }
 
     public function listing(): void
     {
@@ -24,6 +26,10 @@ final class ProjectAdjustmentController
         $session=$this->session('POST');$input=$this->input();$this->csrf($session,$input);
         $project=(int)($input['project_id']??0);$request=(int)($input['request_id']??0);$version=(int)($input['lock_version']??0);
         $expected=(string)($input['expected_project_status']??'');$actor=(int)$session->userId();$context=(string)($input['context']??'');
+        if (in_array($operation, ['approve', 'reject'], true)
+            && (!$session->isAdminModeActive() || $context !== 'academic_management')) {
+            $this->json(false,'Esta decisión sólo está disponible para Administración.',[],403);
+        }
         try {
             $service=new ProjectAdjustmentRequestService();
             $result=match($operation){
@@ -31,6 +37,8 @@ final class ProjectAdjustmentController
                 'respond'=>$service->respond($project,$request,$version,$expected,$actor,$context,(string)($input['message']??'')),
                 'address'=>$service->address($project,$request,$version,$expected,$actor,$context),
                 'close'=>$service->close($project,$request,$version,$expected,$actor,$context),
+                'approve'=>$service->approve($project,$request,$version,$expected,$actor,$context),
+                'reject'=>$service->reject($project,$request,$version,$expected,$actor,$context),
             };
             $this->json(true,(string)$result['message'],$result);
         } catch(ProjectAdjustmentRequestException $e){$this->json(false,$e->getMessage(),[],$e->httpStatus());}

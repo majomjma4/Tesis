@@ -338,11 +338,6 @@ final class AdminReportModel
             return ['headers'=>$headers,'rows'=>$rows];
         }elseif($type==='projects'){
             $sql="SELECT p.id, p.code, p.title, pt.name type_name, c.name career_name, ap.name period_name, p.status status_code,
-                  CASE
-                    WHEN COALESCE(review.pending_count,0)>0 THEN 'pending'
-                    WHEN COALESCE(review.addressed_count,0)>0 THEN 'addressed'
-                    ELSE 'none'
-                  END review_situation,
                   u.full_name tutor_name,
                   p.created_at created_at_raw,
                   p.updated_at updated_at_raw
@@ -351,13 +346,16 @@ final class AdminReportModel
                   JOIN careers c ON c.id=p.career_id
                   JOIN academic_periods ap ON ap.id=p.academic_period_id
                   LEFT JOIN users u ON u.id=p.tutor_id
-                  LEFT JOIN (SELECT project_id, SUM(status='pending') pending_count, SUM(status IN ('addressed','resolved')) addressed_count FROM project_observations GROUP BY project_id) review ON review.project_id=p.id
                   WHERE p.created_at BETWEEN :from AND :to AND p.deleted_at IS NULL
                     AND p.status IN ('development','under_review','approved','defense','tribunal_approved','published')
                   ORDER BY p.created_at DESC";
             $query=$db->prepare($sql);
             $query->execute($params);
             $rawProjects=$query->fetchAll(PDO::FETCH_ASSOC);
+            $situations = (new ProjectReviewSituationService())->forProjects(
+                array_map('intval', array_column($rawProjects, 'id')),
+                $db
+            );
 
             // Obtener autores por proyecto
             $projectIds = array_column($rawProjects, 'id');
@@ -379,11 +377,12 @@ final class AdminReportModel
             foreach ($rawProjects as $p) {
                 $pid = (int)$p['id'];
                 $statusLabel = project_academic_labels((string)$p['status_code'])['status'];
-                $reviewLabel = match((string)$p['review_situation']) {
-                    'pending' => 'Observaciones pendientes',
-                    'addressed' => 'Observaciones atendidas',
-                    default => 'Sin observaciones registradas'
-                };
+                $reviewSituation = $situations[$pid] ?? ProjectReviewSituationService::emptySituation();
+                $reviewLabel = !empty($reviewSituation['has_pending_observations'])
+                    ? 'Observaciones pendientes'
+                    : (!empty($reviewSituation['has_addressed_observations'])
+                        ? 'Observaciones atendidas'
+                        : 'Sin observaciones registradas');
                 $rows[] = [
                     'code' => $p['code'],
                     'title' => $p['title'],

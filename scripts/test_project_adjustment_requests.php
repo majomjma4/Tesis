@@ -95,4 +95,47 @@ try {
     throw new RuntimeException('fallo simulado');
 } catch(RuntimeException $e) { $db->rollBack(); $assert($e->getMessage()==='fallo simulado','rollback ante error posterior'); }
 
+$decisionFixture = $db->query(
+    "SELECT p.id project_id,pp.user_id student_id
+     FROM projects p
+     INNER JOIN project_participants pp ON pp.project_id=p.id AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL
+     INNER JOIN student_profiles sp ON sp.user_id=pp.user_id
+     INNER JOIN users u ON u.id=pp.user_id AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL
+     WHERE p.status='published' AND p.is_available=1 AND p.deleted_at IS NULL AND p.withdrawn_at IS NULL
+       AND NOT EXISTS (SELECT 1 FROM project_adjustment_requests pending WHERE pending.project_id=p.id AND pending.requested_by=pp.user_id AND pending.status='pending')
+     ORDER BY p.id LIMIT 1"
+)->fetch();
+if ($decisionFixture) {
+    $decisionProject=(int)$decisionFixture['project_id']; $decisionStudent=(int)$decisionFixture['student_id'];
+    foreach (['approved','rejected'] as $decision) {
+        $db->beginTransaction();
+        try {
+            $created=$service->createInTransaction($db,$decisionProject,'published',$decisionStudent,'repository',['request_type'=>'published_modification','message'=>'Solicitud transaccional de modificacion publicada.']);
+            $requestId=(int)$created['request']['id']; $requestVersion=(int)$created['request']['lock_version'];
+            $resolved=$decision==='approved'
+                ? $service->approveInTransaction($db,$decisionProject,$requestId,$requestVersion,'published',$admin,'academic_management')
+                : $service->rejectInTransaction($db,$decisionProject,$requestId,$requestVersion,'published',$admin,'academic_management');
+            $assert(($resolved['decision']??'')===$decision,"decision administrativa $decision");
+            $state=$db->query("SELECT status,is_available FROM projects WHERE id=$decisionProject")->fetch();
+            $assert($decision==='approved'
+                ? (($state['status']??'')==='development' && (int)$state['is_available']===0)
+                : (($state['status']??'')==='published' && (int)$state['is_available']===1),"estado del proyecto tras $decision");
+            $requestState=$db->query("SELECT status FROM project_adjustment_requests WHERE id=$requestId")->fetchColumn();
+            $assert($requestState===($decision==='approved'?'addressed':'closed'),"estado persistido de solicitud $decision");
+            $auditAction='project_adjustment_request_'.$decision;
+            $assert((int)$db->query("SELECT COUNT(*) FROM project_audit_log WHERE entity_type='project_adjustment_request' AND entity_id=$requestId AND action='$auditAction'")->fetchColumn()===1,"auditoria de decision $decision");
+            $timelineTypes=array_column((new ProjectAcademicTimelineService($db))->page($decisionProject,0,100)['events'],'event_type');
+            $assert(in_array($decision==='approved'?'adjustment_approved':'adjustment_rejected',$timelineTypes,true),"historial de decision $decision");
+            if ($decision==='approved') {
+                $assert((int)$db->query("SELECT COUNT(*) FROM project_audit_log WHERE project_id=$decisionProject AND action='project_reopened_for_adjustment'")->fetchColumn()===1,'reapertura auditada');
+            } else {
+                $second=$service->createInTransaction($db,$decisionProject,'published',$decisionStudent,'repository',['request_type'=>'published_modification','message'=>'Nueva solicitud despues de una resolucion.']);
+                $assert((int)$second['request']['id']>$requestId,'nueva solicitud despues de rechazo');
+            }
+        } finally { if($db->inTransaction())$db->rollBack(); }
+    }
+} else {
+    echo "SKIP decisiones administrativas: no hay una fixture publicada sin solicitud pendiente.\n";
+}
+
 echo "Pruebas transaccionales finalizadas.\n";
