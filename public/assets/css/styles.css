@@ -4343,6 +4343,51 @@ body:not(.auth-page):not(.login-page) *::-webkit-scrollbar-corner {
     background:var(--scrollbar-corner);
 }
 
+/* La navegacion lateral conserva el desplazamiento, pero no muestra su barra.
+   Las restricciones de ancho evitan que se convierta en un scroll horizontal. */
+.sidebar,
+.sidebar > div:first-child {
+    max-width:100%;
+    min-width:0;
+    box-sizing:border-box;
+    overflow-x:hidden;
+    overflow-y:auto;
+    scrollbar-width:none;
+}
+.sidebar > div:first-child {
+    width:100%;
+}
+body:not(.auth-page):not(.login-page) .sidebar::-webkit-scrollbar,
+body:not(.auth-page):not(.login-page) .sidebar > div:first-child::-webkit-scrollbar {
+    display:none;
+    width:0;
+    height:0;
+}
+.sidebar :is(.logo-area,.menu,.menu-item,.sidebar-footer,.close-btn) {
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    box-sizing:border-box;
+}
+.sidebar .menu-item {
+    width:calc(100% - 5px);
+    margin-inline-end:5px;
+}
+.sidebar .logo-area img {
+    max-width:100%;
+    height:auto;
+    object-fit:contain;
+}
+.sidebar .logo-area :is(h1,p),
+.sidebar .menu-item > span:last-child {
+    max-width:100%;
+    min-width:0;
+    overflow-wrap:anywhere;
+}
+.sidebar .menu-item .menu-icon {
+    flex:0 0 24px;
+}
+
 /* Selectores consistentes: el panel se monta fuera de cards y modales para evitar recortes. */
 .custom-select{position:relative;display:inline-flex;min-width:0;flex:1}.custom-select-native{position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;opacity:0!important;pointer-events:none!important}.custom-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;min-width:0;min-height:44px;padding:0 13px;border:1px solid var(--line);border-radius:11px;background:var(--surface-soft);color:var(--text);font:inherit;font-weight:650;text-align:left;cursor:pointer;transition:border-color .18s ease,box-shadow .18s ease,background .18s ease}.custom-select-trigger span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.custom-select-trigger i{flex:0 0 auto;color:var(--muted);font-size:.72rem;transition:transform .18s ease,color .18s ease}.custom-select-trigger.is-placeholder{color:var(--muted);font-weight:550}.custom-select-trigger:hover{border-color:#7aa2f7;background:var(--surface)}.custom-select-trigger:focus-visible,.custom-select.is-open .custom-select-trigger{outline:0;border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.14);background:var(--surface)}.custom-select.is-open .custom-select-trigger i{color:var(--blue);transform:rotate(180deg)}.custom-select-trigger:disabled{opacity:.55;cursor:not-allowed}.custom-select-panel{position:fixed;z-index:2200;display:grid;gap:3px;padding:6px;overflow:auto;border:1px solid var(--line);border-radius:13px;background:var(--surface);box-shadow:0 18px 48px rgba(15,23,42,.2);scrollbar-width:thin;animation:customSelectIn .14s ease-out}.custom-select-option{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:39px;padding:8px 10px;border:0;border-radius:9px;background:transparent;color:var(--text);font:inherit;font-size:var(--font-md);text-align:left;cursor:pointer}.custom-select-option span{overflow:hidden;text-overflow:ellipsis;white-space:normal}.custom-select-option i{visibility:hidden;color:var(--blue);font-size:.75rem}.custom-select-option:hover,.custom-select-option:focus-visible{outline:0;background:var(--surface-soft)}.custom-select-option[aria-selected=true]{background:rgba(37,99,235,.1);color:var(--blue);font-weight:750}.custom-select-option[aria-selected=true] i{visibility:visible}.custom-select-option:disabled{opacity:.45;cursor:not-allowed}@keyframes customSelectIn{from{opacity:0;transform:translateY(-4px) scale(.985)}to{opacity:1;transform:none}}@media(max-width:600px){.custom-select-panel{max-width:calc(100vw - 16px)}.custom-select-trigger{min-height:46px}}
 .login-user-clear{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;margin-right:-6px;padding:0;border:0;border-radius:9px;background:transparent;color:var(--muted);cursor:pointer}.login-user-clear i{width:auto;color:inherit;pointer-events:none}.login-user-clear:hover{background:rgba(37,99,235,.1);color:var(--blue)}.login-user-clear:focus-visible{outline:3px solid rgba(37,99,235,.3);outline-offset:2px}.login-user-clear[hidden]{display:none}

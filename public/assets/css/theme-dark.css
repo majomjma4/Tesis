@@ -1571,3 +1571,119 @@ body.dark-mode:not(.account-page) {
     border-color: var(--theme-info-border);
     color: var(--theme-info-text);
 }
+
+/* Confirmacion de cierre de revision docente: el markup conserva algunos
+   estilos inline claros, por eso esta correccion permanece scoped al modal. */
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-card {
+    background: var(--surface-elevated) !important;
+    border: 1px solid var(--line) !important;
+    color: var(--text) !important;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-header,
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-footer {
+    background: var(--surface) !important;
+    border-color: var(--line) !important;
+    color: var(--text) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-body {
+    background: var(--surface-elevated) !important;
+    color: var(--text) !important;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] :is(
+    .sw-review-confirm-header h2,
+    .sw-review-confirm-body .sw-submit-question,
+    .sw-review-confirm-body .sw-submit-subtitle,
+    .sw-review-confirm-body [data-sw-review-confirm-message],
+    .sw-review-confirm-body p
+) {
+    color: var(--text) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-submit-icon-badge {
+    background: color-mix(in srgb, var(--blue) 16%, var(--surface-soft)) !important;
+    color: var(--blue) !important;
+    box-shadow: none;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-stats {
+    background: var(--surface-soft) !important;
+    border-color: var(--line) !important;
+    color: var(--text) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-stats [data-sw-review-approved-count] {
+    background: var(--theme-success-bg) !important;
+    border-color: var(--theme-success-border) !important;
+    color: var(--theme-success-text) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-stats [data-sw-review-corrections-count] {
+    background: var(--theme-error-bg) !important;
+    border-color: var(--theme-error-border) !important;
+    color: var(--theme-error-text) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-stats [data-sw-review-observations-count] {
+    background: var(--theme-info-bg) !important;
+    border-color: var(--theme-info-border) !important;
+    color: var(--theme-info-text) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-submit-restriction-box {
+    background: var(--theme-warning-bg) !important;
+    border-color: var(--theme-warning-border) !important;
+    color: var(--theme-warning-text) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-submit-restriction-box :is(i, span) {
+    color: var(--theme-warning-text) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-status {
+    background: var(--theme-info-bg) !important;
+    border-color: var(--theme-info-border) !important;
+    color: var(--theme-info-text) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-error {
+    background: var(--theme-error-bg) !important;
+    border-color: var(--theme-error-border) !important;
+    color: var(--theme-error-text) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-header button {
+    color: var(--muted) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-header button:hover,
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-header button:focus-visible {
+    background: var(--surface-soft) !important;
+    color: var(--text) !important;
+    outline: 3px solid color-mix(in srgb, var(--blue) 38%, transparent);
+    outline-offset: 2px;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-cancel {
+    background: var(--surface-soft) !important;
+    border-color: var(--line) !important;
+    color: var(--text) !important;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-cancel:hover:not(:disabled),
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-cancel:focus-visible {
+    background: var(--surface) !important;
+    border-color: var(--blue) !important;
+    color: var(--text) !important;
+    outline: 3px solid color-mix(in srgb, var(--blue) 38%, transparent);
+    outline-offset: 2px;
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace [data-sw-review-confirm-modal] .sw-review-confirm-submit:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--blue) 48%, transparent) !important;
+    outline-offset: 2px;
+}
