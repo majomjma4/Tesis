@@ -184,11 +184,11 @@ function iconFor(type) {
 function notificationTypeLabel(type, item = null) {
     const custom = item?.metadata?.custom_type_label || item?.custom_type_label;
     if (custom && String(custom).trim() !== "") return String(custom).trim();
-    return { delivery: "Entrega", observation: "Observación", status_change: "Cambio de estado", review: "Revisión", reminder: "Recordatorio", system: "Comunicado institucional", tribunal: "Tribunal", repository: "Información académica", comment: "Comentario", adjustment: "Solicitud de cambios" }[type] || "Notificación";
+    return { delivery: "Entrega", observation: "Observación", status_change: "Cambio de estado", review: "Revisión", reminder: "Recordatorio", system: "Comunicado institucional", tribunal: "Tribunal", repository: "Información académica", comment: "Comentario", adjustment: "Solicitudes de ajuste" }[type] || "Notificación";
 }
 
 function typeClass(type) {
-    return { status_change: "status-approved", review: "correction", repository: "system", comment: "observation" }[type] || type;
+    return { status_change: "status-approved", review: "correction", repository: "system", comment: "observation", adjustment: "correction" }[type] || type;
 }
 
 function createButton(className, label, icon, action) {
@@ -200,29 +200,33 @@ function createButton(className, label, icon, action) {
 
 function createRow(notification) {
     const row = document.createElement("article");
-    row.className = `notification-row type-${typeClass(notification.type)} ${notification.is_read ? "is-read" : "is-unread"}`;
-    row.dataset.notificationId = notification.id; row.dataset.read = String(notification.is_read); row.dataset.type = notification.type;
+    const normalizedTypeClass = String(notification.type_class || typeClass(notification.type)).trim().replace(/\s+/g, "-");
+    const isRead = notification.is_read === true || notification.is_read === 1 || notification.is_read === "1";
+    const description = notification.description ?? notification.message ?? "";
+    const projectName = notification.project ?? notification.project_name ?? "Notificacion general";
+    row.className = `notification-row type-${normalizedTypeClass} ${isRead ? "is-read" : "is-unread"}`;
+    row.dataset.notificationId = notification.id; row.dataset.read = String(isRead); row.dataset.type = notification.type; row.dataset.filter = notification.type;
     const dot = document.createElement((notification.deleted_at && statusFilter.value === "trash") ? "input" : "span");
     if (notification.deleted_at && statusFilter.value === "trash") { dot.type = "checkbox"; dot.className = "trash-notification-checkbox"; dot.value = notification.id; dot.setAttribute("aria-label", `Seleccionar ${notification.title}`); }
-    else { dot.className = "unread-dot"; dot.setAttribute("aria-label", notification.is_read ? "Leida" : "No leida"); }
+    else { dot.className = "unread-dot"; dot.setAttribute("aria-label", isRead ? "Leida" : "No leida"); }
     const icon = document.createElement("span"); icon.className = "notification-type-icon";
-    const iconGlyph = document.createElement("i"); iconGlyph.className = `fa-solid ${iconFor(notification.type)}`; icon.append(iconGlyph);
+    const iconGlyph = document.createElement("i"); iconGlyph.className = `fa-solid ${notification.icon || iconFor(notification.type)}`; icon.append(iconGlyph);
     const copy = document.createElement("div"); copy.className = "notification-copy";
     const head = document.createElement("div"); head.className = "notification-copy-heading";
-    const category = document.createElement("span"); category.className = "notification-category"; category.textContent = notificationTypeLabel(notification.type, notification);
-    const mobileTime = document.createElement("span"); mobileTime.className = "notification-date-mobile"; mobileTime.textContent = notification.time; head.append(category, mobileTime);
+    const category = document.createElement("span"); category.className = "notification-category"; category.textContent = notification.filter || notificationTypeLabel(notification.type, notification);
+    const mobileTime = document.createElement("span"); mobileTime.className = "notification-date-mobile"; mobileTime.textContent = notification.time || "—"; head.append(category, mobileTime);
     const title = document.createElement("h3"); title.textContent = notification.title;
-    const message = document.createElement("p"); message.textContent = notification.description;
+    const message = document.createElement("p"); message.textContent = description;
     const project = document.createElement("span"); project.className = "notification-project";
     const folder = document.createElement("i"); folder.className = "fa-regular fa-folder-open";
-    const projectName = document.createElement("span"); projectName.className = "notification-project-name"; projectName.textContent = notification.project; project.append(folder, projectName); copy.append(head, title, message, project);
+    const projectNameElement = document.createElement("span"); projectNameElement.className = "notification-project-name"; projectNameElement.textContent = projectName; project.append(folder, projectNameElement); copy.append(head, title, message, project);
     const meta = document.createElement("div"); meta.className = "notification-meta";
-    const time = document.createElement("time"); time.append(document.createTextNode(notification.date)); const strong = document.createElement("strong"); strong.textContent = notification.time; time.append(strong);
+    const time = document.createElement("time"); time.append(document.createTextNode(notification.date || "Fecha no disponible")); const strong = document.createElement("strong"); strong.textContent = notification.time || "—"; time.append(strong);
     const actions = document.createElement("div"); actions.className = "notification-row-actions";
-    const view = createButton("view-notification", "Detalle", "", "open-detail");
+    const view = createButton("view-notification", "Detalle", "fa-file-lines", "open-detail");
     const more = createButton("more-notification", "Mas opciones", "fa-ellipsis-vertical", "menu"); more.setAttribute("aria-haspopup", "menu"); more.setAttribute("aria-expanded", "false");
     const menu = document.createElement("div"); menu.className = "notification-context-menu"; menu.role = "menu"; menu.hidden = true;
-    const addMenuItem = (action, label, description, danger = false) => { const b = document.createElement("button"); b.type = "button"; b.role = "menuitem"; b.dataset.menuAction = action; if (danger) b.className = "danger"; const text = document.createElement("span"); const strong = document.createElement("strong"); strong.textContent = label; const small = document.createElement("small"); small.textContent = description; text.append(strong, small); b.append(text); menu.append(b); };
+    const addMenuItem = (action, label, description, danger = false) => { const b = document.createElement("button"); b.type = "button"; b.role = "menuitem"; b.dataset.menuAction = action; if (danger) b.className = "danger"; const icons = { restore: "fa-rotate-left", purge: "fa-trash-can", destroy: "fa-trash-can", "toggle-read": isRead ? "fa-eye-slash" : "fa-envelope-open", delete: "fa-box-archive" }; const glyph = document.createElement("i"); glyph.className = `fa-${action === "delete" ? "solid" : "regular"} ${icons[action] || "fa-gear"}`; glyph.setAttribute("aria-hidden", "true"); const text = document.createElement("span"); const strong = document.createElement("strong"); strong.textContent = label; const small = document.createElement("small"); small.textContent = description; text.append(strong, small); b.append(glyph, text); menu.append(b); };
     const isTrash = Boolean(notification.deleted_at);
     const isArchived = Boolean(notification.archived_at && !notification.deleted_at);
     if (isTrash) {
@@ -239,7 +243,7 @@ function createRow(notification) {
     }
     actions.append(view, more, menu);
     meta.append(time, actions); row.append(dot, icon, copy, meta);
-    [title, message, projectName].forEach((el) => highlight(el, searchInput?.value || ""));
+    [title, message, projectNameElement].forEach((el) => highlight(el, searchInput?.value || ""));
     return row;
 }
 

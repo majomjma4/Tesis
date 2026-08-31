@@ -22,7 +22,8 @@ $hasPreviousReviewForReplacement = !empty((array) ($project['deliveries'] ?? [])
 $historicalPreviewUrl = $historical ? route('project-file-version-preview').'&project_id='.$projectId.'&version_id='.(int)$historical['id'] : '';
 $docLimits = (new ProjectDocumentFileService())->limits();
 $packageUrl = route('project-package-download') . '&id=' . (int)$projectId;
-$packageAvailable = !empty(($studentAcademicPackage ?? [])['available']);
+$packageAvailable = !empty(($studentAcademicPackage ?? [])['available'])
+    || (int) (($studentAcademicPackage ?? [])['file_count'] ?? 0) > 0;
 ?>
 <script type="application/json" data-sw-observations-json><?= json_encode($observations, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
 <?php if ($canReviewDocuments): ?>

@@ -33,21 +33,24 @@ if (calendarRoot) {
     function fromKey(key) { const [year, month, day] = key.split('-').map(Number); return new Date(year, month - 1, day); }
     function startOfWeek(date) { const result = new Date(date); result.setDate(result.getDate() - ((result.getDay() + 6) % 7)); result.setHours(0, 0, 0, 0); return result; }
     function addDays(date, amount) { const result = new Date(date); result.setDate(result.getDate() + amount); return result; }
-    function normalizeSearch(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es'); }
+    function normalizeSearch(value) { return String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es'); }
     function isOverdue(event) { return !event.completed && fromKey(event.date) < today; }
     function sortEvents(items) { const priorities = { high: 0, medium: 1, low: 2 }; return [...items].sort((a, b) => { if (sortMode === 'priority') return (priorities[a.priority] ?? 1) - (priorities[b.priority] ?? 1) || `${a.date} ${a.title}`.localeCompare(`${b.date} ${b.title}`, 'es'); if (sortMode === 'completed') return Number(a.completed) - Number(b.completed) || `${a.date} ${a.title}`.localeCompare(`${b.date} ${b.title}`, 'es'); return `${a.date} ${a.title}`.localeCompare(`${b.date} ${b.title}`, 'es'); }); }
-    function eventDestination(event) { const id = Number(event.projectId || 0); if (!id) return { url: projectUrl, label: 'Ir a Mis proyectos' }; const tab = event.type === 'review' ? 'observations' : (event.type === 'delivery' || event.type === 'deadline' ? 'deliveries' : 'calendar'); return { url: `${projectUrl}&id=${id}&tab=${tab}`, label: tab === 'observations' ? 'Ir a observaciones' : (tab === 'deliveries' ? 'Ir a entregas' : 'Ir al proyecto') }; }
+    function eventDestination(event) { const id = Number(event.projectId || 0); if (!id || !projectUrl) return null; const tab = event.type === 'review' ? 'observations' : (event.type === 'delivery' || event.type === 'deadline' ? 'deliveries' : 'calendar'); return { url: `${projectUrl}&id=${id}&tab=${tab}`, label: tab === 'observations' ? 'Ir a observaciones' : (tab === 'deliveries' ? 'Ir a entregas' : 'Ir al proyecto') }; }
+    function matchesActiveFilters(event) {
+        if (projectFilterId && Number(event.projectId || 0) !== projectFilterId) return false;
+        const matchesType = activeFilter === 'all' || (activeFilter === 'pending' ? !event.completed : event.type === activeFilter);
+        const matchesPriority = activePriority === 'all' || event.priority === activePriority;
+        const title = normalizeSearch(event.title);
+        return matchesType && matchesPriority && (!searchTerm || title.includes(searchTerm));
+    }
+    function matchingEvents() { return sortEvents(events.filter(matchesActiveFilters)); }
     function filteredEvents() {
-        return sortEvents(events.filter((event) => {
-            if (projectFilterId && Number(event.projectId || 0) !== projectFilterId) return false;
-            const matchesType = activeFilter === 'all' || (activeFilter === 'pending' ? !event.completed : event.type === activeFilter);
-            const matchesPriority = activePriority === 'all' || event.priority === activePriority;
-            const text = normalizeSearch(`${event.title} ${event.description || ''}`);
+        return matchingEvents().filter((event) => {
             const prefix = `${visibleDate.getFullYear()}-${String(visibleDate.getMonth() + 1).padStart(2, '0')}`;
             const weekEnd = addDays(today, 7);
-            const matchesScope = quickScope === 'month' ? event.date.startsWith(prefix) : quickScope === 'week' ? (!event.completed && fromKey(event.date) >= today && fromKey(event.date) <= weekEnd) : quickScope === 'completed' ? (event.completed && event.date.startsWith(prefix)) : true;
-            return matchesType && matchesPriority && matchesScope && (!searchTerm || text.includes(searchTerm));
-        }));
+            return quickScope === 'month' ? event.date.startsWith(prefix) : quickScope === 'week' ? (!event.completed && fromKey(event.date) >= today && fromKey(event.date) <= weekEnd) : quickScope === 'completed' ? (event.completed && event.date.startsWith(prefix)) : true;
+        });
     }
     // Final de utilidades de fechas y filtrado
 
@@ -91,7 +94,7 @@ if (calendarRoot) {
         const grid = $('#calendarDaysGrid'); grid.innerHTML = '';
         for (let index = 0; index < 42; index++) {
             const date = addDays(start, index), key = dateKey(date), items = filteredEvents().filter((event) => event.date === key);
-            const cell = document.createElement('button'); cell.type = 'button'; cell.className = 'calendar-cell';
+            const cell = document.createElement('button'); cell.type = 'button'; cell.className = 'calendar-cell'; cell.dataset.calendarDate = key;
             if (date.getMonth() !== month) cell.classList.add('outside'); if (key === dateKey(today)) cell.classList.add('today'); if (key === selectedDate) cell.classList.add('selected');
             cell.setAttribute('aria-label', `${date.toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long' })}, ${items.length} eventos`);
             cell.innerHTML = `<span class="calendar-number">${date.getDate()}</span><span class="calendar-cell-events"></span>`;
@@ -108,7 +111,7 @@ if (calendarRoot) {
             const date = addDays(week, index), key = dateKey(date), items = filteredEvents().filter((event) => event.date === key);
             const column = document.createElement('section'); column.className = `calendar-week-column${key === dateKey(today) ? ' today' : ''}`;
             column.innerHTML = `<button type="button" class="calendar-week-heading"><span>${date.toLocaleDateString('es-EC', { weekday: 'short' })}</span><strong>${date.getDate()}</strong></button><div class="calendar-week-events"></div>`;
-            column.querySelector('button').addEventListener('click', () => { selectedDate = key; renderAgenda(); openAgendaModal(); });
+            const heading = column.querySelector('button'); heading.dataset.calendarDate = key; heading.addEventListener('click', () => { selectedDate = key; renderAgenda(); openAgendaModal(); });
             const body = column.lastElementChild;
             if (!items.length) body.innerHTML = '<span class="week-empty">Sin eventos</span>';
             items.forEach((item) => { const card = document.createElement('button'); card.type = 'button'; card.className = `calendar-week-card ${item.type}${item.completed ? ' completed' : ''}${isOverdue(item) ? ' overdue' : ''}`; card.draggable = !item.readOnly; card.dataset.eventId = item.id; card.innerHTML = `<strong></strong><small>${isOverdue(item) ? 'Vencido · ' : ''}${typeLabels[item.type]}</small>`; card.querySelector('strong').textContent = item.title; card.addEventListener('click', () => openDetails(item)); card.addEventListener('dragstart', (event) => { if (!item.readOnly) event.dataTransfer.setData('text/calendar-event', item.id); }); body.append(card); });
@@ -121,7 +124,7 @@ if (calendarRoot) {
         if (!items.length) { const scoped = Boolean(quickScope), filtered = Boolean(searchTerm || activeFilter !== 'all' || activePriority !== 'all'); container.append(emptyState(scoped ? 'fa-circle-check' : 'fa-magnifying-glass', scoped ? 'No hay eventos en este resumen' : 'No encontramos eventos', quickScope === 'completed' ? 'Aún no has completado eventos durante este mes.' : quickScope === 'week' ? 'No tienes eventos pendientes durante los próximos siete días.' : filtered ? 'Prueba limpiando la búsqueda o los filtros activos.' : 'Crea un evento para comenzar a organizar tu agenda.', scoped || filtered)); return; }
         let lastDate = '';
         items.forEach((event) => {
-            if (event.date !== lastDate) { const heading = document.createElement('h3'); heading.className = 'calendar-list-date'; heading.textContent = fromKey(event.date).toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); container.append(heading); lastDate = event.date; }
+            if (event.date !== lastDate) { const heading = document.createElement('h3'); heading.className = 'calendar-list-date'; heading.dataset.calendarDate = event.date; if (event.date === dateKey(today)) { heading.classList.add('is-today'); heading.tabIndex = -1; } heading.textContent = fromKey(event.date).toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); container.append(heading); lastDate = event.date; }
             container.append(eventCard(event, 'list'));
         });
     }
@@ -132,12 +135,12 @@ if (calendarRoot) {
         article.querySelector('.overdue-badge').hidden = !isOverdue(event); article.classList.toggle('is-overdue', isOverdue(event));
         const actions = article.querySelector('.agenda-actions');
         if (!event.readOnly) actions.append(actionButton(event.completed ? 'fa-arrow-rotate-left' : 'fa-check', event.completed ? 'Reabrir' : 'Completar', () => toggleComplete(event)), actionButton('fa-pen', 'Editar', () => openModal(event)), actionButton('fa-trash-can', 'Eliminar', () => openDeleteDialog(event), true));
-        actions.append(navigationButton(event));
+        const navigation = navigationButton(event); if (navigation) actions.append(navigation);
         article.addEventListener('click', (clickEvent) => { if (!clickEvent.target.closest('.agenda-actions')) openDetails(event); });
         return article;
     }
     function actionButton(icon, label, handler, danger = false) { const button = document.createElement('button'); button.type = 'button'; if (danger) button.className = 'danger'; button.innerHTML = `<i class="fa-solid ${icon}"></i> ${label}`; button.addEventListener('click', handler); return button; }
-    function navigationButton(event) { const destination = eventDestination(event), link = document.createElement('a'); link.className = 'agenda-go-link'; link.href = destination.url; link.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Ir'; link.title = destination.label; link.setAttribute('aria-label', `${destination.label}: ${event.title}`); return link; }
+    function navigationButton(event) { const destination = eventDestination(event); if (!destination) return null; const link = document.createElement('a'); link.className = 'agenda-go-link'; link.href = destination.url; link.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Ir'; link.title = destination.label; link.setAttribute('aria-label', `${destination.label}: ${event.title}`); return link; }
     function emptyState(icon, title, message, showClear = false) { const state = document.createElement('div'); state.className = 'calendar-empty calendar-empty-guided'; state.innerHTML = `<i class="fa-solid ${icon}"></i><strong></strong><p></p>`; state.querySelector('strong').textContent = title; state.querySelector('p').textContent = message; if (showClear) { const button = document.createElement('button'); button.className = 'calendar-empty-add'; button.type = 'button'; button.innerHTML = '<i class="fa-solid fa-filter-circle-xmark"></i> Limpiar filtros'; button.addEventListener('click', clearFilters); state.append(button); } return state; }
     // Final de construcción de componentes del calendario
 
@@ -151,7 +154,7 @@ if (calendarRoot) {
         renderUpcoming();
     }
     function renderUpcoming() {
-        const list = $('#calendarUpcomingList'), upcoming = sortEvents(events.filter((event) => !event.completed && event.date >= dateKey(today))).slice(0, 5); list.innerHTML = ''; $('#calendarUpcomingBadge').textContent = upcoming.length;
+        const list = $('#calendarUpcomingList'), upcoming = matchingEvents().filter((event) => !event.completed && event.date >= dateKey(today)).slice(0, 5); list.innerHTML = ''; $('#calendarUpcomingBadge').textContent = upcoming.length;
         if (!upcoming.length) { list.innerHTML = '<p class="upcoming-empty">No hay próximos eventos programados</p>'; return; }
         upcoming.forEach((event) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'calendar-upcoming-item'; button.innerHTML = `<span class="upcoming-date"><strong>${fromKey(event.date).getDate()}</strong>${fromKey(event.date).toLocaleDateString('es-EC', { month: 'short' })}</span><span><strong></strong><small>${typeLabels[event.type]}${event.time ? ` · ${event.time}` : ''}</small></span>`; button.querySelector('span:nth-child(2) strong').textContent = event.title; button.addEventListener('click', () => openDetails(event)); list.append(button); });
     }
@@ -167,8 +170,29 @@ if (calendarRoot) {
     }
     function renderAll() { updateTitle(); const panels = { month: $('#calendarMonthView'), week: $('#calendarWeekView'), list: $('#calendarListView') }; Object.entries(panels).forEach(([view, panel]) => { const selected = view === activeView; panel.hidden = !selected; panel.classList.toggle('active', selected); }); $('#calendarListTools').hidden = activeView !== 'list'; if (activeView === 'month') renderMonth(); else if (activeView === 'week') renderWeek(); else renderList(); renderAgenda(); updateStats(); }
     function clearQuickScope() { quickScope = null; $$('.calendar-stat-action').forEach((button) => { button.classList.remove('active'); button.setAttribute('aria-pressed', 'false'); }); }
+    function focusDateInView(key) {
+        const target = activeView === 'month'
+            ? $(`.calendar-cell[data-calendar-date="${key}"]`)
+            : activeView === 'week'
+                ? $(`.calendar-week-heading[data-calendar-date="${key}"]`)
+                : $(`.calendar-list-date[data-calendar-date="${key}"]`);
+        if (!target) return;
+        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        if (typeof target.focus === 'function') target.focus({ preventScroll: true });
+    }
+    function focusTodayInView() { focusDateInView(dateKey(today)); }
+    function resetToToday() { selectedDate = dateKey(today); visibleDate = new Date(today.getFullYear(), today.getMonth(), 1); }
+    function goToToday() { clearQuickScope(); resetToToday(); renderAll(); focusTodayInView(); if (compactCalendar.matches) openAgendaModal(); }
     function switchView(view) { clearQuickScope(); activeView = view; try { localStorage.setItem(viewStorageKey, view); } catch (error) {} $$('.calendar-view-switcher button').forEach((button) => { const selected = button.dataset.view === view; button.classList.toggle('active', selected); button.setAttribute('aria-selected', String(selected)); }); renderAll(); }
     function navigate(direction) { if (activeView !== 'week') visibleDate = new Date(visibleDate.getFullYear(), visibleDate.getMonth() + direction, 1); else { const date = fromKey(selectedDate); date.setDate(date.getDate() + direction * 7); selectedDate = dateKey(date); visibleDate = new Date(date.getFullYear(), date.getMonth(), 1); } renderAll(); }
+    function selectFirstSearchMatch() {
+        if (!searchTerm) return null;
+        const match = matchingEvents()[0];
+        if (!match) return null;
+        selectedDate = match.date;
+        visibleDate = new Date(fromKey(match.date).getFullYear(), fromKey(match.date).getMonth(), 1);
+        return match;
+    }
     function clearFilters() { clearQuickScope(); activeFilter = 'all'; activePriority = 'all'; searchTerm = ''; $('#calendarSearch').value = ''; $$('.calendar-filter[data-filter]').forEach((item) => item.classList.toggle('active', item.dataset.filter === 'all')); $$('.calendar-priority-filter').forEach((item) => item.classList.remove('active')); renderAll(); $('#calendarSearch').focus(); }
     function applyQuickScope(scope) { quickScope = scope; activeFilter = 'all'; activePriority = 'all'; searchTerm = ''; $('#calendarSearch').value = ''; if (scope === 'week') visibleDate = new Date(today.getFullYear(), today.getMonth(), 1); $$('.calendar-filter[data-filter]').forEach((item) => item.classList.toggle('active', item.dataset.filter === 'all')); $$('.calendar-priority-filter').forEach((item) => item.classList.remove('active')); activeView = 'list'; $$('.calendar-view-switcher button').forEach((button) => { const selected = button.dataset.view === 'list'; button.classList.toggle('active', selected); button.setAttribute('aria-selected', String(selected)); }); $$('.calendar-stat-action').forEach((button) => { const selected = button.dataset.scope === scope; button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected)); }); renderAll(); $('.calendar-board').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     // Final de renderizado y navegación
@@ -259,7 +283,7 @@ if (calendarRoot) {
         $('#calendarEventForm').reset(); $('#calendarEventId').value = event?.id || ''; $('#calendarEventTitle').value = event?.title || ''; $('#calendarEventDate').value = event?.date || selectedDate; $('#calendarEventTime').value = event?.time || ''; $('#calendarEventType').value = event?.type || 'delivery'; $('#calendarEventPriority').value = event?.priority || 'medium'; $('#calendarEventDescription').value = event?.description || ''; $('#calendarDescriptionCount').textContent = (event?.description || '').length; $('#calendarModalTitle').textContent = event ? 'Editar evento' : 'Nuevo evento'; syncSelectStyles(); syncDateTimeControls(); $('#calendarEventModal').hidden = false; document.body.classList.add('modal-open'); setTimeout(() => $('#calendarEventTitle').focus(), 0);
     }
     function closeModal() { closeDateTimePickers(); $('#calendarEventModal').hidden = true; document.body.classList.remove('modal-open'); }
-    function openDetails(event) { closeAgendaModal(); activeDetailEvent = event; const readOnly = Boolean(event.readOnly); $('#calendarDetailType').textContent = typeLabels[event.type]; $('#calendarDetailType').className = `calendar-detail-type ${event.type}`; $('#calendarDetailTitle').textContent = event.title; $('#calendarDetailDate').textContent = `${fromKey(event.date).toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${event.time ? ` — ${event.time}` : ''}`; $('#calendarDetailPriority').textContent = `Prioridad ${priorityLabels[event.priority || 'medium'].toLowerCase()}`; $('#calendarDetailStatus').textContent = event.completed ? 'Completado' : isOverdue(event) ? 'Vencido' : 'Pendiente'; $('#calendarDetailDescription').textContent = event.description || 'Este recordatorio no tiene una descripción adicional.'; const destination = eventDestination(event); $('#calendarDetailProjectLink').href = destination.url; $('#calendarDetailProjectLink span').textContent = destination.label; $('#calendarDetailEdit').hidden = readOnly; $('#calendarDetailComplete').hidden = readOnly; $('#calendarDetailComplete').innerHTML = event.completed ? '<i class="fa-solid fa-arrow-rotate-left"></i> Reabrir' : '<i class="fa-solid fa-check"></i> Completar'; $('#calendarDetailModal').hidden = false; document.body.classList.add('modal-open'); $('#calendarDetailClose').focus(); }
+    function openDetails(event) { closeAgendaModal(); activeDetailEvent = event; const readOnly = Boolean(event.readOnly); $('#calendarDetailType').textContent = typeLabels[event.type]; $('#calendarDetailType').className = `calendar-detail-type ${event.type}`; $('#calendarDetailTitle').textContent = event.title; $('#calendarDetailDate').textContent = `${fromKey(event.date).toLocaleDateString('es-EC', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${event.time ? ` — ${event.time}` : ''}`; $('#calendarDetailPriority').textContent = `Prioridad ${priorityLabels[event.priority || 'medium'].toLowerCase()}`; $('#calendarDetailStatus').textContent = event.completed ? 'Completado' : isOverdue(event) ? 'Vencido' : 'Pendiente'; $('#calendarDetailDescription').textContent = event.description || 'Este recordatorio no tiene una descripción adicional.'; const destination = eventDestination(event); const projectLink = $('#calendarDetailProjectLink'); projectLink.hidden = !destination; if (destination) { projectLink.href = destination.url; projectLink.querySelector('span').textContent = destination.label; } else { projectLink.removeAttribute('href'); } $('#calendarDetailEdit').hidden = readOnly; $('#calendarDetailComplete').hidden = readOnly; $('#calendarDetailComplete').innerHTML = event.completed ? '<i class="fa-solid fa-arrow-rotate-left"></i> Reabrir' : '<i class="fa-solid fa-check"></i> Completar'; $('#calendarDetailModal').hidden = false; document.body.classList.add('modal-open'); $('#calendarDetailClose').focus(); }
     function closeDetails() { activeDetailEvent = null; $('#calendarDetailModal').hidden = true; document.body.classList.remove('modal-open'); }
     function openDeleteDialog(event) { closeDateTimePickers(); closeCustomSelects(); closeAgendaModal(); pendingDelete = event; $('#calendarDeleteMessage').textContent = `Se eliminará “${event.title}” del ${fromKey(event.date).toLocaleDateString('es-EC', { day: 'numeric', month: 'long' })}. Esta acción no se puede deshacer.`; $('#calendarDeleteModal').hidden = false; document.body.classList.add('modal-open'); $('#calendarDeleteConfirm').focus(); }
     function closeDeleteDialog() { pendingDelete = null; $('#calendarDeleteModal').hidden = true; document.body.classList.remove('modal-open'); }
@@ -271,11 +295,11 @@ if (calendarRoot) {
 
     // Inicio de eventos de interacción
     // Conecta controles, teclado, gestos táctiles y envío del formulario con la lógica anterior.
-    $('#calendarPrevBtn').addEventListener('click', () => navigate(-1)); $('#calendarNextBtn').addEventListener('click', () => navigate(1)); $('#calendarTodayBtn').addEventListener('click', () => { clearQuickScope(); selectedDate = dateKey(today); visibleDate = new Date(today.getFullYear(), today.getMonth(), 1); renderAll(); });
+    $('#calendarPrevBtn').addEventListener('click', () => navigate(-1)); $('#calendarNextBtn').addEventListener('click', () => navigate(1)); $('#calendarTodayBtn').addEventListener('click', goToToday);
     $$('.calendar-stat-action').forEach((button) => button.addEventListener('click', () => applyQuickScope(button.dataset.scope)));
     $$('.calendar-view-switcher button').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view))); $$('.calendar-filter[data-filter]').forEach((button) => button.addEventListener('click', () => { clearQuickScope(); activeFilter = button.dataset.filter; $$('.calendar-filter[data-filter]').forEach((item) => item.classList.toggle('active', item === button)); renderAll(); }));
     $$('.calendar-priority-filter').forEach((button) => button.addEventListener('click', () => { clearQuickScope(); activePriority = activePriority === button.dataset.priority ? 'all' : button.dataset.priority; $$('.calendar-priority-filter').forEach((item) => item.classList.toggle('active', item.dataset.priority === activePriority)); renderAll(); }));
-    $('#calendarSearch').addEventListener('input', (event) => { clearQuickScope(); searchTerm = normalizeSearch(event.target.value.trim()); renderAll(); }); $('#calendarNewEventBtn').addEventListener('click', () => openModal()); $('#calendarAgendaAdd').addEventListener('click', () => openModal()); $('#calendarAgendaClose').addEventListener('click', closeAgendaModal); $('#calendarAgendaModal').addEventListener('click', (event) => { if (event.target === $('#calendarAgendaModal')) closeAgendaModal(); });
+    $('#calendarSearch').addEventListener('input', (event) => { clearQuickScope(); searchTerm = normalizeSearch(event.target.value); selectFirstSearchMatch(); if (!searchTerm) resetToToday(); renderAll(); }); $('#calendarNewEventBtn').addEventListener('click', () => openModal()); $('#calendarAgendaAdd').addEventListener('click', () => openModal()); $('#calendarAgendaClose').addEventListener('click', closeAgendaModal); $('#calendarAgendaModal').addEventListener('click', (event) => { if (event.target === $('#calendarAgendaModal')) closeAgendaModal(); });
     $('#calendarModalClose').addEventListener('click', closeModal); $('#calendarModalCancel').addEventListener('click', closeModal); $('#calendarEventModal').addEventListener('click', (event) => { if (event.target === $('#calendarEventModal')) closeModal(); });
     $('#calendarEventDescription').addEventListener('input', (event) => $('#calendarDescriptionCount').textContent = event.target.value.length);
     $$('.calendar-select-wrap select').forEach((select) => select.addEventListener('change', syncSelectStyles));

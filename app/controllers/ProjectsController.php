@@ -893,8 +893,16 @@ final class ProjectsController
         if ($project === null) { http_response_code(404); exit('El proyecto solicitado no está disponible.'); }
         try {
             $packages = new ProjectRepositoryPackageService();
-            $descriptor = $packages->describeAcademic((int)$projectId, route('project-package-download') . '&id=' . (int)$projectId);
+            $packageUrl = route('project-package-download') . '&id=' . (int)$projectId;
+            $descriptor = $packages->describeAcademic((int)$projectId, $packageUrl);
+            if (empty($descriptor['available']) && (int)($descriptor['file_count'] ?? 0) > 0) {
+                $descriptor = $packages->prepareAcademic((int)$projectId, $packageUrl);
+            }
             $path = ProjectRepositoryPackageService::academicPackagePath((int)$projectId);
+            if ((int)($descriptor['file_count'] ?? 0) < 1) {
+                http_response_code(422);
+                exit('No hay archivos descargables en este proyecto.');
+            }
             if (empty($descriptor['available']) || !is_file($path) || !is_readable($path)) throw new RuntimeException('El paquete no está disponible.');
             clearstatcache(true, $path);
             $size = (int)(filesize($path) ?: 0);

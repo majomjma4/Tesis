@@ -4631,3 +4631,4 @@ body.app-shell.calendar-page :is(.calendar-agenda-item h3,.calendar-board h2){fo
 @media (prefers-reduced-motion: reduce) {
     .app-toast { transition: none; }
 }
+.calendar-page .calendar-list-date.is-today{color:var(--blue);font-weight:800}
