@@ -20,6 +20,12 @@
     --theme-error-bg: color-mix(in srgb, var(--danger) 15%, var(--surface));
     --theme-error-border: color-mix(in srgb, var(--danger) 42%, var(--line));
     --theme-error-text: #fda4af;
+    --theme-purple-bg: color-mix(in srgb, #a78bfa 18%, var(--surface));
+    --theme-purple-border: color-mix(in srgb, #c4b5fd 42%, var(--line));
+    --theme-purple-text: #d8b4fe;
+    --theme-purple-accent: #c4b5fd;
+    --project-profile: 196, 181, 253;
+    --status-defense: 167, 139, 250;
 }
 
 html.theme-dark body:not(.account-page),
@@ -575,9 +581,9 @@ body.dark-mode:not(.account-page) {
     .projects-card .projects-status.is-defense,
     .workspace-status.status-muted
 ) {
-    background: color-mix(in srgb, #c084fc 16%, var(--surface));
-    border-color: color-mix(in srgb, #c084fc 40%, var(--line));
-    color: #e9d5ff;
+    background: var(--theme-purple-bg);
+    border-color: var(--theme-purple-border);
+    color: var(--theme-purple-text);
 }
 
 /* Badges y filtros que todavía conservaban paletas claras locales. */
@@ -812,8 +818,9 @@ body.dark-mode:not(.account-page) {
     .calendar-event-chip.meeting,
     .calendar-week-card.meeting
 ) {
-    background: color-mix(in srgb, #c084fc 17%, var(--surface));
-    color: #e9d5ff;
+    background: var(--theme-purple-bg);
+    border-color: var(--theme-purple-border);
+    color: var(--theme-purple-text);
 }
 
 :is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
@@ -1691,4 +1698,169 @@ body.dark-mode:not(.account-page) {
 :is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .digital-record[data-entity-type="project"][data-record-context="repository"] .ed-participant-group.is-tutoring {
     background: var(--surface-soft);
     border-color: var(--line);
+}
+
+/*
+ * Acentos violeta compartidos.
+ * Los estilos base conservan sus colores de light; esta capa sólo armoniza
+ * la familia morada en las superficies oscuras del layout principal.
+ */
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-dashboard {
+    --student-violet: var(--theme-purple-accent);
+    --student-violet-soft: var(--theme-purple-bg);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .teacher-dashboard {
+    --teacher-violet: var(--theme-purple-accent);
+    --teacher-violet-soft: var(--theme-purple-bg);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-workspace {
+    --sw-violet: var(--theme-purple-accent);
+    --sw-violet-soft: var(--theme-purple-bg);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .assigned-projects-page .assigned-status.is-defense,
+    .projects-card[data-status="defense"] .projects-status,
+    .ap-list > article[data-project-status="defense"] .ap-status,
+    .sw-badge-status.is-tribunal,
+    .sw-badge-status.is-defense,
+    .sw-badge-status.is-tribunal_approved,
+    .projects-publish-file-badge.is-updated,
+    .role-chip.administrator,
+    .status-chip.graduated
+) {
+    background: var(--theme-purple-bg);
+    border-color: var(--theme-purple-border);
+    color: var(--theme-purple-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .ap-status.state-defense {
+    background: var(--theme-purple-bg) !important;
+    border-color: var(--theme-purple-border) !important;
+    color: var(--theme-purple-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .projects-card[data-status="defense"] {
+    border-left-color: var(--theme-purple-accent);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .strip-card-icon.is-published,
+    .student-dashboard .student-project-focus.is-violet::before,
+    .student-dashboard .is-violet .student-status,
+    .tone-purple .notification-stat-icon
+) {
+    background: var(--theme-purple-bg);
+    color: var(--theme-purple-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .strip-card.is-published {
+    --dashboard-accent: var(--theme-purple-accent);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .status-v4-node.is-defense {
+    --status-accent: var(--theme-purple-accent);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .notification-stat.tone-purple,
+    .teacher-dashboard .teacher-follow-up-card--defense,
+    .teacher-dashboard .teacher-follow-up-card--tribunal-assignment
+) {
+    border-color: var(--theme-purple-border);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .notification-stat.tone-purple {
+    border-top-color: var(--theme-purple-accent);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .type-reminder {
+    --type-color: var(--theme-purple-accent);
+    --type-soft: var(--theme-purple-bg);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .calendar-event-chip.meeting,
+    .calendar-week-card.meeting,
+    .calendar-detail-type.meeting
+) {
+    background: var(--theme-purple-bg);
+    border-color: var(--theme-purple-border);
+    color: var(--theme-purple-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .filter-dot.meeting,
+    .calendar-legend i.meeting,
+    .agenda-accent.meeting
+) {
+    background: var(--theme-purple-accent);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .calendar-select-wrap[data-select="type"][data-value="meeting"],
+    .calendar-select-wrap[data-select="type"] .calendar-select-option[data-value="meeting"]
+) {
+    --select-accent: var(--theme-purple-accent);
+    --option-color: var(--theme-purple-accent);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .repository-code-token--keyword {
+    color: var(--theme-purple-accent);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .student-workspace .sw-tab-btn[data-sw-tab="tribunal"] i,
+    .student-workspace .sw-history-event.is-tribunal .sw-history-title i,
+    .tm-situation.is-defense
+) {
+    color: var(--theme-purple-accent);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-workspace .sw-history-event.is-tribunal {
+    border-left-color: var(--theme-purple-accent);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-workspace .sw-record .sw-badge-type {
+    background: var(--theme-purple-bg) !important;
+    border-color: var(--theme-purple-border) !important;
+    color: var(--theme-purple-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-workspace :is(
+    .sw-historical-obs-card.sw-review-color-4,
+    .sw-preview-state-card.is-loading .sw-state-icon-badge,
+    .sw-preview-state-card.is-processing .sw-state-icon-badge
+) {
+    background: var(--theme-purple-bg) !important;
+    border-color: var(--theme-purple-border) !important;
+    color: var(--theme-purple-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-workspace :is(
+    .sw-historical-obs-card.sw-review-color-4 .sw-obs-type-badge,
+    .sw-preview-state-card.is-loading .sw-state-icon-badge .sub-icon,
+    .sw-preview-state-card.is-processing .sw-state-icon-badge .sub-icon
+) {
+    background: var(--theme-purple-bg) !important;
+    color: var(--theme-purple-text) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .digital-record[data-entity-type="project"] .ed-information-meta [data-material-field="type"],
+    .digital-record[data-entity-type="project"] .ed-information-meta [data-material-field="stage"]
+) {
+    --academic-card-accent: var(--theme-purple-accent);
+    border-top-color: var(--theme-purple-accent) !important;
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) :is(
+    .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="project-classification"] .ed-tags > .is-tone-purple,
+    .digital-record[data-entity-type="project"] .ed-document-section[data-information-section="keywords"] .ed-tags > .is-tone-purple
+) {
+    background: var(--theme-purple-bg) !important;
+    border-color: var(--theme-purple-border) !important;
+    color: var(--theme-purple-text) !important;
 }
