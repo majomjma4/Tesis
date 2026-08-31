@@ -16,6 +16,7 @@ final class CalendarController
         $calendarError = null;
         $requestedEvent = null;
         $requestedEventUnavailable = false;
+        $requestedDate = calendar_date_key(is_scalar($_GET['date'] ?? null) ? (string) $_GET['date'] : null);
         $rawEventId = $_GET['event_id'] ?? null;
         $requestedEventId = is_scalar($rawEventId) ? filter_var($rawEventId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
 
@@ -51,6 +52,7 @@ final class CalendarController
             'projectFilterId' => $projectFilterId,
             'requestedEvent' => $requestedEvent,
             'requestedEventUnavailable' => $requestedEventUnavailable,
+            'requestedDate' => $requestedDate,
         ]);
     }
     // Final de presentación del calendario

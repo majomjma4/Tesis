@@ -97,7 +97,8 @@ $urls = (array) ($report['urls'] ?? []);
                         registrados para tu cuenta.</span></div>
             <?php else: ?>
                 <ul class="teacher-agenda-list"><?php foreach (array_slice($upcoming, 0, 3) as $event): ?>
-                        <li><time><?= e((string) ($event['date'] ?? '-')) ?></time><strong><?= e((string) ($event['title'] ?? 'Fecha academica')) ?></strong><?php if (!empty($event['context'])): ?><span><?= e((string) $event['context']) ?></span><?php endif; ?><?php if (!empty($event['time'])): ?><span><?= e((string) $event['time']) ?></span><?php endif; ?>
+                        <?php $calendarRoute = trim((string) ($event['calendar_route'] ?? '')); ?>
+                        <li><?php if ($calendarRoute !== ''): ?><a class="teacher-agenda-event-link" href="<?= e($calendarRoute) ?>"><?php endif; ?><time><?= e((string) ($event['date'] ?? '-')) ?></time><strong><?= e((string) ($event['title'] ?? 'Fecha academica')) ?></strong><?php if (!empty($event['context'])): ?><span><?= e((string) $event['context']) ?></span><?php endif; ?><?php if (!empty($event['time'])): ?><span><?= e((string) $event['time']) ?></span><?php endif; ?><?php if ($calendarRoute !== ''): ?></a><?php endif; ?>
                         </li><?php endforeach; ?>
                 </ul><?php endif; ?><a class="teacher-inline-link" href="<?= e(route('calendar')) ?>">Abrir calendario <span
                     aria-hidden="true">→</span></a>

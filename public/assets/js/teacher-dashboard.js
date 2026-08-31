@@ -8,7 +8,8 @@
         var next = carousel.querySelector('[data-carousel-next]');
         var navigation = carousel.querySelector('[data-carousel-navigation]');
         var status = carousel.querySelector('[data-carousel-status]');
-        var cards = track ? Array.from(track.querySelectorAll('.teacher-project-card')) : [];
+        var cardSelector = carousel.getAttribute('data-carousel-card-selector') || '.teacher-project-card';
+        var cards = track ? Array.from(track.querySelectorAll(cardSelector)) : [];
         if (!viewport || !track || cards.length < 2 || !previous || !next || !navigation) return;
 
         function measurements() {

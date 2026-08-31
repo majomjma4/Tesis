@@ -908,7 +908,7 @@ final class DashboardModel
             usort($upcoming, static fn(array $a, array $b): int => [(string) ($a['date'] ?? ''), (string) ($a['time'] ?? '')] <=> [(string) ($b['date'] ?? ''), (string) ($b['time'] ?? '')]);
             $items = array_map(function (array $event): array {
                 $date = (string) ($event['date'] ?? '');
-                return ['date' => $date !== '' ? (new DateTimeImmutable($date, new DateTimeZone('America/Guayaquil')))->format('d/m/Y') : 'Fecha no disponible', 'time' => $event['time'] ?? null, 'title' => (string) ($event['title'] ?? 'Evento académico'), 'context' => (string) ($event['description'] ?? '')];
+                return ['date' => $date !== '' ? (new DateTimeImmutable($date, new DateTimeZone('America/Guayaquil')))->format('d/m/Y') : 'Fecha no disponible', 'calendar_route' => calendar_date_route($date), 'time' => $event['time'] ?? null, 'title' => (string) ($event['title'] ?? 'Evento académico'), 'context' => (string) ($event['description'] ?? '')];
             }, array_slice($upcoming, 0, 6));
             $result['upcoming'] = ['status' => $items === [] ? 'empty' : 'loaded', 'items' => $items];
         } catch (Throwable $error) {

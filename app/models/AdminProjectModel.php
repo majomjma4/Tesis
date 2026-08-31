@@ -103,13 +103,8 @@ final class AdminProjectModel
         if($periodId>0){$where[]='p.academic_period_id=:period_id';$params['period_id']=$periodId;}
         $reviewSituation=(string)($filters['review_situation']??'');
         if(in_array($reviewSituation,['pending','addressed','none'],true)){
-            if($reviewSituation==='pending'){
-                $where[]='EXISTS (SELECT 1 FROM project_observations po WHERE po.project_id=p.id AND po.status=\'pending\')';
-            }elseif($reviewSituation==='addressed'){
-                $where[]='NOT EXISTS (SELECT 1 FROM project_observations po WHERE po.project_id=p.id AND po.status=\'pending\') AND EXISTS (SELECT 1 FROM project_observations po WHERE po.project_id=p.id AND po.status IN (\'addressed\',\'resolved\'))';
-            }elseif($reviewSituation==='none'){
-                $where[]='NOT EXISTS (SELECT 1 FROM project_observations po WHERE po.project_id=p.id)';
-            }
+            $condition=(new ProjectReviewSituationService())->filterCondition($reviewSituation,'p');
+            if($condition!==null)$where[]=$condition;
         }
         $from=" FROM projects p JOIN project_types pt ON pt.id=p.project_type_id JOIN careers c ON c.id=p.career_id JOIN academic_periods ap ON ap.id=p.academic_period_id LEFT JOIN users u ON u.id=p.tutor_id WHERE ".implode(' AND ',$where);
         return [$from,$params];

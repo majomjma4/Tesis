@@ -90,7 +90,7 @@ function fixture(PDO $db, int $number, bool $withFiles = true): array
             $files[] = ['file_id'=>(int)$db->lastInsertId(), 'expected_checksum'=>$checksum];
         }
     }
-    return compact('project', 'teacher', 'otherTeacher', 'student', 'files', 'code');
+    return compact('project', 'teacher', 'otherTeacher', 'student', 'files', 'code', 'delivery');
 }
 
 function runCase(PDO $db, string $name, callable $test): void
@@ -147,7 +147,7 @@ try {
         check((int)($rowA['file_id'] ?? 0) === $fileA['file_id'] && (string)($rowA['file_checksum_sha256'] ?? '') === $fileA['expected_checksum'], 'La observación A tomó otro archivo o checksum.');
         check((int)($rowB['file_id'] ?? 0) === $fileB['file_id'] && (string)($rowB['file_checksum_sha256'] ?? '') === $fileB['expected_checksum'], 'La observación B tomó otro archivo o checksum.');
         check((int)$rowA['author_id'] === $f['teacher'] && (int)$rowB['author_id'] === $f['teacher'], 'author_id no corresponde al actor del servicio.');
-        check($rowA['delivery_id'] === null && $rowB['delivery_id'] === null, 'delivery_id cambió su semántica actual.');
+        check((int)($rowA['delivery_id'] ?? 0) === (int)$f['delivery'] && (int)($rowB['delivery_id'] ?? 0) === (int)$f['delivery'], 'delivery_id corresponde a la entrega revisada.');
     });
     runCase($db, 'orden inverso no altera file_id ni checksum', function() use ($db, &$case): void {
         $f = fixture($db, ++$case);

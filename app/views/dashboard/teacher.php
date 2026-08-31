@@ -123,11 +123,14 @@ $projectSentence = static function (int $count, string $ending): string {
             <?php else: ?>
                 <ul class="teacher-agenda-list">
                     <?php foreach (array_slice($events, 0, 3) as $event): ?>
+                        <?php $calendarRoute = trim((string) ($event['calendar_route'] ?? '')); ?>
                         <li>
+                            <?php if ($calendarRoute !== ''): ?><a class="teacher-agenda-event-link" href="<?= e($calendarRoute) ?>"><?php endif; ?>
                             <time><?= e($event['date'] ?? '') ?></time>
                             <strong><?= e($event['title'] ?? 'Fecha académica') ?></strong>
                             <?php if (!empty($event['context'])): ?><span><?= e($event['context']) ?></span><?php endif; ?>
                             <?php if (!empty($event['time'])): ?><span><?= e($event['time']) ?></span><?php endif; ?>
+                            <?php if ($calendarRoute !== ''): ?></a><?php endif; ?>
                         </li>
                     <?php endforeach; ?>
                 </ul>
@@ -199,7 +202,9 @@ $projectSentence = static function (int $count, string $ending): string {
             <?php if (!$repo): ?>
                 <?php $empty('Aún no hay proyectos publicados disponibles.'); ?>
             <?php else: ?>
-                <div class="teacher-repository-grid">
+                <div class="teacher-projects-carousel teacher-repository-carousel" data-teacher-projects-carousel data-carousel-card-selector=".teacher-repository-card">
+                    <div class="teacher-projects-carousel__viewport">
+                        <div class="teacher-repository-grid" data-carousel-track>
                     <?php foreach ($repo as $item): ?>
                         <a class="teacher-repository-card" href="<?= e($item['route'] ?? route('repository')) ?>">
                             <div class="teacher-project-meta"><span><?= e($item['code'] ?? '') ?></span><span><?= e($item['type'] ?? 'Proyecto') ?></span></div>
@@ -208,6 +213,15 @@ $projectSentence = static function (int $count, string $ending): string {
                             <small><?= e(trim(($item['career'] ?? '') . ' · ' . ($item['period'] ?? ''), ' ·')) ?></small>
                         </a>
                     <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php if (count($repo) > 1): ?>
+                        <div class="teacher-projects-carousel__navigation" data-carousel-navigation>
+                            <span class="teacher-projects-carousel__status" data-carousel-status aria-live="polite"></span>
+                            <button type="button" data-carousel-prev aria-label="Mostrar proyectos publicados anteriores"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
+                            <button type="button" data-carousel-next aria-label="Mostrar proyectos publicados siguientes"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+                        </div>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
         </section>

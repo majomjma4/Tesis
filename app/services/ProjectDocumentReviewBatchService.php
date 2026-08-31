@@ -73,7 +73,7 @@ final class ProjectDocumentReviewBatchService
         $observationInsert = $db->prepare(
             "INSERT INTO project_observations
              (project_id,delivery_id,file_id,file_checksum_sha256,author_id,category,location_reference,selection_anchor,body,status)
-             VALUES (:project,NULL,:file,:checksum,:actor,:category,:location,:anchor,:body,'pending')"
+             VALUES (:project,:delivery,:file,:checksum,:actor,:category,:location,:anchor,:body,'pending')"
         );
         $observationCount = 0;
         $auditDocuments = [];
@@ -82,7 +82,7 @@ final class ProjectDocumentReviewBatchService
             $decisionChecksum = strtolower((string)$decisionFile['checksum_sha256']);
             foreach ($decision['observations'] as $observation) {
                 $observationInsert->execute([
-                    'project'=>$projectId, 'file'=>$decision['file_id'], 'checksum'=>$decisionChecksum, 'actor'=>$actor,
+                    'project'=>$projectId, 'delivery'=>$deliveryId, 'file'=>$decision['file_id'], 'checksum'=>$decisionChecksum, 'actor'=>$actor,
                     'category'=>$observation['category'], 'location'=>$observation['location_reference'],
                     'anchor'=>$observation['anchor'] === null ? null : json_encode($observation['anchor'], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),
                     'body'=>$observation['body'],

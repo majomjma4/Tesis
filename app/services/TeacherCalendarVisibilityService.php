@@ -53,6 +53,7 @@ final class TeacherCalendarVisibilityService
             'context'=>$projectTitle !== null && trim($projectTitle) !== '' ? $projectTitle : ($type === 'defense_schedule' ? 'Jornada académica' : ($projectId === null ? 'Evento personal' : '')),
             'project_id'=>$projectId,'project_title'=>$projectTitle,'completed'=>false,
             'route'=>$projectId === null ? route('calendar') : route('project-detail').'&id='.$projectId,
+            'calendar_route'=>calendar_date_route($date),
             'action_label'=>$projectId === null ? 'Abrir calendario' : 'Abrir proyecto'];
     }
 }

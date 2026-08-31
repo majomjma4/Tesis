@@ -10,14 +10,16 @@ if (calendarRoot) {
     const projectFilterId = Number(calendarRoot.dataset.projectFilter || 0);
     const requestedEventId = Number(calendarRoot.dataset.requestedEventId || 0);
     const requestedEventUnavailable = calendarRoot.dataset.requestedEventUnavailable === 'true';
+    const requestedDate = calendarRoot.dataset.requestedDate || '';
     const typeLabels = { delivery: 'Entregas', meeting: 'Reuniones', review: 'Revisiones', deadline: 'Fechas límite', personal: 'Personal', defense: 'Defensa', defense_schedule: 'Jornada de defensa' };
     const priorityLabels = { low: 'Baja', medium: 'Media', high: 'Alta' };
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const compactCalendar = window.matchMedia('(max-width: 1180px)');
     const viewStorageKey = 'tesis-calendar-view';
     let events = JSON.parse(calendarRoot.dataset.calendarEvents || '[]');
-    let visibleDate = new Date(today.getFullYear(), today.getMonth(), 1);
-    let selectedDate = dateKey(today);
+    const initialDate = /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? fromKey(requestedDate) : today;
+    let visibleDate = new Date(initialDate.getFullYear(), initialDate.getMonth(), 1);
+    let selectedDate = dateKey(initialDate);
     let activeFilter = 'all';
     let activePriority = 'all';
     let sortMode = 'date';

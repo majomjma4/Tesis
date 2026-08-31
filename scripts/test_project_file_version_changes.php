@@ -11,6 +11,11 @@ $project=(int)$fixture['project_id'];$student=(int)$fixture['student_id'];$file=
 $tracked=['project_files','project_file_versions','project_file_version_changes','project_file_version_addressed_observations','project_file_review_states','project_observations','project_audit_log','notifications'];$before=[];foreach($tracked as $table)$before[$table]=(int)$db->query("SELECT COUNT(*) FROM $table")->fetchColumn();
 $db->beginTransaction();
 try{
+    $deliveryNumber=(int)$db->query("SELECT COALESCE(MAX(version_number),0)+1 FROM project_deliveries WHERE project_id=$project")->fetchColumn();
+    $deliveryInsert=$db->prepare("INSERT INTO project_deliveries(project_id,version_number,title,status,submitted_by,submitted_at) VALUES(:project,:version,'Entrega previa de prueba','under_review',:actor,UTC_TIMESTAMP())");
+    $deliveryInsert->execute(['project'=>$project,'version'=>$deliveryNumber,'actor'=>$student]);
+    $delivery=(int)$db->lastInsertId();
+    $db->prepare('UPDATE project_files SET delivery_id=:delivery WHERE id=:file AND project_id=:project')->execute(['delivery'=>$delivery,'file'=>$file,'project'=>$project]);
     $copy=$db->prepare("INSERT INTO project_files(project_id,category,original_name,storage_name,storage_path,mime_type,extension,size_bytes,checksum_sha256,sort_order,uploaded_by) SELECT project_id,category,'otro.pdf',:storage,'tests/otro.pdf','application/pdf','pdf',1,:checksum,sort_order+100,:actor FROM project_files WHERE id=:file");$copy->execute(['storage'=>'phase3-other-'.bin2hex(random_bytes(8)).'.pdf','checksum'=>hash('sha256','other-'.$project),'actor'=>$student,'file'=>$file]);$otherFile=(int)$db->lastInsertId();
     $otherProject=(int)$db->query("SELECT id FROM projects WHERE id<>$project AND deleted_at IS NULL LIMIT 1")->fetchColumn();if($otherProject<1)$otherProject=$project;
     $obs=$db->prepare("INSERT INTO project_observations(project_id,file_id,author_id,category,body,status) VALUES(:project,:file,:actor,'content',:body,:status)");
@@ -27,7 +32,7 @@ try{
     $expect(fn()=>$service->replaceInTransaction($db,$project,$file,str_repeat('0',64),$stored,$student,'academic',$base),'documento fue actualizado',409);
     $identical=$stored;$identical['checksum_sha256']=$checksum;$expect(fn()=>$service->replaceInTransaction($db,$project,$file,$checksum,$identical,$student,'academic',$base),'mismo contenido');
     $db->prepare("UPDATE project_file_review_states SET status='development' WHERE project_id=? AND file_id=? AND checksum_sha256=?")->execute([$project,$file,$checksum]);
-    $expect(fn()=>$service->replaceWorkspaceInTransaction($db,$project,$file,$checksum,$identical,$student),'mismo contenido',422);
+    $expect(fn()=>$service->replaceWorkspaceInTransaction($db,$project,$file,$checksum,$identical,$student,'Motivo de prueba'), 'mismo contenido',422);
     $db->prepare("UPDATE project_file_review_states SET status='approved' WHERE project_id=? AND file_id=? AND checksum_sha256=?")->execute([$project,$file,$checksum]);
     $expect(fn()=>$service->replaceInTransaction($db,$project,$file,$checksum,$stored,$student,'academic',array_replace($base,['addressed_observation_ids'=>[$otherFileObservation]])),'otro archivo');
     $expect(fn()=>$service->replaceInTransaction($db,$project,$file,$checksum,$stored,$student,'academic',array_replace($base,['addressed_observation_ids'=>[$resolvedObservation]])),'ya fue resuelta');

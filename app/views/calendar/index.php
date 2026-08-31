@@ -34,7 +34,7 @@
 
 <!-- Inicio del espacio de trabajo del calendario -->
 <!-- Contiene navegación, filtros, vistas intercambiables y agenda contextual. -->
-<div class="calendar-workspace" data-calendar-events='<?= e($eventPayload ?: '[]') ?>' data-calendar-error="<?= e((string) ($calendarError ?? '')) ?>" data-events-url="<?= e(route('calendar-events')) ?>" data-csrf="<?= e($calendarCsrf ?? '') ?>" data-project-url="<?= e($projectsUrl) ?>" data-project-filter="<?= (int) ($projectFilterId ?? 0) ?>" data-requested-event-id="<?= (int) (($requestedEvent['id'] ?? 0)) ?>" data-requested-event-unavailable="<?= !empty($requestedEventUnavailable) ? 'true' : 'false' ?>">
+<div class="calendar-workspace" data-calendar-events='<?= e($eventPayload ?: '[]') ?>' data-calendar-error="<?= e((string) ($calendarError ?? '')) ?>" data-events-url="<?= e(route('calendar-events')) ?>" data-csrf="<?= e($calendarCsrf ?? '') ?>" data-project-url="<?= e($projectsUrl) ?>" data-project-filter="<?= (int) ($projectFilterId ?? 0) ?>" data-requested-event-id="<?= (int) (($requestedEvent['id'] ?? 0)) ?>" data-requested-event-unavailable="<?= !empty($requestedEventUnavailable) ? 'true' : 'false' ?>" data-requested-date="<?= e((string) ($requestedDate ?? '')) ?>">
     <section class="calendar-board" aria-label="Calendario mensual">
         <header class="calendar-toolbar">
             <div class="calendar-navigation">

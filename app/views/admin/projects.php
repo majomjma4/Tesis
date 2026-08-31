@@ -153,7 +153,7 @@ $typeLabels = [
                         $projectActionUrl = route('project-detail') . '&id=' . (int) $p['id']
                             . ($canReviewProject ? '&tab=review' : '')
                             . '&return=' . rawurlencode($projectListReturnUrl); ?>
-                        <div class="ap-actions"><a href="<?= e($projectActionUrl) ?>"><?= $canReviewProject ? 'Revisar proyecto' : 'Abrir' ?></a>
+                        <div class="ap-actions"><a href="<?= e($projectActionUrl) ?>"><?= $canReviewProject ? 'Revisar ' : 'Abrir' ?></a>
                         </div>
                     </article>
         <?php endforeach; endif; ?>

@@ -114,7 +114,7 @@ if ($decisionFixture) {
             $requestId=(int)$created['request']['id']; $requestVersion=(int)$created['request']['lock_version'];
             $resolved=$decision==='approved'
                 ? $service->approveInTransaction($db,$decisionProject,$requestId,$requestVersion,'published',$admin,'academic_management')
-                : $service->rejectInTransaction($db,$decisionProject,$requestId,$requestVersion,'published',$admin,'academic_management');
+                : $service->rejectInTransaction($db,$decisionProject,$requestId,$requestVersion,'published',$admin,'academic_management','Motivo de rechazo de prueba.');
             $assert(($resolved['decision']??'')===$decision,"decision administrativa $decision");
             $state=$db->query("SELECT status,is_available FROM projects WHERE id=$decisionProject")->fetch();
             $assert($decision==='approved'

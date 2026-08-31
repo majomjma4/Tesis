@@ -35,6 +35,22 @@ function route(string $page = 'dashboard'): string
     return base_url('index.php?page=' . urlencode($page));
 }
 
+function calendar_date_key(?string $value): ?string
+{
+    $value = trim((string) $value);
+    if ($value === '') return null;
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    $errors = DateTimeImmutable::getLastErrors();
+    if (!$date || ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) || $date->format('Y-m-d') !== $value) return null;
+    return $value;
+}
+
+function calendar_date_route(?string $value): ?string
+{
+    $date = calendar_date_key($value);
+    return $date === null ? null : route('calendar') . '&date=' . rawurlencode($date);
+}
+
 /**
  * Etiquetas institucionales del estado y del momento del ciclo académico.
  *
