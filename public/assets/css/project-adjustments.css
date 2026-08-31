@@ -36,3 +36,130 @@ body.project-adjustment-dialog-open .custom-select-option{min-height:42px;paddin
     left: calc(280px + var(--app-shell-gutter, 0px));
   }
 }
+
+/* Acciones y estado pendiente: semántica visible sin alterar la estructura. */
+.project-adjustment-list:has(.project-adjustment-status.is-pending) {
+  border-color: color-mix(in srgb, var(--warning) 38%, var(--line));
+  background: color-mix(in srgb, var(--warning) 4%, var(--surface));
+}
+.project-adjustment-actions button[data-adjustment-approve],
+.project-adjustment-actions button[data-adjustment-reject] {
+  transition: border-color .18s ease, background-color .18s ease, color .18s ease, outline-color .18s ease;
+}
+.project-adjustment-actions button[data-adjustment-approve] {
+  border-color: color-mix(in srgb, var(--success) 48%, var(--line));
+  background: color-mix(in srgb, var(--success) 10%, var(--surface));
+  color: var(--theme-success-text, #047857);
+}
+.project-adjustment-actions button[data-adjustment-approve]:not(:disabled):hover,
+.project-adjustment-actions button[data-adjustment-approve]:not(:disabled):focus-visible {
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--success) 18%, var(--surface));
+  color: var(--theme-success-text, #047857);
+  outline-color: color-mix(in srgb, var(--success) 38%, transparent);
+}
+.project-adjustment-actions button[data-adjustment-reject] {
+  border-color: color-mix(in srgb, var(--danger) 48%, var(--line));
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
+  color: var(--theme-error-text, #b42318);
+}
+.project-adjustment-actions button[data-adjustment-reject]:not(:disabled):hover,
+.project-adjustment-actions button[data-adjustment-reject]:not(:disabled):focus-visible {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 17%, var(--surface));
+  color: var(--theme-error-text, #b42318);
+  outline-color: color-mix(in srgb, var(--danger) 38%, transparent);
+}
+.project-adjustment-dialog [data-adjustment-decision-confirm] {
+  transition: border-color .18s ease, background-color .18s ease, color .18s ease, outline-color .18s ease;
+}
+.project-adjustment-dialog [data-adjustment-decision-confirm].is-success {
+  border-color: #047857;
+  background: #047857;
+  color: #fff;
+}
+.project-adjustment-dialog [data-adjustment-decision-confirm].is-success:not(:disabled):hover,
+.project-adjustment-dialog [data-adjustment-decision-confirm].is-success:not(:disabled):focus-visible {
+  border-color: #065f46;
+  background: #065f46;
+  color: #fff;
+  outline-color: color-mix(in srgb, var(--success) 38%, transparent);
+}
+.project-adjustment-dialog [data-adjustment-decision-confirm].is-danger {
+  border-color: #b42318;
+  background: #b42318;
+  color: #fff;
+}
+.project-adjustment-dialog [data-adjustment-decision-confirm].is-danger:not(:disabled):hover,
+.project-adjustment-dialog [data-adjustment-decision-confirm].is-danger:not(:disabled):focus-visible {
+  border-color: #8f1d14;
+  background: #8f1d14;
+  color: #fff;
+  outline-color: color-mix(in srgb, var(--danger) 38%, transparent);
+}
+.project-adjustment-dialog[data-adjustment-decision-dialog] > section {
+  font-family: inherit;
+}
+.project-adjustment-dialog[data-adjustment-decision-dialog] .modal-body {
+  padding: 22px;
+  font: inherit;
+}
+.project-adjustment-dialog[data-adjustment-decision-dialog] .modal-body p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-md);
+  line-height: 1.6;
+}
+.project-adjustment-dialog[data-adjustment-decision-dialog] .modal-body {
+  display: grid;
+  gap: 14px;
+}
+.project-adjustment-dialog[data-adjustment-decision-dialog] [data-adjustment-decision-reason-wrap] {
+  display: grid;
+  gap: 7px;
+}
+.project-adjustment-dialog[data-adjustment-decision-dialog] [data-adjustment-decision-reason-wrap] span {
+  color: var(--danger);
+}
+.project-adjustment-dialog[data-adjustment-decision-dialog] [data-adjustment-decision-reason-wrap] small {
+  color: var(--muted);
+  font-size: var(--font-xs);
+  font-weight: 400;
+}
+.project-adjustment-dialog[data-adjustment-decision-dialog] [data-adjustment-decision-error] {
+  color: var(--danger);
+  font-size: var(--font-sm);
+}
+.project-adjustment-rejection-reason {
+  overflow-wrap: anywhere;
+}
+.project-adjustment-dialog[data-adjustment-decision-dialog] footer {
+  margin: 0;
+  padding: 16px 22px 22px;
+  border-top: 1px solid var(--line);
+  gap: 10px;
+}
+.project-adjustment-dialog[data-adjustment-decision-dialog] footer button {
+  font-family: inherit;
+  font-size: var(--font-sm);
+}
+#projectAdjustmentDialog [data-adjustment-confirmation][hidden],
+#projectAdjustmentDialog [data-adjustment-confirmation-footer][hidden] {
+  display: none !important;
+}
+@media (max-width: 520px) {
+  .project-adjustment-dialog[data-adjustment-decision-dialog] .modal-body {
+    padding: 16px;
+  }
+  .project-adjustment-dialog[data-adjustment-decision-dialog] footer {
+    padding: 14px 16px 16px;
+  }
+}
+@media (max-width: 330px) {
+  .project-adjustment-dialog[data-adjustment-decision-dialog] .modal-body {
+    padding: 14px;
+  }
+  .project-adjustment-dialog[data-adjustment-decision-dialog] footer {
+    padding: 12px 14px 14px;
+  }
+}

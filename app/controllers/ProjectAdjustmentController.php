@@ -26,6 +26,7 @@ final class ProjectAdjustmentController
         $session=$this->session('POST');$input=$this->input();$this->csrf($session,$input);
         $project=(int)($input['project_id']??0);$request=(int)($input['request_id']??0);$version=(int)($input['lock_version']??0);
         $expected=(string)($input['expected_project_status']??'');$actor=(int)$session->userId();$context=(string)($input['context']??'');
+        $rejectionReason=(string)($input['rejection_reason']??'');
         if (in_array($operation, ['approve', 'reject'], true)
             && (!$session->isAdminModeActive() || $context !== 'academic_management')) {
             $this->json(false,'Esta decisión sólo está disponible para Administración.',[],403);
@@ -38,7 +39,7 @@ final class ProjectAdjustmentController
                 'address'=>$service->address($project,$request,$version,$expected,$actor,$context),
                 'close'=>$service->close($project,$request,$version,$expected,$actor,$context),
                 'approve'=>$service->approve($project,$request,$version,$expected,$actor,$context),
-                'reject'=>$service->reject($project,$request,$version,$expected,$actor,$context),
+                'reject'=>$service->reject($project,$request,$version,$expected,$actor,$context,$rejectionReason),
             };
             $this->json(true,(string)$result['message'],$result);
         } catch(ProjectAdjustmentRequestException $e){$this->json(false,$e->getMessage(),[],$e->httpStatus());}

@@ -433,6 +433,27 @@ if ($project === null): ?>
         .digital-record[data-record-context="academic_management"] .ed-document-heading{align-items:flex-start;font-size:var(--font-md);line-height:1.35}
     }
     </style><?php endif;
+    $adjustmentPartial = !empty(array_filter([
+        $projectCapabilities['create_adjustment_request'] ?? false,
+        $projectCapabilities['view_adjustment_requests'] ?? false,
+        $projectCapabilities['respond_adjustment_request'] ?? false,
+        $projectCapabilities['address_adjustment_request'] ?? false,
+        $projectCapabilities['close_adjustment_request'] ?? false,
+        $projectCapabilities['approve_adjustment_request'] ?? false,
+        $projectCapabilities['reject_adjustment_request'] ?? false,
+    ])) ? __DIR__.'/_adjustment-requests.php' : '';
+    $adjustmentViewData = [
+        'project' => $project,
+        'projectId' => $projectId,
+        'projectContext' => $projectContext,
+        'projectCapabilities' => $projectCapabilities,
+        'adjustmentData' => $adjustmentData,
+        'adjustmentContext' => $adjustmentContext,
+        'adjustmentCsrf' => $adjustmentCsrf,
+        'adjustmentEndpoints' => $adjustmentEndpoints,
+        'hasPendingModificationRequest' => $hasPendingModificationRequest,
+        'detailUrl' => $detailUrl,
+    ];
     require __DIR__.'/../repository/_ficha-institucional.php';
     /* Dos columnas reales: evita que la altura de Información académica
        reserve espacio en la columna de Descripción/Progreso. */
@@ -459,13 +480,6 @@ if ($project === null): ?>
         .digital-record:is([data-record-context="academic_management"],[data-record-context="academic"]) .ed-information-column{grid-column:auto;gap:18px}
     }
     </style><?php endif;
-    if (!empty(array_filter([
-        $projectCapabilities['create_adjustment_request'] ?? false,
-        $projectCapabilities['view_adjustment_requests'] ?? false,
-        $projectCapabilities['respond_adjustment_request'] ?? false,
-        $projectCapabilities['address_adjustment_request'] ?? false,
-        $projectCapabilities['close_adjustment_request'] ?? false,
-    ]))) require __DIR__.'/_adjustment-requests.php';
     if(!empty($digitalRecord['status_transition']['enabled'])) require __DIR__.'/../repository/_project-status-transition-dialog.php';
     if($publicContext):?><style>@media(min-width:801px){.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr)}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-document-section[data-information-section="description"]{grid-column:1/-1}}</style><?php endif;
     if(!$publicContext&&!empty($descriptionReminder)) require __DIR__.'/_description-reminder.php';

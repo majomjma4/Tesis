@@ -15,8 +15,10 @@
 
   const createDialog = document.querySelector("[data-adjustment-dialog]");
   const responseDialog = document.querySelector("[data-adjustment-response-dialog]");
+  const decisionDialog = document.querySelector("[data-adjustment-decision-dialog]");
   // El diálogo de creación debe escapar de cualquier contenedor con transform u overflow.
   if (createDialog && createDialog.parentElement !== document.body) document.body.appendChild(createDialog);
+  if (decisionDialog && decisionDialog.parentElement !== document.body) document.body.appendChild(decisionDialog);
   if (createDialog) createDialog.hidden = true;
   document.body.classList.remove("project-adjustment-dialog-open");
   const createForm = createDialog?.querySelector("[data-adjustment-create-form]");
@@ -43,6 +45,7 @@
       createConfirmationMessage.classList.remove("is-error");
     }
   };
+  setPublishedConfirmation(false);
   const resetCreateState = () => {
     if (!isPublishedModification) return;
     pendingCreateData = null;
@@ -59,6 +62,7 @@
   let lockedScrollX = 0;
   let lockedScrollY = 0;
   let bodyScrollState = null;
+  let decisionConfirmationOpen = false;
   const focusable = dialog => [...dialog.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled])')];
   const lockDocumentScroll = () => {
     if (bodyScrollState) return;
@@ -79,7 +83,7 @@
     window.scrollTo(lockedScrollX,lockedScrollY);
   };
   const open = (dialog, trigger) => { if (!dialog) return; returnFocus = trigger; lockDocumentScroll(); dialog.hidden = false; focusable(dialog)[0]?.focus(); };
-  const close = dialog => { if (!dialog) return; if (dialog === createDialog) resetCreateState(); dialog.hidden = true; if (![createDialog,responseDialog].some(item => item && !item.hidden)) restoreDocumentScroll(); returnFocus?.focus(); };
+  const close = dialog => { if (!dialog) return; if (dialog === createDialog) resetCreateState(); dialog.hidden = true; if (![createDialog,responseDialog,decisionDialog].some(item => item && !item.hidden)) restoreDocumentScroll(); returnFocus?.focus(); };
   const trap = (event, dialog) => { if (event.key === "Escape") { close(dialog); return; } if (event.key !== "Tab") return; const items=focusable(dialog); if (!items.length) return; const first=items[0],last=items.at(-1); if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();} };
   [createDialog,responseDialog].filter(Boolean).forEach(dialog => { dialog.addEventListener("keydown", event => trap(event,dialog)); dialog.addEventListener("click", event => { if(event.target===dialog) close(dialog); }); });
   createDialog?.addEventListener("click", event => {
@@ -87,6 +91,72 @@
     event.preventDefault();
     event.stopPropagation();
     close(createDialog);
+  });
+
+  const requestDecisionConfirmation = (operation, trigger) => new Promise(resolve => {
+    if (!decisionDialog || decisionConfirmationOpen) { resolve(false); return; }
+    const title = decisionDialog.querySelector("[data-adjustment-decision-title]");
+    const message = decisionDialog.querySelector("[data-adjustment-decision-message]");
+    const confirm = decisionDialog.querySelector("[data-adjustment-decision-confirm]");
+    const reasonWrap = decisionDialog.querySelector("[data-adjustment-decision-reason-wrap]");
+    const reason = decisionDialog.querySelector("[data-adjustment-decision-reason]");
+    const decisionError = decisionDialog.querySelector("[data-adjustment-decision-error]");
+    const cancelButtons = [...decisionDialog.querySelectorAll("[data-adjustment-decision-cancel]")];
+    if (!title || !message || !confirm || !cancelButtons.length || !reasonWrap || !reason || !decisionError) { resolve({confirmed:false,rejectionReason:""}); return; }
+    const approving = operation === "approve";
+    title.textContent = approving ? "¿Aprobar solicitud de modificación?" : "¿Rechazar solicitud de modificación?";
+    message.textContent = approving
+      ? "Al aprobarla, el proyecto volverá a estar disponible para modificación por el estudiante."
+      : "La solicitud será rechazada y el proyecto permanecerá publicado y bloqueado para edición.";
+    confirm.textContent = approving ? "Aprobar" : "Rechazar";
+    confirm.classList.toggle("is-success", approving);
+    confirm.classList.toggle("is-danger", !approving);
+    reasonWrap.hidden = approving;
+    reason.disabled = approving;
+    reason.required = !approving;
+    reason.value = "";
+    decisionError.textContent = "";
+    decisionError.hidden = true;
+    decisionConfirmationOpen = true;
+    let settled = false;
+    const finish = (confirmed, rejectionReason = "") => {
+      if (settled) return;
+      settled = true;
+      decisionConfirmationOpen = false;
+      decisionDialog.removeEventListener("keydown", onKeydown);
+      decisionDialog.removeEventListener("click", onBackdropClick);
+      cancelButtons.forEach(button => button.removeEventListener("click", onCancel));
+      confirm.removeEventListener("click", onConfirm);
+      close(decisionDialog);
+      resolve({confirmed,rejectionReason});
+    };
+    const onCancel = event => { event.preventDefault(); finish(false); };
+    const onConfirm = event => {
+      event.preventDefault();
+      if (!approving) {
+        const value = reason.value.trim();
+        if (value.length < 5 || value.length > 500) {
+          decisionError.textContent = "El motivo del rechazo debe contener entre 5 y 500 caracteres.";
+          decisionError.hidden = false;
+          reason.focus();
+          return;
+        }
+        finish(true, value);
+        return;
+      }
+      finish(true);
+    };
+    const onBackdropClick = event => { if (event.target === decisionDialog) finish(false); };
+    const onKeydown = event => {
+      if (event.key === "Escape") { event.preventDefault(); finish(false); return; }
+      trap(event, decisionDialog);
+    };
+    cancelButtons.forEach(button => button.addEventListener("click", onCancel));
+    confirm.addEventListener("click", onConfirm);
+    decisionDialog.addEventListener("click", onBackdropClick);
+    decisionDialog.addEventListener("keydown", onKeydown);
+    open(decisionDialog, trigger);
+    (approving ? confirm : reason).focus();
   });
 
   const common = () => ({ _csrf:config.dataset.csrf, project_id:config.dataset.projectId, expected_project_status:config.dataset.status, context:config.dataset.context });
@@ -140,15 +210,31 @@
     if(confirmationSubmit && pendingCreateData){submit(createForm,config.dataset.create,pendingCreateData,confirmationSubmit);return;}
     if(event.target.closest("[data-adjustment-cancel]")){close(createDialog);return;}
     if(event.target.closest("[data-adjustment-response-cancel]")){close(responseDialog);return;}
+    if(event.target.closest("[data-adjustment-decision-cancel],[data-adjustment-decision-confirm]")){return;}
     const respond=event.target.closest("[data-adjustment-respond]");
     if(respond){responseRequest={request_id:respond.dataset.requestId,lock_version:respond.dataset.lockVersion};open(responseDialog,respond);return;}
     const action=event.target.closest("[data-adjustment-address],[data-adjustment-close],[data-adjustment-approve],[data-adjustment-reject]");
     if(!action)return;
     const operation=action.hasAttribute("data-adjustment-close")?"close":(action.hasAttribute("data-adjustment-approve")?"approve":(action.hasAttribute("data-adjustment-reject")?"reject":"address"));
-    if (operation === "approve" && !window.confirm("¿Aprobar esta solicitud? El proyecto dejará de estar publicado temporalmente y volverá a estar disponible para edición.")) return;
-    if (operation === "reject" && !window.confirm("¿Rechazar esta solicitud? El proyecto permanecerá publicado y bloqueado para edición.")) return;
+    let rejectionReason = "";
+    if (operation === "approve" || operation === "reject") {
+      const decision = await requestDecisionConfirmation(operation, action);
+      if (!decision?.confirmed) return;
+      rejectionReason = decision.rejectionReason || "";
+    }
     action.disabled=true;
-    try{const result=await request(config.dataset[operation],{...common(),request_id:action.dataset.requestId,lock_version:action.dataset.lockVersion});window.AppToast?.success(result.message);window.location.reload();}catch(error){action.disabled=false;window.AppToast?.error(error.message);}
+    try{
+      const body={...common(),request_id:action.dataset.requestId,lock_version:action.dataset.lockVersion};
+      if (operation === "reject") body.rejection_reason=rejectionReason;
+      const result=await request(config.dataset[operation],body);
+      const successMessage=result.message || "Solicitud rechazada correctamente.";
+      if (operation === "reject") {
+        let persisted=false;
+        try { sessionStorage.setItem("digitalRecordToast", successMessage); persisted=true; } catch {}
+        if (!persisted) window.AppToast?.success(successMessage);
+      } else window.AppToast?.success(successMessage);
+      window.location.reload();
+    }catch(error){action.disabled=false;window.AppToast?.error(error.message);}
   });
   const createData = form => { const values=Object.fromEntries(new FormData(form)); return {...values,project_id:Number(values.project_id),file_id:values.file_id?Number(values.file_id):null}; };
   const validatePublishedModification = form => {

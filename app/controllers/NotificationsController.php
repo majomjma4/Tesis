@@ -127,7 +127,7 @@ final class NotificationsController
                 $this->json(false, 'No fue posible consultar las notificaciones enviadas.', [], 500);
             }
 
-            $this->json(true, '✅ Notificaciones actualizadas.', [
+            $this->json(true, 'Notificaciones actualizadas.', [
                 'notifications' => $notifications,
                 'groups' => $this->groupNotifications($notifications),
                 'pagination' => $pagination,
@@ -180,7 +180,7 @@ final class NotificationsController
             }
         }
 
-        $this->json(true, '✅ Notificaciones actualizadas.', [
+        $this->json(true, 'Notificaciones actualizadas.', [
             'notifications' => $notifications,
             'groups' => $this->groupNotifications($notifications),
             'pagination' => $pagination,

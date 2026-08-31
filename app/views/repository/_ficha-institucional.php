@@ -56,6 +56,8 @@ $tabIds = array_values(array_filter(array_map(static fn (array $tab): string => 
 $activeTab = in_array((string) ($digitalRecord['active_tab'] ?? ''), $tabIds, true)
     ? (string) $digitalRecord['active_tab'] : ($tabIds[0] ?? 'information');
 $tabPartials = is_array($digitalRecord['tab_partials'] ?? null) ? $digitalRecord['tab_partials'] : [];
+$adjustmentPartial = is_string($adjustmentPartial ?? null) ? $adjustmentPartial : '';
+$adjustmentViewData = is_array($adjustmentViewData ?? null) ? $adjustmentViewData : [];
 $renderRecordTab = static function (string $tabPanel) use (&$digitalRecord, $tabPartials): void {
     if ($tabPanel === 'files') require __DIR__ . '/_explorador-documental.php';
     elseif ($tabPanel === 'evolution') require __DIR__ . '/_evolucion-documental.php';
@@ -136,6 +138,7 @@ body.dark-mode .ed-label.is-success{color:#86efac}
             <h1 id="digitalRecordTitle"><?= e((string) ($header['title'] ?? 'Expediente')) ?></h1>
             <?php if ($metadata): ?><dl class="ed-meta"><?php foreach ($metadata as $item): ?><div class="<?= ($item['tone'] ?? '') === 'secondary' ? 'is-secondary' : '' ?>"<?= !empty($item['key']) ? ' data-record-meta="' . e($item['key']) . '"' : '' ?>><dt><?php if (!empty($item['icon'])): ?><i class="fa-solid <?= e((string)$item['icon']) ?>" aria-hidden="true"></i><span><?= e($item['label']) ?></span><?php else: ?><?= e($item['label']) ?><?php endif; ?></dt><dd><?= e($item['value']) ?></dd></div><?php endforeach; ?></dl><?php endif; ?>
         </header>
+        <?php if ($adjustmentPartial !== ''): extract($adjustmentViewData, EXTR_SKIP); require $adjustmentPartial; endif; ?>
         <?php if(!empty($digitalRecord['review_notice'])):$reviewNotice=$digitalRecord['review_notice'];?><aside class="ed-review-notice" role="status"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div><strong><?=e((string)$reviewNotice['message'])?></strong><?php if(!empty($reviewNotice['count'])):?><span><?=(int)$reviewNotice['count']?> observación<?=((int)$reviewNotice['count']===1?'':'es')?> pendiente<?=((int)$reviewNotice['count']===1?'':'s')?>.</span><?php endif;?></div></aside><?php endif;?>
         <nav class="ed-tabs" aria-label="Secciones del expediente"<?= ($digitalRecord['mode'] ?? 'view') === 'view' ? ' role="tablist"' : '' ?>>
             <?php foreach ($tabs as $tabItem): ?><a class="ed-tab" id="recordTab-<?= e($tabItem['id']) ?>" data-record-tab-link data-tab-id="<?= e($tabItem['id']) ?>" href="<?= e($tabItem['url']) ?>"<?= $tabItem['id'] === $activeTab ? ' aria-current="page"' : '' ?><?= ($digitalRecord['mode'] ?? 'view') === 'view' ? ' role="tab" tabindex="' . ($tabItem['id'] === $activeTab ? '0' : '-1') . '" aria-selected="' . ($tabItem['id'] === $activeTab ? 'true' : 'false') . '" aria-controls="recordTabPanel-' . e($tabItem['id']) . '"' : '' ?>><i class="fa-solid <?= e($tabItem['icon']) ?>" aria-hidden="true"></i><?= e($tabItem['label']) ?></a><?php endforeach; ?>

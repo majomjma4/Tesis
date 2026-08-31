@@ -32,9 +32,9 @@ final class ProjectAdjustmentRequestService
         return Database::transaction(fn(PDO $db): array => $this->approveInTransaction($db, $projectId, $requestId, $lockVersion, $expectedStatus, $actorId, $context));
     }
 
-    public function reject(int $projectId, int $requestId, int $lockVersion, string $expectedStatus, int $actorId, string $context): array
+    public function reject(int $projectId, int $requestId, int $lockVersion, string $expectedStatus, int $actorId, string $context, string $rejectionReason = ''): array
     {
-        return Database::transaction(fn(PDO $db): array => $this->rejectInTransaction($db, $projectId, $requestId, $lockVersion, $expectedStatus, $actorId, $context));
+        return Database::transaction(fn(PDO $db): array => $this->rejectInTransaction($db, $projectId, $requestId, $lockVersion, $expectedStatus, $actorId, $context, $rejectionReason));
     }
 
     public function createInTransaction(PDO $db, int $projectId, string $expectedStatus, int $actorId, string $context, array $data): array
@@ -149,27 +149,30 @@ final class ProjectAdjustmentRequestService
         return $result;
     }
 
-    public function rejectInTransaction(PDO $db, int $projectId, int $requestId, int $lockVersion, string $expectedStatus, int $actorId, string $context): array
+    public function rejectInTransaction(PDO $db, int $projectId, int $requestId, int $lockVersion, string $expectedStatus, int $actorId, string $context, string $rejectionReason = ''): array
     {
         $project = $this->lockProject($db, $projectId, $expectedStatus);
         $this->requireCapability($db, $project, $actorId, $context, 'reject_adjustment_request');
         $request = $this->lockRequest($db, $projectId, $requestId, $lockVersion);
         $this->assertPendingPublishedModification($request);
+        $rejectionReason = $this->rejectionReason($rejectionReason);
+        $this->assertRejectionReasonColumn($db);
 
         $update = $db->prepare(
             "UPDATE project_adjustment_requests
-             SET status='closed',closed_at=CURRENT_TIMESTAMP,closed_by=:actor,updated_at=CURRENT_TIMESTAMP,lock_version=lock_version+1
+             SET status='closed',closed_at=CURRENT_TIMESTAMP,closed_by=:actor,rejection_reason=:reason,updated_at=CURRENT_TIMESTAMP,lock_version=lock_version+1
              WHERE id=:id AND lock_version=:version AND status='pending'"
         );
-        $update->execute(['id' => $requestId, 'version' => $lockVersion, 'actor' => $actorId]);
+        $update->execute(['id' => $requestId, 'version' => $lockVersion, 'actor' => $actorId, 'reason' => $rejectionReason]);
         if ($update->rowCount() !== 1) $this->conflict();
 
         (new ProjectAuditService($db))->record(
             $projectId, $actorId, 'project_adjustment_request_rejected', 'project_adjustment_request', $requestId,
             ['status' => 'pending', 'lock_version' => $lockVersion],
-            ['status' => 'closed', 'decision' => 'rejected', 'lock_version' => $lockVersion + 1, 'project_status' => 'published']
+            ['status' => 'closed', 'decision' => 'rejected', 'lock_version' => $lockVersion + 1, 'project_status' => 'published'],
+            $rejectionReason
         );
-        $this->notifyDecision($db, $projectId, $requestId, 'rejected');
+        $this->notifyDecision($db, $projectId, $requestId, 'rejected', $rejectionReason);
         $result = $this->result($db, $projectId, $requestId, 'Solicitud rechazada. El proyecto permanece publicado y bloqueado para edición.');
         $result['decision'] = 'rejected';
         $result['project_status'] = 'published';
@@ -243,16 +246,29 @@ final class ProjectAdjustmentRequestService
         $q=$db->prepare("SELECT action FROM project_audit_log WHERE entity_type='project_adjustment_request' AND entity_id=:id AND action IN ('project_adjustment_request_approved','project_adjustment_request_rejected') ORDER BY id DESC LIMIT 1");
         $q->execute(['id'=>$requestId]);$action=$q->fetchColumn();return $action===false?null:(string)$action;
     }
-    private function notifyDecision(PDO $db, int $projectId, int $requestId, string $decision): void
+    private function notifyDecision(PDO $db, int $projectId, int $requestId, string $decision, ?string $rejectionReason = null): void
     {
         $students=$db->prepare("SELECT DISTINCT pp.user_id FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL WHERE pp.project_id=:project AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL");
         $students->execute(['project'=>$projectId]);
         $approved=$decision==='approved';
         $notify=$db->prepare("INSERT IGNORE INTO notifications(user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key) VALUES(:user,:project,'adjustment',:title,:message,:url,'Abrir proyecto',:metadata,:dedup)");
-        foreach($students->fetchAll(PDO::FETCH_COLUMN) as $recipient){$notify->execute(['user'=>(int)$recipient,'project'=>$projectId,'title'=>$approved?'Solicitud de modificación aprobada':'Solicitud de modificación rechazada','message'=>$approved?'La solicitud de modificación fue aprobada. El proyecto volvió a estar disponible para edición.':'La solicitud de modificación fue rechazada. El proyecto permanece publicado y bloqueado para edición.','url'=>$approved?route('project-detail').'&id='.$projectId:route('repository-detail').'&id='.$projectId,'metadata'=>json_encode(['request_id'=>$requestId,'project_id'=>$projectId,'decision'=>$decision],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),'dedup'=>'adjustment-decision:'.$requestId.':'.$decision.':'.(int)$recipient]);}
+        $rejectedMessage = 'La solicitud de modificación fue rechazada. Motivo: ' . (string)$rejectionReason . ' El proyecto permanece publicado y bloqueado para edición.';
+        foreach($students->fetchAll(PDO::FETCH_COLUMN) as $recipient){$notify->execute(['user'=>(int)$recipient,'project'=>$projectId,'title'=>$approved?'Solicitud de modificación aprobada':'Solicitud de modificación rechazada','message'=>$approved?'La solicitud de modificación fue aprobada. El proyecto volvió a estar disponible para edición.':$rejectedMessage,'url'=>$approved?route('project-detail').'&id='.$projectId:route('repository-detail').'&id='.$projectId,'metadata'=>json_encode(['request_id'=>$requestId,'project_id'=>$projectId,'decision'=>$decision],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),'dedup'=>'adjustment-decision:'.$requestId.':'.$decision.':'.(int)$recipient]);}
     }
     private function notifyAdministratorsOfCreation(PDO $db, int $projectId, int $requestId, string $requestType): void
     {
+        $details = $db->prepare(
+            'SELECT ar.id, ar.project_id, ar.request_type, u.full_name requester_name,
+                    p.code project_code, p.title project_title
+             FROM project_adjustment_requests ar
+             INNER JOIN users u ON u.id=ar.requested_by
+             INNER JOIN projects p ON p.id=ar.project_id
+             WHERE ar.id=:request AND ar.project_id=:project AND ar.status=\'pending\''
+        );
+        $details->execute(['request'=>$requestId,'project'=>$projectId]);
+        $request = $details->fetch();
+        if (!$request) throw new ProjectAdjustmentRequestException('La solicitud pendiente no está disponible para notificar.', 409);
+
         $administrators = $db->query(
             "SELECT id FROM users
              WHERE is_admin=1 AND status='active' AND deleted_at IS NULL AND purged_at IS NULL"
@@ -269,14 +285,18 @@ final class ProjectAdjustmentRequestService
             'request_id' => $requestId,
             'project_id' => $projectId,
             'request_type' => $requestType,
+            'project_code' => (string) $request['project_code'],
+            'project_name' => (string) $request['project_title'],
+            'requester_name' => (string) $request['requester_name'],
         ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $url = route('repository-detail') . '&id=' . $projectId . '&tab=information#projectAdjustmentListTitle';
+        $message = (string) $request['requester_name'] . ' solicitó modificar el proyecto ' . (string) $request['project_code'] . '.';
         foreach ($administrators->fetchAll(PDO::FETCH_COLUMN) as $recipient) {
             $notify->execute([
                 'user' => (int) $recipient,
                 'project' => $projectId,
                 'title' => 'Nueva solicitud de modificación',
-                'message' => 'El proyecto tiene una solicitud de modificación pendiente de revisión administrativa.',
+                'message' => $message,
                 'url' => $url,
                 'metadata' => $metadata,
                 'dedup' => 'adjustment-admin:' . $requestId . ':' . (int) $recipient,
@@ -288,6 +308,13 @@ final class ProjectAdjustmentRequestService
     private function incrementVersion(PDO $db,int $id,int $version): void
     { $q=$db->prepare('UPDATE project_adjustment_requests SET updated_at=NOW(),lock_version=lock_version+1 WHERE id=:id AND lock_version=:version');$q->execute(['id'=>$id,'version'=>$version]);if($q->rowCount()!==1)$this->conflict(); }
     private function conflict(): never { throw new ProjectAdjustmentRequestException('La solicitud fue modificada mientras trabajabas. Recarga el expediente antes de continuar.',409); }
+    private function rejectionReason(string $value): string { $value=trim($value);if($value===''||mb_strlen($value)<5||mb_strlen($value)>500)throw new ProjectAdjustmentRequestException('El motivo del rechazo debe contener entre 5 y 500 caracteres.',422);return $value; }
+    private function assertRejectionReasonColumn(PDO $db): void
+    {
+        $query = $db->prepare("SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='project_adjustment_requests' AND column_name='rejection_reason'");
+        $query->execute();
+        if (!$query->fetchColumn()) throw new ProjectAdjustmentRequestException('La base de datos aún no está preparada para guardar el motivo del rechazo. Aplica la migración correspondiente.',503);
+    }
     private function message(string $value, int $minimum = 1): string { $value=trim($value);if($value===''||mb_strlen($value)<$minimum||mb_strlen($value)>2000)throw new ProjectAdjustmentRequestException($minimum>1?'El motivo de la solicitud debe contener entre '.$minimum.' y 2000 caracteres.':'El mensaje es obligatorio y no puede superar 2000 caracteres.');return $value; }
     private function optionalText(mixed $value,int $max): ?string { $value=trim((string)$value);if($value==='')return null;if(mb_strlen($value)>$max)throw new ProjectAdjustmentRequestException('Una referencia administrativa supera la longitud permitida.');return $value; }
     private function result(PDO $db,int $project,int $id,string $message): array
