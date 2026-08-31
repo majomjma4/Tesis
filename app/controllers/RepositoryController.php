@@ -359,6 +359,10 @@ final class RepositoryController
             return $candidate;
         }
 
+        if ($page === 'assigned-projects' && in_array('teacher', (new ProjectAccessService())->currentRoles(), true)) {
+            return $candidate;
+        }
+
         return $fallback;
     }
 
