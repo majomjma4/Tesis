@@ -4,6 +4,7 @@ declare(strict_types=1);
 final class ProjectDocumentModel
 {
     public const RESTORE_HOURS = 24;
+    public const PRESENTATION_EXTENSIONS = ['pdf', 'docx', 'png', 'jpg', 'jpeg', 'webp', 'txt'];
     private PDO $db;
     public function __construct(?PDO $db=null){$this->db=$db??Database::connection();}
 
@@ -58,7 +59,7 @@ final class ProjectDocumentModel
     }
     public function setPresentation(int $projectId,?int $fileId,int $actor):array
     {
-        $project=$this->lockProject($projectId);if($fileId!==null){$file=$this->findActiveFile($projectId,$fileId,true);if(!in_array(strtolower((string)$file['extension']),['pdf','docx','png','jpg','jpeg','webp','txt'],true))throw new InvalidArgumentException('El archivo seleccionado no es compatible con la vista de presentación.');}
+        $project=$this->lockProject($projectId);if($fileId!==null){$file=$this->findActiveFile($projectId,$fileId,true);if(!in_array(strtolower((string)$file['extension']),self::PRESENTATION_EXTENSIONS,true))throw new InvalidArgumentException('El archivo seleccionado no es compatible con la vista de presentación.');}
         $q=$this->db->prepare('UPDATE projects SET presentation_file_id=:file,updated_at=updated_at WHERE id=:project');$q->execute(['file'=>$fileId,'project'=>$projectId]);
         return ['previous_file_id'=>$project['presentation_file_id']===null?null:(int)$project['presentation_file_id'],'file_id'=>$fileId];
     }

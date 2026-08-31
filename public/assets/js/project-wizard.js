@@ -14,8 +14,10 @@
     const quickTags = document.querySelector('[data-quick-tags]');
     let current = 0, uploading = 0, pendingReplace = null, dirty = false, dialogOpener = null, previousType = form.elements.type?.value || '', pendingType = '', previousModality = form.elements.modality?.value || '', preflightInFlight = false, registrationInFlight = false;
     let draftFiles = [...(config.storedDraft?.files || [])];
+    let validationErrorStep = '', validationErrorMessage = '', validationErrorKind = '';
 
     const announce = (message, kind = 'success') => {
+        validationErrorStep = ''; validationErrorMessage = ''; validationErrorKind = '';
         if (!summary) return;
         const state = kind === true ? 'error' : kind === false ? 'success' : ['success', 'info', 'warning', 'error'].includes(kind) ? kind : 'error';
         summary.hidden = false;
@@ -26,6 +28,7 @@
         summary.append(title, text);
         if (state === 'success' || state === 'info') window.setTimeout(() => { summary.hidden = true; }, 4200);
     };
+    const announceValidation = (target, message, kind = true) => { announce(message, kind); validationErrorStep = target; validationErrorMessage = message; validationErrorKind = String(kind); };
     const setSaveStatus = (state) => {
         if (!status) return;
         status.textContent = state === 'saving' ? 'Guardando cambios…' : state === 'saved' ? 'Cambios guardados temporalmente.' : state === 'error' ? 'No fue posible guardar los cambios.' : '';
@@ -50,28 +53,37 @@
         return result;
     };
     const resetPreflightButton = () => { preflightInFlight = false; document.querySelectorAll('[data-submit-preparation],[data-submit-review]').forEach((button) => { button.disabled = false; button.removeAttribute('aria-disabled'); button.innerHTML = button.matches('[data-submit-review]') ? '<i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Enviar a revisión' : '<i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Guardar en preparación'; }); };
-    const formPayload = () => {
+    const formPayload = (step = steps[current]) => {
         const data = new FormData(form);
         data.set('_csrf', config.draftCsrf || '');
-        data.set('current_step', steps[current]);
+        data.set('current_step', step);
         return data;
     };
-    async function saveDraft(showError = true) {
-        if (!dirty) return true;
+    async function saveDraft(showError = true, step = steps[current]) {
+        const stepNeedsPersistence = Boolean(config.storedDraft?.id) && String(config.storedDraft?.payload?.current_step || '') !== step;
+        if (!dirty && !stepNeedsPersistence) return true;
+        if (!hasSubstantialDraftInput()) { dirty = false; setSaveStatus(''); syncResetVisibility(); return true; }
         setSaveStatus('saving');
         try {
-            const result = await request(endpoints.save, formPayload());
+            const result = await request(endpoints.save, formPayload(step));
             if (!result.success) throw new Error(result.message);
             config.storedDraft = result.data?.draft || config.storedDraft;
             dirty = false; setSaveStatus('saved'); return true;
         } catch (error) { setSaveStatus('error'); if (showError) announce(error.message || 'No fue posible guardar el borrador.', true); return false; }
     }
-    const scheduleSave = () => { dirty = true; window.clearTimeout(form._draftTimer); form._draftTimer = window.setTimeout(() => void saveDraft(), 500); };
+    const scheduleSave = () => { dirty = true; window.clearTimeout(form._draftTimer); if (!hasSubstantialDraftInput()) { dirty = false; setSaveStatus(''); return; } form._draftTimer = window.setTimeout(() => void saveDraft(), 500); };
 
     function updateRegistrationDescription() { const box = document.querySelector('[data-type-registration-description]'); const text = document.querySelector('[data-type-registration-description-text]'); const description = String(typeData().registration_description || '').trim(); if (!box || !text) return; text.textContent = description; box.hidden = description === ''; }
     function applyDefaults() { const type = typeData(); const description = String(type.registration_description || '').trim(); if (type.default_title && !form.elements.title.value.trim()) form.elements.title.value = type.default_title; if (description && !form.elements.description.value.trim()) form.elements.description.value = description; }
     function typeDefaults(type) { const data = config.types?.[type] || {}; return [String(data.default_title || '').trim(), String(data.registration_description || '').trim()]; }
     function hasManualTypeContent(type) { const [title, description] = typeDefaults(type); const currentTitle = form.elements.title.value.trim(), currentDescription = form.elements.description.value.trim(); return (currentTitle !== '' && currentTitle !== title) || (currentDescription !== '' && currentDescription !== description); }
+    function hasSubstantialDraftInput() {
+        const [defaultTitle, defaultDescription] = typeDefaults(selectedType());
+        const title = form.elements.title?.value.trim() || '', description = form.elements.description?.value.trim() || '';
+        if ((title !== '' && title !== defaultTitle) || (description !== '' && description !== defaultDescription)) return true;
+        if (form.elements.tutor_id?.value || form.elements.modality?.value || form.elements.research_line?.value || tags().length || draftFiles.length) return true;
+        return [...form.querySelectorAll('[name="members[]"][type="checkbox"]:checked')].some((input) => input.value !== actorId());
+    }
     function selectType(type) { const option = form.querySelector(`[name="type"][value="${CSS.escape(type)}"]`); if (option) option.checked = true; }
     function applyTypeChange(nextType) { const [nextTitle, nextDescription] = typeDefaults(nextType); form.elements.title.value = nextTitle; form.elements.description.value = nextDescription; if (nextType !== 'thesis') form.elements.modality.value = ''; if (!(config.contract?.[nextType]?.additional || []).includes('research_line')) form.elements.research_line.value = ''; previousType = nextType; previousModality = form.elements.modality?.value || ''; updateConditionalFields(); updatePreview(); scheduleSave(); syncResetVisibility(); }
     function updateConditionalFields() {
@@ -108,48 +120,61 @@
         }));
     }
     const resetTrigger = document.querySelector('[data-discard-draft]');
-    function syncResetVisibility() {
-        if (!resetTrigger) return;
-        const hasFields = [...form.elements].some((field) => {
-            if (field.type === 'hidden' || field.type === 'submit' || field.type === 'button' || field.name === '_csrf' || field.name === 'period') return false;
-            if (field.type === 'checkbox' || field.type === 'radio') return field.checked;
-            return String(field.value || '').trim() !== '';
-        });
-        resetTrigger.hidden = !(Boolean(config.storedDraft?.id) || draftFiles.length > 0 || dirty || current > 0 || hasFields);
-    }
+    const hasDiscardableDraft = () => Boolean(config.storedDraft?.id) || hasSubstantialDraftInput();
+    function syncResetVisibility() { if (resetTrigger) resetTrigger.hidden = !hasDiscardableDraft(); }
     function showStep(index, focus = true) {
-        current = Math.max(0, Math.min(index, steps.length - 1)); updateConditionalFields();
+        const nextIndex = Math.max(0, Math.min(index, steps.length - 1)); refreshValidationSummary(steps[nextIndex]);
+        current = nextIndex; updateConditionalFields();
         const active = steps[current]; Object.entries(sections).forEach(([key, section]) => { section.hidden = key !== active; section.classList.toggle('is-active', key === active); });
         document.querySelectorAll('[data-step-indicator]').forEach((node, position) => { node.classList.toggle('is-complete', position < current); node.toggleAttribute('aria-current', position === current); });
         document.querySelector('#wizardProgressText').textContent = `Paso ${current + 1} de 5`;
         document.querySelector('[data-previous]').hidden = current === 0; document.querySelector('[data-next]').hidden = current === steps.length - 1; document.querySelectorAll('[data-submit-preparation],[data-submit-review]').forEach((button) => { button.hidden = current !== steps.length - 1; });
         if (active === 'confirm') renderConfirmation(); updatePreview(); syncResetVisibility(); if (focus) sections[active].querySelector('h2')?.focus({ preventScroll: true });
     }
-    function validateClient(target) {
-        if (config.availabilityMessage) return announce(config.availabilityMessage, 'warning'), false;
-        const type = selectedType(); if (!type) return announce('Selecciona un tipo de proyecto disponible.', true), false;
+    function validationIssue(target) {
+        if (config.availabilityMessage) return { message: config.availabilityMessage, kind: 'warning' };
+        const type = selectedType(); if (!type) return { message: 'Selecciona un tipo de proyecto disponible.', kind: true };
         if (target !== 'type') {
-            if (form.elements.title.value.trim().length < 5) return announce('El título debe tener al menos 5 caracteres.', true), false;
-            if (form.elements.title.value.trim().length > 240) return announce('El título no puede superar 240 caracteres.', true), false;
-            if (form.elements.description.value.trim().length < 30) return announce('La descripción debe tener al menos 30 caracteres.', true), false;
-            if (type === 'thesis' && !form.elements.modality.value) return announce('Selecciona una modalidad.', true), false;
-            if (['thesis', 'thesis_profile'].includes(type) && !form.elements.research_line.value) return announce('Selecciona una línea de investigación.', true), false;
+            if (form.elements.title.value.trim().length < 5) return { message: 'El título debe tener al menos 5 caracteres.', kind: true };
+            if (form.elements.title.value.trim().length > 240) return { message: 'El título no puede superar 240 caracteres.', kind: true };
+            if (form.elements.description.value.trim().length < 30) return { message: 'La descripción debe tener al menos 30 caracteres.', kind: true };
+            if (type === 'thesis' && !form.elements.modality.value) return { message: 'Selecciona una modalidad.', kind: true };
+            if (['thesis', 'thesis_profile'].includes(type) && !form.elements.research_line.value) return { message: 'Selecciona una línea de investigación.', kind: true };
         }
         if (['team', 'files', 'confirm'].includes(target)) {
-            if (!form.elements.tutor_id.value) return announce('Selecciona un tutor disponible.', true), false;
+            if (!form.elements.tutor_id.value) return { message: 'Selecciona un tutor disponible.', kind: true };
             const members = [...form.querySelectorAll('[name="members[]"]:checked')].map((input) => input.value);
-            if (!members.includes(actorId())) return announce('La persona creadora debe permanecer como líder del equipo.', true), false;
-            if (type === 'thesis' && form.elements.modality.value === 'individual' && members.length > 1) return announce('La modalidad individual solo admite un estudiante.', true), false;
+            if (!members.includes(actorId())) return { message: 'La persona creadora debe permanecer como líder del equipo.', kind: true };
+            if (type === 'thesis' && form.elements.modality.value === 'individual' && members.length > 1) return { message: 'La modalidad individual solo admite un estudiante.', kind: true };
         }
-        if (['files', 'confirm'].includes(target) && uploading > 0) return announce('Espera a que finalicen las cargas de archivos.', 'warning'), false;
-        if (target === 'confirm' && draftFiles.some((file) => file.available === false)) return announce('Quita o vuelve a subir los archivos no disponibles.', true), false;
+        if (['files', 'confirm'].includes(target) && uploading > 0) return { message: 'Espera a que finalicen las cargas de archivos.', kind: 'warning' };
+        if (target === 'confirm' && draftFiles.some((file) => file.available === false)) return { message: 'Quita o vuelve a subir los archivos no disponibles.', kind: true };
+        return null;
+    }
+    function clearValidationSummary() {
+        if (!summary || !validationErrorStep) return;
+        summary.hidden = true;
+        summary.replaceChildren();
+        summary.removeAttribute('data-state');
+        validationErrorStep = ''; validationErrorMessage = ''; validationErrorKind = '';
+    }
+    function refreshValidationSummary(nextStep = steps[current]) {
+        if (!validationErrorStep) return;
+        const issue = validationIssue(validationErrorStep);
+        if (!issue || validationErrorStep !== nextStep) clearValidationSummary();
+        else if (validationErrorMessage !== issue.message || validationErrorKind !== String(issue.kind)) announceValidation(validationErrorStep, issue.message, issue.kind);
+    }
+    function validateClient(target) {
+        const issue = validationIssue(target);
+        if (issue) { announceValidation(target, issue.message, issue.kind); return false; }
+        clearValidationSummary();
         return true;
     }
-    document.querySelector('[data-next]')?.addEventListener('click', async () => { if (validateClient(steps[current]) && await saveDraft()) showStep(current + 1); });
-    document.querySelector('[data-previous]')?.addEventListener('click', () => showStep(current - 1));
+    document.querySelector('[data-next]')?.addEventListener('click', async () => { if (!validateClient(steps[current])) return; const nextIndex = Math.min(current + 1, steps.length - 1); if (await saveDraft(true, steps[nextIndex])) showStep(nextIndex); });
+    document.querySelector('[data-previous]')?.addEventListener('click', async () => { const nextIndex = Math.max(current - 1, 0); if (await saveDraft(true, steps[nextIndex])) showStep(nextIndex); });
     form.addEventListener('submit', (event) => event.preventDefault());
-    form.addEventListener('change', (event) => { if (event.target.name === 'type') { const nextType = selectedType(); if (nextType !== previousType && hasManualTypeContent(previousType)) { pendingType = nextType; selectType(previousType); openDialog(typeChangeDialog, event.target); return; } applyTypeChange(nextType); return; } if (event.target.name === 'modality') { const nextModality = event.target.value; const extraMembers = [...form.querySelectorAll('[name="members[]"][type="checkbox"]:checked')].some((input) => input.value !== actorId()); if (selectedType() === 'thesis' && previousModality !== 'individual' && nextModality === 'individual' && extraMembers) { event.target.value = previousModality; openDialog(modalityChangeDialog, event.target); return; } previousModality = nextModality; updateConditionalFields(); updatePreview(); scheduleSave(); syncResetVisibility(); return; } updateConditionalFields(); updatePreview(); scheduleSave(); syncResetVisibility(); });
-    form.addEventListener('input', () => { updatePreview(); scheduleSave(); syncResetVisibility(); });
+    form.addEventListener('change', (event) => { if (event.target.name === 'type') { const nextType = selectedType(); if (nextType !== previousType && hasManualTypeContent(previousType)) { pendingType = nextType; selectType(previousType); openDialog(typeChangeDialog, event.target); return; } applyTypeChange(nextType); refreshValidationSummary(); return; } if (event.target.name === 'modality') { const nextModality = event.target.value; const extraMembers = [...form.querySelectorAll('[name="members[]"][type="checkbox"]:checked')].some((input) => input.value !== actorId()); if (selectedType() === 'thesis' && previousModality !== 'individual' && nextModality === 'individual' && extraMembers) { event.target.value = previousModality; openDialog(modalityChangeDialog, event.target); return; } previousModality = nextModality; updateConditionalFields(); updatePreview(); scheduleSave(); syncResetVisibility(); refreshValidationSummary(); return; } updateConditionalFields(); updatePreview(); scheduleSave(); syncResetVisibility(); refreshValidationSummary(); });
+    form.addEventListener('input', () => { updatePreview(); scheduleSave(); syncResetVisibility(); refreshValidationSummary(); });
 
     const memberPicker = document.querySelector('[data-member-picker]'); const memberSearch = document.querySelector('#memberSearch');
     document.querySelector('[data-members-open]')?.addEventListener('click', (event) => { memberPicker.hidden = !memberPicker.hidden; event.currentTarget.setAttribute('aria-expanded', String(!memberPicker.hidden)); event.currentTarget.querySelector('span').textContent = memberPicker.hidden ? 'Agregar integrante' : 'Ocultar estudiantes'; if (!memberPicker.hidden) { memberSearch?.focus(); filterStudents(); } });
@@ -202,9 +227,18 @@
     const observeRegisterSummary = (target) => new MutationObserver(() => { const row = target.querySelector('.is-toggle-row:not(.is-files-row)'); const button = row?.querySelector('.wizard-summary-toggle'); const list = row?.querySelector('ul'); if (button && list) button.disabled = list.children.length === 0; }).observe(target, { childList: true, subtree: true });
     registrationSummaryTargets.forEach(observeRegisterSummary);
     document.addEventListener('keydown', (event) => { const dialog = document.querySelector('.wizard-dialog:not([hidden])'); if (!dialog) return; if (event.key === 'Escape') { event.preventDefault(); if (dialog === resetDialog) returnToDraftResume(); else closeDialog(dialog); return; } if (event.key !== 'Tab') return; const focusable = [...dialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter((item) => !item.disabled && !item.hidden); if (!focusable.length) return; const first = focusable[0], last = focusable[focusable.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); } });
-    function restoreServerDraft() { const payload = config.storedDraft?.payload; if (!payload) return; Object.entries(payload).forEach(([name, value]) => [...form.elements].filter((field) => field.name === name || field.name === `${name}[]`).forEach((field) => { if (field.disabled) return; if (field.type === 'checkbox' || field.type === 'radio') field.checked = (Array.isArray(value) ? value : [value]).map(String).includes(field.value); else if (!Array.isArray(value)) field.value = value == null ? '' : String(value); })); previousType = selectedType(); previousModality = form.elements.modality?.value || ''; renderTags((payload.tags || []).filter(Boolean)); dirty = false; updateConditionalFields(); showStep(Math.max(0, steps.indexOf(payload.current_step)), false); renderFiles(); announce('Borrador recuperado.'); }
+    function restoreStep(payload) {
+        const savedStep = String(payload?.current_step || '');
+        const savedIndex = steps.indexOf(savedStep);
+        if (savedIndex < 0) return 0;
+        for (let index = 0; index <= savedIndex; index += 1) {
+            if (validationIssue(steps[index])) return index;
+        }
+        return savedIndex;
+    }
+    function restoreServerDraft() { const payload = config.storedDraft?.payload; if (!payload) return; Object.entries(payload).forEach(([name, value]) => [...form.elements].filter((field) => field.name === name || field.name === `${name}[]`).forEach((field) => { if (field.disabled) return; if (field.type === 'checkbox' || field.type === 'radio') field.checked = (Array.isArray(value) ? value : [value]).map(String).includes(field.value); else if (!Array.isArray(value)) field.value = value == null ? '' : String(value); })); previousType = selectedType(); previousModality = form.elements.modality?.value || ''; renderTags((payload.tags || []).filter(Boolean)); dirty = false; updateConditionalFields(); const step = restoreStep(payload); showStep(step, false); renderFiles(); const issue = validationIssue(steps[step]); if (issue && String(payload.current_step || '') !== '') announceValidation(steps[step], issue.message, issue.kind); else announce('Borrador recuperado.'); }
     function returnToDraftResume() { closeDialog(resetDialog, false); openDialog(resumeDialog, document.querySelector('[data-draft-start-new]')); }
-    document.querySelector('[data-draft-continue]')?.addEventListener('click', () => { closeDialog(resumeDialog); restoreServerDraft(); }); document.querySelector('[data-draft-start-new]')?.addEventListener('click', (event) => openDialog(resetDialog, event.currentTarget)); document.querySelectorAll('[data-discard-draft]').forEach((button) => button.addEventListener('click', (event) => openDialog(resetDialog, event.currentTarget))); document.querySelector('[data-draft-reset-cancel]')?.addEventListener('click', returnToDraftResume);
+    document.querySelector('[data-draft-continue]')?.addEventListener('click', () => { closeDialog(resumeDialog); restoreServerDraft(); }); document.querySelector('[data-draft-start-new]')?.addEventListener('click', (event) => { if (hasDiscardableDraft()) openDialog(resetDialog, event.currentTarget); }); document.querySelectorAll('[data-discard-draft]').forEach((button) => button.addEventListener('click', (event) => { if (hasDiscardableDraft()) openDialog(resetDialog, event.currentTarget); })); document.querySelector('[data-draft-reset-cancel]')?.addEventListener('click', returnToDraftResume);
     document.querySelector('[data-draft-reset-confirm]')?.addEventListener('click', async () => { const body = new FormData(); body.set('_csrf', config.draftCsrf || ''); try { const result = await request(endpoints.reset, body); config.storedDraft = null; draftFiles = []; dirty = false; sessionStorage.removeItem(config.storageKey || ''); form.reset(); previousType = ''; renderTags([]); closeDialog(resumeDialog, false); closeDialog(resetDialog); renderFiles(); showStep(0, false); syncResetVisibility(); announce(result.message || 'Borrador eliminado correctamente.'); } catch (error) { announce(error.message || 'No fue posible eliminar el borrador.', true); } });
     document.querySelector('[data-draft-replace-cancel]')?.addEventListener('click', () => { pendingReplace = null; closeDialog(replaceDialog); }); document.querySelector('[data-draft-replace-confirm]')?.addEventListener('click', () => { const pending = pendingReplace; pendingReplace = null; closeDialog(replaceDialog); if (pending) void uploadFiles([pending.file], true); });
     document.querySelector('[data-type-change-cancel]')?.addEventListener('click', () => { pendingType = ''; closeDialog(typeChangeDialog); }); document.querySelector('[data-type-change-confirm]')?.addEventListener('click', () => { const nextType = pendingType; pendingType = ''; closeDialog(typeChangeDialog); if (nextType) { selectType(nextType); applyTypeChange(nextType); } });

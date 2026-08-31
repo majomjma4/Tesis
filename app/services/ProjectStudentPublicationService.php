@@ -12,10 +12,11 @@ final class ProjectStudentPublicationService
     }
 
     /** @return array<string,mixed> */
-    public function publish(int $projectId, int $userId): array
+    public function publish(int $projectId, int $userId, ?int $presentationFileId = null, bool $hasPresentationSelection = false): array
     {
-        return Database::transaction(function (PDO $db) use ($projectId, $userId): array {
+        return Database::transaction(function (PDO $db) use ($projectId, $userId, $presentationFileId, $hasPresentationSelection): array {
             $context = $this->context($db, $projectId, $userId, true);
+            if ($hasPresentationSelection) $this->setPresentationInTransaction($db, $projectId, $presentationFileId);
             $transition = (new ProjectStatusTransitionService())->transitionInTransaction(
                 $db,
                 $projectId,
@@ -30,13 +31,14 @@ final class ProjectStudentPublicationService
     }
 
     /** Promueve una preparación temporal y publica exactamente su conjunto final de archivos. */
-    public function publishPrepared(int $projectId,int $userId,string $preparationId):array
+    public function publishPrepared(int $projectId,int $userId,string $preparationId,?int $presentationFileId = null,bool $hasPresentationSelection = false):array
     {
         $preparations=new ProjectPublicationPreparationService();$plan=$preparations->plan($preparationId,$projectId,$userId);$moved=[];
         try {
-            $result=Database::transaction(function(PDO $db)use($projectId,$userId,$plan,&$moved):array{
+            $result=Database::transaction(function(PDO $db)use($projectId,$userId,$plan,$presentationFileId,$hasPresentationSelection,&$moved):array{
                 $this->context($db,$projectId,$userId,true);$summary=(new ProjectPublicationPreparationService())->summary($plan);if((int)$summary['file_count']<1)throw new ProjectStudentPublicationException('Debes incluir al menos un archivo para publicar el proyecto.',422);
                 $this->applyPreparation($db,$projectId,$userId,$plan,$moved);
+                if ($hasPresentationSelection) $this->setPresentationInTransaction($db, $projectId, $presentationFileId);
                 $transition=(new ProjectStatusTransitionService())->transitionInTransaction($db,$projectId,(string)$this->projectStatus($db,$projectId),'published','',$userId,'student_publication');
                 return $transition+['project_id'=>$projectId,'file_count'=>(int)$summary['file_count']];
             });
@@ -59,12 +61,31 @@ final class ProjectStudentPublicationService
         $statement=$db->prepare('SELECT status FROM projects WHERE id=:id FOR UPDATE');$statement->execute(['id'=>$projectId]);$status=$statement->fetchColumn();if(!is_string($status))throw new ProjectStudentPublicationException('El proyecto ya no está disponible.',404);return $status;
     }
 
+    private function setPresentationInTransaction(PDO $db, int $projectId, ?int $fileId): void
+    {
+        if ($fileId !== null) {
+            $extensions = ProjectDocumentModel::PRESENTATION_EXTENSIONS;
+            $marks = implode(',', array_fill(0, count($extensions), '?'));
+            $query = $db->prepare("SELECT f.id
+                FROM project_files f
+                INNER JOIN project_file_review_states s
+                  ON s.project_id=f.project_id AND s.file_id=f.id AND s.checksum_sha256=f.checksum_sha256
+                WHERE f.project_id=? AND f.id=? AND f.deleted_at IS NULL AND f.purged_at IS NULL
+                  AND LOWER(f.extension) IN ($marks) AND s.status='approved'
+                LIMIT 1 FOR UPDATE");
+            $query->execute([$projectId, $fileId, ...$extensions]);
+            if (!$query->fetchColumn()) throw new ProjectStudentPublicationException('El archivo de presentación seleccionado no es elegible para este proyecto.', 422);
+        }
+        $update = $db->prepare('UPDATE projects SET presentation_file_id=:file WHERE id=:project');
+        $update->execute(['file'=>$fileId, 'project'=>$projectId]);
+    }
+
     /** @return array{project_id:int,title:string,status:string,file_count:int,files:list<array{id:int,name:string,size_bytes:int,extension:string}>} */
     private function context(PDO $db, int $projectId, int $userId, bool $forUpdate): array
     {
         if ($projectId < 1) throw new ProjectStudentPublicationException('El proyecto solicitado no es válido.', 422);
         $project = $db->prepare(
-            "SELECT p.id,p.title,p.status,p.is_available,p.withdrawn_at,p.deleted_at,pt.code AS type_code
+            "SELECT p.id,p.title,p.status,p.presentation_file_id,p.is_available,p.withdrawn_at,p.deleted_at,pt.code AS type_code
              FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id
              WHERE p.id=:id" . ($forUpdate ? ' FOR UPDATE' : '')
         );
@@ -101,7 +122,10 @@ final class ProjectStudentPublicationService
         if ($activeCount !== count($approved)) {
             throw new ProjectStudentPublicationException('Existen archivos activos pendientes de aprobación. Revísalos antes de publicar el proyecto.', 422);
         }
-        return ['project_id'=>$projectId, 'title'=>(string)$row['title'], 'status'=>(string)$row['status'], 'file_count'=>count($approved), 'files'=>$approved];
+        $presentationFiles = array_values(array_filter($approved, static fn (array $file): bool => in_array(strtolower((string) $file['extension']), ProjectDocumentModel::PRESENTATION_EXTENSIONS, true)));
+        $currentPresentationId = $row['presentation_file_id'] === null ? null : (int) $row['presentation_file_id'];
+        if ($currentPresentationId !== null && !in_array($currentPresentationId, array_column($presentationFiles, 'id'), true)) $currentPresentationId = null;
+        return ['project_id'=>$projectId, 'title'=>(string)$row['title'], 'status'=>(string)$row['status'], 'file_count'=>count($approved), 'files'=>$approved, 'presentation_file_id'=>$currentPresentationId, 'presentation_files'=>$presentationFiles];
     }
 }
 

@@ -66,6 +66,29 @@ final class ProjectDraftService
         return trim((string) (self::TYPE_RULES[$code]['default_title'] ?? ''));
     }
 
+    /** Determina si el borrador contiene información que el estudiante realmente empezó a completar. */
+    public function hasSubstantialInformation(array $draft, array $catalogs): bool
+    {
+        $type = (array) ($catalogs['types'][(string) ($draft['type'] ?? '')] ?? []);
+        $title = trim((string) ($draft['title'] ?? ''));
+        $description = trim((string) ($draft['description'] ?? ''));
+        $defaultTitle = trim((string) ($type['default_title'] ?? ''));
+        $defaultDescription = trim((string) ($type['registration_description'] ?? ''));
+
+        if ($title !== '' && $title !== $defaultTitle) return true;
+        if ($description !== '' && $description !== $defaultDescription) return true;
+        if (trim((string) ($draft['tutor_id'] ?? '')) !== '') return true;
+        if (trim((string) ($draft['modality'] ?? '')) !== '') return true;
+        if (trim((string) ($draft['research_line'] ?? '')) !== '') return true;
+        if ((array) ($draft['tags'] ?? []) !== []) return true;
+
+        $leaderId = (string) ($draft['leader_id'] ?? '');
+        foreach ((array) ($draft['members'] ?? []) as $memberId) {
+            if ((string) $memberId !== '' && (string) $memberId !== $leaderId) return true;
+        }
+        return false;
+    }
+
     public function normalize(array $payload, array $policy, array $catalogs): array
     {
         $value = static fn(string $key): string => trim((string) ($payload[$key] ?? ''));
@@ -180,7 +203,8 @@ final class ProjectDraftService
     private function studentContext(PDO $db, int $userId, int $periodId): ?array
     {
         $q = $db->prepare("SELECT u.id user_id,u.full_name,sp.career_id,c.code career_code,c.name career_name,se.semester
-            FROM users u INNER JOIN student_profiles sp ON sp.user_id=u.id INNER JOIN student_enrollments se ON se.student_id=u.id
+            FROM users u INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id AND r.code='student'
+            INNER JOIN student_profiles sp ON sp.user_id=u.id INNER JOIN student_enrollments se ON se.student_id=u.id
             INNER JOIN careers c ON c.id=se.career_id
             WHERE u.id=:user AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL
               AND se.academic_period_id=:period AND se.status='active' AND se.career_id=sp.career_id LIMIT 1");

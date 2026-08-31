@@ -1167,11 +1167,21 @@ final class ProjectsController
     {
         [$session, $access] = $this->draftRequest(); $userId = $access->currentUserId();
         try {
-            $draftService = new ProjectDraftService(); $catalogs = $draftService->catalogs($userId, $access->projectCreationPolicy());
-            $draft = $draftService->normalize($_POST, $access->projectCreationPolicy(), $catalogs); $errors = $draftService->validateForStorage($draft, $access->projectCreationPolicy(), $catalogs);
+            $draftService = new ProjectDraftService(); $policy = $access->projectCreationPolicy(); $catalogs = $draftService->catalogs($userId, $policy);
+            $draft = $draftService->normalize($_POST, $policy, $catalogs); $errors = $draftService->validateForStorage($draft, $policy, $catalogs);
             if ($errors !== []) $this->json(['success'=>false,'message'=>reset($errors),'data'=>['errors'=>$errors]]);
+            $storage = new ProjectDraftStorageService();
+            $existing = $storage->active($userId);
+            if (empty($existing['files']) && !$draftService->hasSubstantialInformation($draft, $catalogs)) {
+                $existingDraft = null;
+                if ($existing !== null) {
+                    $existingPayload = $draftService->normalize((array) ($existing['payload'] ?? []), $policy, $catalogs);
+                    if ($draftService->hasSubstantialInformation($existingPayload, $catalogs)) $existingDraft = $existing;
+                }
+                $this->json(['success'=>true,'message'=>'No hay información sustancial para guardar todavía.','data'=>['draft'=>$existingDraft]]);
+            }
             $payload = $this->draftPayload($draft, $catalogs, (string) ($_POST['current_step'] ?? 'type'));
-            $saved = (new ProjectDraftStorageService())->save($userId, $payload);
+            $saved = $storage->save($userId, $payload);
             $this->json(['success'=>true,'message'=>'Cambios guardados temporalmente.','data'=>['draft'=>$saved]]);
         } catch (Throwable $exception) { error_log('Project draft save: ' . $exception->getMessage()); http_response_code(500); $this->json(['success'=>false,'message'=>'No fue posible guardar el borrador.','data'=>[]]); }
     }
@@ -1306,7 +1316,19 @@ final class ProjectsController
             if ($mode === 'prepare-remove-add') $this->json(['success'=>true,'message'=>'Archivo retirado de la preparación.','data'=>$preparations->removeAddition((int)$projectId,$access->currentUserId(),$preparationId,(string)($_POST['file_key'] ?? ''))]);
             if ($mode === 'prepare-cancel') {$preparations->cancel((int)$projectId,$access->currentUserId(),$preparationId);$this->json(['success'=>true,'message'=>'Preparación cancelada.','data'=>[]]);}
             if ($mode !== 'publish') throw new ProjectStudentPublicationException('La operación de publicación no es válida.', 422);
-            $data=$preparationId!==''?$service->publishPrepared((int)$projectId,$access->currentUserId(),$preparationId):$service->publish((int)$projectId, $access->currentUserId());
+            $hasPresentationSelection = array_key_exists('presentation_file_id', $_POST);
+            $presentationFileId = null;
+            if ($hasPresentationSelection) {
+                $rawPresentationFileId = trim((string) ($_POST['presentation_file_id'] ?? ''));
+                if ($rawPresentationFileId !== '') {
+                    $presentationFileId = filter_var($rawPresentationFileId, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+                    if ($presentationFileId === false || $presentationFileId === null) throw new ProjectStudentPublicationException('El archivo de presentación seleccionado no es válido.', 422);
+                    $presentationFileId = (int) $presentationFileId;
+                }
+            }
+            $data=$preparationId!==''
+                ?$service->publishPrepared((int)$projectId,$access->currentUserId(),$preparationId,$presentationFileId,$hasPresentationSelection)
+                :$service->publish((int)$projectId, $access->currentUserId(),$presentationFileId,$hasPresentationSelection);
             $data['detail_url'] = route('repository-detail') . '&id=' . (int) $projectId;
             $this->json(['success'=>true,'message'=>'Proyecto publicado correctamente.','data'=>$data]);
         } catch (ProjectStudentPublicationException $exception) {
@@ -1364,6 +1386,14 @@ final class ProjectsController
         }
         try { $storedDraft = (new ProjectDraftStorageService())->active($userId); }
         catch (Throwable $exception) { error_log('Project draft load: ' . $exception->getMessage()); $storedDraft = null; }
+        if ($storedDraft !== null && empty($storedDraft['files'])) {
+            try {
+                $storedPayload = $draftService->normalize((array) ($storedDraft['payload'] ?? []), $policy, $catalogs);
+                if (!$draftService->hasSubstantialInformation($storedPayload, $catalogs)) $storedDraft = null;
+            } catch (Throwable) {
+                $storedDraft = null;
+            }
+        }
         $draft = $draftService->normalize([], $policy, $catalogs); $errors = []; $validated = false; $confirmation = null;
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && $policy['can_create']) {
             $draft = $draftService->normalize($_POST, $policy, $catalogs);

@@ -32,6 +32,7 @@
     const error = ui('error');
     const count = ui('count');
     const previewList = ui('preview');
+    const presentationSelect = ui('presentation');
     const manageList = ui('files');
     const excludedBox = ui('excluded');
     const liveCount = ui('live-count');
@@ -73,6 +74,22 @@
             index++;
         }
         return `${number.toFixed(number >= 10 ? 0 : 1)} ${units[index]}`;
+    };
+    const presentationExtensions = new Set(['pdf', 'docx', 'png', 'jpg', 'jpeg', 'webp', 'txt']);
+    const renderPresentationOptions = (data) => {
+        if (!presentationSelect) return;
+        const previous = presentationSelect.value;
+        const source = Array.isArray(data?.presentation_files) ? data.presentation_files : (data?.files || []);
+        const options = [new Option('Sin presentación', '')];
+        source.forEach((file) => {
+            const id = Number(file.id ?? file.file_id ?? 0);
+            const extension = String(file.extension || '').toLowerCase();
+            if (!id || !presentationExtensions.has(extension)) return;
+            options.push(new Option(file.name || 'Archivo', String(id)));
+        });
+        presentationSelect.replaceChildren(...options);
+        const preferred = previous || (data?.presentation_file_id ? String(data.presentation_file_id) : '');
+        presentationSelect.value = options.some((option) => option.value === preferred) ? preferred : '';
     };
     const typeIcon = (extension) => ({ pdf: 'fa-file-lines', zip: 'fa-file-zipper', docx: 'fa-file-word', doc: 'fa-file-word', xlsx: 'fa-file-excel', xls: 'fa-file-excel', pptx: 'fa-file-powerpoint', ppt: 'fa-file-powerpoint', png: 'fa-file-image', jpg: 'fa-file-image', jpeg: 'fa-file-image', webp: 'fa-file-image' }[String(extension || '').toLowerCase()] || 'fa-file');
     const request = async (requestMode, extra = {}, upload = null) => {
@@ -162,6 +179,7 @@
         count.textContent = formatCount(data?.file_count || 0);
         previewList.replaceChildren(...files.map((file) => makeFileItem(file, true)));
         previewList.classList.remove('is-collapsed');
+        renderPresentationOptions(data);
     };
     const renderExcluded = () => {
         if (!excluded.size) {
@@ -228,6 +246,7 @@
         closeFloatingMenus();
         plan = data;
         manageList.replaceChildren();
+        renderPresentationOptions(data);
         for (const file of data.files || []) {
             const row = makeFileItem(file);
             const badge = document.createElement('em');
@@ -330,6 +349,7 @@
             preparationId = '';
             initial = null;
             plan = null;
+            if (presentationSelect) presentationSelect.value = '';
             excluded.clear();
             pendingChange = null;
             changeConfirm.hidden = true;
@@ -428,7 +448,7 @@
     finalAccept?.addEventListener('click', () => run(async () => {
         finalAccept.disabled = true;
         finalAccept.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Publicando…';
-        const result = await request('publish');
+        const result = await request('publish', { presentation_file_id: presentationSelect?.value || '' });
         sessionStorage.setItem('digitalRecordToast', 'Proyecto publicado correctamente.');
         setBusy(false);
         await close(false);
