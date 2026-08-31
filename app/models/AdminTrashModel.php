@@ -5,15 +5,16 @@ final class AdminTrashModel
  private array $physicalCleanupPending=[];
 
  public function consumePhysicalCleanupPending():array{$pending=$this->physicalCleanupPending;$this->physicalCleanupPending=[];return $pending;}
- public function trashRepositoryProject(int $id,string $reason,int $actor):void
+ public function trashRepositoryProject(int $id,string $reason,int $actor,?int $requiredOwnerId=null):void
  {
   $reason=trim($reason);
   if($id<1)throw new InvalidArgumentException('El proyecto no es válido.');
   if(mb_strlen($reason)<5||mb_strlen($reason)>500)throw new InvalidArgumentException('Indica un motivo entre 5 y 500 caracteres.');
-  Database::transaction(function(PDO $d)use($id,$reason,$actor):void{
-   $read=$d->prepare("SELECT id,code,title,status,published_at,is_available,withdrawn_at,withdrawn_by,deleted_at FROM projects WHERE id=:id FOR UPDATE");
+  Database::transaction(function(PDO $d)use($id,$reason,$actor,$requiredOwnerId):void{
+   $read=$d->prepare("SELECT id,code,title,status,published_at,is_available,withdrawn_at,withdrawn_by,deleted_at,created_by,publication_origin FROM projects WHERE id=:id FOR UPDATE");
    $read->execute(['id'=>$id]);$project=$read->fetch();
    if(!$project)throw new InvalidArgumentException('El proyecto no existe.');
+   if($requiredOwnerId !== null && ((int)($project['created_by'] ?? 0) !== $requiredOwnerId || (string)($project['publication_origin'] ?? '') !== ProjectPublicationOrigin::DIRECT_REPOSITORY))throw new SupportMaterialAccessException('No tienes autorización para enviar este proyecto a Papelera.');
    if($project['deleted_at']!==null)throw new InvalidArgumentException('El proyecto ya se encuentra en la Papelera.');
    if((string)$project['status']!=='published')throw new InvalidArgumentException('Solo pueden enviarse a Papelera proyectos académicamente publicados.');
    $update=$d->prepare('UPDATE projects SET deleted_at=UTC_TIMESTAMP(),deleted_by=:actor,deletion_reason=:reason WHERE id=:id AND deleted_at IS NULL');
@@ -25,12 +26,13 @@ final class AdminTrashModel
    ],$reason);
   });
  }
- public function trashSupportMaterial(int $id,string $reason,int $actor,string $reasonCode='',string $reasonDetail=''):void{Database::transaction(fn(PDO $d)=>$this->trashSupportMaterialAtomic($d,$id,$reason,$actor,$reasonCode,$reasonDetail));}
- public function trashSupportMaterialAtomic(PDO $d,int $id,string $reason,int $actor,string $reasonCode='',string $reasonDetail=''):array
+ public function trashSupportMaterial(int $id,string $reason,int $actor,string $reasonCode='',string $reasonDetail='',?int $requiredOwnerId=null):void{Database::transaction(fn(PDO $d)=>$this->trashSupportMaterialAtomic($d,$id,$reason,$actor,$reasonCode,$reasonDetail,$requiredOwnerId));}
+ public function trashSupportMaterialAtomic(PDO $d,int $id,string $reason,int $actor,string $reasonCode='',string $reasonDetail='',?int $requiredOwnerId=null):array
  {
   if($id<1||mb_strlen(trim($reason))<5)throw new InvalidArgumentException('Indica un motivo de al menos cinco caracteres.');
-  $read=$d->prepare('SELECT sm.id,sm.title,sm.material_type,sm.category_id,category.name category_name,sm.status,sm.is_available,sm.published_at,sm.withdrawn_at,sm.withdrawn_by FROM support_materials sm LEFT JOIN support_material_categories category ON category.id=sm.category_id WHERE sm.id=:id AND sm.deleted_at IS NULL AND sm.purged_at IS NULL FOR UPDATE');$read->execute(['id'=>$id]);$material=$read->fetch();
+  $read=$d->prepare('SELECT sm.id,sm.title,sm.material_type,sm.category_id,category.name category_name,sm.status,sm.is_available,sm.published_at,sm.withdrawn_at,sm.withdrawn_by,sm.created_by FROM support_materials sm LEFT JOIN support_material_categories category ON category.id=sm.category_id WHERE sm.id=:id AND sm.deleted_at IS NULL AND sm.purged_at IS NULL FOR UPDATE');$read->execute(['id'=>$id]);$material=$read->fetch();
   if(!$material){$exists=$d->prepare('SELECT deleted_at,purged_at FROM support_materials WHERE id=:id');$exists->execute(['id'=>$id]);$state=$exists->fetch();if($state&&$state['deleted_at']!==null&&$state['purged_at']===null)throw new InvalidArgumentException('El material ya se encuentra en Papelera.');throw new InvalidArgumentException('El material cambió de estado antes de completar la operación.');}
+  if($requiredOwnerId !== null && (int)($material['created_by'] ?? 0) !== $requiredOwnerId)throw new SupportMaterialAccessException('No tienes autorización para enviar este material a Papelera.');
   $storedReason=trim($reason).($reasonDetail!==''?': '.trim($reasonDetail):'');
   $update=$d->prepare('UPDATE support_materials SET deleted_at=UTC_TIMESTAMP(),deleted_by=:deleted_by,deletion_reason=:reason,updated_by=:updated_by WHERE id=:id AND deleted_at IS NULL AND purged_at IS NULL');$update->execute(['deleted_by'=>$actor,'updated_by'=>$actor,'reason'=>$storedReason,'id'=>$id]);
   if($update->rowCount()!==1)throw new InvalidArgumentException('El material cambió de estado antes de completar la operación.');
@@ -43,13 +45,14 @@ final class AdminTrashModel
   ]);
   return $material;
  }
- public function restoreSupportMaterial(int $id,int $actor):void
+ public function restoreSupportMaterial(int $id,int $actor,?int $requiredOwnerId=null):void
  {
   if($id<1)throw new InvalidArgumentException('El material no es válido.');
-  Database::transaction(function(PDO $d)use($id,$actor):void{
-   $read=$d->prepare('SELECT title,status,is_available,withdrawn_at,withdrawn_by,deletion_reason FROM support_materials WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL FOR UPDATE');
+  Database::transaction(function(PDO $d)use($id,$actor,$requiredOwnerId):void{
+   $read=$d->prepare('SELECT title,status,is_available,withdrawn_at,withdrawn_by,deletion_reason,created_by,deleted_by FROM support_materials WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL FOR UPDATE');
    $read->execute(['id'=>$id]);$material=$read->fetch();
    if(!$material)throw new InvalidArgumentException('El material ya no puede restaurarse.');
+   if($requiredOwnerId !== null && ((int)($material['created_by'] ?? 0) !== $requiredOwnerId || (int)($material['deleted_by'] ?? 0) !== $requiredOwnerId))throw new SupportMaterialAccessException('No tienes autorización para restaurar este material.');
    $update=$d->prepare("UPDATE support_materials SET deleted_at=NULL,deleted_by=NULL,deletion_reason=NULL,updated_by=:actor WHERE id=:id AND deleted_at IS NOT NULL AND purged_at IS NULL");
    $update->execute(['actor'=>$actor,'id'=>$id]);
    if($update->rowCount()!==1)throw new RuntimeException('El material cambió de estado antes de completar la restauración.');
@@ -127,6 +130,104 @@ final class AdminTrashModel
   public function restoreAll(string $entity,int $actor):int{return $this->batch($entity,$this->trashedIds($entity),$actor,false);}
   public function deletePermanentlyBatch(string $entity,array $ids,int $actor):int{return $this->batch($entity,$ids,$actor,true);}
   public function emptyCategory(string $entity,int $actor):int{return $this->batch($entity,$this->trashedIds($entity),$actor,true);}
+
+  /** Operaciones de Papelera acotadas al contenido propio de un Teacher. */
+  public function restoreTeacherBatch(string $entity, array $ids, int $actor, int $ownerId): int
+  {
+      return $this->teacherBatch($entity, $ids, $actor, $ownerId, false);
+  }
+
+  public function deleteTeacherPermanentlyBatch(string $entity, array $ids, int $actor, int $ownerId): int
+  {
+      return $this->teacherBatch($entity, $ids, $actor, $ownerId, true);
+  }
+  private function teacherBatch(string $entity, array $ids, int $actor, int $ownerId, bool $permanent): int
+  {
+      $entity = $this->entity($entity);
+      if ($ownerId < 1 || $actor !== $ownerId) throw new SupportMaterialAccessException('No tienes autorizacion para gestionar esta Papelera.');
+      $ids = $this->ids($ids);
+      if ($ids === []) throw new InvalidArgumentException('Selecciona al menos un elemento.');
+      $this->assertTeacherTrash(Database::connection(), $entity, $ids, $ownerId);
+
+      $stages = [];
+      $storage = new TrashStoragePurgeService();
+      try {
+          if ($permanent) {
+              foreach ($ids as $id) {
+                  $stage = $storage->stage($entity === 'projects' ? 'project' : 'material', $id);
+                  $stage['id'] = $id;
+                  $stages[$id] = $stage;
+              }
+          }
+          $count = Database::transaction(function (PDO $db) use ($entity, $ids, $actor, $ownerId, $permanent): int {
+              $this->assertTeacherTrash($db, $entity, $ids, $ownerId);
+              foreach ($ids as $id) {
+                  if ($permanent) {
+                      $this->permanentlyDeleteAtomic($db, $entity, $id, $actor);
+                  } elseif ($entity === 'materials') {
+                      $this->restoreSupportMaterialAtomic($db, $id, $actor);
+                  } else {
+                      $this->restoreAtomic($db, $entity, $id, $actor);
+                  }
+              }
+              (new AdminActivityService($db))->record(
+                  $actor,
+                  $permanent ? 'teacher_trash_permanently_deleted' : 'teacher_trash_restored',
+                  $permanent ? 'Elimino definitivamente contenido propio de la Papelera' : 'Restauro contenido propio desde la Papelera',
+                  'Repositorio',
+                  $entity === 'projects' ? 'project' : 'support_material',
+                  null,
+                  $entity === 'projects' ? 'Proyectos propios' : 'Materiales propios',
+                  'correct',
+                  ['entity' => $entity, 'count' => count($ids), 'owner_id' => $ownerId]
+              );
+              return count($ids);
+          });
+      } catch (Throwable $exception) {
+          foreach ($stages as $stage) {
+              try {
+                  $storage->restore($stage);
+              } catch (Throwable $restoreError) {
+                  $this->physicalCleanupPending[] = ['entity' => $entity, 'id' => (int) ($stage['id'] ?? 0)];
+                  error_log('Teacher trash staging compensation failed: ' . $restoreError->getMessage());
+              }
+          }
+          throw $exception;
+      }
+
+      foreach ($stages as $stage) {
+          try {
+              $storage->destroy($stage);
+          } catch (Throwable $exception) {
+              $this->physicalCleanupPending[] = ['entity' => $entity, 'id' => (int) ($stage['id'] ?? 0)];
+              error_log('Teacher trash physical cleanup failed: ' . $exception->getMessage());
+          }
+      }
+      return $count;
+  }
+
+  private function assertTeacherTrash(PDO $db, string $entity, array $ids, int $ownerId): void
+  {
+      $table = $entity === 'projects' ? 'projects' : 'support_materials';
+      $conditions = 'deleted_at IS NOT NULL AND id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')';
+      $params = $ids;
+      if ($entity === 'projects') {
+          $conditions .= ' AND created_by=? AND deleted_by=? AND publication_origin=?';
+          $params[] = $ownerId;
+          $params[] = $ownerId;
+          $params[] = ProjectPublicationOrigin::DIRECT_REPOSITORY;
+      } else {
+          $conditions .= ' AND purged_at IS NULL AND created_by=? AND deleted_by=?';
+          $params[] = $ownerId;
+          $params[] = $ownerId;
+      }
+      $query = $db->prepare('SELECT id FROM ' . $table . ' WHERE ' . $conditions . ' FOR UPDATE');
+      $query->execute($params);
+      if (count($query->fetchAll(PDO::FETCH_COLUMN)) !== count($ids)) {
+          throw new SupportMaterialAccessException('Uno o mas elementos no pertenecen a tu Papelera.');
+      }
+  }
+
   /** CLI maintenance entry point. Actor 0 is deliberately recorded as Sistema. */
   public function purgeExpiredAutomatically(bool $dryRun=false):array
   {
@@ -159,7 +260,7 @@ final class AdminTrashModel
    $metadata=json_encode(['origin'=>'automatic','users'=>$result['users'],'projects'=>$result['projects'],'materials'=>$result['materials'],'failed'=>$result['failed']],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
    $q=Database::connection()->prepare("INSERT INTO notifications(user_id,type,title,message,metadata) SELECT id,'system',:title,:message,:metadata FROM users WHERE is_admin=1 AND status='active' AND deleted_at IS NULL AND purged_at IS NULL");$q->execute(['title'=>'Eliminación automática completada','message'=>$message,'metadata'=>$metadata]);
   }
-  private function batch(string $entity,array $ids,int $actor,bool $permanent,bool $automatic=false):int
+   private function batch(string $entity,array $ids,int $actor,bool $permanent,bool $automatic=false):int
   {
    $entity=$this->entity($entity);$ids=$this->ids($ids);if(!$ids)throw new InvalidArgumentException('Selecciona al menos un elemento.');$stages=[];$storage=new TrashStoragePurgeService();
    try{if($permanent)foreach($ids as $id)if($entity!=='users')$stages[$id]=$storage->stage($entity==='projects'?'project':'material',$id);}catch(Throwable $e){foreach($stages as $id=>$stage)try{$storage->restore($stage);}catch(Throwable $restoreError){$this->physicalCleanupPending[]=['entity'=>$entity,'id'=>(int)$id];error_log('Trash staging compensation '.$entity.' #'.$id.': '.$restoreError->getMessage());}throw $e;}

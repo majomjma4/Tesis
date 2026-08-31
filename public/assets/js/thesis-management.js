@@ -28,13 +28,25 @@
   syncModalViewport(); window.addEventListener('resize', syncModalViewport, { passive: true });
   const storageKey = 'thesis-management-context', normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
   const tabs = [...root.querySelectorAll('[data-tm-tab]')].map(button => button.dataset.tmTab), search = root.querySelector('[data-tm-search]'), period = root.querySelector('[data-tm-period]'), clear = root.querySelector('[data-tm-clear-search]');
-  const saved = (()=>{try{return JSON.parse(sessionStorage.getItem(storageKey)||'{}');}catch{return {};}})(), state=Object.fromEntries(tabs.map(tab=>[tab,{page:1,size:10,...(saved[tab]||{})}])); let activeTab=tabs.includes(saved.tab)?saved.tab:'approved', modalScrollY=0;
-  if(search&&typeof saved.search==='string')search.value=saved.search;if(period&&typeof saved.period==='string')period.value=saved.period;
-  const persist=(message='')=>sessionStorage.setItem(storageKey,JSON.stringify({tab:activeTab,...state,search:search?.value||'',period:period?.value||'',scrollY:window.scrollY,message}));
+  const saved = (()=>{try{return JSON.parse(sessionStorage.getItem(storageKey)||'{}');}catch{return {};}})();
+  if (Object.prototype.hasOwnProperty.call(saved, 'search')) {
+    delete saved.search;
+    try { sessionStorage.setItem(storageKey, JSON.stringify(saved)); } catch {}
+  }
+  const state=Object.fromEntries(tabs.map(tab=>[tab,{page:1,size:10,...(saved[tab]||{})}])); let activeTab=tabs.includes(saved.tab)?saved.tab:'approved', modalScrollY=0;
+  if (search) search.value='';
+  if(period&&typeof saved.period==='string')period.value=saved.period;
+  const originalText = new WeakMap();
+  const searchableNodes = card => [...card.querySelectorAll('[data-tm-highlight]')];
+  const restoreHighlights = card => searchableNodes(card).forEach(node=>{if(originalText.has(node))node.textContent=originalText.get(node);});
+  const highlightNode = (node,terms) => {if(!originalText.has(node))originalText.set(node,node.textContent);const value=originalText.get(node);if(!value)return;const chars=[...value],positions=[],folded=chars.map((character,index)=>{const normalized=normalize(character);for(let i=0;i<normalized.length;i+=1)positions.push(index);return normalized;}).join('');const ranges=[];terms.forEach(term=>{let from=0;while(term&&(from=folded.indexOf(term,from))!==-1){ranges.push([positions[from],positions[from+term.length-1]+1]);from+=term.length;}});if(!ranges.length){node.textContent=value;return;}ranges.sort((a,b)=>a[0]-b[0]);const merged=ranges.reduce((result,range)=>{const previous=result.at(-1);if(previous&&range[0]<=previous[1])previous[1]=Math.max(previous[1],range[1]);else result.push(range);return result;},[]);const fragment=document.createDocumentFragment();let cursor=0;merged.forEach(([start,end])=>{if(start>cursor)fragment.append(document.createTextNode(chars.slice(cursor,start).join('')));const mark=document.createElement('mark');mark.className='ar-search-highlight';mark.textContent=chars.slice(start,end).join('');fragment.append(mark);cursor=end;});if(cursor<chars.length)fragment.append(document.createTextNode(chars.slice(cursor).join('')));node.replaceChildren(fragment);};
+  const highlightCard = (card,terms) => searchableNodes(card).forEach(node=>highlightNode(node,terms));
+  const syncSearchClear = () => {if(!clear)return;const hasText=Boolean(search?.value);clear.hidden=!hasText;clear.disabled=!hasText;};
+  const persist=(message='')=>sessionStorage.setItem(storageKey,JSON.stringify({tab:activeTab,...state,period:period?.value||'',scrollY:window.scrollY,message}));
   const cards=tab=>[...root.querySelectorAll(`[data-tm-list="${tab}"] [data-tm-item]`)];
-  const render=tab=>{const items=cards(tab); if (tab === activeTab) { const isEmpty = items.length === 0; if (search) search.disabled = isEmpty; if (period) period.disabled = isEmpty; if (clear) clear.disabled = isEmpty; } const filtered=items.filter(card=>(!search?.value||normalize(card.dataset.search).includes(normalize(search.value)))&&(!period?.value||card.dataset.period===period.value)), current=state[tab], pages=Math.max(1,Math.ceil(filtered.length/current.size));current.page=Math.min(current.page,pages);const start=(current.page-1)*current.size,shown=new Set(filtered.slice(start,start+current.size));items.forEach(item=>item.hidden=!shown.has(item));root.querySelector(`[data-tm-count="${tab}"]`).textContent=filtered.length;const empty=root.querySelector(`[data-tm-empty="${tab}"]`);empty.hidden=filtered.length!==0;empty.querySelector('h2').textContent=items.length&&filtered.length===0?'No se encontraron proyectos con los filtros seleccionados.':empty.dataset.emptyDefault;const pagination=root.querySelector(`[data-tm-pagination="${tab}"]`);pagination.hidden=filtered.length<=current.size;root.querySelector(`[data-tm-summary="${tab}"]`).textContent=filtered.length?`Mostrando ${start+1}-${Math.min(start+current.size,filtered.length)} de ${filtered.length}`:'Mostrando 0 de 0';};
+  const render=tab=>{const items=cards(tab); if (tab === activeTab) { const isEmpty = items.length === 0; if (search) search.disabled = isEmpty; if (period) period.disabled = isEmpty; } const filtered=items.filter(card=>(!search?.value||normalize(card.dataset.search).includes(normalize(search.value)))&&(!period?.value||card.dataset.period===period.value)), current=state[tab], pages=Math.max(1,Math.ceil(filtered.length/current.size));current.page=Math.min(current.page,pages);const start=(current.page-1)*current.size,shown=new Set(filtered.slice(start,start+current.size));items.forEach(item=>{restoreHighlights(item);item.hidden=!shown.has(item);});if(search?.value)filtered.forEach(item=>highlightCard(item,[normalize(search.value)]));root.querySelector(`[data-tm-count="${tab}"]`).textContent=filtered.length;const empty=root.querySelector(`[data-tm-empty="${tab}"]`);empty.hidden=filtered.length!==0;empty.querySelector('h2').textContent=items.length&&filtered.length===0?'No se encontraron proyectos con los filtros seleccionados.':empty.dataset.emptyDefault;const pagination=root.querySelector(`[data-tm-pagination="${tab}"]`);pagination.hidden=filtered.length<=current.size;root.querySelector(`[data-tm-summary="${tab}"]`).textContent=filtered.length?`Mostrando ${start+1}-${Math.min(start+current.size,filtered.length)} de ${filtered.length}`:'Mostrando 0 de 0';syncSearchClear();};
   const activate=tab=>{activeTab=tab;tabs.forEach(key=>{const on=key===tab;root.querySelector(`[data-tm-tab="${key}"]`).classList.toggle('active',on);root.querySelector(`[data-tm-panel="${key}"]`).hidden=!on;});persist();render(tab);};
-  root.querySelectorAll('[data-tm-tab]').forEach(button=>button.addEventListener('click',()=>activate(button.dataset.tmTab)));[search,period].filter(Boolean).forEach(control=>control.addEventListener(control===search?'input':'change',()=>{state[activeTab].page=1;persist();render(activeTab);}));clear?.addEventListener('click',()=>{search.value='';search.focus();render(activeTab);});tabs.forEach(tab=>root.querySelector(`[data-tm-size="${tab}"]`)?.addEventListener('change',event=>{state[tab].size=Number(event.target.value)||10;state[tab].page=1;render(tab);}));tabs.forEach(render);activate(activeTab);if(Number.isFinite(Number(saved.scrollY)))requestAnimationFrame(()=>window.scrollTo(0,Number(saved.scrollY)));
+  root.querySelectorAll('[data-tm-tab]').forEach(button=>button.addEventListener('click',()=>activate(button.dataset.tmTab)));[search,period].filter(Boolean).forEach(control=>control.addEventListener(control===search?'input':'change',()=>{state[activeTab].page=1;persist();render(activeTab);}));clear?.addEventListener('click',()=>{if(!search)return;search.value='';state[activeTab].page=1;persist();render(activeTab);search.focus();});tabs.forEach(tab=>root.querySelector(`[data-tm-size="${tab}"]`)?.addEventListener('change',event=>{state[tab].size=Number(event.target.value)||10;state[tab].page=1;render(tab);}));tabs.forEach(render);activate(activeTab);if(Number.isFinite(Number(saved.scrollY)))requestAnimationFrame(()=>window.scrollTo(0,Number(saved.scrollY)));
   const beforeModal=()=>{modalScrollY=window.scrollY;persist();},reload=message=>{persist(message);window.location.reload();};if(saved.message){const note=document.createElement('div');note.className='tm-feedback';note.textContent=saved.message;root.prepend(note);persist();}
 
   const config=document.querySelector('#thesisTribunalConfig'), modal=document.querySelector('[data-tribunal-modal]');
@@ -166,6 +178,56 @@ const syncEffectiveProposalLoads=()=>{proposal?.querySelectorAll('.tm-member-car
   const info=document.querySelector('[data-defense-info-modal]');wire(info,'[data-defense-info]','[data-defense-info-dialog]','[data-defense-info-close],[data-defense-info-cancel]',button=>{const f=info.querySelector('form'),d=JSON.parse(button.dataset.info||'{}');info.querySelector('[data-defense-info-context]').textContent=`${button.dataset.projectCode} · ${button.dataset.projectTitle}`;f.defense_date.value=d.date||'';f.defense_time.value=(d.time||'').slice(0,5);f.location.value=d.location||'';f.modality.value=d.modality||'';info.querySelector('[data-defense-info-error]').hidden=true;},(modal,get)=>modal.querySelector('form').addEventListener('submit',async event=>{event.preventDefault();const button=modal.querySelector('[data-defense-info-save]'),trigger=get();if(!trigger||button.disabled)return;button.disabled=true;const body=new FormData(event.currentTarget);body.set('_csrf',config.dataset.csrf);body.set('project_id',trigger.dataset.projectId);try{const response=await fetch(config.dataset.info,{method:'POST',body,headers:{Accept:'application/json'}}),json=await response.json();if(!response.ok||!json.success)throw new Error(json.message);window.location.reload();}catch(e){const error=modal.querySelector('[data-defense-info-error]');error.textContent=e.message;error.hidden=false;button.disabled=false;}}));
   const result=document.querySelector('[data-result-modal]');wire(result,'[data-tribunal-result]','[data-result-dialog]','[data-result-close],[data-result-cancel]',button=>{const f=result.querySelector('form');f.reset();result.querySelector('[data-result-context]').textContent=`${button.dataset.projectCode} · ${button.dataset.projectTitle}`;result.querySelector('[data-result-members]').textContent=`Tribunal: ${button.dataset.tribunalCount} miembros`;},(modal,get)=>{const f=modal.querySelector('form'),save=modal.querySelector('[data-result-save]');f.result.forEach(input=>input.addEventListener('change',()=>{const approved=f.result.value==='approved';modal.querySelector('[data-result-effect]').textContent=approved?'Al confirmar, el proyecto avanzará al estado Aprobado por el Tribunal.':'El proyecto permanecerá en etapa de defensa.';save.textContent=approved?'Registrar aprobación':'Registrar resultado';}));f.addEventListener('submit',async event=>{event.preventDefault();const trigger=get();if(!trigger||save.disabled)return;save.disabled=true;const body=new FormData(f);body.set('_csrf',config.dataset.csrf);body.set('project_id',trigger.dataset.projectId);body.set('expected_status','defense');try{const response=await fetch(config.dataset.result,{method:'POST',body,headers:{Accept:'application/json'}}),json=await response.json();if(!response.ok||!json.success)throw new Error(json.message);window.location.reload();}catch(e){const error=modal.querySelector('[data-result-error]');error.textContent=e.message;error.hidden=false;save.disabled=false;}});});
 })();
+
+(() => {
+  const root = document.querySelector('#thesisManagementPage');
+  const config = document.querySelector('#thesisTribunalConfig');
+  const modal = document.querySelector('[data-thesis-publish-modal]');
+  if (!root || !config || !modal || !config.dataset.publish) return;
+  const dialog = modal.querySelector('[data-thesis-publish-dialog]');
+  const error = modal.querySelector('[data-thesis-publish-error]');
+  const confirm = modal.querySelector('[data-thesis-publish-confirm]');
+  let trigger = null;
+  const close = () => {
+    modal.hidden = true;
+    document.body.classList.remove('tm-modal-open');
+    if (error) { error.hidden = true; error.textContent = ''; }
+    if (confirm) confirm.disabled = false;
+    trigger?.focus();
+  };
+  const open = button => {
+    trigger = button;
+    modal.querySelector('[data-thesis-publish-context]').textContent = `${button.dataset.projectCode || ''} · ${button.dataset.projectTitle || ''}`;
+    if (error) { error.hidden = true; error.textContent = ''; }
+    if (confirm) confirm.disabled = false;
+    modal.hidden = false;
+    document.body.classList.add('tm-modal-open');
+    dialog?.focus();
+  };
+  root.querySelectorAll('[data-thesis-publish]').forEach(button => button.addEventListener('click', () => open(button)));
+  modal.querySelectorAll('[data-thesis-publish-close],[data-thesis-publish-cancel]').forEach(button => button.addEventListener('click', close));
+  modal.addEventListener('click', event => { if (event.target === modal) close(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && !modal.hidden) close(); });
+  confirm?.addEventListener('click', async () => {
+    if (!trigger || confirm.disabled) return;
+    confirm.disabled = true;
+    if (error) { error.hidden = true; error.textContent = ''; }
+    const body = new FormData();
+    body.set('_csrf', config.dataset.csrf || '');
+    body.set('project_id', trigger.dataset.projectId || '');
+    body.set('expected_status', 'tribunal_approved');
+    try {
+      const response = await fetch(config.dataset.publish, { method: 'POST', body, headers: { Accept: 'application/json' } });
+      const json = await response.json();
+      if (!response.ok || !json.success) throw new Error(json.message || 'No fue posible publicar el proyecto.');
+      window.location.reload();
+    } catch (exception) {
+      if (error) { error.textContent = exception.message; error.hidden = false; }
+      confirm.disabled = false;
+    }
+  });
+})();
+
 document.addEventListener('click', event => { const gate = document.querySelector('.tm-reason-gate'); if (gate && !gate.hidden && event.target === gate) gate.querySelector('[data-gate-cancel]')?.click(); });
 document.addEventListener('click', event => { const modal = document.querySelector('[data-new-attempt-modal]'); if (modal && !modal.hidden && event.target === modal) modal.querySelector('[data-new-attempt-cancel]')?.click(); });
 

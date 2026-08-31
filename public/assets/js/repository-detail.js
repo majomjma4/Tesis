@@ -5138,6 +5138,19 @@ document.addEventListener("keydown", (event) => {
                 material: { id: record.dataset.recordId, title: document.querySelector("#digitalRecordTitle")?.textContent || "" },
                 onSuccess: result => {
                     setAdministrativeUnread(true);
+                    const becameUnavailable = action === "availability"
+                        && record.dataset.teacherOwnerStatusManagement === "true"
+                        && (result.data?.is_available === false || String(result.data?.is_available) === "0");
+                    if (becameUnavailable) {
+                        sessionStorage.setItem("repositoryToast", result.message);
+                        const target = new URL(record.dataset.adminRedirect || window.location.href, window.location.href);
+                        target.searchParams.set("page", "repository");
+                        target.searchParams.set("tab", "management");
+                        target.searchParams.set("management_section", "unavailable");
+                        target.hash = "teacherOwnedPanel-unavailable";
+                        window.location.assign(target.href);
+                        return;
+                    }
                     if (action === "trash" || withdrawing) {
                         sessionStorage.setItem("repositoryToast", result.message);
                         window.location.assign(result.data?.redirect || record.dataset.adminRedirect);

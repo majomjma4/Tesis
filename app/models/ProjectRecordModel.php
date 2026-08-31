@@ -33,10 +33,11 @@ final class ProjectRecordModel
         return ['events'=>$page,'total'=>$total,'loaded'=>count($page),'has_more'=>$offset+count($page)<$total,'next_offset'=>$offset+count($page)];
     }
 
-    public function find(int $projectId, ?int $userId, bool $administrator, bool $publishedOnly = false, bool $institutionalTeacherReadOnly = false, bool $studentOwnershipOnly = false): ?array
+    public function find(int $projectId, ?int $userId, bool $administrator, bool $publishedOnly = false, bool $institutionalTeacherReadOnly = false, bool $studentOwnershipOnly = false, bool $teacherOwnedDirectReadOnly = false): ?array
     {
         $db = Database::connection();
         $institutionalStatuses = "'" . implode("','", ProjectCapabilityService::INSTITUTIONAL_ACTIVE_STATUSES) . "'";
+        $deletedVisibility = $teacherOwnedDirectReadOnly ? '' : ' AND p.deleted_at IS NULL';
         $sql = "SELECT p.*, pt.code AS type_code, pt.name AS type_name, c.name AS career_name,
                        ap.name AS period_name, s.code AS subject_code, s.name AS subject_name,
                        rl.name AS research_line_name, tutor.id AS tutor_user_id,
@@ -53,30 +54,37 @@ final class ProjectRecordModel
                 LEFT JOIN users tutor ON tutor.id=p.tutor_id
                 LEFT JOIN users publisher ON publisher.id=p.repository_added_by
                 LEFT JOIN teacher_profiles publisher_profile ON publisher_profile.user_id=publisher.id
-                WHERE p.id=:id AND p.deleted_at IS NULL";
+                 WHERE p.id=:id{$deletedVisibility}";
         if ($publishedOnly) $sql .= " AND p.status='published' AND p.withdrawn_at IS NULL" . ($administrator ? '' : ' AND p.is_available=1') . "
             AND EXISTS (SELECT 1 FROM project_files visible_file WHERE visible_file.project_id=p.id AND visible_file.deleted_at IS NULL AND visible_file.purged_at IS NULL)
             AND EXISTS (SELECT 1 FROM project_participants visible_student INNER JOIN student_profiles visible_profile ON visible_profile.user_id=visible_student.user_id WHERE visible_student.project_id=p.id AND visible_student.role_code='student' AND visible_student.status='active' AND visible_student.removed_at IS NULL)";
         if (!$administrator && !$publishedOnly) {
             $sql .= $institutionalTeacherReadOnly
                 ? " AND p.withdrawn_at IS NULL AND p.status IN (" . $institutionalStatuses . ")"
+                : ($teacherOwnedDirectReadOnly
+                    ? " AND p.created_by=:viewer_creator AND p.publication_origin='direct_repository'"
                 : ($studentOwnershipOnly
                     ? " AND p.withdrawn_at IS NULL AND EXISTS (SELECT 1 FROM project_participants access_student INNER JOIN user_roles access_roles ON access_roles.user_id=access_student.user_id INNER JOIN roles access_role ON access_role.id=access_roles.role_id AND access_role.code='student' WHERE access_student.project_id=p.id AND access_student.user_id=:viewer_participant AND access_student.role_code='student' AND access_student.status='active' AND access_student.removed_at IS NULL)"
-                    : " AND (p.created_by=:viewer_creator OR p.tutor_id=:viewer_tutor OR EXISTS (SELECT 1 FROM project_participants access_participant WHERE access_participant.project_id=p.id AND access_participant.user_id=:viewer_participant AND access_participant.status='active' AND access_participant.removed_at IS NULL))");
+                    : " AND (p.created_by=:viewer_creator OR p.tutor_id=:viewer_tutor OR EXISTS (SELECT 1 FROM project_participants access_participant WHERE access_participant.project_id=p.id AND access_participant.user_id=:viewer_participant AND access_participant.status='active' AND access_participant.removed_at IS NULL))"));
         }
         $statement = $db->prepare($sql);
         $parameters = ['id' => $projectId];
         if (!$administrator && !$publishedOnly && !$institutionalTeacherReadOnly) {
-            $parameters['viewer_participant'] = (int) $userId;
-            if (!$studentOwnershipOnly) {
+            if ($teacherOwnedDirectReadOnly) {
                 $parameters['viewer_creator'] = (int) $userId;
-                $parameters['viewer_tutor'] = (int) $userId;
+            } else {
+                $parameters['viewer_participant'] = (int) $userId;
+                if (!$studentOwnershipOnly) {
+                    $parameters['viewer_creator'] = (int) $userId;
+                    $parameters['viewer_tutor'] = (int) $userId;
+                }
             }
         }
         $statement->execute($parameters);
         $project = $statement->fetch();
         if (!$project) return null;
         if (!$publishedOnly && !$administrator
+            && !$teacherOwnedDirectReadOnly
             && (string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW) === ProjectPublicationOrigin::DIRECT_REPOSITORY) {
             return null;
         }

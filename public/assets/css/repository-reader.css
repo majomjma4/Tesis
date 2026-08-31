@@ -25,6 +25,11 @@
 .teacher-direct-project-modal__card { width: min(860px, 100%); }
 .teacher-direct-project-modal__header, .teacher-direct-project-modal__footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; border-bottom: 1px solid var(--line, #dbe3ef); }
 .teacher-direct-project-modal__header h2 { margin: 3px 0 0; } .teacher-direct-project-modal__footer { justify-content: flex-end; border-top: 1px solid var(--line, #dbe3ef); border-bottom: 0; }
+.teacher-content-draft-resume[hidden] { display: none !important; }
+.teacher-content-draft-resume { display: grid; gap: 10px; padding: 28px 24px 24px; border-bottom: 1px solid var(--line, #dbe3ef); background: var(--surface, #fff); color: var(--text, #12203a); }
+.teacher-content-draft-resume h3 { margin: 0; font-size: var(--font-lg); line-height: 1.25; }
+.teacher-content-draft-resume p { margin: 0; color: var(--muted, #64748b); line-height: 1.55; }
+.teacher-content-draft-resume__actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 9px; margin-top: 8px; }
 .teacher-direct-project-modal__body { max-height: calc(100dvh - 170px); overflow-y: auto; padding: 22px 24px; display: grid; gap: 17px; }
 .teacher-direct-project-modal label, .teacher-direct-project-modal fieldset { display: grid; gap: 7px; min-width: 0; border: 0; padding: 0; margin: 0; font-weight: 700; font-size: 13px; }
 .teacher-direct-project-modal small, [data-direct-error-for] { color: var(--muted, #64748b); font-weight: 400; line-height: 1.4; } .teacher-direct-project-modal [data-direct-error-for] { color: #b42318; }
@@ -39,7 +44,7 @@
 .teacher-direct-project-file-list { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; } .teacher-direct-project-file-list li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 8px; background: #f7f9fc; font-size: 13px; } .teacher-direct-project-file-list button { border: 0; background: transparent; color: #b42318; cursor: pointer; }
 .teacher-direct-project-errors { padding: 10px 12px; border-radius: 8px; background: #fff4f2; color: #b42318; } .teacher-direct-project-errors[hidden] { display: none; }
 @media (max-width: 720px) { .teacher-direct-project-grid--two { grid-template-columns: 1fr; } .teacher-direct-project-modal__header, .teacher-direct-project-modal__footer { padding: 16px; } .teacher-direct-project-modal__body { padding: 18px 16px; } }
-@media (max-width: 480px) { .teacher-repository-content-modal { padding: 8px; } .teacher-repository-content-modal__card { padding: 22px 16px; } .teacher-direct-project-modal__card { max-height: calc(100dvh - 16px); border-radius: 13px; } .teacher-direct-project-modal__body { max-height: calc(100dvh - 145px); padding: 16px 12px; } .teacher-direct-project-modal__footer { flex-wrap: wrap; } .teacher-direct-project-modal__footer button { flex: 1 1 130px; } }
+@media (max-width: 480px) { .teacher-repository-content-modal { padding: 8px; } .teacher-repository-content-modal__card { padding: 22px 16px; } .teacher-content-draft-resume { padding: 22px 16px 18px; } .teacher-content-draft-resume__actions { display: grid; grid-template-columns: 1fr; } .teacher-direct-project-modal__card { max-height: calc(100dvh - 16px); border-radius: 13px; } .teacher-direct-project-modal__body { max-height: calc(100dvh - 145px); padding: 16px 12px; } .teacher-direct-project-modal__footer { flex-wrap: wrap; } .teacher-direct-project-modal__footer button { flex: 1 1 130px; } }
 
 [hidden], .ar-project-card[hidden], .ar-material-card[hidden] {
     display: none !important;
@@ -2054,5 +2059,444 @@ body.teacher-material-modal-open {
         flex: 1;
         justify-content: center;
         min-height: 40px;
+    }
+}
+
+/* El estado de recuperación sólo contiene su confirmación; no debe conservar la altura del formulario. */
+.teacher-direct-project-modal__card:has(> .teacher-content-draft-resume:not([hidden])),
+.teacher-material-modal .ed-edit-modal-card:has(> .teacher-content-draft-resume:not([hidden])) {
+    height: auto;
+    min-height: 0;
+}
+
+.teacher-material-modal .ed-edit-modal-card:has(> .teacher-content-draft-resume:not([hidden])) {
+    grid-template-rows: auto auto;
+}
+
+.teacher-content-draft-resume__actions :is(.ar-secondary-action, .ar-primary-action, .teacher-material-btn) {
+    min-height: 42px;
+    padding: 0 18px;
+    border: 1px solid var(--line, #dbe3ef);
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font: inherit;
+    font-weight: 800;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background-color .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
+}
+
+.teacher-content-draft-resume__actions :is(.ar-secondary-action, .teacher-material-btn-secondary) {
+    background: var(--surface, #fff);
+    color: var(--text, #12203a);
+}
+
+.teacher-content-draft-resume__actions :is(.ar-secondary-action, .teacher-material-btn-secondary):hover {
+    background: var(--surface-soft, #f1f5f9);
+    border-color: var(--primary, #2563eb);
+    color: var(--primary, #2563eb);
+    transform: translateY(-1px);
+}
+
+.teacher-content-draft-resume__actions :is(.ar-primary-action, .teacher-material-btn-primary) {
+    border-color: var(--primary, #2563eb);
+    background: var(--primary, #2563eb);
+    color: #fff;
+}
+
+.teacher-content-draft-resume__actions :is(.ar-primary-action, .teacher-material-btn-primary):hover {
+    background: color-mix(in srgb, var(--primary, #2563eb) 88%, #000);
+    border-color: color-mix(in srgb, var(--primary, #2563eb) 88%, #000);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.teacher-content-draft-resume__actions :is(.ar-secondary-action, .ar-primary-action, .teacher-material-btn):focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--primary, #2563eb) 28%, transparent);
+    outline-offset: 2px;
+}
+
+/* Interacciones comunes del repositorio: cada variante conserva su propio color. */
+#repositoryShell :is(button, a.ar-primary-action, a.ar-secondary-action, a.ar-icon-action, a[role="button"]),
+.teacher-repository-content-modal :is(button, a.ar-primary-action, a.ar-secondary-action, a[role="button"]),
+.teacher-material-modal :is(button, a.ar-primary-action, a.ar-secondary-action, a[role="button"]) {
+    cursor: pointer;
+    transition: transform .18s ease, background-color .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+#repositoryShell :is(button, a.ar-primary-action, a.ar-secondary-action, a.ar-icon-action, a[role="button"]):not(:disabled):not([aria-disabled="true"]):hover,
+.teacher-repository-content-modal :is(button, a.ar-primary-action, a.ar-secondary-action, a[role="button"]):not(:disabled):not([aria-disabled="true"]):hover,
+.teacher-material-modal :is(button, a.ar-primary-action, a.ar-secondary-action, a[role="button"]):not(:disabled):not([aria-disabled="true"]):hover {
+    transform: translateY(-1px);
+}
+
+#repositoryShell :is(button, a.ar-primary-action, a.ar-secondary-action, a.ar-icon-action, a[role="button"]):not(:disabled):not([aria-disabled="true"]):active,
+.teacher-repository-content-modal :is(button, a.ar-primary-action, a.ar-secondary-action, a[role="button"]):not(:disabled):not([aria-disabled="true"]):active,
+.teacher-material-modal :is(button, a.ar-primary-action, a.ar-secondary-action, a[role="button"]):not(:disabled):not([aria-disabled="true"]):active {
+    transform: translateY(0);
+}
+
+#repositoryShell :is(button, a.ar-primary-action, a.ar-secondary-action, a.ar-icon-action, a[role="button"]):is(:disabled, [aria-disabled="true"]),
+.teacher-repository-content-modal :is(button, a.ar-primary-action, a.ar-secondary-action, a[role="button"]):is(:disabled, [aria-disabled="true"]),
+.teacher-material-modal :is(button, a.ar-primary-action, a.ar-secondary-action, a[role="button"]):is(:disabled, [aria-disabled="true"]) {
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* GestiÃ³n propia del Teacher: los estados recuperables quedan separados del catÃ¡logo pÃºblico. */
+.teacher-owned-content {
+    margin-top: 0;
+    border-top: 0;
+}
+
+.teacher-owned-content__header {
+    align-items: center;
+    margin-bottom: 22px;
+}
+
+.teacher-owned-content__header p {
+    max-width: 440px;
+    text-align: right;
+}
+
+.teacher-owned-content__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+}
+
+.teacher-owned-content__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    padding: 8px 12px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: var(--font-sm);
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.teacher-owned-content__tab:hover,
+.teacher-owned-content__tab:focus-visible,
+.teacher-owned-content__tab.is-active {
+    border-color: color-mix(in srgb, var(--primary) 30%, var(--line));
+    background: var(--surface-soft);
+    color: var(--text);
+}
+
+.teacher-owned-content__tab.is-active { box-shadow: inset 0 -2px 0 var(--primary); }
+.teacher-owned-content__tab strong { color: var(--text); }
+
+.teacher-owned-content__section {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+}
+
+.teacher-owned-content__section:first-of-type {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+.teacher-owned-content__section-head,
+.teacher-owned-content__card > header,
+.teacher-owned-content__actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.teacher-owned-content__section-head {
+    margin-bottom: 12px;
+}
+
+.teacher-owned-content__section-head h3 {
+    margin: 5px 0 0;
+    color: var(--text);
+    font-size: var(--font-lg);
+}
+
+.teacher-owned-content__count {
+    color: var(--muted);
+    font-size: var(--font-sm);
+    white-space: nowrap;
+}
+
+.teacher-owned-content__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 13px;
+}
+
+.teacher-owned-content__card {
+    min-width: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 15px;
+    background: var(--surface);
+    color: var(--text);
+}
+
+.teacher-owned-content__kind,
+.teacher-owned-content__state {
+    color: var(--muted);
+    font-size: var(--font-xs);
+    font-weight: 700;
+}
+
+.teacher-owned-content__kind i {
+    margin-right: 4px;
+    color: var(--primary);
+}
+
+.teacher-owned-content__state {
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: var(--surface-soft);
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.teacher-owned-content__state--unavailable { color: var(--warning-text, #92400e); }
+.teacher-owned-content__state--withdrawn { color: var(--danger, #b91c1c); }
+.teacher-owned-content__state--trash { color: var(--muted); }
+
+.teacher-owned-content__copy {
+    min-width: 0;
+}
+
+.teacher-owned-content__copy h4 {
+    margin: 5px 0 7px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+    font-size: var(--font-md);
+}
+
+.teacher-owned-content__copy p {
+    margin: 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: var(--font-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.teacher-owned-content__actions {
+    justify-content: flex-start;
+    margin-top: auto;
+    margin-right: -16px;
+    margin-bottom: -16px;
+    margin-left: -16px;
+    padding: 12px 16px 16px;
+    border-top: 1px solid var(--line);
+}
+
+.teacher-owned-content__actions :is(a, button) {
+    max-width: 100%;
+}
+
+.teacher-owned-content__metadata-summary {
+    margin: 0 -16px;
+}
+
+.teacher-owned-content__actions .ar-secondary-action {
+    min-height: 34px;
+    padding: 0 11px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface-soft);
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    box-sizing: border-box;
+    font: inherit;
+    font-size: var(--font-sm);
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.teacher-owned-content__actions .ar-secondary-action:hover:not(:disabled) {
+    border-color: var(--blue);
+    background: var(--surface);
+    color: var(--blue);
+}
+
+/* Restaurar conserva el mismo acabado de reincorporación usado en Admin Repository. */
+#repositoryShell .teacher-owned-content__actions .ar-restore-catalog-action {
+    border: 1px solid var(--blue);
+    cursor: pointer;
+}
+
+#repositoryShell .teacher-owned-content__actions .ar-restore-catalog-action:hover:not(:disabled) {
+    background: #1d4ed8;
+}
+
+#repositoryShell .teacher-owned-content__actions .ar-restore-catalog-action:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, .24);
+    outline-offset: 2px;
+}
+
+#repositoryShell .teacher-owned-content__actions .ar-restore-catalog-action:disabled {
+    opacity: .65;
+    cursor: wait;
+}
+
+.teacher-owned-content__empty {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px;
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    color: var(--muted);
+}
+
+.teacher-owned-content__empty p { margin: 0; }
+
+#repositoryShell .teacher-owned-content__select {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: var(--text);
+    font-size: var(--font-sm);
+    font-weight: 700;
+}
+
+#repositoryShell .teacher-owned-content__select input {
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
+    margin: 0;
+    accent-color: var(--primary);
+}
+
+#repositoryShell .teacher-owned-content__actions .notification-action {
+    min-height: 36px;
+    padding: 7px 12px;
+    font-size: var(--font-sm);
+    font-weight: 800;
+}
+
+.notification-modal-overlay[data-teacher-trash-confirm] .notification-modal-actions {
+    justify-content: flex-end;
+}
+
+.notification-modal-overlay[data-teacher-trash-confirm] .notification-modal-actions .notification-action.primary {
+    margin-left: 0;
+}
+
+#repositoryShell .notification-trash-toolbar .notification-action:disabled {
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+#repositoryShell .teacher-owned-content__select :focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--primary) 28%, transparent);
+    outline-offset: 2px;
+}
+
+.teacher-owned-content__select {
+    flex: 0 0 auto;
+}
+
+.teacher-owned-content__card-leading {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.teacher-owned-content__metadata {
+    display: grid;
+    gap: 7px;
+    margin: 12px 0 0;
+}
+
+.teacher-owned-content__metadata div {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(70px, auto) minmax(0, 1fr);
+    gap: 9px;
+    align-items: baseline;
+    font-size: var(--font-sm);
+}
+
+.teacher-owned-content__metadata dt,
+.teacher-owned-content__trash-meta small {
+    color: var(--muted);
+}
+
+.teacher-owned-content__metadata dd {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.teacher-owned-content__trash-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin-top: 13px;
+    padding-top: 11px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: var(--font-xs);
+    line-height: 1.4;
+}
+
+.teacher-owned-content__trash-meta span {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.teacher-owned-content__trash-meta strong {
+    color: var(--text);
+    font-size: var(--font-sm);
+    font-weight: 750;
+}
+
+@media (max-width: 720px) {
+    .teacher-owned-content__header,
+    .teacher-owned-content__section-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .teacher-owned-content__header p { max-width: none; text-align: left; }
+    .teacher-owned-content__grid { grid-template-columns: minmax(0, 1fr); }
+    #repositoryShell .teacher-owned-content__actions {
+        align-items: stretch;
+        flex-wrap: wrap;
+    }
+    #repositoryShell .teacher-owned-content__actions :is(button, a) {
+        flex: 1 1 180px;
+        justify-content: center;
     }
 }

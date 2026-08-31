@@ -94,6 +94,7 @@ final class ProjectCapabilityService
         'create_adjustment_request', 'view_adjustment_requests', 'respond_adjustment_request',
         'address_adjustment_request', 'close_adjustment_request',
         'approve_adjustment_request', 'reject_adjustment_request',
+        'manage_own_repository_content', 'manage_own_repository_status',
     ];
 
     /** @return array<string,bool> */
@@ -124,7 +125,7 @@ final class ProjectCapabilityService
     /** @return array<string,bool> */
     public function forProjectId(int $projectId, string $context): array
     {
-        $project = $this->projectForId($projectId);
+        $project = $this->projectForId($projectId, $context === 'repository_owner');
         return $project === null ? $this->none() : $this->forCurrentUser($project, $context);
     }
 
@@ -135,14 +136,18 @@ final class ProjectCapabilityService
      */
     public function canViewProjectResource(int $projectId, string $context, string $resource = 'private'): bool
     {
-        if (!in_array($context, ['academic_management', 'academic', 'repository'], true)) return false;
-        $project = $this->projectForId($projectId);
+        if (!in_array($context, ['academic_management', 'academic', 'repository', 'repository_owner'], true)) return false;
+        $project = $this->projectForId($projectId, $context === 'repository_owner');
         if ($project === null) return false;
 
         $session = new AuthSessionService();
         $access = new ProjectAccessService();
         $userId = (int) ($session->userId() ?? 0);
         if ($userId < 1) return false;
+        if ($context === 'repository_owner') {
+            return !$session->isAdminModeActive()
+                && $this->isOwnedRepositoryReadOnlyProject($project, $userId, $access->currentRoles(), false);
+        }
         if ($session->isAdminModeActive()) return true;
         if ($context === 'academic_management') return false;
         if ($context !== 'repository'
@@ -165,6 +170,12 @@ final class ProjectCapabilityService
             if ((int) ($participant['user_id'] ?? 0) === $userId && strtolower((string) ($participant['role_code'] ?? '')) === 'student') return true;
         }
         return false;
+    }
+
+    /** Permite sólo la consulta del contenido directo ocultado por su Teacher propietario. */
+    public function canViewOwnedRepositoryProject(array $project, int $userId, array $roles, bool $administrator = false): bool
+    {
+        return $this->isOwnedRepositoryReadOnlyProject($project, $userId, $roles, $administrator);
     }
 
     /** Lectura institucional del catálogo docente; no concede capacidades de gestión. */
@@ -201,7 +212,7 @@ final class ProjectCapabilityService
         return $this->canViewActiveProject((int) $file['project_id'], $context);
     }
 
-    private function projectForId(int $projectId): ?array
+    private function projectForId(int $projectId, bool $includeDeleted = false): ?array
     {
         if ($projectId < 1) return null;
         $query = Database::connection()->prepare(
@@ -212,7 +223,7 @@ final class ProjectCapabilityService
         );
         $query->execute(['id' => $projectId]);
         $project = $query->fetch();
-        if (!$project || !empty($project['deleted_at'])) return null;
+        if (!$project || (!$includeDeleted && !empty($project['deleted_at']))) return null;
         $participants = Database::connection()->prepare(
             "SELECT user_id,role_code,status,removed_at FROM project_participants
              WHERE project_id=:id AND status='active' AND removed_at IS NULL"
@@ -256,8 +267,17 @@ final class ProjectCapabilityService
     public function resolve(array $project, string $context, int $userId, array $roles, bool $administrator): array
     {
         $capabilities = $this->none();
-        if (!in_array($context, ['academic_management', 'academic', 'repository'], true)) return $capabilities;
-        if ((int) ($project['id'] ?? 0) < 1 || !empty($project['deleted_at']) || $userId < 1) return $capabilities;
+        if (!in_array($context, ['academic_management', 'academic', 'repository', 'repository_owner'], true)) return $capabilities;
+        if ((int) ($project['id'] ?? 0) < 1 || $userId < 1) return $capabilities;
+        if ($context === 'repository_owner') {
+            if (!$this->isOwnedRepositoryReadOnlyProject($project, $userId, $roles, $administrator)) return $capabilities;
+            $capabilities['view_project'] = true;
+            $capabilities['download_files'] = true;
+            $capabilities['download_academic_package'] = true;
+            $capabilities['view_institutional_files'] = true;
+            return $capabilities;
+        }
+        if (!empty($project['deleted_at'])) return $capabilities;
         if (!$administrator && !empty($project['withdrawn_at'])) return $capabilities;
         if ($context !== 'repository'
             && (string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW) === ProjectPublicationOrigin::DIRECT_REPOSITORY) {
@@ -292,6 +312,17 @@ final class ProjectCapabilityService
             $capabilities['download_academic_package'] = true;
             $capabilities['view_institutional_files'] = true;
             if ($administrator) $capabilities['view_admin_history'] = true;
+            $isDirectRepositoryOwner = !$administrator
+                && in_array('teacher', $roles, true)
+                && (string) ($project['publication_origin'] ?? '') === ProjectPublicationOrigin::DIRECT_REPOSITORY
+                && (int) ($project['created_by'] ?? 0) === $userId
+                && $this->isActiveTeacher($userId);
+            if ($isDirectRepositoryOwner) {
+                $capabilities['edit_information'] = true;
+                $capabilities['manage_files'] = true;
+                $capabilities['manage_own_repository_content'] = true;
+                $capabilities['manage_own_repository_status'] = true;
+            }
             $studentParticipant = in_array('student', $roles, true)
                 && count(array_filter($participants, static fn (array $participant): bool =>
                     (int) ($participant['user_id'] ?? 0) === $userId
@@ -486,5 +517,47 @@ final class ProjectCapabilityService
             && empty($project['withdrawn_at'])
             && (string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW) === ProjectPublicationOrigin::WORKFLOW
             && in_array((string) ($project['status'] ?? ''), self::INSTITUTIONAL_ACTIVE_STATUSES, true);
+    }
+
+    private function isOwnedRepositoryReadOnlyProject(array $project, int $userId, array $roles, bool $administrator): bool
+    {
+        if ($administrator || $userId < 1
+            || (string) ($project['publication_origin'] ?? '') !== ProjectPublicationOrigin::DIRECT_REPOSITORY
+            || (int) ($project['created_by'] ?? 0) !== $userId
+            || !in_array('teacher', array_map('strtolower', array_map('strval', $roles)), true)
+            || !$this->isActiveTeacher($userId)) return false;
+
+        if (!empty($project['deleted_at'])) {
+            return (int) ($project['deleted_by'] ?? 0) === $userId;
+        }
+        if (!empty($project['withdrawn_at'])) {
+            return (int) ($project['withdrawn_by'] ?? 0) === $userId;
+        }
+        if ((string) ($project['status'] ?? '') !== 'published' || !empty($project['is_available'])) return false;
+
+        $query = Database::connection()->prepare(
+            "SELECT pal.user_id
+             FROM project_audit_log pal
+             WHERE pal.project_id=:project AND pal.action='project_availability_changed'
+             ORDER BY pal.id DESC LIMIT 1"
+        );
+        $query->execute(['project' => (int) ($project['id'] ?? 0)]);
+        return (int) $query->fetchColumn() === $userId;
+    }
+
+    private function isActiveTeacher(int $userId): bool
+    {
+        if ($userId < 1) return false;
+        $query = Database::connection()->prepare(
+            "SELECT 1
+             FROM users u
+             INNER JOIN teacher_profiles tp ON tp.user_id=u.id
+             INNER JOIN user_roles ur ON ur.user_id=u.id
+             INNER JOIN roles r ON r.id=ur.role_id AND r.code='teacher'
+             WHERE u.id=:user AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL
+             LIMIT 1"
+        );
+        $query->execute(['user' => $userId]);
+        return (bool) $query->fetchColumn();
     }
 }

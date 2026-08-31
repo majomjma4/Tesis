@@ -8,7 +8,9 @@ final class ProjectDocumentController
     {
         $this->post();$session=new AuthSessionService();$this->documentContext=(string)($_POST['context']??'');
         if(!in_array($this->documentContext,['repository','academic_management'],true))$this->json(false,'El contexto documental no es válido.',[],422);
-        $csrfScope=$this->documentContext==='repository'?'admin_repository':'admin_projects';
+        $csrfScope=($this->documentContext==='repository' && (string)($_GET['page']??'')==='repository-direct-project-file')
+            ? 'repository_teacher_content'
+            : ($this->documentContext==='repository'?'admin_repository':'admin_projects');
         if(!$session->validateCsrf($csrfScope,(string)($_POST['_csrf']??'')))$this->json(false,'La solicitud contiene un token CSRF inválido.',[],419);
         $projectId=(int)($_POST['project_id']??$_POST['material_id']??0);$action=(string)($_POST['action']??'');$actor=(int)$session->userId();$model=new ProjectDocumentModel();$storage=new ProjectDocumentFileService();$stored=[];
         $capabilities=(new ProjectCapabilityService())->forProjectId($projectId,$this->documentContext);

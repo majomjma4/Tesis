@@ -166,8 +166,10 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
                 } else echo count($selectableFiles).' '.(count($selectableFiles)===1?'archivo registrado':'archivos registrados');
             ?></p></div>
             <?php $packageDownloadUrl = !empty($package['download_url']) ? (string)$package['download_url'] : ($recordIsProject && (string)($digitalRecord['context'] ?? '') === 'repository' ? route('repository-download') . '&id=' . (int)($digitalRecord['entity']['id'] ?? 0) : '');
-            $showPackageDownload = !empty($package['available']) && $packageDownloadUrl !== '' && count($selectableFiles) >= 1; ?>
-            <?php if ($selectableFiles || $canManageFiles): ?><div class="ed-files-global-actions" data-file-global-actions>
+            $showPackageDownload = !empty($package['available']) && $packageDownloadUrl !== '' && count($selectableFiles) >= 1;
+            $showSelectionDownload = $canDownloadFiles && count($selectableFiles) >= 2;
+            $hasGlobalFileActions = $canManageFiles || $showPackageDownload || $showSelectionDownload; ?>
+            <?php if ($hasGlobalFileActions): ?><div class="ed-files-global-actions" data-file-global-actions>
                 <button class="ed-files-global-toggle" type="button" data-file-global-toggle aria-label="Acciones de archivos del <?= e($recordFileOwner) ?>" aria-haspopup="menu" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i></button>
                 <div class="ed-files-global-menu" data-file-global-menu role="menu" hidden>
                     <?php if ($canManageFiles): ?>
@@ -183,7 +185,7 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
                         <?php if ($showPackageDownload): ?>
                             <a data-record-package-download data-record-download download role="menuitem" href="<?= e($packageDownloadUrl) ?>"><i class="fa-solid fa-file-zipper" aria-hidden="true"></i><span>Descargar ZIP<small><?= count($selectableFiles) ?> <?= count($selectableFiles) === 1 ? 'archivo' : 'archivos' ?></small></span><?php if (!empty($package['size'])): ?><strong class="ed-package-size"><?= e((string) $package['size']) ?></strong><?php endif; ?></a>
                         <?php endif; ?>
-                        <?php if ($canDownloadFiles && count($selectableFiles) >= 2): ?><button type="button" role="menuitem" data-file-selection-toggle><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>Seleccionar archivos</span></button><?php endif; ?>
+                        <?php if ($showSelectionDownload): ?><button type="button" role="menuitem" data-file-selection-toggle><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>Seleccionar archivos</span></button><?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div><?php endif; ?>

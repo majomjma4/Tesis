@@ -249,15 +249,15 @@ final class AdminRepositoryModel
         )->fetchAll();
     }
 
-    public function restorePublication(int $id, int $actor): void
+    public function restorePublication(int $id, int $actor, ?int $requiredOwnerId = null): void
     {
         if ($id < 1) {
             throw new InvalidArgumentException('El proyecto no es válido.');
         }
 
-        Database::transaction(function (PDO $database) use ($id, $actor): void {
+        Database::transaction(function (PDO $database) use ($id, $actor, $requiredOwnerId): void {
             $query = $database->prepare(
-                "SELECT p.id,p.title,p.status,p.published_at,p.is_available,p.withdrawn_at,pt.code type_code
+                "SELECT p.id,p.title,p.status,p.published_at,p.is_available,p.withdrawn_at,p.withdrawn_by,p.created_by,p.publication_origin,pt.code type_code
                 FROM projects p
                 JOIN project_types pt ON pt.id=p.project_type_id
                 WHERE p.id=:id AND p.deleted_at IS NULL
@@ -269,6 +269,11 @@ final class AdminRepositoryModel
                 throw new InvalidArgumentException('El proyecto ya no está disponible.');
             }
 
+            if ($requiredOwnerId !== null && (
+                (int)($before['created_by'] ?? 0) !== $requiredOwnerId
+                || (string)($before['publication_origin'] ?? '') !== ProjectPublicationOrigin::DIRECT_REPOSITORY
+                || (int)($before['withdrawn_by'] ?? 0) !== $requiredOwnerId
+            )) throw new SupportMaterialAccessException('No tienes autorización para restaurar este proyecto.');
             if ($before['status'] !== 'published' || $before['withdrawn_at'] === null) throw new InvalidArgumentException('Solo pueden reincorporarse proyectos retirados previamente del repositorio.');
 
             $database->prepare(
@@ -288,15 +293,15 @@ final class AdminRepositoryModel
         });
     }
 
-    public function setPublished(int $id, bool $publish, int $actor): void
+    public function setPublished(int $id, bool $publish, int $actor, ?int $requiredOwnerId = null): void
     {
         if ($id < 1) {
             throw new InvalidArgumentException('El proyecto no es válido.');
         }
 
-        Database::transaction(function (PDO $database) use ($id, $publish, $actor): void {
+        Database::transaction(function (PDO $database) use ($id, $publish, $actor, $requiredOwnerId): void {
             $query = $database->prepare(
-                'SELECT p.id,p.title,p.status,p.published_at,p.is_available,p.withdrawn_at,pt.code type_code
+                'SELECT p.id,p.title,p.status,p.published_at,p.is_available,p.withdrawn_at,p.withdrawn_by,p.created_by,p.publication_origin,pt.code type_code
                 FROM projects p
                 JOIN project_types pt ON pt.id=p.project_type_id
                 WHERE p.id=:id AND p.deleted_at IS NULL
@@ -309,6 +314,12 @@ final class AdminRepositoryModel
                 throw new InvalidArgumentException('El proyecto ya no está disponible.');
             }
 
+            if ($requiredOwnerId !== null && (
+                (int)($before['created_by'] ?? 0) !== $requiredOwnerId
+                || (string)($before['publication_origin'] ?? '') !== ProjectPublicationOrigin::DIRECT_REPOSITORY
+                || (string)($before['status'] ?? '') !== 'published'
+                || $before['withdrawn_at'] !== null
+            )) throw new SupportMaterialAccessException('No tienes autorización para retirar este proyecto.');
             if ($publish) {
                 $required = $before['type_code'] === 'thesis' ? 'tribunal_approved' : 'approved';
                 if ($before['status'] !== $required) {
@@ -346,19 +357,29 @@ final class AdminRepositoryModel
         });
     }
 
-    public function setAvailability(int $id, bool $available, int $actor): void
+    public function setAvailability(int $id, bool $available, int $actor, ?int $requiredOwnerId = null): void
     {
         if ($id < 1) throw new InvalidArgumentException('El proyecto no es válido.');
-        Database::transaction(function (PDO $database) use ($id, $available, $actor): void {
+        Database::transaction(function (PDO $database) use ($id, $available, $actor, $requiredOwnerId): void {
             $query = $database->prepare(
-                "SELECT id,title,status,is_available FROM projects
+                "SELECT id,title,status,is_available,created_by,publication_origin,withdrawn_at FROM projects
                  WHERE id=:id AND deleted_at IS NULL FOR UPDATE"
             );
             $query->execute(['id' => $id]);
             $before = $query->fetch();
             if (!$before) throw new InvalidArgumentException('El proyecto ya no está disponible.');
+            if ($requiredOwnerId !== null && (
+                (int)($before['created_by'] ?? 0) !== $requiredOwnerId
+                || (string)($before['publication_origin'] ?? '') !== ProjectPublicationOrigin::DIRECT_REPOSITORY
+                || $before['withdrawn_at'] !== null
+            )) throw new SupportMaterialAccessException('No tienes autorización para cambiar este proyecto.');
             if ((string) $before['status'] !== 'published') {
                 throw new InvalidArgumentException('La disponibilidad solo puede cambiarse en proyectos publicados.');
+            }
+            if ($requiredOwnerId !== null && $available) {
+                $lastAvailability = $database->prepare("SELECT user_id FROM project_audit_log WHERE project_id=:id AND action='project_availability_changed' ORDER BY id DESC LIMIT 1");
+                $lastAvailability->execute(['id'=>$id]);
+                if ((int)$lastAvailability->fetchColumn() !== $requiredOwnerId) throw new SupportMaterialAccessException('No puedes revertir una disponibilidad cambiada por administración.');
             }
             if ((bool) $before['is_available'] === $available) {
                 throw new InvalidArgumentException($available

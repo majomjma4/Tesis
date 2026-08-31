@@ -3,6 +3,13 @@
   const open = document.querySelector('[data-teacher-material-create]');
   const form = document.querySelector('[data-teacher-material-form]');
   if (!modal || !open || !form) return;
+  const draftUserId = Number(form.dataset.draftUserId || 0);
+  const draftNotice = form.querySelector('[data-teacher-material-draft-notice]');
+  const draftType = 'material';
+  const draftResume = modal.querySelector('[data-teacher-material-draft-resume]');
+  const draftContinue = modal.querySelector('[data-teacher-material-draft-continue]');
+  const draftStartNew = modal.querySelector('[data-teacher-material-draft-start-new]');
+  let draftRecoveryPending = false;
   const keywordSelector = form.querySelector('[data-teacher-material-keyword-selector]');
   const keywordTrigger = keywordSelector?.querySelector('[data-teacher-material-keyword-trigger]');
   const keywordPanel = keywordSelector?.querySelector('[data-teacher-material-keyword-panel]');
@@ -96,15 +103,93 @@
   const showToast = (message, type = 'success') => {
     window.AppToast?.show(message, type);
   };
-  const close = () => { modal.hidden = true; setDocumentScrollLocked(false); form.reset(); closeKeywordSelector(false); keywordOptions.forEach(option => { option.disabled = false; option.closest('[role="option"]')?.removeAttribute('aria-selected'); }); keywordOptions.forEach(option => { option.closest('[role="option"]')?.removeAttribute('hidden'); }); renderKeywordSelection(); selectedFiles = []; form.querySelector('[data-file-list]').replaceChildren(); form.querySelector('[data-teacher-material-error]').hidden = true; };
-  const openModal = () => { modal.hidden = false; setDocumentScrollLocked(true); modal.querySelector('input[name="title"]')?.focus(); };
+  let selectedFiles = [];
+  const setDraftNotice = fileCount => {
+    if (!draftNotice) return;
+    const count = Number(fileCount) || 0;
+    draftNotice.hidden = count < 1;
+    draftNotice.textContent = count === 1
+      ? 'El borrador tenía 1 archivo seleccionado. Por seguridad, vuelve a seleccionarlo antes de guardar.'
+      : `El borrador tenía ${count} archivos seleccionados. Por seguridad, vuelve a seleccionarlos antes de guardar.`;
+  };
+  const materialDraftState = () => ({
+    title: form.querySelector('[name="title"]')?.value || '',
+    material_type: form.querySelector('[name="material_type"]')?.value || '',
+    category_id: form.querySelector('[name="category_id"]')?.value || '',
+    description: form.querySelector('[name="description"]')?.value || '',
+    keywords: keywordOptions.filter(option => option.checked).map(option => option.value),
+    file_count: selectedFiles.length,
+  });
+  const hasSubstantialMaterialDraft = state => state.title.trim() !== ''
+    || state.description.trim() !== ''
+    || state.keywords.length > 0
+    || state.file_count > 0;
+  const hasSubstantialMaterialDraftRecord = draft => hasSubstantialMaterialDraft({
+    title: String(draft?.title || ''),
+    description: String(draft?.description || ''),
+    keywords: Array.isArray(draft?.keywords) ? draft.keywords : [],
+    file_count: Number(draft?.file_count) || 0,
+  });
+  const saveMaterialDraft = () => {
+    const state = materialDraftState();
+    if (!window.RepositoryContentDrafts || !draftUserId) return;
+    if (!hasSubstantialMaterialDraft(state)) {
+      window.RepositoryContentDrafts.remove(draftUserId, draftType);
+      return;
+    }
+    window.RepositoryContentDrafts.write(draftUserId, draftType, {
+      version: 1,
+      updated_at: Date.now(),
+      ...state,
+    });
+  };
+  const restoreMaterialDraft = () => {
+    if (!window.RepositoryContentDrafts || !draftUserId) return;
+    const draft = window.RepositoryContentDrafts.read(draftUserId, draftType);
+    if (!draft) { setDraftNotice(0); return; }
+    form.querySelector('[name="title"]').value = String(draft.title || '');
+    form.querySelector('[name="material_type"]').value = String(draft.material_type || '');
+    form.querySelector('[name="category_id"]').value = String(draft.category_id || '');
+    form.querySelector('[name="description"]').value = String(draft.description || '');
+    const selectedKeywords = new Set((Array.isArray(draft.keywords) ? draft.keywords : []).map(value => String(value)));
+    keywordOptions.forEach(option => { option.checked = selectedKeywords.has(String(option.value)); });
+    selectedFiles = [];
+    setDraftNotice(Number(draft.file_count) || 0);
+    renderKeywordSelection();
+    form.querySelector('[data-file-list]').replaceChildren();
+  };
+  const clearMaterialDraft = () => window.RepositoryContentDrafts?.remove(draftUserId, draftType);
+  const resetMaterialForm = () => { form.reset(); closeKeywordSelector(false); keywordOptions.forEach(option => { option.disabled = false; option.closest('[role="option"]')?.removeAttribute('aria-selected'); }); keywordOptions.forEach(option => { option.closest('[role="option"]')?.removeAttribute('hidden'); }); renderKeywordSelection(); selectedFiles = []; form.querySelector('[data-file-list]').replaceChildren(); setDraftNotice(0); form.querySelector('[data-teacher-material-error]').hidden = true; };
+  const close = (persistDraft = true) => { if (persistDraft && !draftRecoveryPending) saveMaterialDraft(); modal.hidden = true; setDocumentScrollLocked(false); resetMaterialForm(); draftRecoveryPending = false; draftResume?.setAttribute('hidden', ''); form.hidden = false; };
+  const openModal = () => {
+    const draft = window.RepositoryContentDrafts?.read(draftUserId, draftType);
+    resetMaterialForm();
+    if (hasSubstantialMaterialDraftRecord(draft)) {
+      draftRecoveryPending = true;
+      draftResume?.removeAttribute('hidden');
+      form.hidden = true;
+      modal.hidden = false;
+      setDocumentScrollLocked(true);
+      draftContinue?.focus();
+      return;
+    }
+    if (draft) clearMaterialDraft();
+    draftRecoveryPending = false;
+    draftResume?.setAttribute('hidden', '');
+    form.hidden = false;
+    modal.hidden = false;
+    setDocumentScrollLocked(true);
+    modal.querySelector('input[name="title"]')?.focus();
+  };
   window.openTeacherMaterialModal = openModal;
   open.addEventListener('click', event => { if (open.hasAttribute('data-teacher-content-trigger')) return; openModal(); });
   modal.querySelectorAll('[data-teacher-material-close]').forEach(button => button.addEventListener('click', close));
   modal.addEventListener('click', event => { if (event.target === modal) close(); });
-  const fileInput = form.querySelector('[data-files]'); const dropzone = form.querySelector('[data-teacher-dropzone]'); let selectedFiles = [];
-  const renderFiles = () => form.querySelector('[data-file-list]').replaceChildren(...selectedFiles.map((file, index) => { const item = document.createElement('li'); const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Quitar'; remove.addEventListener('click', () => { selectedFiles.splice(index, 1); renderFiles(); }); item.append(file.name, remove); return item; }));
-  const addFiles = files => { selectedFiles = [...selectedFiles, ...files]; renderFiles(); };
+  draftContinue?.addEventListener('click', () => { draftRecoveryPending = false; draftResume?.setAttribute('hidden', ''); form.hidden = false; restoreMaterialDraft(); modal.querySelector('input[name="title"]')?.focus(); });
+  draftStartNew?.addEventListener('click', () => { clearMaterialDraft(); draftRecoveryPending = false; draftResume?.setAttribute('hidden', ''); resetMaterialForm(); form.hidden = false; modal.querySelector('input[name="title"]')?.focus(); });
+  const fileInput = form.querySelector('[data-files]'); const dropzone = form.querySelector('[data-teacher-dropzone]');
+  const renderFiles = () => form.querySelector('[data-file-list]').replaceChildren(...selectedFiles.map((file, index) => { const item = document.createElement('li'); const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Quitar'; remove.addEventListener('click', () => { selectedFiles.splice(index, 1); renderFiles(); saveMaterialDraft(); }); item.append(file.name, remove); return item; }));
+  const addFiles = files => { selectedFiles = [...selectedFiles, ...files]; renderFiles(); saveMaterialDraft(); };
   fileInput?.addEventListener('change', event => addFiles([...event.target.files]));
   ['dragenter','dragover'].forEach(type => dropzone?.addEventListener(type, event => { event.preventDefault(); dropzone.classList.add('is-dragover'); }));
   ['dragleave','drop'].forEach(type => dropzone?.addEventListener(type, event => { event.preventDefault(); dropzone.classList.remove('is-dragover'); }));
@@ -117,8 +202,11 @@
     selectedFiles.forEach(file => data.append('initial_files[]', file));
     try { const response = await fetch(form.dataset.endpoint, {method:'POST', body:data, headers:{Accept:'application/json'}}); const payload = await response.json();
       if (!response.ok || !payload.success) throw new Error(payload.message || 'No fue posible crear el material.');
-      close(); showToast(payload.message || 'Material creado correctamente.');
+      clearMaterialDraft(); close(false); showToast(payload.message || 'Material creado correctamente.');
       window.setTimeout(() => window.location.reload(), 2400);
     } catch (exception) { error.textContent = exception.message; error.hidden = false; showToast(error.textContent, 'error'); submit.disabled = false; }
   });
+  form.addEventListener('input', saveMaterialDraft);
+  form.addEventListener('change', saveMaterialDraft);
+  window.addEventListener('beforeunload', () => { if (!draftRecoveryPending) saveMaterialDraft(); });
 })();

@@ -5,12 +5,13 @@ declare(strict_types=1);
 /** Consulta la bandeja operativa de Titulación sin mutar el flujo académico. */
 final class ThesisManagementService
 {
-    private const ELIGIBLE_STATUSES = ['approved', 'defense'];
+    private const ELIGIBLE_STATUSES = ['approved', 'defense', 'tribunal_approved'];
 
     /** @return array{projects:list<array<string,mixed>>,periods:list<array{id:int,name:string}>,summary:array<string,int>,defenseSchedules:array<int,array<string,mixed>>} */
     public function listing(): array
     {
         $db = Database::connection();
+        $eligibleStatuses = "'" . implode("','", self::ELIGIBLE_STATUSES) . "'";
         $rows = $db->query(
             "SELECT p.id,p.code,p.title,p.status,p.updated_at,p.approved_at,p.created_at,
                     ap.id period_id,ap.name period_name,u.full_name tutor_name,pd.defense_date,pd.defense_time,pd.location defense_location,pd.modality defense_modality,pd.result defense_result,pd.result_notes,pd.attempt_number defense_attempt_number,(SELECT COUNT(*) FROM project_defenses pd3 WHERE pd3.project_id=p.id) defense_attempt_total
@@ -20,7 +21,7 @@ final class ThesisManagementService
              LEFT JOIN users u ON u.id=p.tutor_id
              LEFT JOIN project_defenses pd ON pd.project_id=p.id
                AND pd.attempt_number=(SELECT MAX(pd2.attempt_number) FROM project_defenses pd2 WHERE pd2.project_id=p.id)
-             WHERE p.deleted_at IS NULL AND p.status IN ('approved','defense')
+             WHERE p.deleted_at IS NULL AND p.withdrawn_at IS NULL AND p.status IN ($eligibleStatuses)
              ORDER BY p.updated_at DESC,p.id DESC"
         )->fetchAll();
         if ($rows === []) {
@@ -75,12 +76,13 @@ final class ThesisManagementService
     private function situation(string $status, int $tribunalCount, string $latestDefenseResult = ''): array
     {
         if ($status === 'defense' && $latestDefenseResult === 'rejected') return ['key'=>'rejected','label'=>'No aprobado','description'=>'El último intento de defensa no fue aprobado','action'=>'Cambiar Tribunal'];
+        if ($status === 'tribunal_approved') return ['key'=>'pending_publication','label'=>'Pendiente de publicación','description'=>'Aprobado por el Tribunal','action'=>'Publicar'];
         if ($status === 'approved') return ['key'=>'pending_tribunal','label'=>'Pendiente de Tribunal','description'=>ThesisTribunalService::isValidMemberCount($tribunalCount)?'Tribunal listo para confirmar':'Se requieren exactamente 3 cargos activos','action'=>'Gestionar Tribunal'];
         if ($status === 'defense') return ['key'=>'defense','label'=>'Defensa en curso','description'=>'Proceso de evaluación en curso','action'=>'Ver proceso'];
         return ['key'=>'pending_publication','label'=>'Pendiente de publicación','description'=>'Aprobado por el Tribunal','action'=>'Continuar proceso'];
     }
 
     /** @return array<string,int> */
-    private function emptySummary(): array { return ['pending_tribunal'=>0,'defense'=>0,'rejected'=>0]; }
+    private function emptySummary(): array { return ['pending_tribunal'=>0,'defense'=>0,'rejected'=>0,'pending_publication'=>0]; }
     private function tutorLabel(string $tutor, array $cotutors): string { $names=array_filter(array_merge([$tutor],$cotutors)); return $names ? implode(' · ', $names) : 'Sin tutor asignado'; }
 }

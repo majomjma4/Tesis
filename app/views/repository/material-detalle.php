@@ -2,6 +2,15 @@
     <section class="repository-detail-not-found"><i class="fa-solid fa-folder-open"></i><h1>Contenido no encontrado</h1><p>El contenido solicitado no existe o ya no se encuentra disponible.</p><a class="open-btn" href="<?= e($repositoryUrl) ?>">Volver al repositorio</a></section>
 <?php else:
     $administratorView = !empty($isAdministrator) || !empty($administratorView);
+    $teacherOwnedReadOnly = !empty($teacherOwnedReadOnly);
+    $teacherOwnedDownloadAllowed = $teacherOwnedReadOnly && !empty($canDownloadOwnedDetail);
+    $resourceContextQuery = $teacherOwnedDownloadAllowed ? '&context=teacher_owner' : '';
+    $effectivePreviewActionUrl = (string) $previewActionUrl . $resourceContextQuery;
+    $effectiveDownloadActionUrl = (string) $downloadActionUrl . $resourceContextQuery;
+    $effectiveZipListActionUrl = (string) $zipListActionUrl . $resourceContextQuery;
+    $effectiveZipEntryPreviewActionUrl = (string) $zipEntryPreviewActionUrl . $resourceContextQuery;
+    $effectiveZipEntryDownloadActionUrl = (string) $zipEntryDownloadActionUrl . $resourceContextQuery;
+    $effectivePackageDownloadActionUrl = (string) $packageDownloadActionUrl . $resourceContextQuery;
     $canEditInfo = !empty($canEditInformation) || $administratorView;
     $canFiles = !empty($canManageFiles) || $administratorView;
     $canStatus = !empty($canChangeStatus) || $administratorView;
@@ -11,7 +20,7 @@
     $requestedTab = strtolower(trim((string) ($_GET['tab'] ?? 'information')));
     $activeTab = in_array($requestedTab, $allowedTabs, true) ? $requestedTab : 'information';
     $materialId = (int) ($material['id'] ?? 0);
-    $detailUrl = route('support-material-detail') . '&id=' . $materialId;
+    $detailUrl = ($teacherOwnedReadOnly ? route('support-material-teacher-detail') : route('support-material-detail')) . '&id=' . $materialId;
     $requestedMode = strtolower(trim((string) ($_GET['mode'] ?? 'view')));
     $mode = $requestedMode === 'edit' && $canEditInfo ? 'edit' : 'view';
     $modeQuery = $mode === 'edit' ? '&mode=edit' : '&mode=view';
@@ -80,12 +89,13 @@
     $materialAvailable = !empty($material['is_available']);
     $documents = array_map(static function (array $file) use (
         $materialAvailable,
+        $teacherOwnedDownloadAllowed,
         $materialId,
-        $previewActionUrl,
-        $downloadActionUrl,
-        $zipListActionUrl,
-        $zipEntryPreviewActionUrl,
-        $zipEntryDownloadActionUrl
+        $effectivePreviewActionUrl,
+        $effectiveDownloadActionUrl,
+        $effectiveZipListActionUrl,
+        $effectiveZipEntryPreviewActionUrl,
+        $effectiveZipEntryDownloadActionUrl
     ): array {
         $name = (string) ($file['name'] ?? 'Archivo sin nombre');
         $extension = mb_strtolower((string) ($file['extension'] ?? pathinfo($name, PATHINFO_EXTENSION)), 'UTF-8');
@@ -97,7 +107,7 @@
         ];
         $isZip = $extension === 'zip';
         $physicalAvailable = !empty($file['available']);
-        $available = $materialAvailable && $physicalAvailable;
+        $available = ($materialAvailable || $teacherOwnedDownloadAllowed) && $physicalAvailable;
         return [
             'id' => $fileId,
             'name' => $name,
@@ -114,43 +124,43 @@
             'is_package' => false,
             'preview_supported' => $available && (isset($previewTypes[$extension]) || $isZip),
             'preview_type' => $isZip ? 'zip' : ($previewTypes[$extension] ?? 'unsupported'),
-            'preview_url' => $available && $fileId > 0 ? (string) $previewActionUrl . $query : '',
-            'zip_url' => $available && $isZip && $fileId > 0 ? (string) $zipListActionUrl . $query : '',
-            'zip_entry_preview_url' => $available && $isZip && $fileId > 0 ? (string) $zipEntryPreviewActionUrl . $query : '',
-            'zip_entry_download_url' => $available && $isZip && $fileId > 0 ? (string) $zipEntryDownloadActionUrl . $query : '',
-            'download_url' => $available && $fileId > 0 ? (string) $downloadActionUrl . $query : '',
+            'preview_url' => $available && $fileId > 0 ? (string) $effectivePreviewActionUrl . $query : '',
+            'zip_url' => $available && $isZip && $fileId > 0 ? (string) $effectiveZipListActionUrl . $query : '',
+            'zip_entry_preview_url' => $available && $isZip && $fileId > 0 ? (string) $effectiveZipEntryPreviewActionUrl . $query : '',
+            'zip_entry_download_url' => $available && $isZip && $fileId > 0 ? (string) $effectiveZipEntryDownloadActionUrl . $query : '',
+            'download_url' => $available && $fileId > 0 ? (string) $effectiveDownloadActionUrl . $query : '',
         ];
     }, $materialFiles);
     $regularArchives = array_values(array_filter($documents, static fn (array $document): bool => ($document['extension'] ?? '') === 'zip'));
     $documents = array_values(array_filter($documents, static fn (array $document): bool => ($document['extension'] ?? '') !== 'zip'));
     $packageDescriptor = is_array($material['package_descriptor'] ?? null) ? $material['package_descriptor'] : [];
     $archives = $regularArchives;
-    $packageAvailable = $materialAvailable && !empty($packageDescriptor['available']);
+    $packageAvailable = ($materialAvailable || $teacherOwnedDownloadAllowed) && !empty($packageDescriptor['available']);
     $packageDownloadUrl = $packageAvailable
-        ? (string) $packageDownloadActionUrl . '&material_id=' . $materialId
+        ? (string) $effectivePackageDownloadActionUrl . '&material_id=' . $materialId
         : '';
 
     $publicationState = (string) ($material['status_key'] ?? 'draft');
     $isPublished = $publicationState === 'published';
-    $statusLabel = match ($publicationState) {
+    $statusLabel = !empty($material['deleted_at']) ? 'Papelera' : match ($publicationState) {
         'published' => 'Publicado',
         'draft' => 'Borrador',
         default => 'Retirado',
     };
     $materialFiles = array_values(array_filter(
         (array) ($material['files'] ?? []),
-        static fn (array $file): bool => ($file['state'] ?? '') === 'available'
+        static fn (array $file): bool => ($file['state'] ?? 'available') === 'available'
+            && !empty($file['available'])
     ));
     $presentationFile = array_values(array_filter(
         $materialFiles,
         static fn (array $file): bool => !empty($file['presentation'])
     ))[0] ?? ($materialFiles[0] ?? null);
     $downloadUrl = $presentationFile !== null
-        ? route('support-material-download') . '&material_id=' . $materialId . '&file_id=' . (int) $presentationFile['id']
-        : (!empty($material['package_descriptor']['available'])
-            ? route('support-material-package-download') . '&id=' . $materialId
+        ? $effectiveDownloadActionUrl . '&material_id=' . $materialId . '&file_id=' . (int) $presentationFile['id']
+        : ($packageAvailable
+            ? $effectivePackageDownloadActionUrl . '&id=' . $materialId
             : null);
-    $packageAvailable = !empty($material['package_descriptor']['available']);
     $resourceCount = count(array_filter(
         (array) ($material['resources'] ?? []),
         static fn (mixed $resource): bool => is_array($resource)
@@ -163,6 +173,9 @@
         'entity' => ['type' => 'support_material', 'id' => $materialId],
         'context' => 'repository',
         'mode' => $mode,
+        'capabilities' => [
+            'download_files' => $materialAvailable || $teacherOwnedDownloadAllowed,
+        ],
         'return_url' => $repositoryUrl,
         'breadcrumbs' => [
             ['label' => 'Repositorio', 'url' => $repositoryUrl],
@@ -174,7 +187,7 @@
             'description' => $mode === 'edit' ? 'Editando información del material.' : (string) ($material['description'] ?? ''),
             'type_label' => 'Material de apoyo',
             'status_label' => $statusLabel,
-            'status_tone' => $isPublished ? 'success' : 'neutral',
+            'status_tone' => !empty($material['deleted_at']) ? 'neutral' : ($isPublished ? 'success' : 'neutral'),
         ],
         'metadata' => array_values(array_filter([
             ['key' => 'publication', 'label' => 'Publicación', 'value' => (string) ($material['publication_date'] ?? '')],
@@ -206,6 +219,7 @@
             'redirect' => $administratorView ? route('admin-repository') . '&tab=materials' : (string) $repositoryUrl,
             'has_unread' => !empty($hasUnreadAdministrativeActivity),
         ],
+        'teacher_owner_status_management' => !$administratorView && $canStatus,
         'information_sections' => [
             ['id' => 'description', 'title' => 'Descripción', 'icon' => 'fa-align-left', 'type' => 'prose', 'content' => (string) ($material['full_description'] ?? $material['description'] ?? '')],
             ['id' => 'institutional', 'title' => 'Ficha del material', 'icon' => 'fa-building-columns', 'type' => 'metadata', 'content' => array_values(array_filter([
@@ -279,9 +293,9 @@
             'errors' => [],
         ],
         'endpoints' => [
-            'preview' => $previewActionUrl ?? '',
+            'preview' => $effectivePreviewActionUrl ?? '',
             'preview_content' => $previewContentActionUrl ?? '',
-            'download' => $downloadActionUrl ?? '',
+            'download' => $effectiveDownloadActionUrl ?? '',
             'admin_history' => $materialHistoryEndpoint ?? '',
             'admin_history_cleanup' => $materialHistoryCleanupEndpoint ?? '',
         ],

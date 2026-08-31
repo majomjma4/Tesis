@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const workspace = document.querySelector('[data-student-workspace]');
+    if (!workspace) return;
     const escapeHtml = (str = '') => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
     const showVisualToast = (message, kind = false, title = '') => {

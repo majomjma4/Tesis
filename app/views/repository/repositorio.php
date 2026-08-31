@@ -20,6 +20,17 @@
 
         <!-- Catálogo unificado y contenedor principal -->
         <main class="ar-catalog" id="repositoryShell">
+            <?php
+            $teacherOwnedContent = is_array($teacherOwnedContent ?? null) ? $teacherOwnedContent : [];
+            $teacherOwnedCounts = (array) ($teacherOwnedContent['counts'] ?? []);
+            $teacherManagementCounts = [
+                'unavailable' => (int) ($teacherOwnedCounts['unavailable'] ?? count((array) ($teacherOwnedContent['unavailable'] ?? []))),
+                'withdrawn' => (int) ($teacherOwnedCounts['withdrawn'] ?? count((array) ($teacherOwnedContent['withdrawn'] ?? []))),
+                'trash' => (int) ($teacherOwnedCounts['trash'] ?? count((array) ($teacherOwnedContent['trash'] ?? []))),
+            ];
+            $teacherManagementTotal = array_sum($teacherManagementCounts);
+            $showTeacherManagement = !empty($teacherOwnedContentUi) && $teacherManagementTotal > 0;
+            ?>
             <!-- Pestañas exactas Admin -->
             <nav class="ar-tabs" role="tablist" aria-label="Secciones del repositorio">
                 <button type="button" class="active" id="tabProjects" role="tab" aria-selected="true" aria-controls="panelProjects">
@@ -32,6 +43,13 @@
                     <span class="ar-tab-label">Material de apoyo</span>
                     <span class="ar-tab-count" id="badgeSupportCount"<?= ($supportStatus ?? 'loaded') === 'error' ? ' aria-label="Estado no disponible"' : '' ?>><?= ($supportStatus ?? 'loaded') === 'error' ? '—' : count($supportDocuments) ?></span>
                 </button>
+            <?php if ($showTeacherManagement): ?>
+                <button type="button" id="tabManagement" role="tab" aria-selected="false" aria-controls="panelManagement">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span class="ar-tab-label">Mi gestión</span>
+                    <span class="ar-tab-count" id="badgeManagementCount"><?= $teacherManagementTotal ?></span>
+                </button>
+            <?php endif; ?>
             </nav>
 
             <!-- Toolbar de proyectos (hermano directo de ar-panel, como en Admin) -->
@@ -290,6 +308,10 @@
                 </div>
                 <footer class="ar-pagination" id="repositorySupportPagination" hidden><span id="repositorySupportPaginationSummary">Mostrando 0 de 0</span><label>Mostrar <select id="repositorySupportPageSize"><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="75">75</option><option value="100">100</option></select></label><nav id="repositorySupportPaginationPages" aria-label="Paginación de materiales de apoyo"></nav></footer>
             </section>
+
+            <?php if (!empty($teacherOwnedContentUi)): ?>
+                <?php require __DIR__ . '/_teacher-owned-content.php'; ?>
+            <?php endif; ?>
 
         </main>
     </div>

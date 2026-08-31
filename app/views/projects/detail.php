@@ -15,6 +15,7 @@ if ($project === null): ?>
     $projectId = (int) $project['id'];
     $detailUrl = (string) $detailUrl;
     $projectContext = (string) ($projectContext ?? ($publicContext ? 'repository' : 'academic'));
+    $isDirectRepositoryProject = (string) ($project['publication_origin'] ?? '') === ProjectPublicationOrigin::DIRECT_REPOSITORY;
     $projectCapabilities = array_replace([
         'view_project' => false,
         'edit_information' => false,
@@ -38,6 +39,9 @@ if ($project === null): ?>
     $isTrackingContext = $isAcademicManagement || !empty($isTeacherContext);
     $academicLabels = project_academic_labels((string) $project['status']);
     $statusLabel = $publicContext ? 'Publicado' : $academicLabels['status'];
+    if ($projectContext === 'repository_owner') {
+        $statusLabel = !empty($project['deleted_at']) ? 'Papelera' : (!empty($project['withdrawn_at']) ? 'Retirado' : (empty($project['is_available']) ? 'No disponible' : $statusLabel));
+    }
     $isDegreeProject = in_array(mb_strtolower((string)($project['type_code'] ?? ''),'UTF-8'), ['thesis','tesis','degree','titulacion','titulación'], true)
         || str_contains(mb_strtolower((string)($project['type_name'] ?? ''),'UTF-8'), 'titul');
     $stageLabel = $academicLabels['stage'];
@@ -62,7 +66,7 @@ if ($project === null): ?>
     }
     $previewTypes = ['pdf'=>'pdf','docx'=>'docx','txt'=>'text','png'=>'image','jpg'=>'image','jpeg'=>'image','webp'=>'image'];
     $presentationFileId = (int) ($project['presentation_file_id'] ?? 0);
-    $zipContextQuery=$publicContext?'&scope=repository':($isAcademicManagement?'&context=academic_management':(!empty($isTeacherContext)?'&context=academic':''));
+    $zipContextQuery=$publicContext?'&scope=repository':($isAcademicManagement?'&context=academic_management':($projectContext==='repository_owner'?'&context=repository_owner':(!empty($isTeacherContext)?'&context=academic':'')));
     $zipListActionUrl=route('project-zip-list').$zipContextQuery;
     $zipEntryPreviewActionUrl=route('project-zip-entry-preview').$zipContextQuery;
     $zipEntryDownloadActionUrl=route('project-zip-entry-download').$zipContextQuery;
@@ -103,7 +107,9 @@ if ($project === null): ?>
         $headerPackage = $publicContext
             ? $packageService->describe($projectId, route('repository-download') . '&id=' . $projectId)
             : ($isTrackingContext && !empty($projectCapabilities['download_academic_package'])
-                ? $packageService->describeAcademic($projectId, route('project-package-download') . '&id=' . $projectId)
+                ? ($projectContext === 'repository_owner'
+                    ? $packageService->describeRepositoryOwner($projectId, route('project-package-download') . '&id=' . $projectId . '&context=repository_owner')
+                    : $packageService->describeAcademic($projectId, route('project-package-download') . '&id=' . $projectId))
                 : ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'academic']);
     } catch (Throwable $packageError) {
         error_log('Academic project package descriptor: ' . $packageError->getMessage());
@@ -154,7 +160,7 @@ if ($project === null): ?>
     ];
     if($publicContext||$isTrackingContext){
         $participantTutor=array_values(array_filter($academicTeam,static fn(array $row):bool=>$row['role_code']==='tutor'))[0]??null;
-        $richTribunal=$isDegreeProject?$tribunal:[];
+        $richTribunal=(!$isDirectRepositoryProject&&$isDegreeProject)?$tribunal:[];
         $usableEmail=static function(mixed $value):string{$email=trim((string)$value);$lower=mb_strtolower($email,'UTF-8');return filter_var($email,FILTER_VALIDATE_EMAIL)&&!str_ends_with($lower,'.invalid')?$email:'';};
         $person=static function(array $row,string $role,bool $includeEmail=false)use($usableEmail):array{return [
             'user_id'=>(int)($row['user_id']??0),'username'=>trim((string)($row['username']??'')),
@@ -202,7 +208,7 @@ if ($project === null): ?>
         $informationSections=array_values(array_filter([
             ['id'=>'description','title'=>'Descripción del proyecto','icon'=>'fa-align-left','type'=>'prose','content'=>$publishedDescription!==''?$publishedDescription:($publicContext?'Este proyecto aún no cuenta con una descripción pública.':'Este proyecto aún no cuenta con una descripción registrada.')],
             ['id'=>'institutional','title'=>'Información académica','icon'=>'fa-building-columns','type'=>'metadata','content'=>$richAcademicFields],
-            $isTrackingContext?['id'=>'academic-progress','title'=>'Progreso académico','icon'=>'fa-route','type'=>'academic_progress','content'=>$academicProgressSteps]:null,
+            ($isTrackingContext&&!$isDirectRepositoryProject)?['id'=>'academic-progress','title'=>'Progreso académico','icon'=>'fa-route','type'=>'academic_progress','content'=>$academicProgressSteps]:null,
             $isAcademicManagement&&$reviewNotice!==null?['id'=>'review-notice','title'=>'Observaciones pendientes','icon'=>'fa-triangle-exclamation','type'=>'review_notice','content'=>$reviewNotice]:null,
             ['id'=>'participants','title'=>'Participantes','icon'=>'fa-users','type'=>'project_participants','content'=>[
                 'authors'=>$richAuthors,'tutoring'=>$richTutoring,'tribunal'=>$richTribunalMembers,
@@ -225,12 +231,17 @@ if ($project === null): ?>
     } elseif (!$publicContext && !empty($projectCapabilities['register_delivery']) && $canDeliver) {
         $actions[] = ['id' => 'delivery', 'label' => 'Registrar entrega', 'kind' => 'primary', 'icon' => 'fa-upload', 'url' => $detailUrl . '&tab=review', 'enabled' => true];
     }
-    if (!$isAcademicManagement && empty($isTeacherContext) && !empty($projectCapabilities['download_files']) && !empty($headerPackage['available'])) $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'],'enabled'=>true,'download'=>true];
+    if (($publicContext || $projectContext === 'repository_owner')
+        && !empty($projectCapabilities['download_files'])
+        && !empty($headerPackage['available'])) {
+        $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'],'enabled'=>true,'download'=>true];
+    }
     if($isAcademicManagement&&(string)$project['status']==='published')$actions[]=['id'=>'repository','label'=>'Ver en Repositorio','kind'=>'secondary','icon'=>'fa-book-open','url'=>route('repository-detail').'&id='.$projectId,'enabled'=>true];
     $statusActionCount=$isAcademicManagement&&!empty($projectCapabilities['change_status'])?count($projectStatusTransitions):0;
     foreach($statusActionCount>0?$projectStatusTransitions:[] as $transition)$actions[]=['id'=>'status-'.$transition['target'],'label'=>(string)$transition['label'],'kind'=>'secondary','icon'=>(string)$transition['icon'],'icon_style'=>'fa-solid','enabled'=>true,'trigger'=>'status-transition','transition'=>$transition];
     $menuActions=[];
-    if($publicContext&&!empty($projectCapabilities['manage_publication'])){
+    $canManageOwnRepositoryStatus = !empty($projectCapabilities['manage_own_repository_status']);
+    if($publicContext&&(!empty($projectCapabilities['manage_publication'])||$canManageOwnRepositoryStatus)){
         $menuActions[]=['label'=>$project['is_available']?'Marcar como no disponible':'Marcar como disponible','icon'=>$project['is_available']?'fa-ban':'fa-circle-check','enabled'=>true,'action'=>'availability'];
         $menuActions[]=['label'=>'Retirar publicación','icon'=>'fa-box-archive','enabled'=>true,'action'=>'publication'];
     }
@@ -287,7 +298,7 @@ if ($project === null): ?>
     $digitalRecord=['entity'=>['type'=>'project','id'=>$projectId,'query_key'=>'project_id'],'context'=>$projectContext,'mode'=>'view','return_url'=>$returnUrl,
         'capabilities'=>$projectCapabilities,
         'breadcrumbs'=>$breadcrumbs,
-        'header'=>['title'=>(string)$project['title'],'description'=>(string)($project['subtitle']??''),'type_label'=>(string)$project['type_name'],'type_icon'=>$publicContext?'fa-folder-tree':null,'status_label'=>$statusLabel,'status_tone'=>in_array((string)$project['status'],['approved','published'],true)?'success':'neutral','publisher_name'=>$publicContext&&$publisherName!==''?$publisherName:''],
+        'header'=>['title'=>(string)$project['title'],'description'=>(string)($project['subtitle']??''),'type_label'=>(string)$project['type_name'],'type_icon'=>$publicContext?'fa-folder-tree':null,'status_label'=>$statusLabel,'status_tone'=>!empty($project['deleted_at'])?'neutral':(in_array((string)$project['status'],['approved','published'],true)?'success':'neutral'),'publisher_name'=>$publicContext&&$publisherName!==''?$publisherName:''],
         'metadata'=>array_values(array_filter($headerMetadata,static fn(?array $row):bool=>$row!==null&&$row['value']!=='')),
         'actions'=>$actions,'menu_actions'=>$menuActions,'tabs'=>$tabs,'active_tab'=>$activeTab,'information_sections'=>$informationSections,
         'adjustment_notice'=>$adjustmentNotice,
@@ -308,7 +319,8 @@ if ($project === null): ?>
             'modifications'=>$publicContext?(array)($project['post_publication_modifications']??[]):[],
         ],
         'endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl,'admin_history'=>(string)($projectHistoryEndpoint??'')], 'version_endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl],
-         'admin_actions'=>['endpoint'=>(string)($projectAdminEndpoint??''),'trash_endpoint'=>(string)($projectTrashEndpoint??''),'csrf_token'=>(string)($projectAdminCsrf??''),'trash_csrf_token'=>(string)($projectTrashCsrf??''),'status'=>(string)$project['status'],'is_available'=>!empty($project['is_available']),'redirect'=>$returnUrl],
+        'admin_actions'=>['endpoint'=>(string)($projectAdminEndpoint??''),'trash_endpoint'=>(string)($projectTrashEndpoint??''),'csrf_token'=>(string)($projectAdminCsrf??''),'trash_csrf_token'=>(string)($projectTrashCsrf??''),'status'=>(string)$project['status'],'is_available'=>!empty($project['is_available']),'redirect'=>$returnUrl],
+        'teacher_owner_status_management'=>!$isAdministratorView && $ownRepositoryStatusManagement,
         'status_transition'=>[
             'enabled'=>$isAcademicManagement&&$projectStatusTransitions!==[],
             'endpoint'=>(string)($projectStatusEndpoint??''),'csrf_token'=>(string)($projectStatusCsrf??''),

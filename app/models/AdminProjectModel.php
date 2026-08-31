@@ -109,10 +109,10 @@ final class AdminProjectModel
         $from=" FROM projects p JOIN project_types pt ON pt.id=p.project_type_id JOIN careers c ON c.id=p.career_id JOIN academic_periods ap ON ap.id=p.academic_period_id LEFT JOIN users u ON u.id=p.tutor_id WHERE ".implode(' AND ',$where);
         return [$from,$params];
     }
-    public function save(array $v,int $id,int $actor,bool $allowStatusChange=false):int
+    public function save(array $v,int $id,int $actor,bool $allowStatusChange=false,?int $requiredOwnerId=null):int
     {
         $this->validate($v);
-        return Database::transaction(function(PDO $d)use($v,$id,$actor,$allowStatusChange):int{
+        return Database::transaction(function(PDO $d)use($v,$id,$actor,$allowStatusChange,$requiredOwnerId):int{
             $tutor=$v['tutor_id']?:null;
             $tutoringChange=['changed'=>false];
             $authorChange=['changed'=>false];
@@ -125,6 +125,21 @@ final class AdminProjectModel
                 $q=$d->prepare('SELECT id,code,title,subtitle,summary,status,project_type_id,career_id,academic_period_id,tutor_id,presentation_file_id,approved_at,created_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE');
                 $q->execute(['id'=>$id]);$before=$q->fetch();
                 if(!$before)throw new InvalidArgumentException('El proyecto ya no existe.');
+                if($requiredOwnerId !== null) {
+                    $ownerQuery=$d->prepare('SELECT created_by,publication_origin,status,withdrawn_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE');
+                    $ownerQuery->execute(['id'=>$id]);
+                    $owner=(array)$ownerQuery->fetch();
+                    if($owner===[])throw new InvalidArgumentException('El proyecto ya no existe.');
+                    $before=array_merge($before,$owner);
+                }
+                if($requiredOwnerId !== null && (
+                    (int)($before['created_by'] ?? 0) !== $requiredOwnerId
+                    || (string)($before['publication_origin'] ?? '') !== ProjectPublicationOrigin::DIRECT_REPOSITORY
+                    || (string)($before['status'] ?? '') !== 'published'
+                    || $before['withdrawn_at'] !== null
+                )) {
+                    throw new SupportMaterialAccessException('No tienes autorización para editar este proyecto del repositorio.');
+                }
                 $currentPeriodId=(int)$before['academic_period_id'];
                 if(!$allowStatusChange)$v['status']=(string)$before['status'];
                 $this->lockAndValidateAcademicPeriod($d,(int)$v['academic_period_id'],$currentPeriodId);

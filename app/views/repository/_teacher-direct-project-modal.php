@@ -5,7 +5,16 @@
             <div><span class="ar-eyebrow">Repositorio institucional</span><h2 id="directProjectTitle">Proyecto académico</h2></div>
             <button type="button" class="teacher-repository-content-modal__close" data-direct-project-close aria-label="Cerrar">&times;</button>
         </div>
-        <form data-direct-project-form data-endpoint="<?= e((string) $directProjectEndpoint) ?>" data-search-endpoint="<?= e((string) $directProjectSearchEndpoint) ?>" data-csrf="<?= e((string) $directProjectCsrf) ?>" novalidate>
+        <section class="teacher-content-draft-resume" data-direct-draft-resume hidden aria-labelledby="directProjectDraftResumeTitle">
+            <span class="ar-eyebrow">Borrador guardado</span>
+            <h3 id="directProjectDraftResumeTitle">Tienes un borrador guardado</h3>
+            <p>Encontramos información que dejaste sin terminar. ¿Deseas continuar desde donde lo dejaste?</p>
+            <div class="teacher-content-draft-resume__actions">
+                <button type="button" class="ar-secondary-action" data-direct-draft-start-new>Empezar de nuevo</button>
+                <button type="button" class="ar-primary-action" data-direct-draft-continue>Recuperar borrador</button>
+            </div>
+        </section>
+        <form data-direct-project-form data-draft-user-id="<?= (int) ((new AuthSessionService())->userId() ?? 0) ?>" data-endpoint="<?= e((string) $directProjectEndpoint) ?>" data-search-endpoint="<?= e((string) $directProjectSearchEndpoint) ?>" data-csrf="<?= e((string) $directProjectCsrf) ?>" novalidate>
             <nav class="teacher-direct-project-stepper" aria-label="Pasos del formulario">
                 <button type="button" data-direct-step-indicator="1" aria-current="step"><span>1</span><b>Información</b></button>
                 <button type="button" data-direct-step-indicator="2"><span>2</span><b>Participantes</b></button>
@@ -30,6 +39,7 @@
                 <section class="teacher-direct-project-step" data-direct-step-panel="3" aria-labelledby="directProjectStep3Title" hidden>
                     <p class="teacher-direct-project-step__kicker">Paso 3 de 3</p><h3 id="directProjectStep3Title" tabindex="-1">Archivos y publicación</h3>
                     <fieldset class="teacher-direct-project-picker"><legend>Archivos</legend><div class="teacher-direct-project-dropzone" data-direct-dropzone><input id="directProjectFiles" type="file" data-direct-files multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"><label for="directProjectFiles"><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i><strong>Selecciona o arrastra archivos aquí</strong><small>Se validarán tamaño y formato al publicar.</small></label></div><ul class="teacher-direct-project-file-list" data-direct-file-list></ul><span data-direct-error-for="files"></span></fieldset>
+                    <p class="teacher-direct-project-draft-notice" data-direct-draft-notice hidden role="status"></p>
                     <div class="teacher-direct-project-summary" data-direct-project-summary aria-live="polite"></div>
                 </section>
                 <div class="teacher-direct-project-errors" data-direct-project-error hidden role="alert"></div>

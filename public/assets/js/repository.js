@@ -1,10 +1,18 @@
 // Inicio de filtros del repositorio lector
 const repositoryContent = document.querySelector("#repositoryContent");
 
+const storedRepositoryToast = sessionStorage.getItem("repositoryToast");
+if (storedRepositoryToast) {
+    sessionStorage.removeItem("repositoryToast");
+    window.AppToast?.success(storedRepositoryToast);
+}
+
 const tabProjects = document.querySelector("#tabProjects");
 const tabSupport = document.querySelector("#tabSupport");
+const tabManagement = document.querySelector("#tabManagement");
 const panelProjects = document.querySelector("#panelProjects");
 const panelSupport = document.querySelector("#panelSupport");
+const panelManagement = document.querySelector("#panelManagement");
 const toolsSupport = document.querySelector("#toolsSupport");
 const repositorySupportStatus = panelSupport?.dataset.supportStatus || "loaded";
 let repositoryProjectRequestSequence = 0;
@@ -238,28 +246,62 @@ window.addEventListener("popstate", () => {
 });
 
 // Manejo de pestañas unificadas (Proyectos / Material de apoyo)
-if (tabProjects && tabSupport && panelProjects && panelSupport) {
-    tabProjects.addEventListener("click", () => {
-        tabProjects.classList.add("active");
-        tabProjects.setAttribute("aria-selected", "true");
-        tabSupport.classList.remove("active");
-        tabSupport.setAttribute("aria-selected", "false");
-        panelProjects.hidden = false;
-        panelSupport.hidden = true;
+const repositoryTabs = [
+    { tab: tabProjects, panel: panelProjects, beforeShow: () => {
         document.querySelector("#repositoryProjectFilters")?.removeAttribute("hidden");
         if (toolsSupport) toolsSupport.hidden = true;
-    });
-    tabSupport.addEventListener("click", () => {
-        tabSupport.classList.add("active");
-        tabSupport.setAttribute("aria-selected", "true");
-        tabProjects.classList.remove("active");
-        tabProjects.setAttribute("aria-selected", "false");
-        panelSupport.hidden = false;
-        panelProjects.hidden = true;
+    } },
+    { tab: tabSupport, panel: panelSupport, beforeShow: () => {
         const currentProjectFilters = document.querySelector("#repositoryProjectFilters");
         if (currentProjectFilters) currentProjectFilters.hidden = true;
         if (toolsSupport) toolsSupport.hidden = false;
+    } },
+    { tab: tabManagement, panel: panelManagement, beforeShow: () => {
+        const currentProjectFilters = document.querySelector("#repositoryProjectFilters");
+        if (currentProjectFilters) currentProjectFilters.hidden = true;
+        if (toolsSupport) toolsSupport.hidden = true;
+    } },
+].filter(({ tab, panel }) => tab && panel);
+
+const selectRepositoryTab = selectedTab => {
+    repositoryTabs.forEach(({ tab, panel, beforeShow }) => {
+        const selected = tab === selectedTab;
+        tab.classList.toggle("active", selected);
+        tab.setAttribute("aria-selected", String(selected));
+        panel.hidden = !selected;
+        if (selected) beforeShow();
     });
+};
+
+repositoryTabs.forEach(({ tab }) => tab.addEventListener("click", () => selectRepositoryTab(tab)));
+
+document.querySelectorAll("[data-teacher-owned-content]").forEach(root => {
+    const tabs = [...root.querySelectorAll('[role="tab"]')];
+    const panels = [...root.querySelectorAll('[role="tabpanel"][data-owned-section]')];
+    tabs.forEach(tab => tab.addEventListener("click", () => {
+        tabs.forEach(candidate => {
+            const selected = candidate === tab;
+            candidate.classList.toggle("is-active", selected);
+            candidate.setAttribute("aria-selected", String(selected));
+        });
+        panels.forEach(panel => { panel.hidden = panel.getAttribute("aria-labelledby") !== tab.id; });
+    }));
+});
+
+const repositoryUrlState = new URL(window.location.href);
+if (repositoryUrlState.searchParams.get("tab") === "management" && tabManagement) {
+    selectRepositoryTab(tabManagement);
+    const requestedManagementSection = repositoryUrlState.searchParams.get("management_section") || "";
+    const managementTab = requestedManagementSection
+        ? [...(panelManagement?.querySelectorAll('[role="tab"]') || [])]
+            .find(tab => tab.id === `teacherOwnedTab-${requestedManagementSection}`)
+        : null;
+    managementTab?.click();
+    if (managementTab) {
+        window.requestAnimationFrame(() => {
+            document.getElementById(`teacherOwnedPanel-${requestedManagementSection}`)?.scrollIntoView({ block: "start" });
+        });
+    }
 }
 
 function normalizeRepositoryText(value) {

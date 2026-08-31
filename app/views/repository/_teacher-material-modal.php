@@ -10,7 +10,16 @@
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </header>
-        <form class="ed-edit-modal-body" data-teacher-material-form
+        <section class="teacher-content-draft-resume" data-teacher-material-draft-resume hidden aria-labelledby="teacherMaterialDraftResumeTitle">
+            <span class="ar-eyebrow">Borrador guardado</span>
+            <h3 id="teacherMaterialDraftResumeTitle">Tienes un borrador guardado</h3>
+            <p>Encontramos información que dejaste sin terminar. ¿Deseas continuar desde donde lo dejaste?</p>
+            <div class="teacher-content-draft-resume__actions">
+                <button type="button" class="teacher-material-btn teacher-material-btn-secondary" data-teacher-material-draft-start-new>Empezar de nuevo</button>
+                <button type="button" class="teacher-material-btn teacher-material-btn-primary" data-teacher-material-draft-continue>Recuperar borrador</button>
+            </div>
+        </section>
+        <form class="ed-edit-modal-body" data-teacher-material-form data-draft-user-id="<?= (int) ((new AuthSessionService())->userId() ?? 0) ?>"
               data-endpoint="<?= e((string) $supportMaterialManageSaveEndpoint) ?>"
               data-file-endpoint="<?= e((string) $supportMaterialManageFileEndpoint) ?>"
               data-csrf="<?= e((string) $supportMaterialCsrf) ?>">
@@ -88,6 +97,8 @@
             </div>
 
             <ul class="teacher-material-selected-list" data-file-list></ul>
+
+            <p class="teacher-material-draft-notice" data-teacher-material-draft-notice hidden role="status"></p>
 
             <p class="teacher-material-error-message" data-teacher-material-error hidden></p>
 

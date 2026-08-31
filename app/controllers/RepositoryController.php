@@ -44,7 +44,7 @@ final class RepositoryController
         View::render('repository/repositorio', [
             'currentPage' => 'repository',
             'title' => 'Repositorio Institucional | Gestión Documental Académica',
-            'pageStyles' => [asset('css/repository-reader.css')],
+            'pageStyles' => [asset('css/repository-reader.css'), asset('css/notifications.css')],
             'pageScript' => asset('js/repository.js'),
             'pageScripts' => $this->teacherMaterialUi($session) ? [asset('js/teacher-support-materials.js')] : [],
             'projects' => $projects,
@@ -97,6 +97,10 @@ final class RepositoryController
         $supportError = null;
         $teacherMaterialUi = false;
         $directProjectUi = false;
+        $teacherOwnedContent = [
+            'active' => [], 'unavailable' => [], 'withdrawn' => [], 'trash' => [],
+            'counts' => ['active' => 0, 'unavailable' => 0, 'withdrawn' => 0, 'trash' => 0],
+        ];
         $directProjectTypes = [];
         $directProjectKeywords = [];
         $directProjectPeriod = null;
@@ -157,6 +161,15 @@ final class RepositoryController
             $directProjectUi = false;
         }
 
+        $teacherRepositoryUi = $teacherMaterialUi || $directProjectUi;
+        if ($teacherRepositoryUi) {
+            try {
+                $teacherOwnedContent = (new RepositoryTeacherContentService())->snapshot((int) ($session->userId() ?? 0));
+            } catch (Throwable $exception) {
+                error_log('Teacher repository content: ' . $exception->getMessage());
+            }
+        }
+
         $favoriteIds = [];
         try { $favoriteIds = (new FavoriteModel())->getFavoriteIds($this->getCurrentUserId()); } catch (Throwable $exception) { error_log('Repository favorites: ' . $exception->getMessage()); }
         $repositoryReturnUrl = (string) ($_SERVER['REQUEST_URI'] ?? route('repository'));
@@ -179,10 +192,11 @@ final class RepositoryController
 
         View::render('repository/repositorio', [
             'currentPage'=>'repository', 'title'=>'Repositorio Institucional | Gestión Documental Académica',
-            'pageStyles'=>[asset('css/repository-reader.css')], 'pageScript'=>asset('js/repository.js'),
+            'pageStyles'=>[asset('css/repository-reader.css'), asset('css/notifications.css')], 'pageScript'=>asset('js/repository.js'),
             'pageScripts'=>array_values(array_filter([
                 $teacherMaterialUi ? asset('js/teacher-support-materials.js') : null,
                 ($teacherMaterialUi || $directProjectUi) ? asset('js/teacher-repository-content.js') : null,
+                $teacherRepositoryUi ? asset('js/teacher-repository-management.js') : null,
             ])),
             'projects'=>$projects, 'repositoryStatus'=>(string) ($result['status'] ?? 'error'),
             'repositoryError'=>$repositoryError, 'repositoryPagination'=>(array) ($result['pagination'] ?? []),
@@ -205,6 +219,18 @@ final class RepositoryController
             'supportMaterialManageFileEndpoint'=>$teacherMaterialUi ? route('support-material-manage-file') : '',
             'supportMaterialManageSaveEndpoint'=>$teacherMaterialUi ? route('support-material-manage-save') : '',
             'supportMaterialCsrf'=>$teacherMaterialUi ? $session->csrfToken('admin_repository') : '',
+            'teacherOwnedContent'=>$teacherOwnedContent,
+            'teacherOwnedContentUi'=>$teacherRepositoryUi,
+            'teacherOwnedContentCsrf'=>$teacherRepositoryUi ? $session->csrfToken('repository_teacher_content') : '',
+            'teacherOwnedContentEndpoints'=>[
+                'project_save'=>route('repository-direct-project-save'),
+                'project_status'=>route('repository-direct-project-status'),
+                'project_trash'=>route('repository-direct-project-trash'),
+                'project_restore'=>route('repository-direct-project-restore'),
+                'teacher_trash'=>route('repository-teacher-trash'),
+                'project_file'=>route('repository-direct-project-file'),
+                'material_status'=>route('support-material-manage-status'),
+            ],
         ]);
     }
 
@@ -213,7 +239,12 @@ final class RepositoryController
         return !$session->isAdminModeActive() && (new SupportMaterialCapabilityService())->canCreate($session);
     }
 
-    public function detail(): void
+    public function teacherOwnedProjectDetail(): void
+    {
+        $this->detail(true);
+    }
+
+    public function detail(bool $teacherOwnedReadOnly = false): void
     {
         $this->ensureSession();
         $session = new AuthSessionService();
@@ -221,19 +252,52 @@ final class RepositoryController
         $isAdministratorView = $session->isAdminModeActive() && $hasRealAdminAccess;
         $projectId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
         $access = new ProjectAccessService();
+        $policy = new ProjectCapabilityService();
+        $ownedProjectCandidate = null;
+        if ($teacherOwnedReadOnly && !$isAdministratorView && $projectId !== false && $projectId !== null) {
+            try {
+                $ownedProjectCandidate = (new RepositoryTeacherContentService())->ownedDirectProject(
+                    (int) $projectId,
+                    (int) ($session->userId() ?? 0)
+                );
+                if (!$policy->canViewOwnedRepositoryProject(
+                    $ownedProjectCandidate,
+                    (int) ($session->userId() ?? 0),
+                    $access->currentRoles(),
+                    false
+                )) $ownedProjectCandidate = null;
+            } catch (SupportMaterialAccessException) {
+                $ownedProjectCandidate = null;
+            }
+        }
         try {
-            $project = ($projectId !== false && $projectId !== null && $access->can('project.view'))
-                ? (new ProjectRecordModel())->find((int)$projectId, $access->currentUserId(), $isAdministratorView, true) : null;
+            $project = ($projectId !== false && $projectId !== null && $access->can('project.view')
+                && (!$teacherOwnedReadOnly || $ownedProjectCandidate !== null))
+                ? (new ProjectRecordModel())->find(
+                    (int) $projectId,
+                    $access->currentUserId(),
+                    $isAdministratorView,
+                    !$teacherOwnedReadOnly,
+                    false,
+                    false,
+                    $teacherOwnedReadOnly
+                ) : null;
         } catch (Throwable $exception) {
             error_log('Repository detail: ' . $exception->getMessage());
             http_response_code(500);
             $this->renderDetailError();
         }
         if ($project === null) http_response_code(404);
-        $capabilityContext = $isAdministratorView ? 'academic_management' : 'repository';
+        $capabilityContext = $isAdministratorView ? 'academic_management' : ($teacherOwnedReadOnly ? 'repository_owner' : 'repository');
         $projectCapabilities = $project !== null
-            ? (new ProjectCapabilityService())->resolve($project, $capabilityContext, (int) ($session->userId() ?? 0), $access->currentRoles(), $isAdministratorView)
-            : (new ProjectCapabilityService())->none();
+            ? $policy->resolve($project, $capabilityContext, (int) ($session->userId() ?? 0), $access->currentRoles(), $isAdministratorView)
+            : $policy->none();
+        if ($teacherOwnedReadOnly && $project !== null && empty($projectCapabilities['view_project'])) {
+            $project = null;
+            $projectCapabilities = $policy->none();
+        }
+        $ownRepositoryManagement = !empty($projectCapabilities['manage_own_repository_content']);
+        $ownRepositoryStatusManagement = !empty($projectCapabilities['manage_own_repository_status']);
         if ($project !== null && !empty($projectCapabilities['view_academic_history'])) {
             $academicPage = (new ProjectRecordModel())->academicHistoryPage((int)$project['id']);
             $project['academic_history'] = $academicPage['events'];
@@ -253,8 +317,8 @@ final class RepositoryController
                 'restorable' => $documentModel->restorable((int)$project['id']),
                 'versions' => $documentModel->versions((int)$project['id']),
                 'limits' => (new ProjectDocumentFileService())->limits(),
-                'endpoint' => route('admin-project-file'),
-                'csrf' => $session->csrfToken('admin_repository')
+                'endpoint' => $ownRepositoryManagement ? route('repository-direct-project-file') : route('admin-project-file'),
+                'csrf' => $session->csrfToken($ownRepositoryManagement ? 'repository_teacher_content' : 'admin_repository')
             ];
         }
         $adjustmentData = ['items' => [], 'summary' => ['has_pending_adjustments' => false, 'pending_count' => 0, 'latest' => null]];
@@ -294,23 +358,26 @@ final class RepositoryController
             'currentPage' => 'repository',
             'title' => $project === null ? 'Proyecto no encontrado | Repositorio' : $project['title'] . ' | Repositorio',
             'pageStyles' => array_values(array_filter([
-                $isAdministratorView ? asset('css/admin-projects.css') : null,
+                ($isAdministratorView || $ownRepositoryManagement) ? asset('css/admin-projects.css') : null,
                 (!empty($projectCapabilities['view_adjustment_requests']) || !empty($projectCapabilities['create_adjustment_request'])) ? asset('css/project-adjustments.css') : null,
             ])),
-            'pageScript' => $isAdministratorView ? asset('js/material-admin-actions.js') : asset('js/repository-detail.js'),
+            // El controlador de acciones debe cargarse antes del detalle: repository-detail.js
+            // registra sus acciones sobre la API SupportMaterialAdminActions compartida.
+            'pageScript' => asset('js/material-admin-actions.js'),
             'pageScripts' => array_values(array_filter([
-                $isAdministratorView ? asset('js/repository-detail.js') : null,
-                $isAdministratorView ? asset('js/admin-projects.js') : null,
+                asset('js/repository-detail.js'),
+                ($isAdministratorView || $ownRepositoryManagement) ? asset('js/admin-projects.js') : null,
                 (!empty($projectCapabilities['view_adjustment_requests']) || !empty($projectCapabilities['create_adjustment_request'])) ? asset('js/project-adjustments.js') : null,
             ])),
             'project' => $project,
             'activeTab' => $activeTab,
             'isAdministrator' => $isAdministratorView,
-            'publicContext' => true,
-            'institutionalReadOnly' => !$isAdministratorView,
+            'isTeacherContext' => $teacherOwnedReadOnly,
+            'publicContext' => !$teacherOwnedReadOnly,
+            'institutionalReadOnly' => $teacherOwnedReadOnly || !$isAdministratorView,
             'canReview' => false,
             'canDeliver' => false,
-            'projectContext' => 'repository',
+            'projectContext' => $teacherOwnedReadOnly ? 'repository_owner' : 'repository',
             'projectCapabilities' => $projectCapabilities,
             'adjustmentData' => $adjustmentData,
             'adjustmentCsrf' => $session->csrfToken('project_adjustment'),
@@ -318,16 +385,16 @@ final class RepositoryController
             'hasPendingModificationRequest' => $hasPendingModificationRequest,
             'adjustmentEndpoints' => $adjustmentEndpoints,
             'projectEditUrl' => '',
-            'detailUrl' => route('repository-detail') . '&id=' . (int)($project['id'] ?? 0),
+            'detailUrl' => ($teacherOwnedReadOnly ? route('repository-teacher-project-detail') : route('repository-detail')) . '&id=' . (int)($project['id'] ?? 0),
             'returnUrl' => $returnUrl,
-            'previewActionUrl' => route('project-file-preview') . '&scope=repository',
-            'downloadActionUrl' => route('project-file-download') . '&scope=repository',
-            'projectAdminEndpoint' => !empty($projectCapabilities['manage_publication']) ? route('admin-repository-publish') : '',
+            'previewActionUrl' => route('project-file-preview') . ($teacherOwnedReadOnly ? '&context=repository_owner' : '&scope=repository'),
+            'downloadActionUrl' => route('project-file-download') . ($teacherOwnedReadOnly ? '&context=repository_owner' : '&scope=repository'),
+            'projectAdminEndpoint' => !empty($projectCapabilities['manage_publication']) ? route('admin-repository-publish') : ($ownRepositoryStatusManagement ? route('repository-direct-project-status') : ''),
             'projectHistoryEndpoint' => !empty($projectCapabilities['view_admin_history']) ? route('admin-project-history') . '&id=' . (int)($project['id'] ?? 0) . '&context=repository' : '',
-            'projectTrashEndpoint' => !empty($projectCapabilities['edit_information']) ? route('admin-project-trash') : '',
-            'projectSaveEndpoint' => !empty($projectCapabilities['edit_information']) ? route('admin-project-save') : '',
-            'projectAdminCsrf' => !empty($projectCapabilities['manage_publication']) ? $session->csrfToken('admin_repository') : '',
-            'projectTrashCsrf' => !empty($projectCapabilities['edit_information']) ? $session->csrfToken('admin_projects') : '',
+            'projectTrashEndpoint' => !empty($projectCapabilities['manage_publication']) ? route('admin-project-trash') : ($ownRepositoryStatusManagement ? route('repository-direct-project-trash') : ''),
+            'projectSaveEndpoint' => !empty($projectCapabilities['manage_publication']) ? route('admin-project-save') : ($ownRepositoryManagement ? route('repository-direct-project-save') : ''),
+            'projectAdminCsrf' => !empty($projectCapabilities['manage_publication']) ? $session->csrfToken('admin_repository') : ($ownRepositoryStatusManagement ? $session->csrfToken('repository_teacher_content') : ''),
+            'projectTrashCsrf' => !empty($projectCapabilities['manage_publication']) ? $session->csrfToken('admin_projects') : ($ownRepositoryManagement ? $session->csrfToken('repository_teacher_content') : ''),
             'projectEditorCatalogs' => !empty($projectCapabilities['edit_information']) ? (new AdminProjectModel())->catalogs() : [],
             'projectDocuments' => $projectDocuments,
             'academicHistoryEndpoint' => !empty($projectCapabilities['view_academic_history']) ? route('project-academic-history-events') . '&project_id=' . (int)($project['id'] ?? 0) . '&context=repository' : '',
@@ -603,6 +670,285 @@ final class RepositoryController
             error_log('Repository direct publish endpoint: ' . $exception->getMessage());
             http_response_code(500);
             $this->sendJson(false, 'No fue posible publicar el proyecto en este momento.');
+        }
+    }
+
+    /** Edita metadatos del proyecto directo únicamente para su Teacher creador. */
+    public function saveDirectProject(): void
+    {
+        $this->ensureSession();
+        header('Content-Type: application/json; charset=UTF-8');
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $this->sendJson(false, 'MÃ©todo no permitido.');
+        }
+        $session = new AuthSessionService();
+        if ($session->isAdminModeActive() || !$session->isTeacher()) {
+            http_response_code(403);
+            $this->sendJson(false, 'No tienes autorizaciÃ³n para editar este contenido.');
+        }
+        if (!$session->validateCsrf('repository_teacher_content', (string) ($_POST['_csrf'] ?? ''))) {
+            http_response_code(419);
+            $this->sendJson(false, 'La sesiÃ³n del formulario expirÃ³. Recarga la pÃ¡gina e intÃ©ntalo nuevamente.');
+        }
+
+        $projectId = (int) ($_POST['id'] ?? $_POST['project_id'] ?? 0);
+        $teacherId = (int) ($session->userId() ?? 0);
+        try {
+            $owned = new RepositoryTeacherContentService();
+            $project = $owned->ownedDirectProject($projectId, $teacherId, false);
+            $owned->assertDirectProjectAction($project, $teacherId, 'edit');
+            $keywords = array_map('strval', array_column((new ProjectKeywordModel())->forProject($projectId), 'name'));
+            $payload = [
+                'title' => trim((string) ($_POST['title'] ?? '')),
+                'subtitle' => trim((string) ($_POST['subtitle'] ?? $project['subtitle'] ?? '')),
+                'summary' => trim((string) ($_POST['summary'] ?? $project['summary'] ?? '')),
+                'project_type_id' => (int) $project['project_type_id'],
+                'career_id' => (int) $project['career_id'],
+                'academic_period_id' => (int) $project['academic_period_id'],
+                'tutor_id' => (int) ($project['tutor_id'] ?? 0),
+                'status' => 'published',
+                'presentation_file_id' => (int) ($project['presentation_file_id'] ?? 0),
+                'keywords' => $keywords,
+                'tutoring_managed' => false,
+                'authors_managed' => false,
+            ];
+            $saved = (new AdminProjectModel())->save($payload, $projectId, $teacherId, false, $teacherId);
+            $this->sendJson(true, 'Proyecto actualizado correctamente.', ['id' => $saved]);
+        } catch (SupportMaterialAccessException $exception) {
+            http_response_code($exception->httpStatus);
+            $this->sendJson(false, $exception->getMessage());
+        } catch (InvalidArgumentException $exception) {
+            http_response_code(422);
+            $this->sendJson(false, $exception->getMessage());
+        } catch (Throwable $exception) {
+            error_log('Repository teacher project save: ' . $exception->getMessage());
+            http_response_code(500);
+            $this->sendJson(false, 'No fue posible guardar el proyecto.');
+        }
+    }
+
+    /** Cambia disponibilidad o retiro de un proyecto directo propiedad del Teacher. */
+    public function changeDirectProjectStatus(): void
+    {
+        $this->ensureSession();
+        header('Content-Type: application/json; charset=UTF-8');
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $this->sendJson(false, 'MÃ©todo no permitido.');
+        }
+        $session = new AuthSessionService();
+        if ($session->isAdminModeActive() || !$session->isTeacher()) {
+            http_response_code(403);
+            $this->sendJson(false, 'No tienes autorizaciÃ³n para gestionar este contenido.');
+        }
+        if (!$session->validateCsrf('repository_teacher_content', (string) ($_POST['_csrf'] ?? ''))) {
+            http_response_code(419);
+            $this->sendJson(false, 'La sesiÃ³n del formulario expirÃ³. Recarga la pÃ¡gina e intÃ©ntalo nuevamente.');
+        }
+
+        $projectId = (int) ($_POST['project_id'] ?? $_POST['id'] ?? 0);
+        $teacherId = (int) ($session->userId() ?? 0);
+        $action = strtolower(trim((string) ($_POST['action'] ?? '')));
+        try {
+            $owned = new RepositoryTeacherContentService();
+            $project = $owned->ownedDirectProject($projectId, $teacherId, true);
+            $repository = new AdminRepositoryModel();
+            if ($action === 'availability') {
+                $raw = (string) ($_POST['is_available'] ?? '');
+                if (!in_array($raw, ['0', '1'], true)) throw new InvalidArgumentException('La disponibilidad solicitada no es vÃ¡lida.');
+                $owned->assertDirectProjectAction($project, $teacherId, 'status');
+                $repository->setAvailability($projectId, $raw === '1', $teacherId, $teacherId);
+                $this->sendJson(true, $raw === '1' ? 'Proyecto marcado como disponible.' : 'Proyecto marcado como no disponible.', [
+                    'status_key' => 'published',
+                    'status_label' => 'Publicado',
+                    'is_available' => $raw === '1',
+                    'availability_label' => $raw === '1' ? 'Disponible' : 'No disponible',
+                ]);
+            }
+            if ($action === 'publication') {
+                $target = strtolower(trim((string) ($_POST['status'] ?? '')));
+                if ($target === 'withdrawn') {
+                    $owned->assertDirectProjectAction($project, $teacherId, 'status');
+                    $repository->setPublished($projectId, false, $teacherId, $teacherId);
+                    $this->sendJson(true, 'Proyecto retirado del Repositorio.');
+                }
+                if ($target === 'published') {
+                    $owned->assertDirectProjectAction($project, $teacherId, 'restore_publication');
+                    $repository->restorePublication($projectId, $teacherId, $teacherId);
+                    $this->sendJson(true, 'Proyecto reincorporado al Repositorio.');
+                }
+                throw new InvalidArgumentException('El estado solicitado no es vÃ¡lido.');
+            }
+            throw new InvalidArgumentException('La acciÃ³n solicitada no es vÃ¡lida.');
+        } catch (SupportMaterialAccessException $exception) {
+            http_response_code($exception->httpStatus);
+            $this->sendJson(false, $exception->getMessage());
+        } catch (InvalidArgumentException $exception) {
+            http_response_code(422);
+            $this->sendJson(false, $exception->getMessage());
+        } catch (Throwable $exception) {
+            error_log('Repository teacher project status: ' . $exception->getMessage());
+            http_response_code(500);
+            $this->sendJson(false, 'No fue posible actualizar el estado del proyecto.');
+        }
+    }
+
+    /** EnvÃ­a un proyecto directo propio a la Papelera con doble comprobaciÃ³n de ownership. */
+    public function trashDirectProject(): void
+    {
+        $this->ensureSession();
+        header('Content-Type: application/json; charset=UTF-8');
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $this->sendJson(false, 'MÃ©todo no permitido.');
+        }
+        $session = new AuthSessionService();
+        if ($session->isAdminModeActive() || !$session->isTeacher()) {
+            http_response_code(403);
+            $this->sendJson(false, 'No tienes autorizaciÃ³n para retirar este contenido.');
+        }
+        if (!$session->validateCsrf('repository_teacher_content', (string) ($_POST['_csrf'] ?? ''))) {
+            http_response_code(419);
+            $this->sendJson(false, 'La sesiÃ³n del formulario expirÃ³. Recarga la pÃ¡gina e intÃ©ntalo nuevamente.');
+        }
+
+        $projectId = (int) ($_POST['project_id'] ?? $_POST['id'] ?? 0);
+        $teacherId = (int) ($session->userId() ?? 0);
+        try {
+            $owned = new RepositoryTeacherContentService();
+            $project = $owned->ownedDirectProject($projectId, $teacherId, true);
+            $owned->assertDirectProjectAction($project, $teacherId, 'trash');
+            (new AdminTrashModel())->trashRepositoryProject($projectId, (string) ($_POST['reason'] ?? ''), $teacherId, $teacherId);
+            $this->sendJson(true, 'Proyecto enviado a la Papelera.');
+        } catch (SupportMaterialAccessException $exception) {
+            http_response_code($exception->httpStatus);
+            $this->sendJson(false, $exception->getMessage());
+        } catch (InvalidArgumentException $exception) {
+            http_response_code(422);
+            $this->sendJson(false, $exception->getMessage());
+        } catch (Throwable $exception) {
+            error_log('Repository teacher project trash: ' . $exception->getMessage());
+            http_response_code(500);
+            $this->sendJson(false, 'No fue posible enviar el proyecto a la Papelera.');
+        }
+    }
+
+    /** Restaura sólo proyectos directos enviados a Papelera por el Teacher propietario. */
+    public function restoreDirectProject(): void
+    {
+        $this->ensureSession();
+        header('Content-Type: application/json; charset=UTF-8');
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $this->sendJson(false, 'MÃ©todo no permitido.');
+        }
+        $session = new AuthSessionService();
+        if ($session->isAdminModeActive() || !$session->isTeacher()) {
+            http_response_code(403);
+            $this->sendJson(false, 'No tienes autorizaciÃ³n para restaurar este contenido.');
+        }
+        if (!$session->validateCsrf('repository_teacher_content', (string) ($_POST['_csrf'] ?? ''))) {
+            http_response_code(419);
+            $this->sendJson(false, 'La sesiÃ³n del formulario expirÃ³. Recarga la pÃ¡gina e intÃ©ntalo nuevamente.');
+        }
+
+        $projectId = (int) ($_POST['project_id'] ?? $_POST['id'] ?? 0);
+        try {
+            (new RepositoryTeacherContentService())->restoreProject($projectId, (int) ($session->userId() ?? 0));
+            $this->sendJson(true, 'Proyecto restaurado correctamente.');
+        } catch (SupportMaterialAccessException $exception) {
+            http_response_code($exception->httpStatus);
+            $this->sendJson(false, $exception->getMessage());
+        } catch (InvalidArgumentException $exception) {
+            http_response_code(422);
+            $this->sendJson(false, $exception->getMessage());
+        } catch (Throwable $exception) {
+            error_log('Repository teacher project restore: ' . $exception->getMessage());
+            http_response_code(500);
+            $this->sendJson(false, 'No fue posible restaurar el proyecto.');
+        }
+    }
+
+    /** Restaura o elimina definitivamente solo elementos de la Papelera propia del Teacher. */
+    public function manageTeacherTrash(): void
+    {
+        $this->ensureSession();
+        header('Content-Type: application/json; charset=UTF-8');
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $this->sendJson(false, 'Metodo no permitido.');
+        }
+
+        $session = new AuthSessionService();
+        if ($session->isAdminModeActive() || !$session->isTeacher()) {
+            http_response_code(403);
+            $this->sendJson(false, 'No tienes autorizacion para gestionar esta Papelera.');
+        }
+        if (!$session->validateCsrf('repository_teacher_content', (string) ($_POST['_csrf'] ?? ''))) {
+            http_response_code(419);
+            $this->sendJson(false, 'La sesion del formulario expiro. Recarga la pagina e intentalo nuevamente.');
+        }
+        $actor = (int) ($session->userId() ?? 0);
+        if (!(new RepositoryTeacherContentService())->isActiveTeacher($actor)) {
+            http_response_code(403);
+            $this->sendJson(false, 'La identidad Teacher ya no esta autorizada para gestionar esta Papelera.');
+        }
+
+        $kind = strtolower(trim((string) ($_POST['kind'] ?? '')));
+        $operation = strtolower(trim((string) ($_POST['operation'] ?? $_POST['action'] ?? '')));
+        $category = $kind === 'project' ? 'projects' : ($kind === 'material' ? 'materials' : '');
+        if ($category === '' || !in_array($operation, ['restore', 'purge'], true)) {
+            http_response_code(422);
+            $this->sendJson(false, 'La operacion de Papelera no es valida.');
+        }
+
+        $rawIds = isset($_POST['ids']) ? (array) $_POST['ids'] : [
+            $kind === 'project' ? ($_POST['project_id'] ?? $_POST['id'] ?? '') : ($_POST['material_id'] ?? $_POST['id'] ?? ''),
+        ];
+        $ids = [];
+        foreach ($rawIds as $rawId) {
+            if (!is_int($rawId) && !(is_string($rawId) && preg_match('/^[1-9][0-9]*$/', $rawId))) {
+                http_response_code(422);
+                $this->sendJson(false, 'Uno de los identificadores no es valido.');
+            }
+            $id = (int) $rawId;
+            if ($id < 1) {
+                http_response_code(422);
+                $this->sendJson(false, 'Uno de los identificadores no es valido.');
+            }
+            $ids[$id] = true;
+        }
+        $ids = array_keys($ids);
+        if ($ids === [] || count($ids) > 100) {
+            http_response_code(422);
+            $this->sendJson(false, 'Selecciona entre uno y cien elementos.');
+        }
+
+        try {
+            $trash = new AdminTrashModel();
+            $count = $operation === 'restore'
+                ? $trash->restoreTeacherBatch($category, $ids, $actor, $actor)
+                : $trash->deleteTeacherPermanentlyBatch($category, $ids, $actor, $actor);
+            $pending = $trash->consumePhysicalCleanupPending();
+            $message = $operation === 'restore'
+                ? 'Contenido restaurado correctamente.'
+                : 'Contenido eliminado definitivamente.';
+            if ($pending) $message .= ' Algunos archivos requieren limpieza posterior.';
+            $this->sendJson(true, $message, [
+                'count' => $count,
+                'filesystem_cleanup_pending' => count($pending),
+            ]);
+        } catch (SupportMaterialAccessException $exception) {
+            http_response_code($exception->httpStatus);
+            $this->sendJson(false, $exception->getMessage());
+        } catch (InvalidArgumentException $exception) {
+            http_response_code(422);
+            $this->sendJson(false, $exception->getMessage());
+        } catch (Throwable $exception) {
+            error_log('Teacher repository trash: ' . $exception->getMessage());
+            http_response_code(500);
+            $this->sendJson(false, 'No fue posible completar la operacion de Papelera.');
         }
     }
 

@@ -38,6 +38,29 @@ final class SupportMaterialModel
         return array_map([$this, 'hydrate'], $statement->fetchAll());
     }
 
+    /** Contenido propio del Teacher, separado por estado en la capa de repositorio. */
+    public function getTeacherOwnedManagement(int $teacherId): array
+    {
+        if ($teacherId < 1) return [];
+        $statement = Database::connection()->prepare(
+            $this->baseQuery() . " WHERE sm.created_by=:teacher_id AND sm.purged_at IS NULL
+             ORDER BY COALESCE(sm.updated_at,sm.created_at) DESC,sm.id DESC"
+        );
+        $statement->execute(['teacher_id' => $teacherId]);
+        return array_map([$this, 'hydrate'], $statement->fetchAll());
+    }
+
+    public function findByIdIncludingDeleted(int $materialId): ?array
+    {
+        if ($materialId < 1) return null;
+        $statement = Database::connection()->prepare(
+            $this->baseQuery() . ' WHERE sm.id=:id AND sm.purged_at IS NULL'
+        );
+        $statement->execute(['id' => $materialId]);
+        $row = $statement->fetch();
+        return $row ? $this->hydrate($row) : null;
+    }
+
     public function getWithdrawn(): array
     {
         $materials = $this->listing('withdrawn');
@@ -503,7 +526,7 @@ final class SupportMaterialModel
         return (int) $database->lastInsertId();
     }
 
-    public function setStatus(int $id, string $status, int $actor): array
+    public function setStatus(int $id, string $status, int $actor, ?int $requiredOwnerId = null): array
     {
         if (!in_array($status, ['published', 'withdrawn'], true)) {
             throw new InvalidArgumentException('El estado solicitado no es válido.');
@@ -511,6 +534,13 @@ final class SupportMaterialModel
         $material = $this->findByIdForUpdate($id);
         if ($material === null) {
             throw new InvalidArgumentException('El material ya no está disponible.');
+        }
+        if ($requiredOwnerId !== null && (int)($material['created_by'] ?? 0) !== $requiredOwnerId) {
+            throw new SupportMaterialAccessException('No tienes autorización para cambiar este material de apoyo.');
+        }
+        if ($requiredOwnerId !== null && $status === 'published' && (string)($material['status'] ?? '') === 'withdrawn'
+            && (int)($material['withdrawn_by'] ?? 0) !== $requiredOwnerId) {
+            throw new SupportMaterialAccessException('No puedes restaurar un material retirado por administración.');
         }
         if ((string) $material['status'] === $status) {
             throw new InvalidArgumentException($status === 'published'
@@ -544,12 +574,22 @@ final class SupportMaterialModel
         ];
     }
 
-    public function setAvailability(int $id, bool $available, int $actor): bool
+    public function setAvailability(int $id, bool $available, int $actor, ?int $requiredOwnerId = null): bool
     {
         $material = $this->findByIdForUpdate($id);
         if ($material === null) throw new InvalidArgumentException('El material ya no está disponible.');
+        if ($requiredOwnerId !== null && (int)($material['created_by'] ?? 0) !== $requiredOwnerId) {
+            throw new SupportMaterialAccessException('No tienes autorización para cambiar este material de apoyo.');
+        }
         if ((string) $material['status'] !== 'published') {
             throw new InvalidArgumentException('La disponibilidad solo puede cambiarse en materiales publicados.');
+        }
+        if ($requiredOwnerId !== null && $available) {
+            $lastAvailability = Database::connection()->prepare("SELECT actor_user_id FROM admin_audit_log WHERE entity_type='support_material' AND entity_id=:id AND action='support_material_availability_changed' ORDER BY id DESC LIMIT 1");
+            $lastAvailability->execute(['id' => $id]);
+            if ((int)$lastAvailability->fetchColumn() !== $requiredOwnerId) {
+                throw new SupportMaterialAccessException('No puedes revertir una disponibilidad cambiada por administración.');
+            }
         }
         $previous = (bool) $material['is_available'];
         if ($previous === $available) {

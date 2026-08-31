@@ -37,7 +37,12 @@ final class SupportMaterialController
         ]);
     }
 
-    public function detail(): void
+    public function teacherOwnedDetail(): void
+    {
+        $this->detail(true);
+    }
+
+    public function detail(bool $teacherOwnedReadOnly = false): void
     {
         $this->ensureSession();
         $session = new AuthSessionService();
@@ -45,16 +50,25 @@ final class SupportMaterialController
         $capabilities = new SupportMaterialCapabilityService();
         $materialId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
         $materialModel = new SupportMaterialModel();
-        $material = $materialId === false || $materialId === null ? null : $materialModel->findById((int) $materialId, $isAdministrator);
-        if ($material === null && $materialId && !$isAdministrator) {
-            $candidate = $materialModel->findById((int) $materialId, true);
-            if ($capabilities->canManage($session, $candidate)) $material = $candidate;
+        $material = null;
+        if ($materialId !== false && $materialId !== null) {
+            if ($teacherOwnedReadOnly) {
+                if (!$isAdministrator) {
+                    $candidate = $materialModel->findByIdIncludingDeleted((int) $materialId);
+                    if ($capabilities->canViewOwnedDetail($session, $candidate)) $material = $candidate;
+                }
+            } else {
+                $material = $materialModel->findById((int) $materialId, $isAdministrator);
+                if ($material !== null && !$isAdministrator && empty($material['is_available'])) {
+                    $material = null;
+                }
+            }
         }
         $administratorView = $session->isAdminModeActive() && $isAdministrator;
-        $canEditInformation = $capabilities->canEditInformation($session, $material);
-        $canManageFiles = $capabilities->canManageFiles($session, $material);
-        $canChangeStatus = $capabilities->canChangeStatus($session, $material);
-        $canDelete = $capabilities->canDelete($session, $material);
+        $canEditInformation = !$teacherOwnedReadOnly && $capabilities->canEditInformation($session, $material);
+        $canManageFiles = !$teacherOwnedReadOnly && $capabilities->canManageFiles($session, $material);
+        $canChangeStatus = !$teacherOwnedReadOnly && $capabilities->canChangeStatus($session, $material);
+        $canDelete = !$teacherOwnedReadOnly && $capabilities->canDelete($session, $material);
         $canManageMaterial = $canEditInformation || $canManageFiles || $canChangeStatus || $canDelete;
         $materialCategories = [];
         $restorableFiles = [];
@@ -133,6 +147,9 @@ final class SupportMaterialController
             'packageDownloadActionUrl' => route('support-material-package-download'),
             'isAdministrator' => $administratorView,
             'administratorView' => $administratorView,
+            'teacherOwnedReadOnly' => $teacherOwnedReadOnly,
+            'canDownloadOwnedDetail' => $teacherOwnedReadOnly
+                && $capabilities->canDownloadOwnedDetail($session, $material),
             'canManageSupportMaterial' => $canManageMaterial,
             'canEditInformation' => $canEditInformation,
             'canManageFiles' => $canManageFiles,
@@ -141,7 +158,9 @@ final class SupportMaterialController
             'materialEditUrl' => !$canEditInformation || $material === null ? '' : route('support-material-detail') . '&id=' . (int) $material['id'] . '&mode=edit&tab=information',
             'materialSaveEndpoint' => $isAdministrator ? route('admin-support-material-save') : ($canEditInformation ? route('support-material-manage-save') : ''),
             'materialFileEndpoint' => $isAdministrator ? route('admin-support-material-file') : ($canManageFiles ? route('support-material-manage-file') : ''),
-            'materialStatusEndpoint' => ($administratorView || $canChangeStatus || $canDelete) ? route('admin-support-material-status') : '',
+            'materialStatusEndpoint' => $administratorView
+                ? route('admin-support-material-status')
+                : (($canChangeStatus || $canDelete) ? route('support-material-manage-status') : ''),
             'materialHistoryEndpoint' => $administratorView ? route('admin-support-material-history') . '&id=' . (int) ($material['id'] ?? 0) : '',
             'materialHistoryCleanupEndpoint' => $administratorView ? route('admin-support-material-history-cleanup') : '',
             'materialCsrfToken' => ($isAdministrator || $canManageMaterial) ? $session->csrfToken('admin_repository') : '',
@@ -157,6 +176,119 @@ final class SupportMaterialController
         ]);
     }
     // Final de presentación de materiales
+
+    /** Gestiona el estado del material propio sin habilitar el endpoint administrativo. */
+    public function manageOwnedStatus(): void
+    {
+        $this->ensureSession();
+        header('Content-Type: application/json; charset=UTF-8');
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            $this->sendJson(false, 'MÃ©todo no permitido.');
+        }
+        $session = new AuthSessionService();
+        if ($session->isAdminModeActive() || !$session->isTeacher()) {
+            http_response_code(403);
+            $this->sendJson(false, 'No tienes autorizaciÃ³n para gestionar este material.');
+        }
+        $submittedCsrf = (string) ($_POST['_csrf'] ?? '');
+        if (!$session->validateCsrf('repository_teacher_content', $submittedCsrf)
+            && !$session->validateCsrf('admin_repository', $submittedCsrf)) {
+            http_response_code(419);
+            $this->sendJson(false, 'La sesiÃ³n del formulario expirÃ³. Recarga la pÃ¡gina e intÃ©ntalo nuevamente.');
+        }
+
+        $materialId = (int) ($_POST['material_id'] ?? $_POST['id'] ?? 0);
+        $teacherId = (int) ($session->userId() ?? 0);
+        $action = strtolower(trim((string) ($_POST['action'] ?? '')));
+        try {
+            $owned = new RepositoryTeacherContentService();
+            $model = new SupportMaterialModel();
+            $material = $model->findByIdIncludingDeleted($materialId);
+            $owned->assertSupportMaterialAction($material ?? [], $teacherId, $action === 'restore' ? 'restore' : $action);
+
+            if ($action === 'restore') {
+                (new AdminTrashModel())->restoreSupportMaterial($materialId, $teacherId, $teacherId);
+                $this->sendJson(true, 'Material restaurado correctamente.');
+            }
+            if ($action === 'trash') {
+                $reasonCode = trim((string) ($_POST['reason_code'] ?? ''));
+                $reasonDetail = trim((string) ($_POST['reason_detail'] ?? ''));
+                $reasonLabels = [
+                    'incorrect' => 'PublicaciÃ³n incorrecta',
+                    'outdated' => 'InformaciÃ³n desactualizada',
+                    'pending_review' => 'Material pendiente de revisiÃ³n',
+                    'incomplete_files' => 'Archivos incompletos',
+                    'replaced' => 'Material reemplazado',
+                    'not_required' => 'Ya no es requerido',
+                    'other' => 'Otro motivo',
+                ];
+                $reason = trim((string) ($_POST['reason'] ?? ''));
+                if ($reason === '') $reason = $reasonLabels[$reasonCode] ?? $reasonCode;
+                if ($reasonCode === 'other' && $reasonDetail !== '') $reason = $reasonDetail;
+                (new AdminTrashModel())->trashSupportMaterial($materialId, $reason, $teacherId, $reasonCode, $reasonDetail, $teacherId);
+                $this->sendJson(true, 'Material enviado a la Papelera.');
+            }
+            if ($action === 'availability') {
+                $raw = (string) ($_POST['is_available'] ?? '');
+                if (!in_array($raw, ['0', '1'], true)) throw new InvalidArgumentException('La disponibilidad solicitada no es vÃ¡lida.');
+                $owned->assertSupportMaterialAction($material, $teacherId, 'availability');
+                $available = $raw === '1';
+                Database::transaction(function (PDO $database) use ($model, $materialId, $teacherId, $available, $material): void {
+                    $previous = $model->setAvailability($materialId, $available, $teacherId, $teacherId);
+                    (new AdminActivityService($database))->record(
+                        $teacherId,
+                        'support_material_availability_changed',
+                        $available ? 'MarcÃ³ material como disponible' : 'MarcÃ³ material como no disponible',
+                        'Repositorio',
+                        'support_material',
+                        $materialId,
+                        (string) ($material['title'] ?? 'Material de apoyo'),
+                        'correct',
+                        ['previous_available' => $previous, 'is_available' => $available, 'actor_context' => 'teacher_owner']
+                    );
+                });
+                $this->sendJson(true, $available ? 'Material marcado como disponible.' : 'Material marcado como no disponible.', [
+                    'status_key' => 'published',
+                    'status_label' => 'Publicado',
+                    'is_available' => $available,
+                    'availability_label' => $available ? 'Disponible' : 'No disponible',
+                ]);
+            }
+            if ($action === 'publication') {
+                $target = strtolower(trim((string) ($_POST['status'] ?? '')));
+                if (!in_array($target, ['published', 'withdrawn'], true)) throw new InvalidArgumentException('El estado solicitado no es vÃ¡lido.');
+                $owned->assertSupportMaterialAction($material, $teacherId, 'publication');
+                $change = Database::transaction(function (PDO $database) use ($model, $materialId, $teacherId, $target, $material): array {
+                    $change = $model->setStatus($materialId, $target, $teacherId, $teacherId);
+                    (new AdminActivityService($database))->record(
+                        $teacherId,
+                        $target === 'published' ? 'support_material_published' : 'support_material_withdrawn',
+                        $target === 'published' ? 'PublicÃ³ material de apoyo' : 'RetirÃ³ material de apoyo',
+                        'Repositorio',
+                        'support_material',
+                        $materialId,
+                        (string) ($material['title'] ?? 'Material de apoyo'),
+                        'correct',
+                        ['previous_status' => $change['previous_status'], 'new_status' => $change['new_status'], 'actor_context' => 'teacher_owner']
+                    );
+                    return $change;
+                });
+                $this->sendJson(true, $target === 'published' ? 'Material reincorporado al Repositorio.' : 'Material retirado del Repositorio.', $change);
+            }
+            throw new InvalidArgumentException('La acciÃ³n solicitada no es vÃ¡lida.');
+        } catch (SupportMaterialAccessException $exception) {
+            http_response_code($exception->httpStatus);
+            $this->sendJson(false, $exception->getMessage());
+        } catch (InvalidArgumentException $exception) {
+            http_response_code(422);
+            $this->sendJson(false, $exception->getMessage());
+        } catch (Throwable $exception) {
+            error_log('Teacher support material status: ' . $exception->getMessage());
+            http_response_code(500);
+            $this->sendJson(false, 'No fue posible actualizar el material.');
+        }
+    }
 
     public function evolutionEvents(): void
     {
@@ -230,10 +362,11 @@ final class SupportMaterialController
         $fileData = $this->buildPreviewFile($file, $stream);
         $materialId = rawurlencode((string) $material['id']);
         $fileId = rawurlencode((string) $file['id']);
+        $resourceContextQuery = $this->isTeacherOwnedResourceContext() ? '&context=teacher_owner' : '';
         $preview = (new FilePreviewService())->prepare(
             $fileData,
-            base_url("index.php?page=support-material-preview-content&material_id={$materialId}&file_id={$fileId}"),
-            base_url("index.php?page=support-material-download&material_id={$materialId}&file_id={$fileId}")
+            base_url("index.php?page=support-material-preview-content&material_id={$materialId}&file_id={$fileId}{$resourceContextQuery}"),
+            base_url("index.php?page=support-material-download&material_id={$materialId}&file_id={$fileId}{$resourceContextQuery}")
         );
         fclose($stream);
         $this->sendJson(true, $preview['message'], ['preview' => $preview]);
@@ -356,6 +489,7 @@ final class SupportMaterialController
         $query = '&material_id=' . rawurlencode((string) $material['id'])
             . '&file_id=' . rawurlencode((string) $zipFile['id'])
             . '&path=' . rawurlencode((string) $entry['path']);
+        if ($this->isTeacherOwnedResourceContext()) $query .= '&context=teacher_owner';
         $preview = (new FilePreviewService())->prepare(
             $entry,
             base_url('index.php?page=support-material-zip-entry-content' . $query),
@@ -410,14 +544,15 @@ final class SupportMaterialController
         $this->ensureSession();
         $this->ensureGet();
         $materialId = filter_var($_GET['material_id'] ?? $_GET['id'] ?? null, FILTER_VALIDATE_INT);
+        $teacherOwnedResource = $this->isTeacherOwnedResourceContext();
         $material = $materialId === false || $materialId === null
             ? null
-            : (new SupportMaterialModel())->findById((int) $materialId);
+            : $this->resolveDownloadableMaterial((int) $materialId);
         if ($material === null) {
             http_response_code(404);
             $this->renderError('El material solicitado no está disponible.');
         }
-        if (empty($material['is_available'])) {
+        if (empty($material['is_available']) && !$teacherOwnedResource) {
             http_response_code(404);
             $this->renderError('El material está publicado, pero temporalmente no está disponible para consulta o descarga.');
         }
@@ -476,16 +611,38 @@ final class SupportMaterialController
 
     // Inicio de resolución segura de archivos
     // Comprueba identificadores, extensiones, ubicación privada, MIME y apertura del flujo de lectura.
+    private function isTeacherOwnedResourceContext(): bool
+    {
+        return strtolower(trim((string) ($_GET['context'] ?? ''))) === 'teacher_owner';
+    }
+
+    private function resolveDownloadableMaterial(int $materialId): ?array
+    {
+        if ($materialId < 1) return null;
+        $model = new SupportMaterialModel();
+        if ($this->isTeacherOwnedResourceContext()) {
+            $material = $model->findByIdIncludingDeleted($materialId);
+            $session = new AuthSessionService();
+            return (new SupportMaterialCapabilityService())->canDownloadOwnedDetail($session, $material)
+                ? $material
+                : null;
+        }
+        return $model->findById($materialId);
+    }
+
     private function resolveFileRequest(bool $jsonResponse = false): array
     {
         $materialId = filter_var($_GET['material_id'] ?? $_GET['id'] ?? null, FILTER_VALIDATE_INT);
         $fileId = filter_var($_GET['file_id'] ?? $_GET['path'] ?? null, FILTER_VALIDATE_INT);
         $model = new SupportMaterialModel();
-        $material = $materialId === false || $materialId === null ? null : $model->findById((int) $materialId);
+        $teacherOwnedResource = $this->isTeacherOwnedResourceContext();
+        $material = $materialId === false || $materialId === null
+            ? null
+            : $this->resolveDownloadableMaterial((int) $materialId);
         if ($material === null) {
             $this->failFileRequest(404, 'El material solicitado no está disponible.', $jsonResponse);
         }
-        if (empty($material['is_available'])) {
+        if (empty($material['is_available']) && !$teacherOwnedResource) {
             $this->failFileRequest(404, 'El material está publicado, pero temporalmente no está disponible para consulta o descarga.', $jsonResponse);
         }
         $file = $fileId === false || $fileId === null ? null : $model->findFile($material, (int) $fileId);

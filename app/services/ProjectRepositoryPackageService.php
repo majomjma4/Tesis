@@ -58,6 +58,12 @@ final class ProjectRepositoryPackageService
         return $this->describeAtPath($projectId, self::academicPackagePath($projectId, $institutionalOnly), $downloadUrl, 'academic', $institutionalOnly);
     }
 
+    /** Describe el mismo paquete institucional para el Teacher propietario autorizado. */
+    public function describeRepositoryOwner(int $projectId, string $downloadUrl = ''): array
+    {
+        return $this->describeAtPath($projectId, self::packagePath($projectId), $downloadUrl, 'repository_owner');
+    }
+
     /** Genera o reconstruye el paquete privado de seguimiento. */
     public function prepareAcademic(int $projectId, string $downloadUrl = '', bool $institutionalOnly = false): array
     {

@@ -7,8 +7,10 @@ final class SupportMaterialCapabilityService
 {
     public function canCreate(AuthSessionService $session): bool
     {
-        return $session->hasAdminAccess()
-            || in_array('teacher', array_map('strtolower', $session->roles()), true);
+        $isAdministrator = $session->hasAdminAccess() && $session->isAdminModeActive();
+        $isTeacher = in_array('teacher', array_map('strtolower', $session->roles()), true);
+
+        return $isAdministrator || $isTeacher;
     }
 
     public function canEditInformation(AuthSessionService $session, ?array $material): bool
@@ -26,7 +28,7 @@ final class SupportMaterialCapabilityService
     public function canChangeStatus(AuthSessionService $session, ?array $material): bool
     {
         if ($material === null) return false;
-        return $this->isAdministrator($session) || $this->isTeacherOwner($session, $material);
+        return $this->isAdministrator($session) || $this->isTeacherStatusOwner($session, $material);
     }
 
     public function canWithdraw(AuthSessionService $session, ?array $material): bool
@@ -44,6 +46,41 @@ final class SupportMaterialCapabilityService
     {
         try { $this->assertCanManage($session, $material); return true; }
         catch (SupportMaterialAccessException) { return false; }
+    }
+
+    /** Permite consultar material propio oculto sin convertir la vista en una acción de gestión. */
+    public function canViewOwnedDetail(AuthSessionService $session, ?array $material): bool
+    {
+        if ($material === null || $session->isAdminModeActive()
+            || !in_array('teacher', array_map('strtolower', $session->roles()), true)
+            || (int) ($session->userId() ?? 0) < 1
+            || (int) ($material['created_by'] ?? 0) !== (int) ($session->userId() ?? 0)) return false;
+
+        if (!empty($material['deleted_at'])) {
+            return (int) ($material['deleted_by'] ?? 0) === (int) ($session->userId() ?? 0);
+        }
+
+        $status = (string) ($material['status_key'] ?? $material['status'] ?? '');
+        if ($status === 'withdrawn') {
+            return (int) ($material['withdrawn_by'] ?? 0) === (int) ($session->userId() ?? 0);
+        }
+        if ($status !== 'published' || !empty($material['is_available'])) return false;
+
+        $query = Database::connection()->prepare(
+            "SELECT actor_user_id
+             FROM admin_audit_log
+             WHERE entity_type='support_material' AND entity_id=:id
+               AND action='support_material_availability_changed'
+             ORDER BY id DESC LIMIT 1"
+        );
+        $query->execute(['id' => (int) ($material['id'] ?? 0)]);
+        return (int) $query->fetchColumn() === (int) ($session->userId() ?? 0);
+    }
+
+    /** Permite descargar el detalle completo de material propio, incluido en Papelera. */
+    public function canDownloadOwnedDetail(AuthSessionService $session, ?array $material): bool
+    {
+        return $this->canViewOwnedDetail($session, $material);
     }
 
     public function assertCanCreate(AuthSessionService $session): void
@@ -70,8 +107,30 @@ final class SupportMaterialCapabilityService
     {
         return in_array('teacher', array_map('strtolower', $session->roles()), true)
             && (int) ($session->userId() ?? 0) > 0
-            && (int) ($material['created_by'] ?? 0) === (int) ($session->userId() ?? 0);
+            && (int) ($material['created_by'] ?? 0) === (int) ($session->userId() ?? 0)
+            && empty($material['deleted_at'])
+            && (string) ($material['status_key'] ?? $material['status'] ?? '') !== 'withdrawn';
     }
+
+    private function isTeacherStatusOwner(AuthSessionService $session, array $material): bool
+    {
+        if (!in_array('teacher', array_map('strtolower', $session->roles()), true)
+            || (int) ($session->userId() ?? 0) < 1
+            || (int) ($material['created_by'] ?? 0) !== (int) ($session->userId() ?? 0)) return false;
+        $actor = (int) ($session->userId() ?? 0);
+        if (!empty($material['deleted_at'])) return (int)($material['deleted_by'] ?? 0) === $actor;
+        if ((string)($material['status_key'] ?? '') === 'withdrawn') {
+            return (int)($material['withdrawn_by'] ?? 0) === $actor;
+        }
+        if ((string)($material['status_key'] ?? '') !== 'published') return false;
+        if (empty($material['is_available'])) {
+            $query = Database::connection()->prepare("SELECT actor_user_id FROM admin_audit_log WHERE entity_type='support_material' AND entity_id=:id AND action='support_material_availability_changed' ORDER BY id DESC LIMIT 1");
+            $query->execute(['id'=>(int)($material['id'] ?? 0)]);
+            return (int)$query->fetchColumn() === $actor;
+        }
+        return true;
+    }
+
 
     public function assertCanEditInformation(AuthSessionService $session, ?array $material): void
     {
