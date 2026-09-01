@@ -9,8 +9,7 @@ return [
     'timezone' => 'America/Guayaquil',
     // APP_SETTINGS_ENCRYPTION_KEY se configura fuera del repositorio como Base64 de exactamente 32 bytes.
     // No guardes aquí la clave real.
-    // Actívalo solo después de importar las migraciones y crear el primer administrador.
-    'auth_required' => true,
+    // Activa la aplicación solo después de importar el baseline y crear el primer administrador.
     // LibreOffice is a server dependency. Windows: C:\\Program Files\\LibreOffice\\program\\soffice.exe
     // Linux: /usr/bin/libreoffice or /usr/bin/soffice
     'libreoffice_path' => '',

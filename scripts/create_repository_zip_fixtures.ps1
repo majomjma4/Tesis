@@ -141,7 +141,10 @@ try {
     $emptyStream.Dispose()
 }
 
-[System.IO.File]::WriteAllText((Join-Path $storagePath 'damaged.zip'), 'not-a-valid-zip', [System.Text.UTF8Encoding]::new($false))
+$qaFixturePath = Join-Path $PSScriptRoot '..\storage\qa-fixtures\repository'
+$qaFixturePath = [System.IO.Path]::GetFullPath($qaFixturePath)
+[System.IO.Directory]::CreateDirectory($qaFixturePath) | Out-Null
+[System.IO.File]::WriteAllText((Join-Path $qaFixturePath 'damaged.zip'), 'not-a-valid-zip', [System.Text.UTF8Encoding]::new($false))
 
 $supportPath = Join-Path $PSScriptRoot '..\storage\support-materials'
 $supportPath = [System.IO.Path]::GetFullPath($supportPath)

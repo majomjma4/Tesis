@@ -2,6 +2,10 @@
 
 # Registro de Cambios del Proyecto
 
+> Nota vigente (2026-09-01): la auditoría final sustituyó el snapshot histórico
+> con datos por un baseline estructural sin filas. La instalación nueva debe
+> seguir `database/README.md` y no importar datos de producción.
+
 Versión del documento: 1.0
 
 ---

@@ -157,9 +157,3 @@ final class CalendarModel
     private function date(string $value): string { $date=DateTimeImmutable::createFromFormat('!Y-m-d',$value);$errors=DateTimeImmutable::getLastErrors();if(!$date||($errors!==false&&($errors['warning_count']>0||$errors['error_count']>0))||$date->format('Y-m-d')!==$value)throw new CalendarEventException('La fecha no es válida.',422);return $value; }
     private function time(mixed $value): ?string { $value=trim((string)$value);if($value==='')return null;$time=DateTimeImmutable::createFromFormat('!H:i',$value);$errors=DateTimeImmutable::getLastErrors();if(!$time||($errors!==false&&($errors['warning_count']>0||$errors['error_count']>0))||$time->format('H:i')!==$value)throw new CalendarEventException('La hora no es válida.',422);return $value.':00'; }
 }
-
-final class CalendarEventException extends RuntimeException
-{
-    public function __construct(string $message, private readonly int $httpStatus) { parent::__construct($message); }
-    public function httpStatus(): int { return $this->httpStatus; }
-}

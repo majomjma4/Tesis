@@ -28,4 +28,24 @@ storage/private/avatars/*
 !storage/private/avatars/.gitkeep
 /storage/private/project-review-representations/*
 !/storage/private/project-review-representations/.gitkeep
+# Runtime privado adicional: nunca versionar cargas, paquetes ni temporales.
+/storage/private/project-packages/*
+!/storage/private/project-packages/.gitkeep
+/storage/private/project-drafts/*
+!/storage/private/project-drafts/.gitkeep
+/storage/private/project-publication-preparations/*
+!/storage/private/project-publication-preparations/.gitkeep
+/storage/repository/*
+!/storage/repository/.gitkeep
+/storage/calendar/*
+!/storage/calendar/.gitkeep
+# Backups, recovery y QA contienen datos o evidencias de instalaciones reales.
+/database/backups/
+/database/recovery/
+/database/backup_*.sql
+/storage/qa-backups/
+/storage/qa-fixtures/
+# Dependencias y herramientas locales; el build cPanel las incorpora desde composer.lock.
+/vendor/
+/composer.phar
 scratch_*

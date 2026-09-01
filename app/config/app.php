@@ -9,9 +9,8 @@ $baseUrl = $scriptDirectory === '/' ? '' : rtrim($scriptDirectory, '/');
 $config = [
     'app_name' => 'Gestion Documental Academica',
     'base_url' => $baseUrl,
-    'environment' => getenv('APP_ENV') ?: 'development',
-    'dev_autoreload' => filter_var(getenv('DEV_AUTORELOAD') ?: 'true', FILTER_VALIDATE_BOOL),
-    'auth_required' => filter_var(getenv('AUTH_REQUIRED') ?: 'false', FILTER_VALIDATE_BOOL),
+    'environment' => getenv('APP_ENV') ?: 'production',
+    'dev_autoreload' => filter_var(getenv('DEV_AUTORELOAD') ?: 'false', FILTER_VALIDATE_BOOL),
     'timezone' => getenv('APP_TIMEZONE') ?: 'America/Guayaquil',
     'settings_encryption_key' => getenv('APP_SETTINGS_ENCRYPTION_KEY') ?: '',
     // Server dependency for private DOCX review previews. Never expose this path to browsers.
@@ -22,7 +21,7 @@ $config = [
     'mail_port' => (int) (getenv('MAIL_PORT') ?: 587),
     'mail_encryption' => getenv('MAIL_ENCRYPTION') ?: 'tls',
     'mail_username' => getenv('MAIL_USERNAME') ?: '',
-    'mail_password' => getenv('MAIL_PASSWORD') ?: '',
+    'mail_password' => getenv('SMTP_PASSWORD') ?: (getenv('MAIL_PASSWORD') ?: ''),
     'mail_from_address' => getenv('MAIL_FROM_ADDRESS') ?: '',
     'mail_from_name' => getenv('MAIL_FROM_NAME') ?: 'Gestión Documental Académica',
     'password_reset_ttl_minutes' => (int) (getenv('PASSWORD_RESET_TTL_MINUTES') ?: 15),

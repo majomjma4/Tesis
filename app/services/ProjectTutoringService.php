@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 /** Sincroniza la Tutoría de un proyecto usando usuarios docentes reales. */
-final class ProjectTutoringException extends InvalidArgumentException {}
-
 final class ProjectTutoringService
 {
     private const ROLE_CODES = ['tutor', 'co_tutor', 'cotutor', 'co-tutor'];

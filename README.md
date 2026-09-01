@@ -12,6 +12,20 @@ Para habilitar la capacidad máxima de la aplicación (500 MB por archivo y 1 GB
 
 El servidor requiere LibreOffice para generar de forma privada las vistas de revisión PDF de archivos DOCX. Configure `LIBREOFFICE_PATH` (por ejemplo, `C:\Program Files\LibreOffice\program\soffice.exe` en Windows o `/usr/bin/libreoffice` en Linux). El DOCX original permanece como el archivo académico oficial.
 
+## Estado tecnico vigente
+
+El cierre tecnico comprobado de los Bloques 1--5 esta documentado en
+[`TECHNICAL_CLOSURE_20260901.md`](z%20archivos%20md/TECHNICAL_CLOSURE_20260901.md).
+El baseline estructural de `database/snapshot.sql` contiene 54 tablas y el
+paquete de cPanel incluye `vendor` generado desde `composer.lock`, incluido
+PHPMailer. El build por allowlist excluye SQL, datos productivos de `storage`,
+archivos privados, recovery, backups, QA y fixtures.
+
+La aplicacion usa headers de hardening compatibles con la interfaz actual.
+HSTS solo se envia en produccion HTTPS fuera de localhost; no se activa en el
+XAMPP local HTTP. SMTP y LibreOffice requieren configuracion y QA manual del
+servidor final.
+
 # Objetivo
 
 Desarrollar una plataforma web que permita administrar de forma organizada los proyectos académicos de la institución, facilitando la comunicación entre estudiantes, docentes, tutores y jurados mediante un sistema de seguimiento documental con historial y repositorio institucional.
@@ -256,8 +270,9 @@ index.php
 
 # Instalación de la base de datos
 
-La estructura y los datos transportables actuales se encuentran en
-`database/snapshot.sql`. Las instrucciones para importarlos, aplicar migraciones
+El baseline estructural actual se encuentra en
+`database/snapshot.sql`; no contiene datos transportables. Las instrucciones para
+importarlo, aplicar migraciones posteriores
 y crear la cuenta administrativa inicial están disponibles en
 `database/README.md`.
 
@@ -274,8 +289,12 @@ y crear la cuenta administrativa inicial están disponibles en
 - Configurar `APP_SETTINGS_ENCRYPTION_KEY` en el entorno del servidor como una
   clave Base64 que decodifique exactamente 32 bytes. No guardar la clave real
   en Git ni en archivos de configuración del proyecto.
-- Configurar `auth_required => true` antes de exponer el sistema.
-- Importar el `database/snapshot.sql` actualizado.
+- Crear una base nueva y vacía; nunca importar sobre la base activa `tesis`.
+- Ejecutar `scripts/import_database.ps1` con `-DatabaseName <base_nueva>`.
+- Aplicar únicamente las migraciones `UP` posteriores al baseline; no ejecutar
+  todos los `.sql` ni ningún archivo `_down.sql` automáticamente.
+- La autenticación ya es obligatoria en las rutas no públicas; no existe un
+  interruptor operativo `auth_required`.
 
 Para comprobar los módulos disponibles:
 

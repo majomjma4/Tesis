@@ -250,8 +250,3 @@ final class ProjectDraftStorageService
     private function decodePayload(string $json): array { try { $value = json_decode($json, true, 512, JSON_THROW_ON_ERROR); return is_array($value) ? $value : []; } catch (Throwable) { return []; } }
     private function uuid(): string { $hex = bin2hex(random_bytes(16)); return substr($hex, 0, 8) . '-' . substr($hex, 8, 4) . '-4' . substr($hex, 13, 3) . '-' . dechex((hexdec($hex[16]) & 0x3) | 0x8) . substr($hex, 17, 3) . '-' . substr($hex, 20); }
 }
-
-final class ProjectDraftFileConflictException extends InvalidArgumentException
-{
-    public function __construct(public readonly int $fileId, string $message) { parent::__construct($message); }
-}

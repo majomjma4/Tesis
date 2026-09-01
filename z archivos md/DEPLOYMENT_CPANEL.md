@@ -26,14 +26,55 @@ El resultado se crea en `dist/tesis-cpanel.zip` sin Git, herramientas del agente
 
 ## Base de datos
 
-Importa mediante phpMyAdmin, en este orden:
+El ZIP de cPanel no incluye SQL ni datos. Prepara la base antes de publicar:
 
-1. `database/migrations/20260715_create_notifications.sql`
-2. `database/migrations/20260716_add_notification_archive.sql`
-3. `database/migrations/20260718_create_academic_projects.sql`
-3. `database/seeds/notifications_demo.sql` solo si necesitas datos demostrativos.
+1. Crea una base nueva y vacia con `utf8mb4_unicode_ci`.
+2. Importa `database/snapshot.sql` con
+   `scripts/import_database.ps1 -DatabaseName <base_nueva>` o con una
+   herramienta equivalente que acepte solamente el baseline estructural.
+3. Ejecuta `20260901_create_schema_migrations.sql` y registra el marcador del
+   baseline con su SHA-256.
+4. Para actualizaciones, consulta `schema_migrations` y ejecuta solo archivos
+   `UP` pendientes posteriores al baseline. Nunca ejecutes todos los `.sql`, un
+   comodin que incluya `_down.sql` ni una restauracion sobre `tesis`.
 
-Las migraciones deben conservarse en el repositorio aunque ya se hayan ejecutado, porque permiten reconstruir y versionar la base de datos.
+El importador oficial rechaza la base activa `tesis`, destinos inexistentes y
+cualquier destino que ya tenga tablas. Las migraciones historicas se conservan
+para auditoria, pero no se reejecutan automaticamente en una instalacion nueva.
+
+## Dependencias y seguridad
+
+El builder usa una allowlist e incluye `vendor` construido desde `composer.lock`,
+incluido PHPMailer. El ZIP no contiene SQL, datos productivos de `storage`,
+archivos privados, recovery, backups, QA ni fixtures.
+
+El `.htaccess` aplica `nosniff`, politica de referer, same-origin para frames,
+Permissions-Policy y una CSP compatible con los scripts inline existentes,
+Font Awesome de cdnjs, previews, imagenes `data:`/`blob:` y fetch/XHR interno.
+HSTS se agrega solo para produccion HTTPS fuera de localhost; no se activa en
+XAMPP HTTP. Retirar `unsafe-inline` requiere un refactor posterior con nonces
+o hashes.
+
+## Mantenimiento y QA
+
+Estos comandos son verificadores o mantenimientos CLI y no deben publicarse
+como rutas web:
+
+```powershell
+php scripts/check_project_document_storage.php
+php scripts/check_support_material_storage.php
+php scripts/audit_support_material_storage.php
+php scripts/cleanup_preview_locks.php dry-run
+php scripts/cleanup_preview_locks.php cleanup
+php scripts/cleanup_expired_password_reset_tokens.php dry-run
+php scripts/cleanup_expired_password_reset_tokens.php cleanup
+php scripts/cleanup_expired_password_reset_tokens.php verify
+php scripts/test_security_headers.php https://example.com/
+```
+
+El cleanup de tokens puede programarse mediante cron/cPanel. La prueba de
+SMTP, LibreOffice, HTTPS real y permisos efectivos debe hacerse manualmente en
+el servidor final; no se simula con datos de produccion.
 
 ## Permisos
 

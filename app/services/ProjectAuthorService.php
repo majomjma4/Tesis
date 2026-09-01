@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 /** Sincroniza los autores estudiantes de un proyecto sin destruir su historial. */
-final class ProjectAuthorException extends InvalidArgumentException {}
-
 final class ProjectAuthorService
 {
     /**

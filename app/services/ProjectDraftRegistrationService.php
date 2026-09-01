@@ -105,8 +105,3 @@ final class ProjectDraftRegistrationService
         foreach(array_reverse($moved) as $file){$source=(string)$file['source'];$destination=(string)$file['destination'];if(!is_file($destination))continue;try{$dir=dirname($source);if(!is_dir($dir)&&!mkdir($dir,0775,true)&&!is_dir($dir))throw new RuntimeException('No fue posible recrear el directorio temporal.');if(!@rename($destination,$source))throw new RuntimeException('No fue posible restaurar un archivo temporal.');}catch(Throwable $exception){error_log('Project registration filesystem compensation: '.$exception->getMessage());}}
     }
 }
-
-final class ProjectDraftRegistrationException extends RuntimeException
-{
-    public function __construct(string $message,public readonly array $errors=[]){parent::__construct($message);}
-}

@@ -1,5 +1,11 @@
 # DEVELOPMENT_STATUS.md
 
+> Cierre tecnico vigente (2026-09-01): consultar
+> [`TECHNICAL_CLOSURE_20260901.md`](TECHNICAL_CLOSURE_20260901.md) para el
+> estado real de instalacion, seguridad, storage, tokens, QA y despliegue.
+> Este archivo conserva notas historicas; sus estados anteriores no sustituyen
+> el cierre tecnico ni el codigo actual.
+
 # Estado Actual del Desarrollo
 
 > Actualización técnica: 23/07/2026. La edición administrativa de proyectos compara valores persistidos, registra diferencias legibles y confirma acciones sensibles.

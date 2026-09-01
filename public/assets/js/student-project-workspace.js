@@ -536,41 +536,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    /*
-        // El estado addressed sólo lo produce el flujo de corrección documental.
-        return;
-    }; /* Legacy direct status mutation removed; formal correction flow owns this state.
-        if (!item.id || isRedirectingToLogin) return;
-        buttonEl.disabled = true;
-        try {
-            const body = new FormData();
-            body.set('_csrf', csrf);
-            body.set('project_id', String(projectId));
-            body.set('observation_id', String(item.id));
-            body.set('status', newStatus);
-
-            const response = await fetch('index.php?page=student-project-observation-status-removed', jsonRequestInit({ method: 'POST', body }));
-            const payload = await readJsonResponse(response);
-
-            if (!payload.success) {
-                throw new Error(payload.message || 'No se pudo actualizar el estado de la observación.');
-            }
-
-            item.status = newStatus;
-            toast(newStatus === 'addressed' ? 'Observación marcada como atendida.' : 'Observación marcada como pendiente.', 'info');
-            renderStudentObservations();
-        } catch (error) {
-            if (error.code === 'session_expired' || error.status === 401 || error.status === 419) {
-                return;
-            }
-            console.error('Error al cambiar estado de observación:', error);
-            toast(error.message || 'No fue posible cambiar el estado de la observación.', true);
-        } finally {
-            if (!isRedirectingToLogin) buttonEl.disabled = false;
-        }
-    };
-
-    */
     const sortStudentObservations = (itemList) => {
         return [...itemList].map((item, originalIndex) => {
             let anchorObj = null;
@@ -896,41 +861,6 @@ document.addEventListener('DOMContentLoaded', () => {
             author.style.fontSize = '0.72rem';
             author.textContent = `${item.author_name || 'Docente'} · ${item.created_at || ''}`;
 
-            /*
-            const toggleBtn = document.createElement('button');
-            toggleBtn.type = 'button';
-            toggleBtn.className = 'sw-obs-toggle-status-btn';
-            const isAddressed = observationIsAddressed(item);
-            toggleBtn.style.fontSize = '0.73rem';
-            toggleBtn.style.padding = '3px 7px';
-            toggleBtn.style.borderRadius = '4px';
-            toggleBtn.style.border = '1px solid transparent';
-            toggleBtn.style.background = 'transparent';
-            toggleBtn.style.color = isAddressed ? '#64748b' : '#16a34a';
-            toggleBtn.style.cursor = 'pointer';
-            toggleBtn.style.fontWeight = '500';
-            toggleBtn.style.marginLeft = 'auto';
-            toggleBtn.style.transition = 'all 0.15s ease';
-            toggleBtn.innerHTML = isAddressed
-                ? '<i class="fa-solid fa-rotate-left" style="margin-right:4px;font-size:0.7rem;"></i> Marcar como pendiente'
-                : '<i class="fa-solid fa-check" style="margin-right:4px;font-size:0.75rem;"></i> Marcar como atendida';
-
-            toggleBtn.addEventListener('mouseenter', () => {
-                toggleBtn.style.background = isAddressed ? '#f1f5f9' : '#f0fdf4';
-                toggleBtn.style.borderColor = isAddressed ? '#cbd5e1' : '#bbf7d0';
-            });
-            toggleBtn.addEventListener('mouseleave', () => {
-                toggleBtn.style.background = 'transparent';
-                toggleBtn.style.borderColor = 'transparent';
-            });
-
-            toggleBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const nextStatus = isAddressed ? 'pending' : 'addressed';
-                toggleStudentObservationStatusInBackend(item, nextStatus, toggleBtn);
-            });
-
-            */
             footer.append(author);
 
             card.dataset.observationId = String(item.id || '');

@@ -215,8 +215,3 @@ final class RepositoryDirectProjectService
     private function cleanupMoved(array $moved): void
     { foreach(array_reverse($moved) as $file){$destination=(string)($file['destination']??'');$source=(string)($file['source']??'');if($source!==''&&$destination!==''&&is_file($destination)){if(!is_dir(dirname($source)))@mkdir(dirname($source),0775,true);@rename($destination,$source);}elseif($destination!==''&&is_file($destination)){@unlink($destination);}} }
 }
-
-final class RepositoryDirectProjectException extends RuntimeException
-{
-    public function __construct(string $message, public readonly array $errors = [], public readonly int $status = 422, ?Throwable $previous = null) { parent::__construct($message, 0, $previous); }
-}

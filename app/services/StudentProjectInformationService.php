@@ -3,19 +3,6 @@
 declare(strict_types=1);
 
 /** Edición acotada de información académica por un estudiante participante activo. */
-final class StudentProjectInformationException extends InvalidArgumentException
-{
-    public function __construct(string $message, private readonly int $status = 422)
-    {
-        parent::__construct($message);
-    }
-
-    public function httpStatus(): int
-    {
-        return $this->status;
-    }
-}
-
 final class StudentProjectInformationService
 {
     private const MIN_SUMMARY_LENGTH = 30;

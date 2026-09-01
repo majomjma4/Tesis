@@ -25,6 +25,17 @@ if (($config['environment'] ?? 'production') === 'production') {
 }
 // Final de carga de configuración y dependencias
 
+// HSTS is emitted only for real HTTPS production hosts; never poison local HTTP development.
+$requestHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+$requestHost = (string) preg_replace('/:\d+$/', '', $requestHost);
+$isHttpsRequest = strtolower((string) ($_SERVER['HTTPS'] ?? '')) === 'on'
+    || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443;
+if (($config['environment'] ?? 'production') === 'production'
+    && $isHttpsRequest
+    && !in_array($requestHost, ['localhost', '127.0.0.1', '::1'], true)) {
+    header('Strict-Transport-Security: max-age=31536000', true);
+}
+
 // Inicio del enrutamiento principal
 // Resuelve los alias de cada pantalla y dirige la solicitud al controlador correspondiente.
 $page = strtolower(trim((string) ($_GET['page'] ?? 'dashboard')));
@@ -122,6 +133,7 @@ match ($page) {
     'project-adjustment-close' => (new ProjectAdjustmentController())->close(),
     'project-adjustment-approve' => (new ProjectAdjustmentController())->approve(),
     'project-adjustment-reject' => (new ProjectAdjustmentController())->reject(),
+    // API interna conservada: el detalle renderiza el listado server-side; no hay fetch UI directo.
     'project-adjustment-list' => (new ProjectAdjustmentController())->listing(),
     'project-description-save' => (new ProjectsController())->saveDescription(),
     'project-draft-save' => (new ProjectsController())->saveProjectDraft(),

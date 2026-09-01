@@ -128,7 +128,3 @@ final class ProjectStudentPublicationService
         return ['project_id'=>$projectId, 'title'=>(string)$row['title'], 'status'=>(string)$row['status'], 'file_count'=>count($approved), 'files'=>$approved, 'presentation_file_id'=>$currentPresentationId, 'presentation_files'=>$presentationFiles];
     }
 }
-
-final class ProjectStudentPublicationException extends RuntimeException
-{
-}

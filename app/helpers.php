@@ -35,6 +35,27 @@ function route(string $page = 'dashboard'): string
     return base_url('index.php?page=' . urlencode($page));
 }
 
+/** Returns a safe same-origin path for post-action redirects. */
+function safe_internal_redirect_target(string $candidate, string $fallback): string
+{
+    $candidate = trim($candidate);
+    if ($candidate === '' || strlen($candidate) > 2048) return $fallback;
+    if (preg_match('/[\x00-\x1F\x7F]/', $candidate) || str_contains($candidate, '\\')) return $fallback;
+
+    $normalized = $candidate;
+    for ($attempt = 0; $attempt < 3; $attempt++) {
+        $decoded = rawurldecode($normalized);
+        if ($decoded === $normalized) break;
+        $normalized = $decoded;
+    }
+
+    if (preg_match('/[\x00-\x1F\x7F]/', $normalized) || str_contains($normalized, '\\')) return $fallback;
+    if (!str_starts_with($normalized, '/') || str_starts_with($normalized, '//')) return $fallback;
+    if (preg_match('/^[a-z][a-z0-9+.-]*:/i', $normalized)) return $fallback;
+
+    return $candidate;
+}
+
 function calendar_date_key(?string $value): ?string
 {
     $value = trim((string) $value);

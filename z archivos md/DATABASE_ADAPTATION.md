@@ -1,41 +1,55 @@
-# Preparación para MariaDB
+# Preparacion para MariaDB
 
-La aplicación queda preparada para MariaDB, InnoDB, `utf8mb4`, PDO y consultas preparadas. La persistencia continúa deshabilitada por defecto para no mezclar datos de demostración con información institucional.
+La aplicacion utiliza MariaDB, InnoDB, `utf8mb4`, PDO y consultas preparadas.
+El baseline estructural vigente (`database/snapshot.sql`) contiene 54 tablas y
+ninguna fila transportable.
+La persistencia queda deshabilitada por defecto cuando no se configura una base,
+pero la autenticacion de las rutas no publicas siempre se valida en el servidor.
 
-## Orden de activación
+## Orden seguro de activacion
 
-1. Crear una base vacía con `utf8mb4_unicode_ci`.
-2. Importar, en orden, las migraciones de `database/migrations`.
-3. Crear usuarios con contraseñas generadas mediante `password_hash()`; nunca insertar contraseñas en texto plano.
-4. Asignar roles en `user_roles` y completar `student_profiles` o `teacher_profiles`.
-5. Registrar carreras, periodos y matrículas activas.
-6. Copiar `app/config/database.local.php.example` como `database.local.php` y configurar una cuenta SQL con permisos solo sobre esta base.
-7. Ejecutar `php scripts/database_health.php`.
-8. Probar inicio de sesión con `auth_required=false`.
-9. Activar `auth_required=true` únicamente después de confirmar el primer administrador.
+1. Crear una base nueva y vacia con `utf8mb4_unicode_ci`.
+2. Importar `database/snapshot.sql` con
+   `scripts/import_database.ps1 -DatabaseName <base_nueva>`.
+3. Ejecutar `20260901_create_schema_migrations.sql` como la migracion de control.
+4. Registrar el marcador del baseline y el SHA-256 del archivo; no inventar que
+   las 78 migraciones historicas fueron aplicadas en una base sin historial.
+5. Configurar credenciales SQL y secretos en variables de entorno o archivos
+   locales ignorados por Git.
+6. Crear el primer administrador y ejecutar `php scripts/database_health.php`.
+7. Probar una ruta publica y una ruta autenticada antes de publicar.
 
-## Principios establecidos
+## Reglas de migracion
 
-- Todas las tablas usan InnoDB y claves foráneas.
-- Los textos usan `utf8mb4`.
-- PDO trabaja con emulación deshabilitada y horario UTC.
+- El baseline es el estado estructural actual y no incluye filas ni datos
+  institucionales.
+- Un actualizador consulta `schema_migrations` y ejecuta solo archivos `UP`
+  pendientes posteriores al baseline, validando su checksum.
+- Cada archivo se registra despues de una ejecucion exitosa.
+- Los cuatro archivos `_down.sql` son reversas manuales y no forman parte de la
+  ejecucion automatica.
+- Las fechas nominalmente futuras no se renombran en masa; la anomalia queda en
+  `database/MIGRATIONS_INVENTORY.md`.
+- Las migraciones historicas que insertan, actualizan o eliminan datos no se
+  ejecutan durante una instalacion nueva. Los datos iniciales se provisionan por
+  un proceso separado y controlado.
+
+## Principios de persistencia
+
+- Todas las tablas usan InnoDB y claves foraneas.
+- Los textos usan `utf8mb4` y la aplicacion usa consultas preparadas.
 - Las operaciones compuestas deben ejecutarse en transacciones.
-- El código de proyecto se reserva con bloqueo `FOR UPDATE` dentro de la transacción.
-- Los archivos permanecen fuera de `public`; la base guarda metadatos y rutas relativas, nunca BLOB.
-- Las vistas no ejecutan SQL. El acceso se realiza mediante servicios y repositorios.
-- Los permisos visibles nunca sustituyen la validación del servidor.
-- Los únicos roles globales iniciales son Estudiante, Docente y Administrador. Tutor, líder o miembro de tribunal son funciones internas de un proyecto, no roles de acceso independientes.
-
-## Códigos institucionales
-
-- El formato se obtiene de `system_settings`; los prefijos y la longitud numérica solo afectan proyectos futuros.
-- La reserva utiliza `project_code_sequences` con bloqueo `FOR UPDATE`.
-- La secuencia nunca retrocede al borrar proyectos y el generador evita reutilizar códigos históricos.
+- El codigo de proyecto se reserva con bloqueo `FOR UPDATE` dentro de la
+  transaccion.
+- Los archivos permanecen fuera de `public`; la base guarda metadatos y rutas
+  relativas, nunca BLOB.
+- Los permisos visibles nunca sustituyen la validacion del servidor.
+- Estudiante, Docente y Administrador son los roles globales iniciales; tutor,
+  lider y tribunal son funciones internas de un proyecto.
 
 ## Convivencia temporal
 
-`DB_ENABLED=false` conserva los modelos demostrativos actuales. Los nuevos servicios PDO no se utilizan hasta activar la conexión. La migración `20260719_prepare_database_adaptation.sql` conserva temporalmente las columnas antiguas de carrera y periodo para permitir una transición sin pérdida; se retirarán después de poblar las claves normalizadas.
-
-## Primera integración recomendada
-
-Implementar como una sola ruta vertical: autenticación real → crear proyecto → listar proyectos del usuario → abrir detalle. Después se migran entregas, revisión, calendario, notificaciones y repositorio de forma incremental.
+`DB_ENABLED=false` permite conservar el modo demostrativo cuando no hay una base
+configurada. Los servicios PDO se utilizan solo al activar la conexion. La
+configuracion de produccion no habilita autorecarga ni guarda secretos en el
+repositorio.

@@ -1,6 +1,5 @@
 <?php
 declare(strict_types=1);
-final class ThesisDefenseResultException extends InvalidArgumentException { public function __construct(string $message,private int $status=422){parent::__construct($message);} public function httpStatus():int{return $this->status;} }
 final class ThesisDefenseResultService
 {
  public function save(int $id,string $expected,string $result,string $notes,int $actor):array{return Database::transaction(fn(PDO $db)=>$this->saveTx($db,$id,$expected,$result,$notes,$actor));}

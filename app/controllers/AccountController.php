@@ -211,10 +211,10 @@ final class AccountController
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && $session->validateCsrf('toggle_admin_mode', (string) ($_POST['_csrf'] ?? ''))) {
             $session->toggleAdminMode();
         }
-        $returnUrl = (string) ($_POST['return_url'] ?? $_SERVER['HTTP_REFERER'] ?? route('dashboard'));
-        if (!str_starts_with($returnUrl, '/') && !str_starts_with($returnUrl, route('dashboard'))) {
-            $returnUrl = route('dashboard');
-        }
+        $returnUrl = safe_internal_redirect_target(
+            (string) ($_POST['return_url'] ?? $_SERVER['HTTP_REFERER'] ?? ''),
+            route('dashboard')
+        );
         header('Location: ' . $returnUrl);
         exit;
     }
