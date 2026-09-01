@@ -5140,7 +5140,10 @@ document.addEventListener("keydown", (event) => {
                     setAdministrativeUnread(true);
                     const becameUnavailable = action === "availability"
                         && record.dataset.teacherOwnerStatusManagement === "true"
-                        && (result.data?.is_available === false || String(result.data?.is_available) === "0");
+                        // La acción se abrió desde un registro disponible; usar ese
+                        // estado conocido evita depender de la serialización del
+                        // booleano devuelto por el endpoint para decidir la ruta.
+                        && record.dataset.recordAvailable === "1";
                     if (becameUnavailable) {
                         sessionStorage.setItem("repositoryToast", result.message);
                         const target = new URL(record.dataset.adminRedirect || window.location.href, window.location.href);
@@ -5313,9 +5316,15 @@ document.addEventListener("keydown", (event) => {
         const body = new FormData();
         body.set("_csrf", record.dataset.adminCsrf);
         body.set("id", record.dataset.recordId);
-        body.set("action", pendingAction);
+        const isProjectPublication = record.dataset.entityType === "project" && pendingAction === "publication";
+        const requestAction = isProjectPublication
+            ? (record.dataset.recordStatus === "published" ? "unpublish" : "publish")
+            : pendingAction;
+        body.set("action", requestAction);
         if (pendingAction === "availability") body.set("is_available", record.dataset.recordAvailable === "1" ? "0" : "1");
-        if (pendingAction === "publication") body.set("status", record.dataset.recordStatus === "published" ? "withdrawn" : "published");
+        if (!isProjectPublication && pendingAction === "publication") {
+            body.set("status", record.dataset.recordStatus === "published" ? "withdrawn" : "published");
+        }
         if (pendingAction === "trash") {
             body.set("reason_code", selectedReason.value);
             body.set("reason_detail", selectedReason.value === "other" ? reason.value.trim() : "");
