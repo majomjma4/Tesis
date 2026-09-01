@@ -13,13 +13,14 @@ final class ProjectAuditService
             throw new InvalidArgumentException('Los datos de auditoría son incompletos.');
         }
         $connection = $this->db ?? Database::connection();
+        $effectiveContext = (new AuthSessionService())->effectiveAuditContext();
         $statement = $connection->prepare(
             'INSERT INTO project_audit_log
-             (project_id, user_id, action, entity_type, entity_id, previous_state, new_state, reason, ip_address, user_agent)
-             VALUES (:project_id, :user_id, :action, :entity_type, :entity_id, :previous_state, :new_state, :reason, :ip_address, :user_agent)'
+             (project_id, user_id, effective_context, action, entity_type, entity_id, previous_state, new_state, reason, ip_address, user_agent)
+             VALUES (:project_id, :user_id, :effective_context, :action, :entity_type, :entity_id, :previous_state, :new_state, :reason, :ip_address, :user_agent)'
         );
         $statement->execute([
-            'project_id' => $projectId, 'user_id' => $userId, 'action' => $action,
+            'project_id' => $projectId, 'user_id' => $userId, 'effective_context' => $effectiveContext, 'action' => $action,
             'entity_type' => $entityType, 'entity_id' => $entityId,
             'previous_state' => $previousState === null ? null : json_encode($previousState, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'new_state' => $newState === null ? null : json_encode($newState, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),

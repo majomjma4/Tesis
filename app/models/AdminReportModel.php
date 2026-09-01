@@ -78,6 +78,8 @@ final class AdminReportModel
             $entityType = (string)$event['entity_type'];
             $actor = $event['actor'] ?: 'Sistema';
             $createdAt = (string)$event['created_at'];
+            $effectiveContext = trim((string)($event['effective_context'] ?? ''));
+            if (!in_array($effectiveContext, ['admin', 'admin_mode', 'teacher', 'student', 'system'], true)) $effectiveContext = null;
 
             // 1. Ocultar acciones internas/técnicas o demasiado genéricas
             // 2. Consolidar duplicados lógicos donde un evento se registra como 'project' y como 'project_file'
@@ -108,7 +110,8 @@ final class AdminReportModel
                 'element_label' => $elementLabel,
                 'created_at' => $createdAt,
                 'created_at_local' => $this->formatLocalDateTime($createdAt),
-                'actor' => $actor
+                'actor' => $actor,
+                'effective_context' => $effectiveContext,
             ];
         }
 
@@ -229,13 +232,13 @@ final class AdminReportModel
         [$whereAdmin, $paramsAdmin] = $this->auditActionFilter('a', 'admin', $maxRelevance);
         [$whereProject, $paramsProject] = $this->auditActionFilter('p', 'project', $maxRelevance);
         $sql = "SELECT id, action, action_label, module, entity_type, entity_id, element_label,
-                       details, previous_state, new_state, project_available, created_at, actor
+                       details, previous_state, new_state, project_available, created_at, actor, effective_context
                 FROM (
                     SELECT a.id, a.action, a.action_label, a.module, a.entity_type, a.entity_id,
                            a.element_label, a.details, NULL previous_state, NULL new_state,
                            CASE WHEN a.entity_type='project' AND EXISTS (SELECT 1 FROM projects target WHERE target.id=a.entity_id) THEN 1
                                 WHEN a.entity_type='project' THEN 0 ELSE NULL END project_available,
-                           a.created_at, u.full_name actor
+                           a.created_at, u.full_name actor, NULL effective_context
                     FROM admin_audit_log a LEFT JOIN users u ON u.id=a.actor_user_id
                     WHERE a.created_at BETWEEN :from1 AND :to1 AND $whereAdmin
                     UNION ALL
@@ -243,7 +246,7 @@ final class AdminReportModel
                            NULL element_label, NULL details, p.previous_state, p.new_state,
                            CASE WHEN p.entity_type='project' AND EXISTS (SELECT 1 FROM projects target WHERE target.id=p.entity_id) THEN 1
                                 WHEN p.entity_type='project' THEN 0 ELSE NULL END project_available,
-                           p.created_at, u.full_name actor
+                           p.created_at, u.full_name actor, p.effective_context
                     FROM project_audit_log p LEFT JOIN users u ON u.id=p.user_id
                     WHERE p.created_at BETWEEN :from2 AND :to2 AND $whereProject
                 ) audit_events

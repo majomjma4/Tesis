@@ -164,6 +164,17 @@ final class AuthSessionService
         if (in_array('student', $this->roles(), true)) return 'student';
         return 'student';
     }
+    /** Contexto efectivo del actor para auditoría; nunca acepta un valor del cliente. */
+    public function effectiveAuditContext(): string
+    {
+        if (PHP_SAPI === 'cli' && session_status() !== PHP_SESSION_ACTIVE) return 'system';
+        if (!$this->isAuthenticated()) return 'system';
+        if ($this->isAdminOnly()) return 'admin';
+        if ($this->isTeacherAndAdmin()) return $this->isAdminModeActive() ? 'admin_mode' : 'teacher';
+        if ($this->isTeacher()) return 'teacher';
+        if (in_array('student', $this->roles(), true)) return 'student';
+        return 'system';
+    }
     public function isInitialAdmin(): bool { $this->start(); return (bool)($_SESSION['is_initial_admin']??false); }
     public function name(): string { $this->start(); return (string)($_SESSION['user_name']??'Usuario'); }
     public function email(): string { $this->start(); return (string)($_SESSION['user_email']??''); }

@@ -122,6 +122,11 @@ if ($decisionFixture) {
                 : (($state['status']??'')==='published' && (int)$state['is_available']===1),"estado del proyecto tras $decision");
             $requestState=$db->query("SELECT status FROM project_adjustment_requests WHERE id=$requestId")->fetchColumn();
             $assert($requestState===($decision==='approved'?'addressed':'closed'),"estado persistido de solicitud $decision");
+            if ($decision==='rejected') {
+                $persistedReason=$db->prepare('SELECT rejection_reason FROM project_adjustment_requests WHERE id=:id');
+                $persistedReason->execute(['id'=>$requestId]);
+                $assert($persistedReason->fetchColumn()==='Motivo de rechazo de prueba.','motivo de rechazo persistido');
+            }
             $auditAction='project_adjustment_request_'.$decision;
             $assert((int)$db->query("SELECT COUNT(*) FROM project_audit_log WHERE entity_type='project_adjustment_request' AND entity_id=$requestId AND action='$auditAction'")->fetchColumn()===1,"auditoria de decision $decision");
             $timelineTypes=array_column((new ProjectAcademicTimelineService($db))->page($decisionProject,0,100)['events'],'event_type');

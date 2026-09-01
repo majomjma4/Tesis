@@ -93,11 +93,7 @@ final class ProjectAuditHistoryModel
         ];
     }
 
-    /**
-     * The audit schema predates persistence of the Admin Mode session flag.
-     * Use the durable administrative actor plus an explicit action allowlist,
-     * with guards for codes that are also used by ordinary student flows.
-     */
+    /** New events use the persisted effective context; the actor fallback is legacy-only. */
     private function administrativeWhere(): string
     {
         $actions = implode(',', array_map(
@@ -105,15 +101,21 @@ final class ProjectAuditHistoryModel
             self::ADMINISTRATIVE_ACTIONS
         ));
 
-        return "actor.is_admin=1
-            AND audit.action IN ({$actions})
-            AND NOT (
-                audit.action='project_description_updated'
-                AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(audit.new_state,'$.edited_by_administrator')),'') NOT IN ('1','true')
-            )
-            AND NOT (
-                audit.action='project_published'
-                AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(audit.new_state,'$.context')),'')='student_publication'
+        return "audit.action IN ({$actions})
+            AND (
+                audit.effective_context IN ('admin','admin_mode')
+                OR (
+                    audit.effective_context IS NULL
+                    AND actor.is_admin=1
+                    AND NOT (
+                        audit.action='project_description_updated'
+                        AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(audit.new_state,'$.edited_by_administrator')),'') NOT IN ('1','true')
+                    )
+                    AND NOT (
+                        audit.action='project_published'
+                        AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(audit.new_state,'$.context')),'')='student_publication'
+                    )
+                )
             )";
     }
 
@@ -130,10 +132,13 @@ final class ProjectAuditHistoryModel
         $timezone = (string) ($config['timezone'] ?? 'America/Guayaquil');
         if (!in_array($timezone, timezone_identifiers_list(), true)) $timezone = 'America/Guayaquil';
         $local = $utc->setTimezone(new DateTimeZone($timezone));
+        $effectiveContext = trim((string) ($row['effective_context'] ?? ''));
+        if (!in_array($effectiveContext, ['admin', 'admin_mode', 'teacher', 'student', 'system'], true)) $effectiveContext = null;
         return [
             'id' => (int) $row['id'], 'action' => (string) $row['action'],
             'action_label' => $this->actionLabel((string) $row['action']),
             'summary' => $this->context === 'academic_management' ? 'Proyecto académico' : 'Proyecto',
+            'effective_context' => $effectiveContext,
             'actor' => [
                 'name' => trim((string) ($row['actor_name'] ?? '')) ?: 'Sistema institucional',
                 'email' => (string) ($row['actor_email'] ?? ''),

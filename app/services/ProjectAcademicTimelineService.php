@@ -28,11 +28,11 @@ final class ProjectAcademicTimelineService
     }    private function unionSql(): string
     {
         return <<<'SQL'
-SELECT CONCAT('registration:',p.id) event_key,'project_registered' event_type,'project' source_type,p.id source_id,p.created_at occurred_at,u.id actor_id,u.full_name actor_name,NULL previous_state,NULL new_state,
+SELECT CONCAT('registration:',p.id) event_key,'project_registered' event_type,'project' source_type,p.id source_id,p.created_at occurred_at,u.id actor_id,u.full_name actor_name,NULL effective_context,NULL previous_state,NULL new_state,
        JSON_OBJECT('has_delivery',EXISTS(SELECT 1 FROM project_deliveries d WHERE d.project_id=p.id)) payload
 FROM projects p LEFT JOIN users u ON u.id=p.created_by WHERE p.id=? AND p.deleted_at IS NULL
 UNION ALL
-SELECT CONCAT('delivery:',d.id),'delivery_registered','project_delivery',d.id,d.submitted_at,u.id,u.full_name,NULL,NULL,
+SELECT CONCAT('delivery:',d.id),'delivery_registered','project_delivery',d.id,d.submitted_at,u.id,u.full_name,NULL,NULL,NULL,
        JSON_OBJECT('title',d.title,'comment',d.comment,'version_number',d.version_number,'status',d.status,
                    'file_count',COALESCE(
                        (SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(l.new_state,'$.submitted_file_count')) AS UNSIGNED)
@@ -46,42 +46,42 @@ SELECT CONCAT('delivery:',d.id),'delivery_registered','project_delivery',d.id,d.
                    )) payload
 FROM project_deliveries d LEFT JOIN users u ON u.id=d.submitted_by WHERE d.project_id=?
 UNION ALL
-SELECT CONCAT('observation-batch:',MIN(o.id)),'observation_batch_created','project_observation',MIN(o.id),MAX(o.created_at),u.id,u.full_name,NULL,NULL,
+SELECT CONCAT('observation-batch:',MIN(o.id)),'observation_batch_created','project_observation',MIN(o.id),MAX(o.created_at),u.id,u.full_name,NULL,NULL,NULL,
        JSON_OBJECT('observation_count',COUNT(o.id),'affected_file_count',COUNT(DISTINCT NULLIF(o.file_id,0)),'corrected_files_count',COALESCE((SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(l.new_state,'$.corrections_requested')) AS UNSIGNED) FROM project_audit_log l WHERE l.project_id=o.project_id AND l.action='project_document_review_completed' AND DATE_FORMAT(l.created_at,'%Y-%m-%d %H:%i:%s')=DATE_FORMAT(MAX(o.created_at),'%Y-%m-%d %H:%i:%s') LIMIT 1),COUNT(DISTINCT NULLIF(o.file_id,0))),'delivery_id',o.delivery_id)
 FROM project_observations o LEFT JOIN users u ON u.id=o.author_id WHERE o.project_id=? GROUP BY DATE_FORMAT(o.created_at,'%Y-%m-%d %H:%i:%s'),o.author_id,o.delivery_id
 UNION ALL
-SELECT CONCAT('observation-response:',r.id),'observation_responded','observation_response',r.id,r.created_at,u.id,u.full_name,NULL,NULL,
+SELECT CONCAT('observation-response:',r.id),'observation_responded','observation_response',r.id,r.created_at,u.id,u.full_name,NULL,NULL,NULL,
        JSON_OBJECT('body',r.body,'observation_id',r.observation_id)
 FROM observation_responses r JOIN project_observations o ON o.id=r.observation_id LEFT JOIN users u ON u.id=r.author_id WHERE o.project_id=?
 UNION ALL
-SELECT CONCAT('adjustment-requested:',a.id),'adjustment_requested','project_adjustment_request',a.id,a.created_at,u.id,u.full_name,NULL,JSON_OBJECT('status','pending'),
+SELECT CONCAT('adjustment-requested:',a.id),'adjustment_requested','project_adjustment_request',a.id,a.created_at,u.id,u.full_name,NULL,NULL,JSON_OBJECT('status','pending'),
        JSON_OBJECT('request_type',a.request_type,'message',a.message,'section',a.related_section,'field',a.related_field,'file_id',a.file_id,'file_name',f.original_name)
 FROM project_adjustment_requests a LEFT JOIN users u ON u.id=a.requested_by LEFT JOIN project_files f ON f.id=a.file_id WHERE a.project_id=?
 UNION ALL
-SELECT CONCAT('adjustment-responded:',r.id),'adjustment_responded','project_adjustment_response',r.id,r.created_at,u.id,u.full_name,NULL,NULL,
+SELECT CONCAT('adjustment-responded:',r.id),'adjustment_responded','project_adjustment_response',r.id,r.created_at,u.id,u.full_name,NULL,NULL,NULL,
        JSON_OBJECT('message',r.message,'adjustment_id',r.request_id)
 FROM project_adjustment_request_responses r JOIN project_adjustment_requests a ON a.id=r.request_id LEFT JOIN users u ON u.id=r.author_id WHERE a.project_id=?
 UNION ALL
-SELECT CONCAT('adjustment-addressed:',a.id),'adjustment_addressed','project_adjustment_request',a.id,a.addressed_at,NULL,NULL,JSON_OBJECT('status','pending'),JSON_OBJECT('status','addressed'),
+SELECT CONCAT('adjustment-addressed:',a.id),'adjustment_addressed','project_adjustment_request',a.id,a.addressed_at,NULL,NULL,NULL,JSON_OBJECT('status','pending'),JSON_OBJECT('status','addressed'),
        JSON_OBJECT('request_type',a.request_type,'message',a.message)
 FROM project_adjustment_requests a WHERE a.project_id=? AND a.addressed_at IS NOT NULL
   AND NOT EXISTS(SELECT 1 FROM project_audit_log l WHERE l.entity_type='project_adjustment_request' AND l.entity_id=a.id AND l.action='project_adjustment_request_approved')
 UNION ALL
-SELECT CONCAT('adjustment-closed:',a.id),'adjustment_closed','project_adjustment_request',a.id,a.closed_at,u.id,u.full_name,JSON_OBJECT('status','addressed'),JSON_OBJECT('status','closed'),
+SELECT CONCAT('adjustment-closed:',a.id),'adjustment_closed','project_adjustment_request',a.id,a.closed_at,u.id,u.full_name,NULL,JSON_OBJECT('status','addressed'),JSON_OBJECT('status','closed'),
        JSON_OBJECT('request_type',a.request_type,'message',a.message)
 FROM project_adjustment_requests a LEFT JOIN users u ON u.id=a.closed_by WHERE a.project_id=? AND a.closed_at IS NOT NULL
   AND NOT EXISTS(SELECT 1 FROM project_audit_log l WHERE l.entity_type='project_adjustment_request' AND l.entity_id=a.id AND l.action='project_adjustment_request_rejected')
 UNION ALL
-SELECT CONCAT('adjustment-decision:',l.id),CASE WHEN l.action='project_adjustment_request_approved' THEN 'adjustment_approved' ELSE 'adjustment_rejected' END,'project_adjustment_request',l.entity_id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
+SELECT CONCAT('adjustment-decision:',l.id),CASE WHEN l.action='project_adjustment_request_approved' THEN 'adjustment_approved' ELSE 'adjustment_rejected' END,'project_adjustment_request',l.entity_id,l.created_at,u.id,u.full_name,l.effective_context,l.previous_state,l.new_state,
        JSON_OBJECT('adjustment_id',l.entity_id,'request_type',a.request_type,'message',a.message,'decision',CASE WHEN l.action='project_adjustment_request_approved' THEN 'approved' ELSE 'rejected' END)
 FROM project_audit_log l JOIN project_adjustment_requests a ON a.id=l.entity_id LEFT JOIN users u ON u.id=l.user_id
 WHERE l.project_id=? AND l.entity_type='project_adjustment_request' AND l.action IN ('project_adjustment_request_approved','project_adjustment_request_rejected')
 UNION ALL
-SELECT CONCAT('document-review:',l.id),'document_review_completed','project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
+SELECT CONCAT('document-review:',l.id),'document_review_completed','project_audit_log',l.id,l.created_at,u.id,u.full_name,l.effective_context,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason)
 FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=? AND l.action='project_document_review_completed' AND NOT EXISTS(SELECT 1 FROM project_observations obs WHERE obs.project_id=l.project_id AND DATE_FORMAT(obs.created_at,'%Y-%m-%d %H:%i:%s')=DATE_FORMAT(l.created_at,'%Y-%m-%d %H:%i:%s'))
 UNION ALL
-SELECT CONCAT('document-status:',s.id),'document_status_recorded','project_file_review_state',s.id,s.updated_at,u.id,u.full_name,NULL,JSON_OBJECT('status',s.status),
+SELECT CONCAT('document-status:',s.id),'document_status_recorded','project_file_review_state',s.id,s.updated_at,u.id,u.full_name,NULL,NULL,JSON_OBJECT('status',s.status),
        JSON_OBJECT('file_id',s.file_id,'file_name',f.original_name,'checksum',s.checksum_sha256,'status',s.status)
 FROM project_file_review_states s JOIN project_files f ON f.id=s.file_id LEFT JOIN users u ON u.id=s.reviewed_by
 WHERE s.project_id=?
@@ -89,25 +89,25 @@ WHERE s.project_id=?
   AND NOT (s.status='under_review' AND EXISTS(SELECT 1 FROM project_deliveries d WHERE d.project_id=s.project_id))
   AND NOT EXISTS(SELECT 1 FROM project_audit_log l WHERE l.project_id=s.project_id AND l.action='project_document_review_completed' AND JSON_SEARCH(l.new_state,'one',s.checksum_sha256) IS NOT NULL)
 UNION ALL
-SELECT CONCAT('document-version:',c.id),'document_version_uploaded','project_file_version_change',c.id,c.changed_at,u.id,u.full_name,
+SELECT CONCAT('document-version:',c.id),'document_version_uploaded','project_file_version_change',c.id,c.changed_at,u.id,u.full_name,NULL,
        JSON_OBJECT('checksum',c.previous_checksum,'version_number',c.previous_version_number,'document_status',c.previous_document_status),
        JSON_OBJECT('checksum',c.new_checksum,'version_number',c.new_version_number,'document_status',c.new_document_status),
        JSON_OBJECT('file_id',c.file_id,'file_name',f.original_name,'previous_file_name',v.original_name,'previous_version_number',c.previous_version_number,'new_version_number',c.new_version_number,'previous_checksum',c.previous_checksum,'new_checksum',c.new_checksum,'reason',c.reason,'declared_summary',c.declared_summary,'sections_json',c.sections_json,'previous_document_status',c.previous_document_status,'new_document_status',c.new_document_status,'addressed_observation_count',(SELECT COUNT(*) FROM project_file_version_addressed_observations link WHERE link.change_id=c.id))
 FROM project_file_version_changes c JOIN project_files f ON f.id=c.file_id LEFT JOIN project_file_versions v ON v.id=c.previous_version_id LEFT JOIN users u ON u.id=c.changed_by WHERE c.project_id=? AND EXISTS(SELECT 1 FROM project_deliveries d WHERE d.project_id=c.project_id AND d.submitted_at<=c.changed_at)
 UNION ALL
-SELECT CONCAT('document-archive:',l.id),'document_version_archived','project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
+SELECT CONCAT('document-archive:',l.id),'document_version_archived','project_audit_log',l.id,l.created_at,u.id,u.full_name,l.effective_context,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason,'archived_count',JSON_VALUE(l.new_state,'$.archived_count'),'unavailable_count',JSON_VALUE(l.new_state,'$.unavailable_count'))
 FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=? AND l.action='project_document_versions_archived'
 UNION ALL
-SELECT CONCAT('file-version:',v.id),'file_version_registered','project_file_version',v.id,v.replaced_at,u.id,u.full_name,NULL,NULL,
+SELECT CONCAT('file-version:',v.id),'file_version_registered','project_file_version',v.id,v.replaced_at,u.id,u.full_name,NULL,NULL,NULL,
        JSON_OBJECT('file_id',v.file_id,'file_name',v.original_name,'version_number',v.version_number,'checksum',v.checksum_sha256,'reason',v.replacement_reason)
 FROM project_file_versions v LEFT JOIN users u ON u.id=v.replaced_by WHERE v.project_id=? AND EXISTS(SELECT 1 FROM project_deliveries d WHERE d.project_id=v.project_id AND d.submitted_at<=v.replaced_at) AND NOT EXISTS(SELECT 1 FROM project_file_version_changes c WHERE c.previous_version_id=v.id)
 UNION ALL
-SELECT CONCAT('file-change:',l.id),l.action,'project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
+SELECT CONCAT('file-change:',l.id),l.action,'project_audit_log',l.id,l.created_at,u.id,u.full_name,l.effective_context,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason,'entity_id',l.entity_id)
 FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=? AND l.action IN ('project.file_added','project.file_replaced','project.file_removed','project.file_restored','project_file_added','project_file_replaced','project_file_removed','project_file_restored')
 UNION ALL
-SELECT CONCAT('academic:',l.id),l.action,'project_audit_log',l.id,l.created_at,u.id,u.full_name,l.previous_state,l.new_state,
+SELECT CONCAT('academic:',l.id),l.action,'project_audit_log',l.id,l.created_at,u.id,u.full_name,l.effective_context,l.previous_state,l.new_state,
        JSON_OBJECT('reason',l.reason)
 FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=? AND (
   (l.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_unpublished','project_republished','project_publication_reverted','project_status_changed','project_reopened_for_adjustment','project_participants_updated','tribunal_assigned','tribunal_updated','thesis_defense_information_updated','tribunal_result_registered','defense_attempt_started')
@@ -117,7 +117,7 @@ FROM project_audit_log l LEFT JOIN users u ON u.id=l.user_id WHERE l.project_id=
   OR (l.action='project_updated'
    AND NOT EXISTS(SELECT 1 FROM project_audit_log semantic WHERE semantic.project_id=l.project_id AND semantic.created_at=l.created_at AND semantic.action IN ('project_approved','project_tribunal_approved','tribunal_approved','project_published','project_republished','project_publication_reverted','project_corrections_requested'))))
 UNION ALL
-SELECT CONCAT('publication-fallback:',p.id),'project_published','project',p.id,p.published_at,NULL,NULL,NULL,JSON_OBJECT('status','published'),
+SELECT CONCAT('publication-fallback:',p.id),'project_published','project',p.id,p.published_at,NULL,NULL,NULL,NULL,JSON_OBJECT('status','published'),
        JSON_OBJECT('fallback',TRUE)
 FROM projects p WHERE p.id=? AND p.published_at IS NOT NULL AND NOT EXISTS(SELECT 1 FROM project_audit_log l WHERE l.project_id=p.id AND l.action IN ('project_published','project_republished'))
 SQL;
@@ -126,6 +126,8 @@ SQL;
     private function normalize(array $row): array
     {
         $type=(string)$row['event_type'];$payload=$this->json($row['payload']??null);$previous=$this->json($row['previous_state']??null);$new=$this->json($row['new_state']??null);
+        $effectiveContext=trim((string)($row['effective_context']??''));
+        if(!in_array($effectiveContext,['admin','admin_mode','teacher','student','system'],true))$effectiveContext=null;
         [$title,$description,$viewType]=$this->copy($type,$payload,$previous,$new);
         $utc=$this->utc((string)$row['occurred_at']);$local=$utc->setTimezone(new DateTimeZone(self::LOCAL_TIMEZONE));$badges=$this->badges($type,$payload,$previous,$new);
         $delivery=null;$file=null;$version=null;$observation=null;$adjustment=null;
@@ -140,7 +142,8 @@ SQL;
             'source_type'=>(string)$row['source_type'],'source_id'=>(int)$row['source_id'],'actor'=>trim((string)($row['actor_name']??'')),'title'=>$title,'description'=>$description,
             'project_id'=>null,'delivery'=>$delivery,'file'=>$file,'version'=>$version,'observation'=>$observation,'adjustment'=>$adjustment,
             'previous_state'=>$this->translateHistoricalState($previous),'new_state'=>$this->translateHistoricalState($new),'badges'=>$badges,
-            'metadata'=>array_filter(['actor_id'=>isset($row['actor_id'])?(int)$row['actor_id']:null,'payload'=>$payload],static fn(mixed $value):bool=>$value!==null&&$value!==[]),
+            'effective_context'=>$effectiveContext,
+            'metadata'=>array_filter(['actor_id'=>isset($row['actor_id'])?(int)$row['actor_id']:null,'effective_context'=>$effectiveContext,'payload'=>$payload],static fn(mixed $value):bool=>$value!==null&&$value!==[]),
             'is_download_available'=>false,
         ];
         $event['project_id']=$this->projectIdFromPayload($payload);$event['key']=$event['event_key'];$event['type']=$viewType;$event['date']=$event['occurred_at_utc'];$event['detail']=$description;$event['meta']=$badges;
