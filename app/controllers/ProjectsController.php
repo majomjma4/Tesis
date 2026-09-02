@@ -363,6 +363,13 @@ final class ProjectsController
             ? $descriptionService->pendingReminder((int) $project['id'], $access->currentUserId())
             : null;
         $projectCapabilities = (new ProjectCapabilityService())->forCurrentUser($project, $projectContext);
+        $studentEditSituation = null;
+        if ($isStudentParticipant) {
+            $studentEditSituation = (new ProjectCapabilityService())->studentEditSituation(
+                Database::connection(), $project, $access->currentUserId()
+            );
+            $project['student_edit_situation'] = $studentEditSituation;
+        }
         $institutionalReadOnly = !$isAdministrator && $isTeacher && empty($projectCapabilities['review_documents']);
         $adjustmentData = ['items' => [], 'summary' => ['has_pending_adjustments' => false, 'pending_count' => 0, 'latest' => null]];
         if (!empty($projectCapabilities['view_adjustment_requests'])) {
@@ -375,6 +382,20 @@ final class ProjectsController
                 );
             } catch (ProjectAdjustmentRequestException $exception) {
                 error_log('Project adjustment UI: ' . $exception->getMessage());
+            }
+        }
+        $adjustmentActor = !$isAdministrator && $isTeacher
+            ? 'teacher'
+            : ($isStudentParticipant ? 'student' : '');
+        $hasPendingModificationRequest = false;
+        if ($adjustmentActor !== '' && !empty($projectCapabilities['create_adjustment_request'])) {
+            try {
+                $hasPendingModificationRequest = (new ProjectAdjustmentRequestService())->hasPendingForRequester(
+                    (int) $project['id'],
+                    (int) ($session->userId() ?? 0)
+                );
+            } catch (Throwable $exception) {
+                error_log('Project adjustment pending request: ' . $exception->getMessage());
             }
         }
         $hasAdjustmentUi = (bool) array_filter([
@@ -541,10 +562,11 @@ final class ProjectsController
             'descriptionSaveEndpoint' => route('project-description-save'),
             'lifecycleDescription' => $descriptionService->effectiveDescription((string) $project['type_code'], $project['summary'] ?? null),
             'academicHistoryEndpoint' => !empty($projectCapabilities['view_academic_history']) ? route('project-academic-history-events') . '&project_id=' . (int) $project['id'] . '&context=' . rawurlencode($projectContext) : '',
-            'adjustmentData' => $adjustmentData,
-            'adjustmentContext' => $projectContext,
-            'adjustmentCsrf' => $session->csrfToken('project_adjustment'),
-            'hasPendingModificationRequest' => false,
+             'adjustmentData' => $adjustmentData,
+             'adjustmentContext' => $projectContext,
+             'adjustmentActor' => $adjustmentActor,
+             'adjustmentCsrf' => $session->csrfToken('project_adjustment'),
+            'hasPendingModificationRequest' => $hasPendingModificationRequest,
             'adjustmentEndpoints' => [
                 'create' => route('project-adjustment-create'), 'respond' => route('project-adjustment-respond'),
                 'address' => route('project-adjustment-address'), 'close' => route('project-adjustment-close'),

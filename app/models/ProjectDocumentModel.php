@@ -10,7 +10,7 @@ final class ProjectDocumentModel
 
     public function lockProject(int $id):array
     {
-        $q=$this->db->prepare("SELECT id,title,tutor_id,presentation_file_id,status,deleted_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE");
+        $q=$this->db->prepare("SELECT id,title,tutor_id,presentation_file_id,status,publication_origin,academic_period_id,published_at,is_available,withdrawn_at,deleted_at FROM projects WHERE id=:id AND deleted_at IS NULL FOR UPDATE");
         $q->execute(['id'=>$id]);$row=$q->fetch();if(!$row)throw new InvalidArgumentException('El proyecto ya no está disponible.');return $row;
     }
     public function activeFiles(int $projectId):array

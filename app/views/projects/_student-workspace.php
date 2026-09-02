@@ -9,7 +9,9 @@ $statusLabel = $statusLabels[$status] ?? project_academic_labels($status)['statu
 $typeCode = (string) ($project['type_code'] ?? '');
 $isDegreeProject = $typeCode === 'thesis';
 $participants = (array) ($project['participants'] ?? []);
-
+$studentEditSituation = (array) ($project['student_edit_situation'] ?? []);
+$controlledStudentRequest = empty($isTeacherContext) && empty($isAdministrator)
+    && !empty($studentEditSituation['can_request_controlled_modification']);
 // Extract tutors
 $tutorParticipants = array_values(array_filter($participants, static fn(array $p): bool => in_array((string) ($p['role_code'] ?? ''), ['tutor', 'cotutor', 'director', 'codirector'], true) && (string) ($p['status'] ?? 'active') === 'active' && empty($p['removed_at'])));
 $tutorNames = array_map(static fn(array $p): string => (string) ($p['full_name'] ?? $p['name'] ?? 'Tutor'), $tutorParticipants);
@@ -87,12 +89,25 @@ $formatDate = static fn (?string $date, bool $time = false): string => format_ut
                         <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> <span>Editar información</span>
                     </button>
                 <?php endif; ?>
+                <?php if (!empty($projectCapabilities['create_adjustment_request']) && empty($hasPendingModificationRequest)): ?>
+                    <a class="ed-action sw-header-adjustment" href="#projectAdjustmentDialog">
+                        <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
+                        <span><?= $controlledStudentRequest ? 'Solicitar modificación' : 'Solicitar cambios' ?></span>
+                    </a>
+                <?php endif; ?>
                 <?php if ($canDownloadHeader): ?>
                     <a class="ed-action sw-header-download" href="<?= e($headerDownloadUrl) ?>" download data-record-download aria-label="Descargar archivos del proyecto"><i class="fa-solid fa-download" aria-hidden="true"></i>Descargar</a>
                 <?php endif; ?>
                 <span class="sw-badge-status is-<?= e($status) ?>" data-sw-project-status-badge><i class="fa-solid fa-circle-dot" aria-hidden="true"></i><?= e($statusLabel) ?></span>
             </div>
         </div>
+
+        <?php if (!empty($studentEditSituation['can_edit_ordinary']) && !empty($project['published_at'])): ?>
+            <aside class="project-adjustment-banner" role="status">
+                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                <div><strong>Proyecto publicado con modificación autorizada</strong><p>Los cambios quedarán registrados en el historial y serán notificados a la administración. La versión publicada anterior se conserva.</p></div>
+            </aside>
+        <?php endif; ?>
 
         <div class="sw-header-people-grid">
             <div class="sw-person-group sw-tutor-group">
@@ -140,6 +155,9 @@ $formatDate = static fn (?string $date, bool $time = false): string => format_ut
     <main>
         <?php foreach (array_keys($tabs) as $key): ?><section class="sw-tab-pane<?= $activeTab === $key ? ' is-active' : '' ?>" id="swTab-<?= e($key) ?>" role="tabpanel"><?php require __DIR__ . '/student-workspace/_' . $key . '.php'; ?></section><?php endforeach; ?>
     </main>
+    <?php if (!empty($projectCapabilities['create_adjustment_request']) || !empty($projectCapabilities['view_adjustment_requests'])): ?>
+        <?php require __DIR__ . '/_adjustment-requests.php'; ?>
+    <?php endif; ?>
     <?php if (!empty($projectCapabilities['edit_information'])): ?>
         <?php require __DIR__ . '/student-workspace/_edit-information-modal.php'; ?>
     <?php endif; ?>

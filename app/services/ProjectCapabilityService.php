@@ -93,19 +93,37 @@ final class ProjectCapabilityService
         'manage_workspace_files', 'send_for_review',
         'create_adjustment_request', 'view_adjustment_requests', 'respond_adjustment_request',
         'address_adjustment_request', 'close_adjustment_request',
-        'approve_adjustment_request', 'reject_adjustment_request',
+        'approve_adjustment_request', 'reject_adjustment_request', 'manage_adjustment_requests',
         'manage_own_repository_content', 'manage_own_repository_status',
     ];
+
+    private function isRelatedTeacher(PDO $db, array $project, int $userId): bool
+    {
+        if ($userId < 1) return false;
+        if ((int) ($project['tutor_id'] ?? 0) === $userId) return true;
+        $query = $db->prepare(
+            "SELECT 1 FROM project_participants
+             WHERE project_id=:project AND user_id=:user
+               AND status='active' AND removed_at IS NULL
+               AND LOWER(role_code) IN ('tutor','cotutor','co_tutor','co-tutor')
+             LIMIT 1"
+        );
+        $query->execute(['project' => (int) ($project['id'] ?? 0), 'user' => $userId]);
+        return (bool) $query->fetchColumn();
+    }
 
     /** @return array<string,bool> */
     public function forCurrentUser(array $project, string $context): array
     {
         $session = new AuthSessionService();
         $access = new ProjectAccessService();
-        return $this->resolve(
-            $project, $context, (int) ($session->userId() ?? 0),
-            $access->currentRoles(), $session->isAdminModeActive()
+        $userId = (int) ($session->userId() ?? 0);
+        $roles = $access->currentRoles();
+        $administrator = $session->isAdminModeActive();
+        $resolved = $this->resolve(
+            $project, $context, $userId, $roles, $administrator
         );
+        return $resolved;
     }
 
     /** Capability explícita para el motor de publicación directa del Repository. */
@@ -295,7 +313,7 @@ final class ProjectCapabilityService
         if ($context === 'academic_management') {
             if (!$administrator) return $capabilities;
             foreach (['view_project','edit_information','manage_files','view_academic_history','view_admin_history','change_status','request_corrections','manage_participants','manage_tutoring','manage_tribunal','manage_publication','download_files','download_academic_package','view_institutional_files'] as $key) $capabilities[$key] = true;
-            foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request','approve_adjustment_request','reject_adjustment_request'] as $key) $capabilities[$key] = true;
+            foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request','approve_adjustment_request','reject_adjustment_request','manage_adjustment_requests'] as $key) $capabilities[$key] = true;
             if ((string)($project['status'] ?? '') === 'development') $capabilities['manage_files'] = false;
             return $capabilities;
         }
@@ -332,11 +350,22 @@ final class ProjectCapabilityService
                     && strtolower((string) ($participant['role_code'] ?? '')) === 'student'
                     && (!array_key_exists('is_student', $participant) || !empty($participant['is_student']))
                 )) > 0;
-            if (!$administrator && $studentParticipant) $capabilities['create_adjustment_request'] = true;
+            $administrativeIdentity = in_array('administrator', $roles, true);
+            $teacherActor = !$administrator
+                && in_array('teacher', $roles, true)
+                && $this->isActiveTeacher($userId);
+            $studentActor = !$administrator && !$administrativeIdentity && $studentParticipant;
+            if (($studentActor || $teacherActor)
+                && (string) ($project['publication_origin'] ?? '') === ProjectPublicationOrigin::WORKFLOW) {
+                $capabilities['create_adjustment_request'] = true;
+            }
             return $capabilities;
         }
 
-        $isTeacher = in_array('teacher', $roles, true);
+        $administrativeIdentity = in_array('administrator', $roles, true);
+        // Un usuario con doble rol actúa como Docente mientras no esté en
+        // Admin Mode; la identidad administrativa solo gobierna ese modo.
+        $isTeacher = in_array('teacher', $roles, true) && !$administrator;
         $isStudent = in_array('student', $roles, true);
         // Proyectos activos es una bandeja de seguimiento general para Docente:
         // puede consultar cualquier expediente, sin recibir capacidades de mutación.
@@ -365,24 +394,33 @@ final class ProjectCapabilityService
         // El seguimiento de Proyectos activos permite a cualquier Docente solicitar
         // y consultar ajustes, sin concederle edición ni revisión formal.
         if ($isTeacher) {
-            $capabilities['create_adjustment_request'] = (string) ($project['status'] ?? '') === 'development';
-            $capabilities['view_adjustment_requests'] = $related;
+            // Cualquier docente con acceso institucional legítimo puede pedir
+            // cambios; no se limita esta acción a tutor/cotutor.
+            $capabilities['create_adjustment_request'] = $this->isAcademicAdjustmentProject($project)
+                && ($this->isInstitutionallyVisibleActiveProject($project) || $this->isRelatedAcademicTeacher($project, $userId));
+            $capabilities['view_adjustment_requests'] = (int) ($project['tutor_id'] ?? 0) === $userId
+                || count(array_filter($participants, static fn (array $participant): bool =>
+                    (int) ($participant['user_id'] ?? 0) === $userId
+                    && in_array(strtolower((string) ($participant['role_code'] ?? '')), ['tutor','cotutor','co_tutor','co-tutor'], true)
+                )) > 0;
         }
         $isOwnerStudent = $isStudent && count(array_filter($participants, static fn (array $participant): bool =>
             (int) ($participant['user_id'] ?? 0) === $userId && strtolower((string) ($participant['role_code'] ?? '')) === 'student'
         )) > 0;
         if ($isOwnerStudent) {
             $status = (string) ($project['status'] ?? '');
-            $capabilities['edit_information'] = $status === 'development';
+            $situation = $this->studentEditSituation(Database::connection(), $project, $userId);
+            $capabilities['edit_information'] = !empty($situation['can_edit_ordinary']);
             $capabilities['view_adjustment_requests'] = true;
             // Un expediente publicado conserva lectura, pero no permite mutaciones.
             $capabilities['respond_adjustment_request'] = $status !== 'published';
             $capabilities['address_adjustment_request'] = $status !== 'published';
+            $capabilities['create_adjustment_request'] = !empty($situation['can_request_controlled_modification']);
             $type = (string) ($project['type_code'] ?? '');
             $capabilities['publish_project'] = ($type === 'thesis' && $status === 'tribunal_approved')
                 || ($type !== 'thesis' && $status === 'approved');
-            $capabilities['manage_workspace_files'] = $status === 'development';
-            $capabilities['send_for_review'] = $status === 'development';
+            $capabilities['manage_workspace_files'] = !empty($situation['can_edit_ordinary']);
+            $capabilities['send_for_review'] = !empty($situation['can_edit_ordinary']);
         }
 
         // La entrega estudiantil se habilita únicamente mientras el expediente sigue en desarrollo.
@@ -434,25 +472,107 @@ final class ProjectCapabilityService
     }
 
     /** Revalida en datos persistidos la identidad Student y su participación activa. */
-    public function canStudentEditProjectInTransaction(PDO $db, int $projectId, int $userId): bool
+    /**
+     * Fuente única de verdad para la edición estudiantil.
+     * La fecha se compara en la base de datos (UTC), nunca con un valor del
+     * navegador. La reapertura administrativa queda respaldada por auditoría.
+     *
+     * @return array<string,mixed>
+     */
+    public function studentEditSituation(PDO $db, array $project, int $userId): array
     {
-        if ($projectId < 1 || $userId < 1) return false;
-        $statement = $db->prepare(
+        $projectId = (int) ($project['id'] ?? 0);
+        $empty = [
+            'project_id' => $projectId,
+            'student_participant' => false,
+            'workflow_project' => false,
+            'period_active' => false,
+            'administratively_reopened' => false,
+            'can_edit_ordinary' => false,
+            'can_request_controlled_modification' => false,
+            'reason' => 'not_available',
+        ];
+        if ($projectId < 1 || $userId < 1) return $empty;
+
+        $current = $db->prepare(
+            'SELECT p.id,p.status,p.publication_origin,p.academic_period_id,p.deleted_at,p.withdrawn_at,
+                    ap.status period_status,ap.starts_on period_starts_on,ap.ends_on period_ends_on
+             FROM projects p
+             LEFT JOIN academic_periods ap ON ap.id=p.academic_period_id
+             WHERE p.id=:project LIMIT 1'
+        );
+        $current->execute(['project' => $projectId]);
+        $row = $current->fetch();
+        if (!$row) return $empty;
+        if (!empty($row['deleted_at']) || !empty($row['withdrawn_at'])) return $empty;
+
+        $student = $db->prepare(
             "SELECT 1
              FROM users u
              INNER JOIN user_roles ur ON ur.user_id=u.id
              INNER JOIN roles r ON r.id=ur.role_id AND r.code='student'
              INNER JOIN student_profiles sp ON sp.user_id=u.id
              INNER JOIN project_participants pp ON pp.user_id=u.id
-             INNER JOIN projects p ON p.id=pp.project_id AND p.status='development'
              WHERE u.id=:user AND pp.project_id=:project
                AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL
-               AND p.deleted_at IS NULL AND p.withdrawn_at IS NULL
                AND LOWER(pp.role_code)='student' AND pp.status='active' AND pp.removed_at IS NULL
-             LIMIT 1 FOR UPDATE"
+             LIMIT 1"
         );
-        $statement->execute(['user'=>$userId, 'project'=>$projectId]);
-        return (bool) $statement->fetchColumn();
+        $student->execute(['user' => $userId, 'project' => $projectId]);
+        $studentParticipant = (bool) $student->fetchColumn();
+
+        $periodCheck = $db->prepare(
+            'SELECT 1 FROM academic_periods
+             WHERE id=:period AND status=\'active\'
+               AND starts_on <= UTC_DATE() AND ends_on >= UTC_DATE() LIMIT 1'
+        );
+        $periodCheck->execute(['period' => (int) ($row['academic_period_id'] ?? 0)]);
+        $periodActive = (bool) $periodCheck->fetchColumn();
+
+        $reopen = $db->prepare(
+            "SELECT action FROM project_audit_log
+             WHERE project_id=:project
+               AND action IN ('project_reopened_for_adjustment','project_submitted_for_review',
+                              'project_corrections_requested','project_approved','project_tribunal_approved',
+                              'tribunal_approved','project_published','project_unpublished',
+                              'project_republished','project_publication_reverted')
+             ORDER BY id DESC LIMIT 1"
+        );
+        $reopen->execute(['project' => $projectId]);
+        $administrativelyReopened = (string) $reopen->fetchColumn() === 'project_reopened_for_adjustment';
+
+        $status = (string) ($row['status'] ?? '');
+        $workflow = (string) ($row['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW) === ProjectPublicationOrigin::WORKFLOW;
+        $ordinary = $studentParticipant && $workflow && $status === 'development'
+            && ($periodActive || $administrativelyReopened);
+        $formalized = in_array($status, ['approved', 'defense', 'tribunal_approved', 'published'], true);
+        $controlled = $studentParticipant && $workflow && !$ordinary
+            && (!$periodActive || $formalized);
+
+        $reason = $ordinary ? 'ordinary_editing'
+            : (!$studentParticipant ? 'not_project_student' : (!$workflow ? 'not_academic_workflow'
+                : (!$periodActive ? 'academic_period_finished' : ($formalized ? 'formalized_project' : 'academic_state_locked'))));
+        return [
+            'project_id' => $projectId,
+            'student_participant' => $studentParticipant,
+            'workflow_project' => $workflow,
+            'period_id' => (int) ($row['academic_period_id'] ?? 0),
+            'period_status' => (string) ($row['period_status'] ?? ''),
+            'period_starts_on' => (string) ($row['period_starts_on'] ?? ''),
+            'period_ends_on' => (string) ($row['period_ends_on'] ?? ''),
+            'period_active' => $periodActive,
+            'administratively_reopened' => $administrativelyReopened && $status === 'development',
+            'status' => $status,
+            'can_edit_ordinary' => $ordinary,
+            'can_request_controlled_modification' => $controlled,
+            'reason' => $reason,
+        ];
+    }
+
+    public function canStudentEditProjectInTransaction(PDO $db, int $projectId, int $userId): bool
+    {
+        if ($projectId < 1 || $userId < 1) return false;
+        return !empty($this->studentEditSituation($db, ['id' => $projectId], $userId)['can_edit_ordinary']);
     }
 
     /** @return array<string,bool> Capacidades de ajustes recalculadas con identidad persistida. */
@@ -460,6 +580,8 @@ final class ProjectCapabilityService
     {
         $result = $this->none();
         if ($userId < 1 || !in_array($context, ['academic_management', 'academic', 'repository'], true)) return $result;
+        $projectId = (int) ($project['id'] ?? 0);
+        if ($projectId < 1 || !empty($project['deleted_at']) || !empty($project['withdrawn_at'])) return $result;
         $identity = $db->prepare(
             "SELECT u.is_admin,r.code FROM users u LEFT JOIN user_roles ur ON ur.user_id=u.id LEFT JOIN roles r ON r.id=ur.role_id
              WHERE u.id=:user AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL"
@@ -468,19 +590,30 @@ final class ProjectCapabilityService
         $rows = $identity->fetchAll();
         if ($rows === []) return $result;
         $isAdmin = count(array_filter($rows, static fn(array $row): bool => !empty($row['is_admin']) || strtolower((string)$row['code']) === 'administrator')) > 0;
-        if ($context === 'academic_management' && $isAdmin) {
-            foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request','approve_adjustment_request','reject_adjustment_request'] as $key) $result[$key] = true;
+        $session = new AuthSessionService();
+        $adminMode = $session->isAuthenticated()
+            && (int) ($session->userId() ?? 0) === $userId
+            && $session->hasAdminAccess()
+            && $session->isAdminModeActive();
+        $origin = (string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW);
+        $status = (string) ($project['status'] ?? '');
+        if ($context === 'academic_management') {
+            if (!$isAdmin || !$adminMode || $origin !== ProjectPublicationOrigin::WORKFLOW) return $result;
+            foreach (['create_adjustment_request','view_adjustment_requests','close_adjustment_request','approve_adjustment_request','reject_adjustment_request','manage_adjustment_requests'] as $key) $result[$key] = true;
             return $result;
         }
+        if ($origin !== ProjectPublicationOrigin::WORKFLOW) return $result;
         $roles = array_map(static fn(array $row): string => strtolower((string)$row['code']), $rows);
         $assignment = $db->prepare(
             "SELECT LOWER(role_code) FROM project_participants WHERE project_id=:project AND user_id=:user
               AND status='active' AND removed_at IS NULL FOR UPDATE"
         );
-        $assignment->execute(['project'=>(int)$project['id'], 'user'=>$userId]);
+        $assignment->execute(['project'=>$projectId, 'user'=>$userId]);
         $projectRoles = array_map('strval', $assignment->fetchAll(PDO::FETCH_COLUMN));
-        $isTutor = ((int)($project['tutor_id'] ?? 0) === $userId) || count(array_intersect(['tutor', 'co_tutor', 'cotutor', 'co-tutor'], $projectRoles)) > 0;
-        $teacher = in_array('teacher', $roles, true) && $isTutor;
+        // La cuenta puede tener is_admin=1 y seguir operando como Docente
+        // fuera de Admin Mode. Mantener esta decisión igual que resolve().
+        $teacherIdentity = in_array('teacher', $roles, true) && !$adminMode && $this->isActiveTeacherInTransaction($db, $userId);
+        $teacher = $teacherIdentity && ($this->isInstitutionallyVisibleActiveProject($project) || $this->isRelatedAcademicTeacherInTransaction($db, $project, $userId));
         $student = in_array('student', $roles, true) && in_array('student', $projectRoles, true);
         $studentProfile = false;
         if ($student) {
@@ -489,13 +622,23 @@ final class ProjectCapabilityService
             $studentProfile = (bool) $profile->fetchColumn();
         }
         if ($context === 'repository') {
-            if ($isAdmin || (string) ($project['status'] ?? '') !== 'published' || empty($project['is_available'])) return $result;
-            if ($student && $studentProfile) $result['create_adjustment_request'] = true;
+            if (($isAdmin && !$teacherIdentity) || (string) ($project['status'] ?? '') !== 'published' || empty($project['is_available'])) return $result;
+            $files = $db->prepare("SELECT 1 FROM project_files WHERE project_id=:project AND deleted_at IS NULL AND purged_at IS NULL LIMIT 1");
+            $files->execute(['project' => $projectId]);
+            if (!$files->fetchColumn()) return $result;
+            if (($student && $studentProfile) || ($teacherIdentity && $status === 'published')) $result['create_adjustment_request'] = true;
             return $result;
         }
-        if ($context !== 'academic' || $isAdmin) return $result;
-        if ($teacher || $student) $result['view_adjustment_requests'] = true;
-        if (in_array('teacher', $roles, true) && (string) ($project['status'] ?? '') === 'development') $result['create_adjustment_request'] = true;
+        if ($context !== 'academic' || ($isAdmin && !$teacherIdentity) || $status === 'published') return $result;
+        $institutionallyActive = in_array($status, self::INSTITUTIONAL_ACTIVE_STATUSES, true);
+        // El estudiante participante conserva lectura de sus solicitudes en
+        // estados formalizados para poder seguir una reapertura controlada.
+        if (!$institutionallyActive && !$student) return $result;
+        if ($student) $result['view_adjustment_requests'] = true;
+        if ($teacher && $institutionallyActive) $result['view_adjustment_requests'] = $this->isRelatedTeacher($db, $project, $userId);
+        if ($teacher) $result['create_adjustment_request'] = true;
+        $studentSituation = $student ? $this->studentEditSituation($db, $project, $userId) : null;
+        if ($student && $studentProfile && !empty($studentSituation['can_request_controlled_modification'])) $result['create_adjustment_request'] = true;
         if ($student && (string) ($project['status'] ?? '') !== 'published') {
             $result['respond_adjustment_request'] = true;
             $result['address_adjustment_request'] = true;
@@ -522,11 +665,31 @@ final class ProjectCapabilityService
             && in_array((string) ($project['status'] ?? ''), self::INSTITUTIONAL_ACTIVE_STATUSES, true);
     }
 
+    private function isAcademicAdjustmentProject(array $project): bool
+    {
+        return empty($project['deleted_at'])
+            && empty($project['withdrawn_at'])
+            && (string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW) === ProjectPublicationOrigin::WORKFLOW
+            && in_array((string) ($project['status'] ?? ''), [...self::INSTITUTIONAL_ACTIVE_STATUSES, 'published'], true);
+    }
+
+    private function isRelatedAcademicTeacher(array $project, int $userId): bool
+    {
+        if ($userId < 1) return false;
+        if ((int) ($project['tutor_id'] ?? 0) === $userId) return true;
+        foreach ((array) ($project['participants'] ?? []) as $participant) {
+            if ((int) ($participant['user_id'] ?? 0) !== $userId) continue;
+            if (in_array(strtolower((string) ($participant['role_code'] ?? '')), ['tutor', 'cotutor', 'co_tutor', 'co-tutor', 'tribunal', 'jury'], true)) return true;
+        }
+        return false;
+    }
+
     private function isOwnedRepositoryReadOnlyProject(array $project, int $userId, array $roles, bool $administrator): bool
     {
         if ($administrator || $userId < 1
             || (string) ($project['publication_origin'] ?? '') !== ProjectPublicationOrigin::DIRECT_REPOSITORY
             || (int) ($project['created_by'] ?? 0) !== $userId
+            || in_array('administrator', array_map('strtolower', array_map('strval', $roles)), true)
             || !in_array('teacher', array_map('strtolower', array_map('strval', $roles)), true)
             || !$this->isActiveTeacher($userId)) return false;
 
@@ -561,6 +724,37 @@ final class ProjectCapabilityService
              LIMIT 1"
         );
         $query->execute(['user' => $userId]);
+        return (bool) $query->fetchColumn();
+    }
+
+    private function isActiveTeacherInTransaction(PDO $db, int $userId): bool
+    {
+        if ($userId < 1) return false;
+        $query = $db->prepare(
+            "SELECT 1
+             FROM users u
+             INNER JOIN teacher_profiles tp ON tp.user_id=u.id
+             INNER JOIN user_roles ur ON ur.user_id=u.id
+             INNER JOIN roles r ON r.id=ur.role_id AND r.code='teacher'
+             WHERE u.id=:user AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL
+             LIMIT 1"
+        );
+        $query->execute(['user' => $userId]);
+        return (bool) $query->fetchColumn();
+    }
+
+    private function isRelatedAcademicTeacherInTransaction(PDO $db, array $project, int $userId): bool
+    {
+        if ($userId < 1) return false;
+        if ((int) ($project['tutor_id'] ?? 0) === $userId) return true;
+        $query = $db->prepare(
+            "SELECT 1 FROM project_participants
+             WHERE project_id=:project AND user_id=:user
+               AND status='active' AND removed_at IS NULL
+               AND LOWER(role_code) IN ('tutor','cotutor','co_tutor','co-tutor','tribunal','jury')
+             LIMIT 1"
+        );
+        $query->execute(['project' => (int) ($project['id'] ?? 0), 'user' => $userId]);
         return (bool) $query->fetchColumn();
     }
 }

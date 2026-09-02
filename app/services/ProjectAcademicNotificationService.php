@@ -34,6 +34,40 @@ final class ProjectAcademicNotificationService
     public function finalApproval(PDO $db,int $projectId,string $code,string $title,string $status,string $statusLabel,int $auditId):void {if($auditId<1)return;$metadata=$this->metadata($code,$title,['transition'=>$status,'audit_id'=>$auditId]);$this->forStudents($db,$projectId,'status_change','Estado de proyecto actualizado','El proyecto ha alcanzado el estado de “'.mb_strtolower($statusLabel).'”.','project-final-status:'.$projectId.':'.$status.':'.$auditId,$metadata,'Ver proyecto');}
     /** Notifica la publicación final a estudiantes activos y al tutor relacionado. */
     public function projectPublished(PDO $db,int $projectId,string $code,string $title,int $auditId):void {if($auditId<1)return;$metadata=$this->metadata($code,$title,['transition'=>'published','audit_id'=>$auditId]);$message='El documento final ha sido publicado correctamente en el Repositorio Académico.';$this->forStudents($db,$projectId,'repository','Proyecto publicado',$message,'project-published-students:'.$projectId.':'.$auditId,$metadata,'Ver en Repositorio');$tutors=$db->prepare("SELECT DISTINCT pp.user_id FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id WHERE pp.project_id=:project AND LOWER(pp.role_code) IN ('tutor','cotutor','co_tutor','co-tutor') AND pp.status='active' AND pp.removed_at IS NULL AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL");$tutors->execute(['project'=>$projectId]);foreach($tutors->fetchAll(PDO::FETCH_COLUMN) as $tutorId)$this->forUser($db,(int)$tutorId,$projectId,'repository','Proyecto publicado',$message,'project-published-tutor:'.$projectId.':'.(int)$tutorId.':'.$auditId,$metadata,'Ver en Repositorio');}
+    /** Informa a administración de una edición realizada después de publicar. */
+    public function postPublicationModification(PDO $db,int $projectId,int $actorId,int $auditId,string $scope):void
+    {
+        if ($projectId < 1 || $actorId < 1 || $auditId < 1 || trim($scope) === '') return;
+        $project = $db->prepare('SELECT code,title,published_at FROM projects WHERE id=:project AND deleted_at IS NULL LIMIT 1');
+        $project->execute(['project' => $projectId]);
+        $row = $project->fetch();
+        if (!$row || empty($row['published_at'])) return;
+
+        $actor = $db->prepare("SELECT full_name FROM users WHERE id=:actor AND status='active' AND deleted_at IS NULL AND purged_at IS NULL LIMIT 1");
+        $actor->execute(['actor' => $actorId]);
+        $actorName = trim((string) $actor->fetchColumn()) ?: 'Un estudiante';
+        $metadata = $this->metadata((string) $row['code'], (string) $row['title'], [
+            'event' => 'post_publication_modification',
+            'audit_id' => $auditId,
+            'actor_id' => $actorId,
+            'scope' => $scope,
+        ]);
+        $message = $actorName . ' registró una modificación posterior a la publicación del proyecto. La versión publicada anterior se conserva en el historial.';
+        $admins = $db->query("SELECT id FROM users WHERE is_admin=1 AND status='active' AND deleted_at IS NULL AND purged_at IS NULL");
+        $insert = $db->prepare("INSERT IGNORE INTO notifications(user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key)
+            VALUES(:user,:project,'adjustment','Modificación posterior a publicación',:message,:url,'Revisar proyecto',:metadata,:dedup)");
+        foreach ($admins->fetchAll(PDO::FETCH_COLUMN) as $adminId) {
+            $id = (int) $adminId;
+            $insert->execute([
+                'user' => $id,
+                'project' => $projectId,
+                'message' => $message,
+                'url' => route('project-detail') . '&id=' . $projectId,
+                'metadata' => json_encode($metadata, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                'dedup' => 'project-post-publication-modification:' . $auditId . ':' . $id,
+            ]);
+        }
+    }
     public function defenseStarted(PDO $db,int $projectId,string $code,string $title,int $actorId):void {$metadata=$this->metadata($code,$title,['transition'=>'defense']);$this->forStudents($db,$projectId,'tribunal','Defensa de proyecto iniciada','El proyecto ha sido derivado al Tribunal para la sustentación de la defensa.','project-defense-started-students:'.$projectId,$metadata,'Ver proyecto');$q=$db->prepare("INSERT IGNORE INTO notifications(user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key) SELECT DISTINCT pp.user_id,:project,'tribunal','Defensa de proyecto iniciada',:message,:url,'Ver proyecto',:metadata,CONCAT('project-defense-started-member:',:project,':',pp.user_id) FROM project_participants pp JOIN users u ON u.id=pp.user_id WHERE pp.project_id=:participants AND LOWER(pp.role_code) IN ('tribunal','jury') AND pp.status='active' AND pp.removed_at IS NULL AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL");$q->execute(['project'=>$projectId,'message'=>'Se ha dado inicio a la etapa de defensa del proyecto para tu evaluación.','url'=>route('project-detail').'&id='.$projectId,'metadata'=>json_encode($metadata,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),'participants'=>$projectId]);}
     private function forStudents(PDO $db,int $projectId,string $type,string $title,string $message,string $dedup,array $metadata,string $actionLabel,string $tab='summary'):void {$q=$db->prepare("INSERT IGNORE INTO notifications(user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key) SELECT DISTINCT pp.user_id,:project,:type,:title,:message,:url,:label,:metadata,:dedup FROM project_participants pp INNER JOIN users u ON u.id=pp.user_id WHERE pp.project_id=:participants AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL");$q->execute(['project'=>$projectId,'type'=>$type,'title'=>$title,'message'=>$message,'url'=>$this->projectNotificationUrl($type,$projectId,$tab),'label'=>$actionLabel,'metadata'=>json_encode($metadata,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),'dedup'=>$dedup,'participants'=>$projectId]);}
     private function forUser(PDO $db,int $userId,int $projectId,string $type,string $title,string $message,string $dedup,array $metadata,string $actionLabel,string $tab='summary'):void {$q=$db->prepare("INSERT INTO notifications(user_id,project_id,type,title,message,action_url,action_label,metadata,deduplication_key) SELECT u.id,:project,:type,:title,:message,:url,:label,:metadata,:dedup FROM users u WHERE u.id=:user AND u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL");$q->execute(['user'=>$userId,'project'=>$projectId,'type'=>$type,'title'=>$title,'message'=>$message,'url'=>$this->projectNotificationUrl($type,$projectId,$tab),'label'=>$actionLabel,'metadata'=>json_encode($metadata,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),'dedup'=>$dedup]);}

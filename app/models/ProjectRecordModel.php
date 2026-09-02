@@ -39,7 +39,9 @@ final class ProjectRecordModel
         $institutionalStatuses = "'" . implode("','", ProjectCapabilityService::INSTITUTIONAL_ACTIVE_STATUSES) . "'";
         $deletedVisibility = $teacherOwnedDirectReadOnly ? '' : ' AND p.deleted_at IS NULL';
         $sql = "SELECT p.*, pt.code AS type_code, pt.name AS type_name, c.name AS career_name,
-                       ap.name AS period_name, s.code AS subject_code, s.name AS subject_name,
+                       ap.id AS period_id, ap.name AS period_name, ap.status AS period_status,
+                       ap.starts_on AS period_starts_on, ap.ends_on AS period_ends_on,
+                       s.code AS subject_code, s.name AS subject_name,
                        rl.name AS research_line_name, tutor.id AS tutor_user_id,
                        tutor.username AS tutor_username, tutor.full_name AS tutor_name,
                        tutor.email AS tutor_email,

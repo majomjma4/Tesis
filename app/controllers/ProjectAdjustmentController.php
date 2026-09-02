@@ -14,6 +14,10 @@ final class ProjectAdjustmentController
     public function listing(): void
     {
         $session=$this->session('GET'); $input=$_GET; $this->csrf($session,$input);
+        if ((string)($input['context'] ?? '') === 'academic_management'
+            && (!$session->hasAdminAccess() || !$session->isAdminModeActive())) {
+            $this->json(false,'La gestión administrativa requiere Admin Mode activo.',[],403);
+        }
         try {
             $result=(new ProjectAdjustmentRequestService())->listForProject((int)($input['project_id']??0),(string)($input['expected_project_status']??''),(int)$session->userId(),(string)($input['context']??''));
             $this->json(true,'Solicitudes administrativas obtenidas.',$result);
@@ -27,8 +31,12 @@ final class ProjectAdjustmentController
         $project=(int)($input['project_id']??0);$request=(int)($input['request_id']??0);$version=(int)($input['lock_version']??0);
         $expected=(string)($input['expected_project_status']??'');$actor=(int)$session->userId();$context=(string)($input['context']??'');
         $rejectionReason=(string)($input['rejection_reason']??'');
+        if ($context === 'academic_management'
+            && (!$session->hasAdminAccess() || !$session->isAdminModeActive())) {
+            $this->json(false,'La gestión administrativa requiere Admin Mode activo.',[],403);
+        }
         if (in_array($operation, ['approve', 'reject'], true)
-            && (!$session->isAdminModeActive() || $context !== 'academic_management')) {
+            && $context !== 'academic_management') {
             $this->json(false,'Esta decisión sólo está disponible para Administración.',[],403);
         }
         try {

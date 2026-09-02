@@ -47,13 +47,15 @@ final class ProjectDescriptionService
         if($description==='')throw new InvalidArgumentException('Escribe una descripción o selecciona “Omitir por ahora”.');
         if(mb_strlen($description,'UTF-8')>4000)throw new InvalidArgumentException('La descripción no puede superar los 4000 caracteres.');
         Database::transaction(function(PDO $db)use($projectId,$userId,$description):void{
-            $q=$db->prepare("SELECT p.summary,p.status,p.withdrawn_at,pt.code type_code FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id=:project_id AND p.deleted_at IS NULL FOR UPDATE");$q->execute(['project_id'=>$projectId]);$project=$q->fetch();
+            $q=$db->prepare("SELECT p.id,p.summary,p.status,p.publication_origin,p.academic_period_id,p.published_at,p.withdrawn_at,pt.code type_code FROM projects p INNER JOIN project_types pt ON pt.id=p.project_type_id WHERE p.id=:project_id AND p.deleted_at IS NULL FOR UPDATE");$q->execute(['project_id'=>$projectId]);$project=$q->fetch();
             if (is_array($project) && !empty($project['withdrawn_at'])) throw new InvalidArgumentException('El proyecto ya no está disponible para actualizarse.');
             if(!$project||!in_array((string)$project['type_code'],self::REMINDER_TYPES,true))throw new InvalidArgumentException('Este proyecto no admite una descripción escrita por el estudiante.');
-            if ((string)$project['status'] !== 'development') throw new InvalidArgumentException('La descripción solo puede actualizarse mientras el proyecto está En desarrollo.');
-            if(!(new ProjectCapabilityService())->canStudentEditProjectInTransaction($db,$projectId,$userId))throw new InvalidArgumentException('No tienes permiso para modificar la descripción de este proyecto.');
+            if (empty((new ProjectCapabilityService())->studentEditSituation($db,$project,$userId)['can_edit_ordinary'])) throw new InvalidArgumentException('La descripción no puede editarse directamente en la situación actual del proyecto.');
             $previous=trim((string)($project['summary']??''));$db->prepare('UPDATE projects SET summary=:summary WHERE id=:id')->execute(['summary'=>$description,'id'=>$projectId]);
-            (new ProjectAuditService($db))->record($projectId,$userId,'project_description_updated','project',$projectId,['summary'=>$previous?:null],['summary'=>$description]);
+            $auditId = (new ProjectAuditService($db))->record($projectId,$userId,'project_description_updated','project',$projectId,['summary'=>$previous?:null],['summary'=>$description]);
+            if (!empty($project['published_at'])) {
+                (new ProjectAcademicNotificationService())->postPublicationModification($db,$projectId,$userId,$auditId,'project_description');
+            }
             $db->prepare("UPDATE notifications SET is_read=1,read_at=COALESCE(read_at,NOW()),updated_at=NOW() WHERE project_id=:project_id AND user_id=:user_id AND type='reminder' AND JSON_UNQUOTE(JSON_EXTRACT(metadata,'$.purpose'))='project_description'")->execute(['project_id'=>$projectId,'user_id'=>$userId]);
         });
     }

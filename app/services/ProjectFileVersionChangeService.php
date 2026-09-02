@@ -9,7 +9,9 @@ final class ProjectFileVersionChangeService
     public function replaceWorkspaceInTransaction(PDO $db,int $projectId,int $fileId,string $expectedChecksum,array $stored,int $actor,string $customReason=''):array
     {
         $model=new ProjectDocumentModel($db);$project=$model->lockProject($projectId);
-        if((string)$project['status']!=='development')throw new ProjectDocumentVersionException('Los archivos solo pueden modificarse mientras el proyecto está En desarrollo.',409);
+        if (empty((new ProjectCapabilityService())->studentEditSituation($db, $project, $actor)['can_edit_ordinary'])) {
+            throw new ProjectDocumentVersionException('Los archivos no pueden modificarse directamente en la situación actual del proyecto. Solicita una modificación administrativa si corresponde.', 409);
+        }
         $current=$model->findActiveFile($projectId,$fileId,true);
         if(!preg_match('/^[a-f0-9]{64}$/',$expectedChecksum)||!hash_equals((string)$current['checksum_sha256'],$expectedChecksum))$this->conflict();
         $hasPreviousReview=$this->hasPreviousReview($db,$projectId);
@@ -32,7 +34,10 @@ final class ProjectFileVersionChangeService
         $insert=$db->prepare("INSERT INTO project_file_version_changes(project_id,file_id,previous_version_id,previous_checksum,new_checksum,previous_version_number,new_version_number,changed_by,reason,declared_summary,sections_json,previous_document_status,new_document_status) VALUES(:project,:file,:previous_version,:previous_checksum,:new_checksum,:previous_number,:new_number,:actor,:reason,:summary,NULL,:previous_status,'development')");
         $insert->execute(['project'=>$projectId,'file'=>$fileId,'previous_version'=>(int)$replacement['previous_version_id'],'previous_checksum'=>$expectedChecksum,'new_checksum'=>$newChecksum,'previous_number'=>$previousNumber,'new_number'=>$newNumber,'actor'=>$actor,'reason'=>$reason,'summary'=>$summary,'previous_status'=>$previousStatus]);$changeId=(int)$db->lastInsertId();
         (new ProjectDocumentReviewService($db))->recordCurrentStatus($projectId,$fileId,$newChecksum,'development',$actor);
-        (new ProjectAuditService($db))->record($projectId,$actor,'project_workspace_file_replaced','project_file_version_change',$changeId,['checksum'=>$expectedChecksum,'version_number'=>$previousNumber],['change_id'=>$changeId,'file_id'=>$fileId,'previous_checksum'=>$expectedChecksum,'new_checksum'=>$newChecksum,'previous_version_number'=>$previousNumber,'new_version_number'=>$newNumber,'reason'=>$reason,'summary'=>$summary,'previous_status'=>$previousStatus,'new_status'=>'development'],$reason);
+        $auditId = (new ProjectAuditService($db))->record($projectId,$actor,'project_workspace_file_replaced','project_file_version_change',$changeId,['checksum'=>$expectedChecksum,'version_number'=>$previousNumber],['change_id'=>$changeId,'file_id'=>$fileId,'previous_checksum'=>$expectedChecksum,'new_checksum'=>$newChecksum,'previous_version_number'=>$previousNumber,'new_version_number'=>$newNumber,'reason'=>$reason,'summary'=>$summary,'previous_status'=>$previousStatus,'new_status'=>'development'],$reason);
+        if (!empty($project['published_at'])) {
+            (new ProjectAcademicNotificationService())->postPublicationModification($db,$projectId,$actor,$auditId,'document_version');
+        }
         return ['change_id'=>$changeId,'file'=>$replacement['file'],'previous_version_id'=>(int)$replacement['previous_version_id'],'previous_version_number'=>$previousNumber,'new_version_number'=>$newNumber];
     }
 
@@ -77,7 +82,10 @@ final class ProjectFileVersionChangeService
             $placeholders=implode(',',array_fill(0,count($observationIds),'?'));$update=$db->prepare("UPDATE project_observations SET status='addressed' WHERE project_id=? AND id IN ($placeholders) AND status='pending'");$update->execute([$projectId,...$observationIds]);}
         (new ProjectDocumentReviewService($db))->recordCurrentStatus($projectId,$fileId,$newChecksum,'development',$actor);
         $auditPayload=['change_id'=>$changeId,'project_id'=>$projectId,'file_id'=>$fileId,'previous_checksum'=>$expectedChecksum,'new_checksum'=>$newChecksum,'previous_version_number'=>$previousNumber,'new_version_number'=>$newNumber,'reason'=>$reason,'declared_summary'=>$summary,'sections'=>$sections,'addressed_observation_ids'=>$observationIds,'previous_document_status'=>$previousStatus,'new_document_status'=>'development'];
-        (new ProjectAuditService($db))->record($projectId,$actor,'project_document_version_created','project_file_version_change',$changeId,['checksum'=>$expectedChecksum,'version_number'=>$previousNumber,'document_status'=>$previousStatus],$auditPayload,$reason);
+        $auditId = (new ProjectAuditService($db))->record($projectId,$actor,'project_document_version_created','project_file_version_change',$changeId,['checksum'=>$expectedChecksum,'version_number'=>$previousNumber,'document_status'=>$previousStatus],$auditPayload,$reason);
+        if (!empty($project['published_at'])) {
+            (new ProjectAcademicNotificationService())->postPublicationModification($db,$projectId,$actor,$auditId,'document_version');
+        }
         $this->notifyTutor($db,$project,$current,$changeId,$newNumber,$summary,count($observationIds),$previousStatus);
         return ['change_id'=>$changeId,'file'=>$replacement['file'],'previous_version_id'=>(int)$replacement['previous_version_id'],'previous_version_number'=>$previousNumber,'new_version_number'=>$newNumber,'previous_checksum'=>$expectedChecksum,'new_checksum'=>$newChecksum,'previous_document_status'=>$previousStatus,'new_document_status'=>'development','reason'=>$reason,'declared_summary'=>$summary,'sections'=>$sections,'addressed_observation_ids'=>$observationIds];
     }

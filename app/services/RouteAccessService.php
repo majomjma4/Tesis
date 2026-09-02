@@ -32,6 +32,17 @@ final class RouteAccessService
             if($this->isAjaxOrJsonRequest($page))$this->denyJson('No tienes permiso para administrar archivos.', 403);
             header('Location: '.route('forbidden'));exit;
         }
+        // Las rutas de ajustes son mixtas: docentes/estudiantes las usan en
+        // contexto académico, pero cualquier contexto administrativo debe
+        // conservar la misma exigencia de Admin Mode. El cuerpo JSON se
+        // verifica nuevamente en ProjectAdjustmentController y en el service.
+        $adjustmentContext = (string) ($_POST['context'] ?? $_GET['context'] ?? '');
+        if (str_starts_with($page, 'project-adjustment-')
+            && $adjustmentContext === 'academic_management'
+            && (!(bool) $identity['is_admin'] || !$session->isAdminModeActive())) {
+            if ($this->isAjaxOrJsonRequest($page)) $this->denyJson('La gestión administrativa requiere Admin Mode activo.', 403);
+            header('Location: ' . route('forbidden')); exit;
+        }
     }
 
     private function isAjaxOrJsonRequest(string $page = ''): bool

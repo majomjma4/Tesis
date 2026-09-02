@@ -15,7 +15,7 @@ final class StudentProjectSubmissionService
     public function submitForReviewInTransaction(PDO $db, int $projectId, int $actorId, bool $failAfterStateUpdates = false): array
     {
         if ($projectId < 1 || $actorId < 1) throw new StudentProjectSubmissionException('La solicitud no es válida.');
-        $project = $this->lockProject($db, $projectId);
+        $project = $this->lockProject($db, $projectId, $actorId);
         $this->assertActor($db, $projectId, $actorId);
         $this->assertAcademicInformation($db, $project);
 
@@ -67,13 +67,13 @@ final class StudentProjectSubmissionService
         ];
     }
 
-    private function lockProject(PDO $db, int $projectId): array
+    private function lockProject(PDO $db, int $projectId, int $actorId): array
     {
-        $query = $db->prepare('SELECT id,code,title,summary,tutor_id,status,deleted_at,withdrawn_at FROM projects WHERE id=:id FOR UPDATE');
+        $query = $db->prepare('SELECT id,code,title,summary,tutor_id,status,publication_origin,academic_period_id,published_at,is_available,deleted_at,withdrawn_at FROM projects WHERE id=:id FOR UPDATE');
         $query->execute(['id'=>$projectId]);
         $project = $query->fetch();
         if (!$project || !empty($project['deleted_at']) || !empty($project['withdrawn_at'])) throw new StudentProjectSubmissionException('El proyecto solicitado no está disponible.', 404);
-        if ((string)$project['status'] !== 'development') throw new StudentProjectSubmissionException('El proyecto ya no está disponible para envío a revisión.', 409);
+        if (empty((new ProjectCapabilityService())->studentEditSituation($db, $project, $actorId)['can_edit_ordinary'])) throw new StudentProjectSubmissionException('El proyecto ya no está disponible para envío ordinario a revisión.', 409);
         return $project;
     }
 

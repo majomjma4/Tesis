@@ -383,6 +383,19 @@ final class RepositoryController
         }
         $adjustmentData = ['items' => [], 'summary' => ['has_pending_adjustments' => false, 'pending_count' => 0, 'latest' => null]];
         $adjustmentContext = $isAdministratorView ? 'academic_management' : 'repository';
+        $repositoryAdjustmentActor = '';
+        if ($project !== null && !$isAdministratorView && !empty($projectCapabilities['create_adjustment_request'])) {
+            $repositoryRoles = array_map('strtolower', array_map('strval', $access->currentRoles()));
+            $repositoryAdjustmentActor = in_array('teacher', $repositoryRoles, true)
+                ? 'teacher'
+                : (in_array('student', $repositoryRoles, true) && count(array_filter(
+                    (array) ($project['participants'] ?? []),
+                    static fn (array $participant): bool => (int) ($participant['user_id'] ?? 0) === (int) ($session->userId() ?? 0)
+                        && strtolower((string) ($participant['role_code'] ?? '')) === 'student'
+                        && (string) ($participant['status'] ?? 'active') === 'active'
+                        && empty($participant['removed_at'])
+                )) > 0 ? 'student' : '');
+        }
         $hasPendingModificationRequest = false;
         if ($project !== null && !empty($projectCapabilities['create_adjustment_request']) && !$isAdministratorView) {
             try {
@@ -439,8 +452,9 @@ final class RepositoryController
             'canDeliver' => false,
             'projectContext' => $teacherOwnedReadOnly ? 'repository_owner' : 'repository',
             'projectCapabilities' => $projectCapabilities,
-            'adjustmentData' => $adjustmentData,
-            'adjustmentCsrf' => $session->csrfToken('project_adjustment'),
+             'adjustmentData' => $adjustmentData,
+             'adjustmentActor' => $repositoryAdjustmentActor,
+             'adjustmentCsrf' => $session->csrfToken('project_adjustment'),
             'adjustmentContext' => $adjustmentContext,
             'hasPendingModificationRequest' => $hasPendingModificationRequest,
             'adjustmentEndpoints' => $adjustmentEndpoints,

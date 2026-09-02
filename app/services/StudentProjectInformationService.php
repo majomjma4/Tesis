@@ -26,15 +26,16 @@ final class StudentProjectInformationService
     public function saveInTransaction(PDO $db, array $payload, int $actorId): array
     {
         $projectQuery = $db->prepare(
-            'SELECT id,title,summary,tutor_id,status,deleted_at,withdrawn_at FROM projects WHERE id=:id FOR UPDATE'
+            'SELECT id,title,summary,tutor_id,status,published_at,deleted_at,withdrawn_at FROM projects WHERE id=:id FOR UPDATE'
         );
         $projectQuery->execute(['id' => $payload['project_id']]);
         $project = $projectQuery->fetch();
         if (!$project || !empty($project['deleted_at']) || !empty($project['withdrawn_at'])) {
             throw new StudentProjectInformationException('El proyecto solicitado no está disponible.', 404);
         }
-        if ((string) $project['status'] !== 'development') {
-            throw new StudentProjectInformationException('La información solo puede editarse mientras el proyecto está En desarrollo.', 422);
+        $editSituation = (new ProjectCapabilityService())->studentEditSituation($db, $project, $actorId);
+        if (empty($editSituation['can_edit_ordinary'])) {
+            throw new StudentProjectInformationException('La información no puede editarse directamente en la situación actual del proyecto. Solicita una modificación administrativa si corresponde.', 422);
         }
 
         $participant = $db->prepare(
@@ -84,6 +85,11 @@ final class StudentProjectInformationService
         $auditId = (new ProjectAuditService($db))->record(
             $payload['project_id'], $actorId, 'project_updated', 'project', $payload['project_id'], $previous, $next
         );
+        if (!empty($project['published_at'])) {
+            (new ProjectAcademicNotificationService())->postPublicationModification(
+                $db, $payload['project_id'], $actorId, $auditId, 'project_information'
+            );
+        }
 
         return ['changed' => true, 'project_id' => $payload['project_id'], 'audit_id' => $auditId];
     }

@@ -107,7 +107,7 @@
     title.textContent = approving ? "¿Aprobar solicitud de modificación?" : "¿Rechazar solicitud de modificación?";
     message.textContent = approving
       ? "Al aprobarla, el proyecto volverá a estar disponible para modificación por el estudiante."
-      : "La solicitud será rechazada y el proyecto permanecerá publicado y bloqueado para edición.";
+      : "La solicitud será rechazada y el proyecto conservará su estado actual.";
     confirm.textContent = approving ? "Aprobar" : "Rechazar";
     confirm.classList.toggle("is-success", approving);
     confirm.classList.toggle("is-danger", !approving);

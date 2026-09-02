@@ -171,11 +171,11 @@ final class ProjectStatusTransitionService
     }
 
     /**
-     * Reabre un proyecto publicado por una solicitud administrativa aprobada.
-     * Es una transición excepcional y explícita: conserva published_at y deja
-     * el proyecto fuera del repositorio mientras vuelve a preparación.
+     * Autoriza una modificación controlada y, cuando corresponde, devuelve el
+     * proyecto a desarrollo. Conserva published_at y la auditoría de la
+     * formalización anterior; no altera la transición académica normal.
      */
-    public function reopenPublishedForAdjustmentInTransaction(PDO $db, int $projectId, int $actor, int $requestId): array
+    public function reopenForAdjustmentInTransaction(PDO $db, int $projectId, int $actor, int $requestId): array
     {
         if ($projectId < 1 || $actor < 1 || $requestId < 1) {
             throw new ProjectStatusTransitionException('La reapertura administrativa no es válida.');
@@ -190,16 +190,20 @@ final class ProjectStatusTransitionService
         if (!$project || !empty($project['deleted_at']) || !empty($project['withdrawn_at'])) {
             throw new ProjectStatusTransitionException('El proyecto publicado no está disponible.', 404);
         }
-        if ((string) $project['status'] !== 'published') {
-            throw new ProjectStatusTransitionException('El proyecto ya no está publicado. Actualiza el expediente antes de continuar.', 409);
+        $previousStatus = (string) $project['status'];
+        if (!in_array($previousStatus, ['development', 'approved', 'defense', 'tribunal_approved', 'published'], true)) {
+            throw new ProjectStatusTransitionException('El proyecto se encuentra en una etapa que no admite esta reapertura controlada.', 409);
         }
 
         $update = $db->prepare(
             "UPDATE projects SET status='development',is_available=0,updated_at=CURRENT_TIMESTAMP
-             WHERE id=:id AND status='published'"
+             WHERE id=:id AND status=:status"
         );
-        $update->execute(['id' => $projectId]);
-        if ($update->rowCount() !== 1) {
+        $update->execute(['id' => $projectId, 'status' => $previousStatus]);
+        $verify = $db->prepare('SELECT status,is_available FROM projects WHERE id=:id LIMIT 1');
+        $verify->execute(['id' => $projectId]);
+        $current = $verify->fetch();
+        if (!$current || (string) $current['status'] !== 'development') {
             throw new ProjectStatusTransitionException('El estado del proyecto cambió mientras se aprobaba la solicitud.', 409);
         }
 
@@ -209,17 +213,25 @@ final class ProjectStatusTransitionService
             'project_reopened_for_adjustment',
             'project',
             $projectId,
-            ['status' => 'published', 'is_available' => (int) $project['is_available']],
+            ['status' => $previousStatus, 'is_available' => (int) $project['is_available']],
             ['status' => 'development', 'is_available' => 0, 'request_id' => $requestId],
-            'Solicitud de modificación aprobada.'
+            $previousStatus === 'development'
+                ? 'Autorización administrativa de edición posterior al cierre del período.'
+                : 'Solicitud de modificación aprobada.'
         );
 
         return [
             'id' => $projectId,
-            'previous_status' => 'published',
+            'previous_status' => $previousStatus,
             'status' => 'development',
             'published_at' => $project['published_at'],
         ];
+    }
+
+    /** Compatibilidad con el flujo histórico de solicitudes publicadas. */
+    public function reopenPublishedForAdjustmentInTransaction(PDO $db, int $projectId, int $actor, int $requestId): array
+    {
+        return $this->reopenForAdjustmentInTransaction($db, $projectId, $actor, $requestId);
     }
 
     private function appliesToType(array $definition, string $type): bool

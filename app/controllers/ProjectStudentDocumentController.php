@@ -61,7 +61,12 @@ final class ProjectStudentDocumentController
         $conflict = $model->activeFileConflict($projectId, (string)$stored['original_name'], (int)$stored['size_bytes'], (string)$stored['checksum_sha256']);
         if ($conflict) throw new ProjectDocumentVersionException('Este archivo ya existe dentro del proyecto.', 409);
         $file = $model->add($projectId, $stored, $actor);
-        (new ProjectAuditService($db))->record($projectId, $actor, 'project_workspace_file_added', 'project_file', (int)$file['id'], null, ['file_id'=>(int)$file['id'],'checksum'=>(string)$file['checksum_sha256']], 'Archivo agregado durante la preparación documental.');
+        $auditId = (new ProjectAuditService($db))->record($projectId, $actor, 'project_workspace_file_added', 'project_file', (int)$file['id'], null, ['file_id'=>(int)$file['id'],'checksum'=>(string)$file['checksum_sha256']], 'Archivo agregado durante la preparación documental.');
+        $published = $db->prepare('SELECT published_at FROM projects WHERE id=:project LIMIT 1');
+        $published->execute(['project' => $projectId]);
+        if (!empty($published->fetchColumn())) {
+            (new ProjectAcademicNotificationService())->postPublicationModification($db, $projectId, $actor, $auditId, 'document_added');
+        }
         return ['file_id'=>(int)$file['id']];
     }
 
@@ -145,7 +150,12 @@ final class ProjectStudentDocumentController
         $this->assertEditableFile($db, $projectId, $file);
         $this->assertFileCanBeRemoved($db, $projectId, $file);
         $removed = $model->retire($projectId, [$fileId], $actor);
-        (new ProjectAuditService($db))->record($projectId, $actor, 'project_workspace_file_removed', 'project_file', $fileId, ['checksum'=>(string)$file['checksum_sha256']], ['removed'=>true], 'Archivo retirado del espacio de trabajo.');
+        $auditId = (new ProjectAuditService($db))->record($projectId, $actor, 'project_workspace_file_removed', 'project_file', $fileId, ['checksum'=>(string)$file['checksum_sha256']], ['removed'=>true], 'Archivo retirado del espacio de trabajo.');
+        $published = $db->prepare('SELECT published_at FROM projects WHERE id=:project LIMIT 1');
+        $published->execute(['project' => $projectId]);
+        if (!empty($published->fetchColumn())) {
+            (new ProjectAcademicNotificationService())->postPublicationModification($db, $projectId, $actor, $auditId, 'document_removed');
+        }
         return ['file_id'=>$fileId,'removed'=>count($removed) === 1];
     }
 
@@ -175,9 +185,9 @@ final class ProjectStudentDocumentController
 
     private function lockWorkspace(PDO $db, int $projectId, int $actor): void
     {
-        $project = $db->prepare('SELECT id,status,deleted_at,withdrawn_at FROM projects WHERE id=:id FOR UPDATE'); $project->execute(['id'=>$projectId]); $row=$project->fetch();
+        $project = $db->prepare('SELECT id,status,publication_origin,academic_period_id,published_at,is_available,deleted_at,withdrawn_at FROM projects WHERE id=:id FOR UPDATE'); $project->execute(['id'=>$projectId]); $row=$project->fetch();
         if (!$row || !empty($row['deleted_at']) || !empty($row['withdrawn_at'])) throw new InvalidArgumentException('El proyecto no está disponible.');
-        if ((string)$row['status'] !== 'development') throw new ProjectDocumentVersionException('Los archivos solo pueden modificarse mientras el proyecto está En desarrollo.', 409);
+        if (empty((new ProjectCapabilityService())->studentEditSituation($db, $row, $actor)['can_edit_ordinary'])) throw new ProjectDocumentVersionException('Los archivos no pueden modificarse directamente en la situación actual del proyecto. Solicita una modificación administrativa si corresponde.', 409);
         $student=$db->prepare("SELECT 1 FROM project_participants pp JOIN user_roles ur ON ur.user_id=pp.user_id JOIN roles r ON r.id=ur.role_id AND r.code='student' WHERE pp.project_id=:project AND pp.user_id=:actor AND pp.role_code='student' AND pp.status='active' AND pp.removed_at IS NULL LIMIT 1 FOR UPDATE");
         $student->execute(['project'=>$projectId,'actor'=>$actor]); if (!$student->fetchColumn()) throw new ProjectDocumentVersionException('No tienes permiso para modificar los archivos de este proyecto.', 403);
     }

@@ -7,6 +7,7 @@ if ($project === null): ?>
     <section class="repository-detail-not-found"><i class="fa-solid fa-folder-open"></i><h1>Proyecto no encontrado</h1><p>El expediente solicitado no existe o no está disponible para tu cuenta.</p><a class="open-btn" href="<?= e($returnUrl) ?>">Volver</a></section>
 <?php else:
     $projectContext = (string) ($projectContext ?? ($publicContext ? 'repository' : 'academic'));
+    $adjustmentActor = (string) ($adjustmentActor ?? '');
     $projectCapabilities = array_replace([
         'view_project' => false,
         'edit_information' => false,
@@ -239,13 +240,14 @@ if ($project === null): ?>
         $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
     }
     if (!$isAdministrator && !empty($projectCapabilities['create_adjustment_request'])) {
-        $isPublishedStudentRequest = $publicContext && $projectContext === 'repository';
-        if ($isPublishedStudentRequest && !empty($hasPendingModificationRequest)) {
-            $actions[] = ['id' => 'modification-pending', 'label' => 'Solicitud pendiente', 'kind' => 'secondary', 'icon' => 'fa-clock', 'enabled' => false, 'title' => 'Ya existe una solicitud de modificación pendiente de revisión.'];
+        $isPublishedStudentRequest = $publicContext && $projectContext === 'repository' && $adjustmentActor === 'student';
+        if (!empty($hasPendingModificationRequest)) {
+            $actions[] = ['id' => $isPublishedStudentRequest ? 'modification-pending' : 'adjustment-pending', 'label' => 'Solicitud pendiente', 'kind' => 'secondary', 'icon' => 'fa-clock', 'enabled' => false, 'title' => 'Ya existe una solicitud de cambios pendiente de revisión.'];
         } else {
             $actions[] = ['id' => $isPublishedStudentRequest ? 'modification-request' : 'adjustment', 'label' => $isPublishedStudentRequest ? 'Solicitar modificación' : 'Solicitar cambios', 'kind' => 'secondary', 'icon' => 'fa-comment-dots', 'enabled' => true, 'url' => '#projectAdjustmentDialog'];
         }
-    } elseif (!$publicContext && !empty($projectCapabilities['register_delivery']) && $canDeliver) {
+    }
+    if (!$publicContext && !empty($projectCapabilities['register_delivery']) && $canDeliver) {
         $actions[] = ['id' => 'delivery', 'label' => 'Registrar entrega', 'kind' => 'primary', 'icon' => 'fa-upload', 'url' => $detailUrl . '&tab=review', 'enabled' => true];
     }
     if ($canDownloadHeader && $headerDownloadUrl !== '') {
@@ -478,6 +480,7 @@ if ($project === null): ?>
         'projectCapabilities' => $projectCapabilities,
         'adjustmentData' => $adjustmentData,
         'adjustmentContext' => $adjustmentContext,
+        'adjustmentActor' => $adjustmentActor,
         'adjustmentCsrf' => $adjustmentCsrf,
         'adjustmentEndpoints' => $adjustmentEndpoints,
         'hasPendingModificationRequest' => $hasPendingModificationRequest,

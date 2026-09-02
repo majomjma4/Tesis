@@ -4,15 +4,20 @@
 $adjustmentItems = (array)($adjustmentData['items'] ?? []);
 $adjustmentSummary = (array)($adjustmentData['summary'] ?? []);
 $adjustmentContext = (string)($adjustmentContext ?? $projectContext);
-$isPublishedStudentRequest = $adjustmentContext === 'repository'
+$adjustmentActor = (string)($adjustmentActor ?? '');
+$isPublishedStudentRequest = $adjustmentActor === 'student'
+    && $adjustmentContext === 'repository'
     && (string)($project['status'] ?? '') === 'published'
+    && !empty($projectCapabilities['create_adjustment_request']);
+$isControlledStudentRequest = $adjustmentActor === 'student'
+    && $adjustmentContext === 'academic'
+    && !empty($project['student_edit_situation']['can_request_controlled_modification'])
     && !empty($projectCapabilities['create_adjustment_request']);
 $pendingAdjustments = array_values(array_filter($adjustmentItems, static fn(array $item): bool => ($item['status'] ?? '') === 'pending'));
 $addressedAdjustments = array_values(array_filter($adjustmentItems, static fn(array $item): bool => ($item['status'] ?? '') === 'addressed'));
 $rejectedAdjustments = array_values(array_filter($adjustmentItems, static fn(array $item): bool => ($item['decision'] ?? '') === 'rejected' && !empty($item['rejection_reason'])));
 $latestAdjustment = (array)($adjustmentSummary['latest'] ?? $adjustmentSummary['latest_request'] ?? []);
 $typeLabels = ['incomplete_information'=>'Información incompleta','incorrect_data'=>'Datos incorrectos','inconsistency'=>'Inconsistencia','other'=>'Otro ajuste'];
-$typeLabels['published_modification'] = 'Solicitud de modificación';
 $studentNames = array_values(array_filter(array_map(static fn(array $student): string => trim((string)($student['full_name'] ?? $student['name'] ?? '')), (array)($project['student_authors'] ?? []))));
 $adjustmentDate = static function (?string $value): string {
     if (!$value) return '';
@@ -42,7 +47,7 @@ $adjustmentDate = static function (?string $value): string {
 </div></article><?php endforeach;?></section>
 <?php endif; ?>
 
-<?php if(!empty($projectCapabilities['create_adjustment_request']) && !$isPublishedStudentRequest): ?>
+<?php if(!empty($projectCapabilities['create_adjustment_request']) && empty($hasPendingModificationRequest) && !$isPublishedStudentRequest && !$isControlledStudentRequest): ?>
 <div class="project-adjustment-dialog" id="projectAdjustmentDialog" data-adjustment-dialog hidden>
  <section role="dialog" aria-modal="true" aria-labelledby="projectAdjustmentTitle" aria-describedby="projectAdjustmentHelp">
   <header><div><span>Seguimiento del proyecto</span><h2 id="projectAdjustmentTitle">Solicitar ajuste</h2></div><button type="button" data-adjustment-cancel aria-label="Cerrar diálogo"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header>
@@ -52,7 +57,7 @@ $adjustmentDate = static function (?string $value): string {
    <label>Sección<select name="related_section"><option value="">Sin sección específica</option><option>Descripción del proyecto</option><option>Información académica</option><option>Participantes</option><option>Clasificación</option><option>Documentación</option></select></label>
    <label class="project-adjustment-document-field">Documento relacionado (opcional)<select name="file_id"><option value="">Ninguno</option><?php foreach((array)$project['files'] as $file):?><option value="<?=(int)$file['id']?>"><?=e((string)$file['original_name'])?></option><?php endforeach;?></select></label></div>
    <label>Mensaje<textarea name="message" maxlength="2000" rows="5" required></textarea></label>
-   <p class="project-adjustment-recipients"><strong>Destinatarios:</strong> <?=e($studentNames ? implode(', ',$studentNames) : 'estudiantes relacionados con el proyecto')?>. Se determinan automáticamente.</p>
+   <p class="project-adjustment-recipients"><strong>Destinatarios:</strong> <?= !empty($isAdministrator) ? 'estudiantes relacionados con el proyecto' : ($studentNames ? e(implode(', ',$studentNames)) : 'estudiantes relacionados con el proyecto') ?>. Se determinan automáticamente.</p>
    <p data-adjustment-message role="status" aria-live="polite" hidden></p></div>
    <footer><button type="button" data-adjustment-cancel>Cancelar</button><button type="submit" class="is-primary">Enviar solicitud</button></footer>
   </form>
@@ -60,16 +65,17 @@ $adjustmentDate = static function (?string $value): string {
 </div>
 <?php endif; ?>
 
-<?php if($isPublishedStudentRequest && empty($hasPendingModificationRequest)): ?>
+<?php if(($isPublishedStudentRequest || $isControlledStudentRequest) && empty($hasPendingModificationRequest)): ?>
 <div class="project-adjustment-dialog" id="projectAdjustmentDialog" data-adjustment-dialog hidden>
  <section role="dialog" aria-modal="true" aria-labelledby="projectModificationTitle" aria-describedby="projectModificationHelp">
-  <header><div><span>Proyecto publicado</span><h2 id="projectModificationTitle">Solicitar modificación</h2></div><button type="button" data-adjustment-cancel aria-label="Cerrar diálogo"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header>
-  <form data-adjustment-create-form><div class="modal-body" data-adjustment-form-body><input type="hidden" name="_csrf" value="<?=e((string)$adjustmentCsrf)?>"><input type="hidden" name="project_id" value="<?=(int)$projectId?>"><input type="hidden" name="expected_project_status" value="published"><input type="hidden" name="context" value="repository"><input type="hidden" name="request_type" value="published_modification">
+  <header><div><span><?= $isControlledStudentRequest ? 'Modificación controlada' : 'Proyecto publicado' ?></span><h2 id="projectModificationTitle">Solicitar modificación</h2></div><button type="button" data-adjustment-cancel aria-label="Cerrar diálogo"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></header>
+  <form data-adjustment-create-form><div class="modal-body" data-adjustment-form-body><input type="hidden" name="_csrf" value="<?=e((string)$adjustmentCsrf)?>"><input type="hidden" name="project_id" value="<?=(int)$projectId?>"><input type="hidden" name="expected_project_status" value="<?=e((string)($project['status'] ?? ''))?>"><input type="hidden" name="context" value="<?= $isControlledStudentRequest ? 'academic' : 'repository' ?>"><input type="hidden" name="request_type" value="published_modification">
    <p id="projectModificationHelp">Describe qué necesitas modificar y por qué. La solicitud será revisada por un administrador.</p>
-   <label>Motivo de la solicitud<textarea name="message" minlength="10" maxlength="2000" rows="6" required></textarea></label>
+    <?php if (!empty($project['published_at'])): ?><p class="project-adjustment-warning"><strong>Este proyecto ya cuenta con una versión publicada.</strong> Si la modificación es autorizada, quedará registrada en el historial y será notificada a la administración.</p><?php endif; ?>
+    <label>Motivo de la solicitud<textarea name="message" minlength="10" maxlength="2000" rows="6" required></textarea></label>
    <p data-adjustment-message role="status" aria-live="polite" hidden></p></div>
    <div class="modal-body project-adjustment-confirmation" data-adjustment-confirmation hidden>
-    <p>Tu solicitud será enviada a un administrador para su revisión. El proyecto seguirá publicado y permanecerá bloqueado para edición hasta que la solicitud sea aprobada.</p>
+    <p><?= $isControlledStudentRequest ? 'Tu solicitud será enviada a un administrador. Si se aprueba, se autorizará la edición mediante la transición administrativa existente.' : 'Tu solicitud será enviada a un administrador para su revisión. El proyecto seguirá publicado y permanecerá bloqueado para edición hasta que la solicitud sea aprobada.' ?></p>
    <p data-adjustment-message data-adjustment-confirmation-message role="alert" aria-live="polite" hidden></p>
    </div>
    <footer data-adjustment-form-footer><button type="button" data-adjustment-cancel>Cancelar</button><button type="submit" class="is-primary">Enviar solicitud</button></footer>
