@@ -28,6 +28,7 @@ if (calendarRoot) {
     let quickScope = null;
     let pendingDelete = null;
     let activeDetailEvent = null;
+    const completionRequests = new Set();
 
     // Inicio de utilidades de fechas y filtrado
     // Convierte fechas, detecta vencimientos y construye la colección visible según filtros y orden.
@@ -136,12 +137,12 @@ if (calendarRoot) {
         article.querySelector('.agenda-meta').textContent = `${typeLabels[event.type]}${event.time ? ` · ${event.time}` : ''}`; article.querySelector('h3').textContent = event.title; article.querySelector('p').textContent = event.description || 'Sin descripción.';
         article.querySelector('.overdue-badge').hidden = !isOverdue(event); article.classList.toggle('is-overdue', isOverdue(event));
         const actions = article.querySelector('.agenda-actions');
-        if (!event.readOnly) actions.append(actionButton(event.completed ? 'fa-arrow-rotate-left' : 'fa-check', event.completed ? 'Reabrir' : 'Completar', () => toggleComplete(event)), actionButton('fa-pen', 'Editar', () => openModal(event)), actionButton('fa-trash-can', 'Eliminar', () => openDeleteDialog(event), true));
+        if (!event.readOnly) actions.append(actionButton(event.completed ? 'fa-arrow-rotate-left' : 'fa-check', event.completed ? 'Reabrir' : 'Completar', (button) => toggleComplete(event, button)), actionButton('fa-pen', 'Editar', () => openModal(event)), actionButton('fa-trash-can', 'Eliminar', () => openDeleteDialog(event), true));
         const navigation = navigationButton(event); if (navigation) actions.append(navigation);
         article.addEventListener('click', (clickEvent) => { if (!clickEvent.target.closest('.agenda-actions')) openDetails(event); });
         return article;
     }
-    function actionButton(icon, label, handler, danger = false) { const button = document.createElement('button'); button.type = 'button'; if (danger) button.className = 'danger'; button.innerHTML = `<i class="fa-solid ${icon}"></i> ${label}`; button.addEventListener('click', handler); return button; }
+    function actionButton(icon, label, handler, danger = false) { const button = document.createElement('button'); button.type = 'button'; if (danger) button.className = 'danger'; button.innerHTML = `<i class="fa-solid ${icon}"></i> ${label}`; button.addEventListener('click', () => handler(button)); return button; }
     function navigationButton(event) { const destination = eventDestination(event); if (!destination) return null; const link = document.createElement('a'); link.className = 'agenda-go-link'; link.href = destination.url; link.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Ir'; link.title = destination.label; link.setAttribute('aria-label', `${destination.label}: ${event.title}`); return link; }
     function emptyState(icon, title, message, showClear = false) { const state = document.createElement('div'); state.className = 'calendar-empty calendar-empty-guided'; state.innerHTML = `<i class="fa-solid ${icon}"></i><strong></strong><p></p>`; state.querySelector('strong').textContent = title; state.querySelector('p').textContent = message; if (showClear) { const button = document.createElement('button'); button.className = 'calendar-empty-add'; button.type = 'button'; button.innerHTML = '<i class="fa-solid fa-filter-circle-xmark"></i> Limpiar filtros'; button.addEventListener('click', clearFilters); state.append(button); } return state; }
     // Final de construcción de componentes del calendario
@@ -292,7 +293,24 @@ if (calendarRoot) {
     async function deleteConfirmed() { if (!pendingDelete) return; const event = { ...pendingDelete }; const button = $('#calendarDeleteConfirm'); window.AppLoading?.setButtonLoading(button, true, 'Eliminando…'); try { await request('DELETE', { id: event.id }); events = events.filter((item) => item.id !== event.id); closeDeleteDialog(); renderAll(); toast('Evento eliminado.', false, { label: 'Deshacer', handler: async () => { try { await saveOne({ ...event, id: '' }); toast('Evento restaurado correctamente.'); } catch (error) { toast(error.message, true); } } }); } catch (error) { toast(error.message, true); } finally { window.AppLoading?.setButtonLoading(button, false); } }
     async function saveOne(event, render = true) { const result = await request('POST', event); const index = events.findIndex((item) => item.id === result.data.id); if (index >= 0) events[index] = result.data; else events.push(result.data); if (render) renderAll(); return result.data; }
     async function moveEvent(id, newDate) { const event = events.find((item) => item.id === id); if (!event || event.readOnly || event.date === newDate) return; const previous = event.date; event.date = newDate; renderAll(); try { await saveOne(event); selectedDate = newDate; renderAll(); toast(`Evento movido al ${fromKey(newDate).toLocaleDateString('es-EC', { day: 'numeric', month: 'long' })}.`); } catch (error) { event.date = previous; renderAll(); toast(error.message, true); } }
-    async function toggleComplete(event) { try { await saveOne({ ...event, completed: !event.completed }); toast(event.completed ? 'Evento reabierto.' : 'Evento completado. ¡Buen trabajo!'); } catch (error) { toast(error.message, true); } }
+    async function toggleComplete(event, button = $('#calendarDetailComplete')) {
+        const eventId = String(event.id);
+        if (completionRequests.has(eventId)) return;
+        completionRequests.add(eventId);
+        const wasCompleted = Boolean(event.completed);
+        if (button) button.disabled = true;
+        window.AppLoading?.setButtonLoading(button, true, wasCompleted ? 'Reabriendo…' : 'Completando…');
+        try {
+            await saveOne({ ...event, completed: !wasCompleted });
+            toast(wasCompleted ? 'Evento reabierto.' : 'Evento completado. ¡Buen trabajo!');
+        } catch (error) {
+            toast(error.message, true);
+        } finally {
+            window.AppLoading?.setButtonLoading(button, false);
+            if (button) button.disabled = false;
+            completionRequests.delete(eventId);
+        }
+    }
     // Final de diálogos y persistencia de eventos
 
     // Inicio de eventos de interacción
@@ -307,7 +325,7 @@ if (calendarRoot) {
     $$('.calendar-select-wrap select').forEach((select) => select.addEventListener('change', syncSelectStyles));
     $('#calendarSort').addEventListener('change', (event) => { sortMode = event.target.value; renderAll(); });
     $('#calendarDeleteCancel').addEventListener('click', closeDeleteDialog); $('#calendarDeleteConfirm').addEventListener('click', deleteConfirmed); $('#calendarDeleteModal').addEventListener('click', (event) => { if (event.target === $('#calendarDeleteModal')) closeDeleteDialog(); });
-    $('#calendarDetailClose').addEventListener('click', closeDetails); $('#calendarDetailModal').addEventListener('click', (event) => { if (event.target === $('#calendarDetailModal')) closeDetails(); }); $('#calendarDetailEdit').addEventListener('click', () => { const event = activeDetailEvent; closeDetails(); if (event && !event.readOnly) openModal(event); }); $('#calendarDetailComplete').addEventListener('click', async () => { const event = activeDetailEvent; if (!event || event.readOnly) return; closeDetails(); await toggleComplete(event); });
+    $('#calendarDetailClose').addEventListener('click', closeDetails); $('#calendarDetailModal').addEventListener('click', (event) => { if (event.target === $('#calendarDetailModal')) closeDetails(); }); $('#calendarDetailEdit').addEventListener('click', () => { const event = activeDetailEvent; closeDetails(); if (event && !event.readOnly) openModal(event); }); $('#calendarDetailComplete').addEventListener('click', async () => { const event = activeDetailEvent; const button = $('#calendarDetailComplete'); if (!event || event.readOnly) return; closeDetails(); await toggleComplete(event, button); });
     $('#calendarEventForm').addEventListener('submit', async (formEvent) => {
         formEvent.preventDefault(); const button = $('#calendarSaveBtn'); window.AppLoading?.setButtonLoading(button, true, 'Guardando…');
         try {

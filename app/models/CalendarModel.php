@@ -15,7 +15,9 @@ final class CalendarModel
                     e.title,e.event_type,e.priority,e.event_date,e.event_time,e.description,e.is_completed,e.created_at,e.updated_at
              FROM project_events e
              LEFT JOIN projects p ON p.id=e.project_id
-             WHERE e.created_by=:owner ORDER BY e.event_date,e.event_time IS NULL,e.event_time,e.id'
+             WHERE e.created_by=:owner
+               AND (e.project_id IS NULL OR (p.deleted_at IS NULL AND p.withdrawn_at IS NULL))
+             ORDER BY e.event_date,e.event_time IS NULL,e.event_time,e.id'
         );
         $statement->execute(['owner'=>$this->owner($ownerId)]);
         return array_map(fn(array $event): array => $this->present($event), $statement->fetchAll());
@@ -53,7 +55,7 @@ final class CalendarModel
     {
         $events = $this->getEventsForOwner($teacherId);
         $db = Database::connection();
-        $projects = $db->prepare("SELECT p.id FROM projects p WHERE p.deleted_at IS NULL AND (p.tutor_id=:tutor OR EXISTS (
+        $projects = $db->prepare("SELECT p.id FROM projects p WHERE p.deleted_at IS NULL AND p.withdrawn_at IS NULL AND (p.tutor_id=:tutor OR EXISTS (
             SELECT 1 FROM project_participants pp WHERE pp.project_id=p.id AND pp.user_id=:participant
               AND pp.status='active' AND pp.removed_at IS NULL AND LOWER(pp.role_code) IN ('tutor','cotutor','co_tutor','co-tutor','tribunal','jury')
         ))");

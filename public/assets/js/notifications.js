@@ -426,7 +426,7 @@ function updateFilterState() {
 
         const selectedOption = control.querySelector(`[data-filter-value="${CSS.escape(select.value)}"]`);
 
-        const prefix = type === "project" ? "Proyecto" : "Tipo";
+        const prefix = type === "project" ? "Proyecto" : type === "status" ? "Mostrar" : "Tipo";
 
         const label =
             selectedOption?.querySelector("span:nth-child(2)")?.textContent || select.options[select.selectedIndex]?.textContent || "Todos";
@@ -435,29 +435,11 @@ function updateFilterState() {
             triggerLabel.textContent = `${prefix}: ${label}`;
         }
 
-        if (select.value !== "all" && select.value !== "0") {
-            active.push(`${prefix}: ${label}`);
-        }
+        if (select.value !== "all" && select.value !== "0") active.push({ label: `${prefix}: ${label}`, clear: () => { select.value = "all"; } });
     });
 
-    if (dateFromInput?.value || dateToInput?.value) active.push(`Fecha: ${dateFromInput?.value || "…"} — ${dateToInput?.value || "…"}`);
-
-    if (activeFilter && activeFilterLabel) {
-        activeFilter.hidden = active.length === 0;
-        activeFilterLabel.textContent = active.join(" · ");
-    }
-
-    if (trashToolbar && statusFilter) {
-        trashToolbar.hidden = statusFilter.value !== "trash";
-    }
-
-}
-
-function updateFilterState() {
-    const active = [];
-    if (statusFilter?.value !== "all") active.push({ label: `Mostrar: ${statusFilter.options[statusFilter.selectedIndex]?.textContent || "Todas"}`, clear: () => { statusFilter.value = "all"; } });
-    if (typeFilter?.value && typeFilter.value !== "all") active.push({ label: `Tipo: ${typeFilter.options[typeFilter.selectedIndex]?.textContent}`, clear: () => { typeFilter.value = "all"; } });
     if (dateFromInput?.value || dateToInput?.value) active.push({ label: `Fecha: ${dateFromInput?.value || "…"} — ${dateToInput?.value || "…"}`, clear: () => { if (dateFromInput) dateFromInput.value = ""; if (dateToInput) dateToInput.value = ""; } });
+
     if (activeFilter) { activeFilter.replaceChildren(); activeFilter.hidden = active.length === 0; active.forEach((item) => { const chip = document.createElement("button"); chip.type = "button"; chip.className = "notification-filter-chip"; chip.append(document.createTextNode(item.label)); const close = document.createElement("i"); close.className = "fa-solid fa-xmark"; close.setAttribute("aria-hidden", "true"); chip.append(close); chip.addEventListener("click", () => { item.clear(); currentPage = 1; updateFilterState(); loadNotifications(false, { updateHistory: true, historyMode: "push" }); }); activeFilter.append(chip); }); }
     if (trashToolbar) trashToolbar.hidden = statusFilter?.value !== "trash";
 }

@@ -95,9 +95,16 @@ final class NotificationsController
         $perPage = (int) ($_GET['notifications_per_page'] ?? 10);
         if (!in_array($perPage, [10, 25, 50, 75, 100], true)) $perPage = 10;
         $model = new NotificationModel();
+        $retentionDays = 60;
+        try {
+            $retentionDays = (new SystemSettingModel())->retentionDays('notification_trash_retention_days');
+        } catch (Throwable $exception) {
+            error_log('Notifications retention setting error: ' . $exception->getMessage());
+        }
 
         if ($status === 'sent') {
-            if (!(new AuthSessionService())->hasAdminAccess()) {
+            $auth = new AuthSessionService();
+            if (!$auth->hasAdminAccess() || !$auth->isAdminModeActive()) {
                 $this->json(false, 'No tienes permiso para ver esta sección.', [], 403);
             }
             try {
@@ -174,7 +181,7 @@ final class NotificationsController
                 $notifications = $pagination['items'];
                 $counters = $model->getDemoCounters($allNotifications);
                 $sectionNotifications = array_values(array_filter($allNotifications, static fn (array $item): bool => $trash ? !empty($item['deleted_at']) : ($hidden ? !empty($item['archived_at']) && empty($item['deleted_at']) : empty($item['archived_at']) && empty($item['deleted_at']))));
-                $sectionCounters = $this->sectionCounters($sectionNotifications, $counters, $hidden, $trash);
+                $sectionCounters = $this->sectionCounters($sectionNotifications, $counters, $hidden, $trash, $retentionDays);
             } else {
                 $this->json(false, 'No fue posible consultar las notificaciones.', [], 500);
             }
@@ -386,8 +393,9 @@ final class NotificationsController
         $this->requirePostAndCsrf();
         $id = $this->notificationId();
         $this->runJson(function (NotificationModel $model, int $userId) use ($id): array {
+            $auth = new AuthSessionService();
             $notification = $model->findActiveForUser($id, $userId);
-            if ($notification === null && (new AuthSessionService())->hasAdminAccess()) {
+            if ($notification === null && $auth->hasAdminAccess() && $auth->isAdminModeActive()) {
                 $db = Database::connection();
                 $q = $db->prepare(
                     "SELECT n.id, n.type, n.title, n.message, n.project_id, n.action_url, n.action_label, n.metadata, n.created_at,
@@ -768,13 +776,14 @@ final class NotificationsController
         ];
     }
 
-    private function sectionCounters(array $notifications, array $globalCounters, bool $hidden, bool $trash): array
+    private function sectionCounters(array $notifications, array $globalCounters, bool $hidden, bool $trash, int $retentionDays): array
     {
         if (!$hidden && !$trash) {
             return $globalCounters;
         }
         $weekStart = new DateTimeImmutable('monday this week');
-        $expirationThreshold = new DateTimeImmutable('-23 days');
+        $expirationCutoffDays = max(0, $retentionDays - 7);
+        $expirationThreshold = new DateTimeImmutable("-{$expirationCutoffDays} days");
         return [
             'total' => count($notifications),
             'unread' => count(array_filter($notifications, static fn (array $item): bool => !$item['is_read'])),
