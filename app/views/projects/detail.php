@@ -36,6 +36,10 @@ if ($project === null): ?>
     ], is_array($projectCapabilities ?? null) ? $projectCapabilities : []);
     $projectStatusTransitions = is_array($projectStatusTransitions ?? null) ? $projectStatusTransitions : [];
     $isAcademicManagement = $projectContext === 'academic_management';
+    // Flags del contrato común del detalle: el administrador llega desde el
+    // controlador y la gestión propia se deriva únicamente de capacidades.
+    $isAdministratorView = isset($isAdministrator) && (bool) $isAdministrator;
+    $ownRepositoryStatusManagement = !empty($projectCapabilities['manage_own_repository_status']);
     $isTrackingContext = $isAcademicManagement || !empty($isTeacherContext);
     $academicLabels = project_academic_labels((string) $project['status']);
     $statusLabel = $publicContext ? 'Publicado' : $academicLabels['status'];
