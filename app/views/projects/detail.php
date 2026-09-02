@@ -147,7 +147,10 @@ if ($project === null): ?>
     }
     $tabs = [['id'=>'information','label'=>'Información','icon'=>'fa-file-lines']];
     if(!empty($projectCapabilities['download_files']) || !empty($projectCapabilities['view_institutional_files']))$tabs[]=['id'=>'files','label'=>'Documentos','icon'=>'fa-folder-open'];
-    if(!empty($projectCapabilities['view_academic_history']))$tabs[]=['id'=>'evolution','label'=>'Historial','icon'=>'fa-clock-rotate-left'];
+    $hasRealAcademicHistory = !empty($projectCapabilities['view_academic_history'])
+        && !empty($project['academic_history'])
+        && (int)($project['academic_history_total'] ?? 0) > 0;
+    if($hasRealAcademicHistory)$tabs[]=['id'=>'evolution','label'=>'Historial','icon'=>'fa-clock-rotate-left'];
     foreach ($tabs as &$tabItem) $tabItem['url']=$detailUrl.'&tab='.$tabItem['id']; unset($tabItem);
     $allowedTabs=array_column($tabs,'id'); $activeTab=in_array($activeTab,$allowedTabs,true)?$activeTab:'information';
     $importantDates=array_values(array_filter([
@@ -328,7 +331,9 @@ if ($project === null): ?>
             'academic'=>(array)($project['academic_history']??[]),
             'academic_total'=>(int)($project['academic_history_total']??count((array)($project['academic_history']??[]))),
             'academic_endpoint'=>(string)($academicHistoryEndpoint??''),
-            'modifications'=>$publicContext?(array)($project['post_publication_modifications']??[]):[],
+            'modifications'=>$isAdministratorView && !empty($projectCapabilities['view_admin_history'])
+                ? (array)($project['post_publication_modifications']??[])
+                : [],
         ],
         'endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl,'admin_history'=>(string)($projectHistoryEndpoint??'')], 'version_endpoints'=>['preview'=>$previewActionUrl,'download'=>$downloadActionUrl],
         'admin_actions'=>['endpoint'=>(string)($projectAdminEndpoint??''),'trash_endpoint'=>(string)($projectTrashEndpoint??''),'csrf_token'=>(string)($projectAdminCsrf??''),'trash_csrf_token'=>(string)($projectTrashCsrf??''),'status'=>(string)$project['status'],'is_available'=>!empty($project['is_available']),'redirect'=>$returnUrl],
@@ -508,7 +513,7 @@ if ($project === null): ?>
     }
     </style><?php endif;
     if(!empty($digitalRecord['status_transition']['enabled'])) require __DIR__.'/../repository/_project-status-transition-dialog.php';
-    if($publicContext):?><style>@media(min-width:801px){.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr);align-items:stretch}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-document-section[data-information-section="description"]{grid-column:1/-1}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information>.ed-document-section[data-information-section="participants"]{display:flex;flex-direction:column;justify-content:center}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information>.ed-document-section[data-information-section="participants"]>.ed-project-participants{min-height:100%;align-content:center}}</style><?php endif;
+     if($publicContext):?><style>@media(min-width:801px){.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr);row-gap:20px;align-items:stretch}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-document-section[data-information-section="description"]{grid-column:1/-1}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information>.ed-document-section[data-information-section="institutional"]{grid-column:1;grid-row:2}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information>.ed-document-section[data-information-section="participants"]{grid-column:2;grid-row:2;display:flex;flex-direction:column;justify-content:center}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information>.ed-document-section[data-information-section="academic-progress"]{grid-column:1;grid-row:3}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information>.ed-document-section[data-information-section="project-classification"]{grid-column:2;grid-row:3}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information>.ed-document-section[data-information-section="participants"]>.ed-project-participants{min-height:100%;align-content:center}}</style><?php endif;
     if(!$publicContext&&!empty($descriptionReminder)) require __DIR__.'/_description-reminder.php';
     if(($publicContext||$isAcademicManagement)&&!empty($projectCapabilities['edit_information'])&&!empty($projectEditorCatalogs)){$projectEditorOnly=true;$catalogs=$projectEditorCatalogs;$projectCsrf=$projectTrashCsrf;$projectEndpoints=['save'=>$projectSaveEndpoint,'trash'=>$projectTrashEndpoint];$projectStatusDialog=['enabled'=>false];$projectEditorPayload=array_merge($project,['tutor_id'=>(int)($primaryActiveTutor['user_id']??$project['tutor_id']??0),'tutor_user_id'=>(int)($primaryActiveTutor['user_id']??$project['tutor_user_id']??0),'tutor_username'=>(string)($primaryActiveTutor['username']??$project['tutor_username']??''),'tutor_name'=>(string)($primaryActiveTutor['name']??$project['tutor_name']??''),'tutor_email'=>(string)($primaryActiveTutor['email']??$project['tutor_email']??''),'status_label'=>$statusLabel,'stage_label'=>$stageLabel,'capabilities'=>$projectCapabilities,'status_actions'=>$projectStatusTransitions,'status_transitions'=>$projectStatusTransitions,'presentation_files'=>array_values(array_map(static fn(array $file):array=>['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'extension'=>(string)$file['extension'],'format'=>strtoupper((string)$file['extension']),'icon'=>'fa-regular fa-file','size'=>ArchiveService::formatBytes((int)$file['size_bytes'])],$project['files']))]);require __DIR__.'/../admin/projects.php';}
 endif;

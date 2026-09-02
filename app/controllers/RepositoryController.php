@@ -359,7 +359,7 @@ final class RepositoryController
         $ownRepositoryManagement = !empty($projectCapabilities['manage_own_repository_content']);
         $ownRepositoryStatusManagement = !empty($projectCapabilities['manage_own_repository_status']);
         if ($project !== null && !empty($projectCapabilities['view_academic_history'])) {
-            $academicPage = (new ProjectRecordModel())->academicHistoryPage((int)$project['id']);
+            $academicPage = (new ProjectAcademicTimelineService())->publicPage((int)$project['id'], 0, 15);
             $project['academic_history'] = $academicPage['events'];
             $project['academic_history_total'] = $academicPage['total'];
         } elseif ($project !== null) {

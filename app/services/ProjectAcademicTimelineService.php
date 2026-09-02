@@ -6,26 +6,80 @@ declare(strict_types=1);
 final class ProjectAcademicTimelineService
 {
     private const LOCAL_TIMEZONE = 'America/Guayaquil';
+    private const PUBLIC_EVENT_TYPES = [
+        'project_registered', 'delivery_registered', 'observation_batch_created',
+        'document_review_completed', 'document_status_recorded',
+        'project_approved', 'project_tribunal_approved', 'tribunal_approved',
+        'project_published', 'project_republished', 'project_publication_reverted',
+        'project_status_changed', 'project_corrections_requested',
+        'tribunal_assigned', 'tribunal_updated', 'thesis_defense_information_updated',
+        'tribunal_result_registered', 'defense_attempt_started',
+    ];
     private int $currentProjectId = 0;
 
     public function __construct(private readonly ?PDO $db = null) {}
 
     public function page(int $projectId, int $offset = 0, int $limit = 10): array
     {
+        return $this->pageForEventTypes($projectId, $offset, $limit, null);
+    }
+
+    /** Página pública: conserva únicamente hitos académicos y no devuelve payloads internos. */
+    public function publicPage(int $projectId, int $offset = 0, int $limit = 15): array
+    {
+        $page = $this->pageForEventTypes($projectId, $offset, $limit, self::PUBLIC_EVENT_TYPES, true);
+        $page['events'] = array_map(fn (array $event): array => $this->publicEvent($event), $page['events']);
+        $page['loaded'] = count($page['events']);
+        $page['cursor'] = null;
+        return $page;
+    }
+
+    /** @param list<string>|null $eventTypes */
+    private function pageForEventTypes(int $projectId, int $offset, int $limit, ?array $eventTypes, bool $workflowOnly = false): array
+    {
         $offset=max(0,$offset);$limit=max(1,min(100,$limit));$this->currentProjectId=$projectId;$db=$this->db??Database::connection();
         $exists=$db->prepare('SELECT publication_origin FROM projects WHERE id=:id AND deleted_at IS NULL');$exists->execute(['id'=>$projectId]);
         $origin = $exists->fetchColumn();
-        if ($origin === false || $origin === ProjectPublicationOrigin::DIRECT_REPOSITORY) return ['events'=>[],'total'=>0,'loaded'=>0,'has_more'=>false,'next_offset'=>$offset,'cursor'=>null];
+        if ($origin === false || ($workflowOnly ? $origin !== ProjectPublicationOrigin::WORKFLOW : $origin === ProjectPublicationOrigin::DIRECT_REPOSITORY)) {
+            return ['events'=>[],'total'=>0,'loaded'=>0,'has_more'=>false,'next_offset'=>$offset,'cursor'=>null];
+        }
         $union=$this->unionSql();$parameters=array_fill(0,substr_count($union,'?'),$projectId);
-        $query=$db->prepare("SELECT timeline.*,COUNT(*) OVER() total_count FROM ($union) timeline ORDER BY occurred_at DESC,source_type DESC,source_id DESC,event_key DESC LIMIT $limit OFFSET $offset");
+        $eventFilter = '';
+        if ($eventTypes !== null && $eventTypes !== []) {
+            $eventMarks = implode(',', array_fill(0, count($eventTypes), '?'));
+            $eventFilter = " WHERE event_type IN ($eventMarks)";
+            $parameters = array_merge($parameters, $eventTypes);
+        }
+        $query=$db->prepare("SELECT timeline.*,COUNT(*) OVER() total_count FROM ($union) timeline$eventFilter ORDER BY occurred_at DESC,source_type DESC,source_id DESC,event_key DESC LIMIT $limit OFFSET $offset");
         $query->execute($parameters);$rows=$query->fetchAll();$total=isset($rows[0])?(int)$rows[0]['total_count']:0;
-        if($rows===[]&&$offset>0){$count=$db->prepare("SELECT COUNT(*) FROM ($union) timeline_count");$count->execute($parameters);$total=(int)$count->fetchColumn();}
+        if($rows===[]&&$offset>0){$count=$db->prepare("SELECT COUNT(*) FROM ($union) timeline_count$eventFilter");$count->execute($parameters);$total=(int)$count->fetchColumn();}
         $events=[];$seen=[];
         foreach($rows as $row){unset($row['total_count']);$event=$this->normalize($row);if(isset($seen[$event['event_key']]))continue;$seen[$event['event_key']]=true;$events[]=$event;}
         $next=$offset+count($events);
         return ['events'=>$events,'total'=>$total,'loaded'=>count($events),'has_more'=>$next<$total,'next_offset'=>$next,
             'cursor'=>$events===[]?null:$this->cursor($events[array_key_last($events)])];
-    }    private function unionSql(): string
+    }
+
+    private function publicEvent(array $event): array
+    {
+        $eventType = (string) ($event['event_type'] ?? '');
+        $detail = match ($eventType) {
+            'project_registered' => 'Se registró el proyecto dentro del flujo académico institucional.',
+            'delivery_registered' => 'Se registró una entrega documental para revisión académica.',
+            default => (string) ($event['detail'] ?? $event['description'] ?? ''),
+        };
+
+        return [
+            'type' => (string) ($event['type'] ?? 'status'),
+            'title' => (string) ($event['title'] ?? 'Evento académico'),
+            'detail' => $detail,
+            'actor' => trim((string) ($event['actor'] ?? '')),
+            'date' => (string) ($event['occurred_at_local'] ?? $event['date'] ?? ''),
+            'meta' => array_values(array_filter((array) ($event['meta'] ?? []), static fn (mixed $value): bool => is_scalar($value) && (string) $value !== '')),
+        ];
+    }
+
+    private function unionSql(): string
     {
         return <<<'SQL'
 SELECT CONCAT('registration:',p.id) event_key,'project_registered' event_type,'project' source_type,p.id source_id,p.created_at occurred_at,u.id actor_id,u.full_name actor_name,NULL effective_context,NULL previous_state,NULL new_state,

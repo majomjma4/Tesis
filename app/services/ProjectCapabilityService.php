@@ -307,7 +307,10 @@ final class ProjectCapabilityService
                 && (int) ($project['author_count'] ?? $this->participantCount($participants, ['student'])) > 0;
             $capabilities['view_project'] = $administrator ? $published : $publiclyAvailable;
             if (!$capabilities['view_project']) return $capabilities;
-            $capabilities['view_academic_history'] = false;
+            // El permiso de lectura acompaña al acceso al repositorio. La existencia
+            // de contenido real la decide el timeline; los proyectos directos no
+            // producen eventos académicos y la vista no crea una pestaña vacía.
+            $capabilities['view_academic_history'] = true;
             $capabilities['download_files'] = true;
             $capabilities['download_academic_package'] = true;
             $capabilities['view_institutional_files'] = true;

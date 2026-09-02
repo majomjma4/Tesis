@@ -588,7 +588,7 @@ final class ProjectsController
         $capabilities=$policy->forProjectId((int)$projectId,$context);
         if(empty($capabilities['view_academic_history'])){http_response_code(403);$this->json(['success'=>false,'message'=>'No tienes autorización para consultar el historial académico de este proyecto.','data'=>[]]);}
         $page=$context==='repository'
-            ?(new ProjectRecordModel())->academicHistoryPage((int)$projectId,$offset,15)
+            ?(new ProjectAcademicTimelineService())->publicPage((int)$projectId,$offset,15)
             :(new ProjectAcademicTimelineService())->page((int)$projectId,$offset,15);
         $this->json(['success'=>true,'message'=>'Historial académico cargado.','data'=>$page]);
     }
