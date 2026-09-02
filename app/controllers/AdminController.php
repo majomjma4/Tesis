@@ -760,7 +760,7 @@ final class AdminController
         try{
             $model=new SupportMaterialModel();
             (new SupportMaterialCapabilityService())->assertCanManage($session,$model->findById($materialId,true));
-            if($action==='purge_restorable'&&!$session->hasAdminAccess()){
+            if($action==='purge_restorable'&&(!$session->hasAdminAccess()||!$session->isAdminModeActive())){
                 throw new SupportMaterialAccessException('No tienes autorización para eliminar archivos definitivamente.');
             }
             if($action==='list_restorable'){
