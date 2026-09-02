@@ -40,7 +40,9 @@ if ($project === null): ?>
         return;
     }
     $detailUrl = (string) $detailUrl;
-    $isDirectRepositoryProject = (string) ($project['publication_origin'] ?? '') === ProjectPublicationOrigin::DIRECT_REPOSITORY;
+    $publicationOrigin = (string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW);
+    $isDirectRepositoryProject = $publicationOrigin === ProjectPublicationOrigin::DIRECT_REPOSITORY;
+    $isAcademicWorkflowProject = $publicationOrigin === ProjectPublicationOrigin::WORKFLOW;
     $projectStatusTransitions = is_array($projectStatusTransitions ?? null) ? $projectStatusTransitions : [];
     $isAcademicManagement = $projectContext === 'academic_management';
     // Flags del contrato común del detalle: el administrador llega desde el
@@ -195,7 +197,8 @@ if ($project === null): ?>
         $academicProgressStatuses=$isDegreeProject
             ?['development','under_review','approved','defense','tribunal_approved','published']
             :['development','under_review','approved','published'];
-        $academicProgressCurrentIndex=array_search((string)$project['status'],$academicProgressStatuses,true);
+        $academicProgressStatus=(string)$project['status']==='completed'?'published':(string)$project['status'];
+        $academicProgressCurrentIndex=array_search($academicProgressStatus,$academicProgressStatuses,true);
         $academicProgressSteps=[];
         foreach($academicProgressStatuses as $progressIndex=>$progressStatus){
             $academicProgressSteps[]=[
@@ -219,7 +222,7 @@ if ($project === null): ?>
         $informationSections=array_values(array_filter([
             ['id'=>'description','title'=>'Descripción del proyecto','icon'=>'fa-align-left','type'=>'prose','content'=>$publishedDescription!==''?$publishedDescription:($publicContext?'Este proyecto aún no cuenta con una descripción pública.':'Este proyecto aún no cuenta con una descripción registrada.')],
             ['id'=>'institutional','title'=>'Información académica','icon'=>'fa-building-columns','type'=>'metadata','content'=>$richAcademicFields],
-            ($isTrackingContext&&!$isDirectRepositoryProject)?['id'=>'academic-progress','title'=>'Progreso académico','icon'=>'fa-route','type'=>'academic_progress','content'=>$academicProgressSteps]:null,
+            ($isAcademicWorkflowProject&&($publicContext||$isTrackingContext))?['id'=>'academic-progress','title'=>'Progreso académico','icon'=>'fa-route','type'=>'academic_progress','content'=>$academicProgressSteps]:null,
             $isAcademicManagement&&$reviewNotice!==null?['id'=>'review-notice','title'=>'Observaciones pendientes','icon'=>'fa-triangle-exclamation','type'=>'review_notice','content'=>$reviewNotice]:null,
             ['id'=>'participants','title'=>'Participantes','icon'=>'fa-users','type'=>'project_participants','content'=>[
                 'authors'=>$richAuthors,'tutoring'=>$richTutoring,'tribunal'=>$richTribunalMembers,
@@ -367,24 +370,24 @@ if ($project === null): ?>
     .digital-record[data-record-context="academic"][data-record-status="defense"] .ed-label[data-record-status-label]{--project-status-color:#7c3aed}
     .digital-record[data-record-context="academic"][data-record-status="tribunal_approved"] .ed-label[data-record-status-label]{--project-status-color:#0f766e}
     .digital-record[data-record-context="academic"][data-record-status="published"] .ed-label[data-record-status-label]{--project-status-color:#15803d}
-    .digital-record[data-record-context="academic"] .ed-information{grid-template-areas:"description description" "institutional participants" "progress classification";grid-template-rows:auto max-content max-content;row-gap:18px}
-    .digital-record[data-record-context="academic"] .ed-document-section[data-information-section="description"]{grid-area:description}
-    .digital-record[data-record-context="academic"] .ed-document-section[data-information-section="institutional"]{grid-area:institutional}
-    .digital-record[data-record-context="academic"] .ed-document-section[data-information-section="participants"]{grid-area:participants}
-    .digital-record[data-record-context="academic"] .ed-document-section[data-information-section="academic-progress"]{position:relative;z-index:0;grid-area:progress;margin:0;border-top:3px solid var(--primary)}
-    .digital-record[data-record-context="academic"] .ed-document-section[data-information-section="project-classification"]{grid-area:classification}
-    .digital-record[data-record-context="academic"] .ed-academic-progress{min-width:0;margin:0;padding:4px 0 2px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));list-style:none}
-    .digital-record[data-record-context="academic"] .ed-academic-progress[data-step-count="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}
-    .digital-record[data-record-context="academic"] .ed-academic-progress li{position:relative;min-width:0;display:grid;grid-template-rows:30px auto;justify-items:center;gap:8px;color:var(--muted);text-align:center}
-    .digital-record[data-record-context="academic"] .ed-academic-progress li:not(:last-child)::after{position:absolute;z-index:0;top:14px;left:calc(50% + 15px);width:calc(100% - 30px);height:2px;background:var(--line);content:""}
-    .digital-record[data-record-context="academic"] .ed-academic-progress li[data-step-state="completed"]:not(:last-child)::after{background:#16a34a}
-    .digital-record[data-record-context="academic"] .ed-academic-progress-marker{position:relative;z-index:1;width:30px;height:30px;border:2px solid var(--line);border-radius:50%;background:var(--surface);color:var(--muted);display:grid;place-items:center;font-size:var(--font-xs);font-weight:850}
-    .digital-record[data-record-context="academic"] .ed-academic-progress li[data-step-state="completed"] .ed-academic-progress-marker{border-color:#16a34a;background:#16a34a;color:#fff}
-    .digital-record[data-record-context="academic"] .ed-academic-progress li[aria-current="step"] .ed-academic-progress-marker{border-color:var(--primary);background:var(--primary);color:#fff;box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 14%,transparent)}
-    .digital-record[data-record-context="academic"] .ed-academic-progress-label{max-width:112px;font-size:var(--font-xs);font-weight:780;line-height:1.35;word-break:normal;overflow-wrap:break-word}
-    .digital-record[data-record-context="academic"] .ed-academic-progress li[data-step-state="completed"] .ed-academic-progress-label{color:#15803d}
-    .digital-record[data-record-context="academic"] .ed-academic-progress li[aria-current="step"] .ed-academic-progress-label{color:var(--primary);font-weight:900}
-    .digital-record[data-record-context="academic"] .ed-academic-progress-current{display:block;margin-top:2px;font-size:var(--font-xs);font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-information{grid-template-areas:"description description" "institutional participants" "progress classification";grid-template-rows:auto max-content max-content;row-gap:18px}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-document-section[data-information-section="description"]{grid-area:description}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-document-section[data-information-section="institutional"]{grid-area:institutional}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-document-section[data-information-section="participants"]{grid-area:participants}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-document-section[data-information-section="academic-progress"]{position:relative;z-index:0;grid-area:progress;margin:0;border-top:3px solid var(--primary)}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-document-section[data-information-section="project-classification"]{grid-area:classification}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress{min-width:0;margin:0;padding:4px 0 2px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));list-style:none}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress[data-step-count="4"]{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress li{position:relative;min-width:0;display:grid;grid-template-rows:30px auto;justify-items:center;gap:8px;color:var(--muted);text-align:center}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress li:not(:last-child)::after{position:absolute;z-index:0;top:14px;left:calc(50% + 15px);width:calc(100% - 30px);height:2px;background:var(--line);content:""}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress li[data-step-state="completed"]:not(:last-child)::after{background:#16a34a}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress-marker{position:relative;z-index:1;width:30px;height:30px;border:2px solid var(--line);border-radius:50%;background:var(--surface);color:var(--muted);display:grid;place-items:center;font-size:var(--font-xs);font-weight:850}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress li[data-step-state="completed"] .ed-academic-progress-marker{border-color:#16a34a;background:#16a34a;color:#fff}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress li[aria-current="step"] .ed-academic-progress-marker{border-color:var(--primary);background:var(--primary);color:#fff;box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 14%,transparent)}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress-label{max-width:112px;font-size:var(--font-xs);font-weight:780;line-height:1.35;word-break:normal;overflow-wrap:break-word}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress li[data-step-state="completed"] .ed-academic-progress-label{color:#15803d}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress li[aria-current="step"] .ed-academic-progress-label{color:var(--primary);font-weight:900}
+    .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress-current{display:block;margin-top:2px;font-size:var(--font-xs);font-weight:900;letter-spacing:.06em;text-transform:uppercase}
     .digital-record[data-record-context="academic_management"] .ed-header{container:project-admin-header/inline-size}
     .digital-record[data-record-context="academic_management"] .ed-meta>div{min-width:0}
     .digital-record[data-record-context="academic_management"] .ed-meta :is(dt,dd){word-break:normal;overflow-wrap:break-word}
@@ -417,19 +420,19 @@ if ($project === null): ?>
     @media(max-width:1100px){
         .digital-record[data-record-context="academic_management"] .ed-academic-progress[data-step-count="6"]{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:22px}
         .digital-record[data-record-context="academic_management"] .ed-academic-progress[data-step-count="6"] li:nth-child(3)::after{display:none}
-        .digital-record[data-record-context="academic"] .ed-academic-progress[data-step-count="6"]{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:22px}
-        .digital-record[data-record-context="academic"] .ed-academic-progress[data-step-count="6"] li:nth-child(3)::after{display:none}
+        .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress[data-step-count="6"]{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:22px}
+        .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress[data-step-count="6"] li:nth-child(3)::after{display:none}
     }
-    @media(max-width:800px){.digital-record[data-entity-type="project"] .ed-information{grid-template-columns:1fr}.digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="academic-progress"],.digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="review-notice"]{grid-column:auto;grid-row:auto}.digital-record[data-record-context="academic"] .ed-information{grid-template-areas:none}.digital-record[data-record-context="academic"] .ed-document-section[data-information-section="description"],.digital-record[data-record-context="academic"] .ed-document-section[data-information-section="institutional"],.digital-record[data-record-context="academic"] .ed-document-section[data-information-section="participants"],.digital-record[data-record-context="academic"] .ed-document-section[data-information-section="academic-progress"],.digital-record[data-record-context="academic"] .ed-document-section[data-information-section="project-classification"]{grid-area:auto}}
+    @media(max-width:800px){.digital-record[data-entity-type="project"] .ed-information{grid-template-columns:1fr}.digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="academic-progress"],.digital-record[data-record-context="academic_management"] .ed-document-section[data-information-section="review-notice"]{grid-column:auto;grid-row:auto}.digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-information{grid-template-areas:none}.digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-document-section[data-information-section="description"],.digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-document-section[data-information-section="institutional"],.digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-document-section[data-information-section="participants"],.digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-document-section[data-information-section="academic-progress"],.digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-document-section[data-information-section="project-classification"]{grid-area:auto}}
     @media(max-width:520px){
         .digital-record[data-record-context="academic_management"] .ed-academic-progress,.digital-record[data-record-context="academic_management"] .ed-academic-progress[data-step-count="4"],.digital-record[data-record-context="academic_management"] .ed-academic-progress[data-step-count="6"]{grid-template-columns:1fr;row-gap:0;padding:0}
         .digital-record[data-record-context="academic_management"] .ed-academic-progress li{min-height:48px;padding:0 0 14px;grid-template-columns:30px minmax(0,1fr);grid-template-rows:auto;align-items:start;justify-items:start;gap:11px;text-align:left}
         .digital-record[data-record-context="academic_management"] .ed-academic-progress li:not(:last-child)::after,.digital-record[data-record-context="academic_management"] .ed-academic-progress[data-step-count="6"] li:nth-child(3)::after{display:block;top:30px;left:14px;width:2px;height:calc(100% - 30px)}
         .digital-record[data-record-context="academic_management"] .ed-academic-progress-label{max-width:none;padding-top:6px}
-        .digital-record[data-record-context="academic"] .ed-academic-progress,.digital-record[data-record-context="academic"] .ed-academic-progress[data-step-count="4"],.digital-record[data-record-context="academic"] .ed-academic-progress[data-step-count="6"]{grid-template-columns:1fr;row-gap:0;padding:0}
-        .digital-record[data-record-context="academic"] .ed-academic-progress li{min-height:48px;padding:0 0 14px;grid-template-columns:30px minmax(0,1fr);grid-template-rows:auto;align-items:start;justify-items:start;gap:11px;text-align:left}
-        .digital-record[data-record-context="academic"] .ed-academic-progress li:not(:last-child)::after,.digital-record[data-record-context="academic"] .ed-academic-progress[data-step-count="6"] li:nth-child(3)::after{display:block;top:30px;left:14px;width:2px;height:calc(100% - 30px)}
-        .digital-record[data-record-context="academic"] .ed-academic-progress-label{max-width:none;padding-top:6px}
+        .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress,.digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress[data-step-count="4"],.digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress[data-step-count="6"]{grid-template-columns:1fr;row-gap:0;padding:0}
+        .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress li{min-height:48px;padding:0 0 14px;grid-template-columns:30px minmax(0,1fr);grid-template-rows:auto;align-items:start;justify-items:start;gap:11px;text-align:left}
+        .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress li:not(:last-child)::after,.digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress[data-step-count="6"] li:nth-child(3)::after{display:block;top:30px;left:14px;width:2px;height:calc(100% - 30px)}
+        .digital-record:is([data-record-context="academic"],[data-record-context="repository"]) .ed-academic-progress-label{max-width:none;padding-top:6px}
     }
     @media(max-width:400px){
         .digital-record[data-record-context="academic_management"] .ed-back-links{margin-left:0;gap:10px}
@@ -494,6 +497,9 @@ if ($project === null): ?>
         .digital-record:is([data-record-context="academic_management"],[data-record-context="academic"]) .ed-information-column .ed-document-section[data-information-section="participants"]{grid-area:participants}
         .digital-record:is([data-record-context="academic_management"],[data-record-context="academic"]) .ed-information-column .ed-document-section[data-information-section="academic-progress"]{grid-area:progress}
         .digital-record:is([data-record-context="academic_management"],[data-record-context="academic"]) .ed-information-column .ed-document-section[data-information-section="project-classification"]{grid-area:classification}
+        .digital-record:is([data-record-context="academic_management"],[data-record-context="academic"]) .ed-information{align-items:stretch}
+        .digital-record:is([data-record-context="academic_management"],[data-record-context="academic"]) .ed-information>.ed-document-section[data-information-section="participants"]{display:flex;flex-direction:column;justify-content:center}
+        .digital-record:is([data-record-context="academic_management"],[data-record-context="academic"]) .ed-information>.ed-document-section[data-information-section="participants"]>.ed-project-participants{min-height:100%;align-content:center}
     }
     @media(max-width:800px){
         .digital-record:is([data-record-context="academic_management"],[data-record-context="academic"]) .ed-information{grid-template-columns:1fr}
@@ -502,7 +508,7 @@ if ($project === null): ?>
     }
     </style><?php endif;
     if(!empty($digitalRecord['status_transition']['enabled'])) require __DIR__.'/../repository/_project-status-transition-dialog.php';
-    if($publicContext):?><style>@media(min-width:801px){.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr)}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-document-section[data-information-section="description"]{grid-column:1/-1}}</style><?php endif;
+    if($publicContext):?><style>@media(min-width:801px){.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information{grid-template-columns:minmax(0,2fr) minmax(260px,1fr);align-items:stretch}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-document-section[data-information-section="description"]{grid-column:1/-1}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information>.ed-document-section[data-information-section="participants"]{display:flex;flex-direction:column;justify-content:center}.digital-record[data-entity-type="project"][data-record-context="repository"] .ed-information>.ed-document-section[data-information-section="participants"]>.ed-project-participants{min-height:100%;align-content:center}}</style><?php endif;
     if(!$publicContext&&!empty($descriptionReminder)) require __DIR__.'/_description-reminder.php';
     if(($publicContext||$isAcademicManagement)&&!empty($projectCapabilities['edit_information'])&&!empty($projectEditorCatalogs)){$projectEditorOnly=true;$catalogs=$projectEditorCatalogs;$projectCsrf=$projectTrashCsrf;$projectEndpoints=['save'=>$projectSaveEndpoint,'trash'=>$projectTrashEndpoint];$projectStatusDialog=['enabled'=>false];$projectEditorPayload=array_merge($project,['tutor_id'=>(int)($primaryActiveTutor['user_id']??$project['tutor_id']??0),'tutor_user_id'=>(int)($primaryActiveTutor['user_id']??$project['tutor_user_id']??0),'tutor_username'=>(string)($primaryActiveTutor['username']??$project['tutor_username']??''),'tutor_name'=>(string)($primaryActiveTutor['name']??$project['tutor_name']??''),'tutor_email'=>(string)($primaryActiveTutor['email']??$project['tutor_email']??''),'status_label'=>$statusLabel,'stage_label'=>$stageLabel,'capabilities'=>$projectCapabilities,'status_actions'=>$projectStatusTransitions,'status_transitions'=>$projectStatusTransitions,'presentation_files'=>array_values(array_map(static fn(array $file):array=>['id'=>(int)$file['id'],'name'=>(string)$file['original_name'],'extension'=>(string)$file['extension'],'format'=>strtoupper((string)$file['extension']),'icon'=>'fa-regular fa-file','size'=>ArchiveService::formatBytes((int)$file['size_bytes'])],$project['files']))]);require __DIR__.'/../admin/projects.php';}
 endif;

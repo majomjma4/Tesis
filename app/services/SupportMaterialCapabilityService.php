@@ -16,13 +16,13 @@ final class SupportMaterialCapabilityService
     public function canEditInformation(AuthSessionService $session, ?array $material): bool
     {
         if ($material === null) return false;
-        return $this->isAdministrator($session) || $this->isTeacherOwner($session, $material);
+        return $this->isAdministrator($session) || $this->isTeacherEditor($session, $material);
     }
 
     public function canManageFiles(AuthSessionService $session, ?array $material): bool
     {
         if ($material === null) return false;
-        return $this->isAdministrator($session) || $this->isTeacherOwner($session, $material);
+        return $this->isAdministrator($session) || $this->isTeacherEditor($session, $material);
     }
 
     public function canChangeStatus(AuthSessionService $session, ?array $material): bool
@@ -93,7 +93,7 @@ final class SupportMaterialCapabilityService
     {
         if ($material === null) throw new SupportMaterialAccessException('El material solicitado no existe.', 404);
         if ($this->isAdministrator($session)) return;
-        if (!$this->isTeacherOwner($session, $material)) {
+        if (!$this->isTeacherEditor($session, $material)) {
             throw new SupportMaterialAccessException('No tienes autorización para gestionar este material de apoyo.');
         }
     }
@@ -108,6 +108,14 @@ final class SupportMaterialCapabilityService
         return in_array('teacher', array_map('strtolower', $session->roles()), true)
             && (int) ($session->userId() ?? 0) > 0
             && (int) ($material['created_by'] ?? 0) === (int) ($session->userId() ?? 0)
+            && empty($material['deleted_at'])
+            && (string) ($material['status_key'] ?? $material['status'] ?? '') !== 'withdrawn';
+    }
+
+    private function isTeacherEditor(AuthSessionService $session, array $material): bool
+    {
+        return in_array('teacher', array_map('strtolower', $session->roles()), true)
+            && (int) ($session->userId() ?? 0) > 0
             && empty($material['deleted_at'])
             && (string) ($material['status_key'] ?? $material['status'] ?? '') !== 'withdrawn';
     }

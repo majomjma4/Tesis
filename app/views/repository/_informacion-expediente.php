@@ -55,6 +55,9 @@ body.dark-mode .ed-form-state{color:#6ee7b7}body.dark-mode .ed-form-state.is-dir
 .ed-keyword-option input:focus-visible,.ed-keyword-chip:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 28%,transparent);outline-offset:2px}
 </style>
 <style>.ed-participant-group.is-tutoring .ed-participant-contact[hidden]{display:none!important}</style>
+<style>
+.ed-participant-group-heading{flex-wrap:wrap}.ed-participant-group-title{min-width:0;display:flex;align-items:center;gap:8px;flex:1 1 auto}.ed-participant-group-heading .ed-participant-more{width:auto;min-height:28px;flex:0 0 auto;margin:0 0 0 auto;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;gap:5px;font:inherit;font-size:var(--font-xs);font-weight:800;line-height:1.2;white-space:nowrap;cursor:pointer}.ed-participant-group-heading .ed-participant-more:hover{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 5%,var(--surface));color:var(--primary)}.ed-participant-group-heading .ed-participant-more:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 25%,transparent);outline-offset:2px}.ed-participant-group-heading .ed-participant-more i{width:auto;height:auto;border-radius:0;background:transparent;color:inherit;display:inline-block;font-size:8px}
+</style>
 <?php if ($recordMode === 'edit'): ?>
     <div class="ed-form-error-summary" role="alert" tabindex="-1" hidden data-record-error-summary><strong>No fue posible guardar los cambios.</strong><p data-record-error-message>Revisa la información señalada.</p></div>
     <p class="ed-form-status" role="status" aria-live="polite" hidden data-record-form-status></p>
@@ -142,14 +145,64 @@ body.dark-mode .ed-form-state{color:#6ee7b7}body.dark-mode .ed-form-state.is-dir
             </header><?php endif;?>
             <?php if ($section['type'] === 'prose'): ?>
                 <div class="ed-prose"><?php foreach (preg_split('/(?:\r?\n){2,}/', trim((string) $content), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $paragraph): ?><p><?= nl2br(e(trim($paragraph))) ?></p><?php endforeach; ?></div>
-            <?php elseif ($section['type'] === 'project_participants'): $authors=(array)($content['authors']??[]);$tutoring=(array)($content['tutoring']??[]);$tribunalMembers=(array)($content['tribunal']??[]);$participantGroups=[['label'=>count($authors)===1?'Autor':'Autores','icon'=>'fa-user-graduate','tone'=>'authors','people'=>$authors,'limit'=>3,'empty'=>'No existen autores asociados al proyecto.'],['label'=>count($tutoring)>1?'Tutoría':'Tutor','icon'=>'fa-chalkboard-user','tone'=>'tutoring','people'=>$tutoring,'limit'=>2,'empty'=>'El proyecto no registra tutoría asignada.']];if($tribunalMembers||!empty($content['show_tribunal']))$participantGroups[]=['label'=>'Tribunal','icon'=>'fa-user-group','tone'=>'tribunal','people'=>$tribunalMembers,'limit'=>3,'empty'=>'El proyecto aún no tiene un tribunal asignado.']; ?>
+            <?php elseif ($section['type'] === 'project_participants'):
+                $authors = array_values((array) ($content['authors'] ?? []));
+                $tutoring = array_values((array) ($content['tutoring'] ?? []));
+                $tribunalMembers = array_values((array) ($content['tribunal'] ?? []));
+                $prioritizePerson = static function (array $people, callable $isPreferred): array {
+                    foreach ($people as $index => $person) {
+                        if (!$isPreferred($person)) continue;
+                        if ($index > 0) {
+                            array_splice($people, $index, 1);
+                            array_unshift($people, $person);
+                        }
+                        break;
+                    }
+                    return $people;
+                };
+                $authors = $prioritizePerson($authors, static fn (array $person): bool => !empty($person['leader']) || !empty($person['is_display_leader']) || !empty($person['is_leader']));
+                $tribunalMembers = $prioritizePerson($tribunalMembers, static fn (array $person): bool => strtolower((string) ($person['tribunal_position'] ?? '')) === 'president');
+                $participantGroups = [
+                    ['label' => count($authors) === 1 ? 'Autor' : 'Autores', 'icon' => 'fa-user-graduate', 'tone' => 'authors', 'people' => $authors, 'limit' => 1, 'empty' => 'No existen autores asociados al proyecto.'],
+                    ['label' => count($tutoring) === 1 ? 'Tutor' : 'Tutores', 'icon' => 'fa-chalkboard-user', 'tone' => 'tutoring', 'people' => $tutoring, 'limit' => 1, 'empty' => 'El proyecto no registra tutoría asignada.'],
+                ];
+                if ($tribunalMembers !== []) $participantGroups[] = ['label' => 'Tribunal', 'icon' => 'fa-user-group', 'tone' => 'tribunal', 'people' => $tribunalMembers, 'limit' => 1, 'empty' => 'El proyecto aún no tiene un tribunal asignado.'];
+            ?>
                 <div class="ed-project-participants">
-                    <?php foreach($participantGroups as $group):$groupId='participant-group-'.e($section['id']).'-'.e($group['tone']);$hiddenCount=max(0,count($group['people'])-(int)$group['limit']);?>
-                        <section class="ed-participant-group is-<?=e($group['tone'])?>">
-                            <header class="ed-participant-group-heading"><i class="fa-solid <?=e($group['icon'])?>" aria-hidden="true"></i><h3><?=e($group['label'])?></h3></header>
-                            <?php if(!$group['people']):?><p class="ed-participant-empty"><?=e($group['empty'])?></p><?php else:?><div class="ed-participant-people" id="<?=$groupId?>"><?php foreach($group['people'] as $personIndex=>$person):$username=trim((string)($person['username']??''));$name=trim((string)($person['name']??''));$email=trim((string)($person['email']??''));$contactId='participant-contact-'.e($section['id']).'-'.e($group['tone']).'-'.(int)$personIndex;$expandable=$email!=='';$overflow=$personIndex>=(int)$group['limit'];?><article class="ed-participant-person"<?= $overflow?' hidden data-participant-overflow-item':'' ?>><?php if($expandable):?><button class="ed-participant-person-main" type="button" aria-expanded="false" aria-controls="<?=$contactId?>" data-participant-contact-toggle><?php else:?><div class="ed-participant-person-main"><?php endif;?><span class="user-avatar ed-participant-avatar" aria-hidden="true"><?php if(!empty($person['avatar_url'])):?><img src="<?=e((string)$person['avatar_url'])?>" alt=""><?php else:?><?=e((string)($person['initial']??'U'))?><?php endif;?></span><span class="ed-participant-identity"><strong><?=e($username!==''?'@'.$username:$name)?></strong><?php if($username!==''):?><span><?=e($name)?></span><?php endif;?><?php if(($person['role']??'')!=='Estudiante'):?><small><?=e((string)$person['role'])?></small><?php endif;?></span><span class="ed-participant-person-actions"><?php if(!empty($person['leader'])&&count($authors)>1):?><span class="ed-leader-badge">Líder</span><?php endif;?><?php if($expandable):?><i class="fa-solid fa-chevron-down ed-participant-contact-chevron" aria-hidden="true"></i><?php endif;?></span><?php if($expandable):?></button><div class="ed-participant-contact" id="<?=$contactId?>" hidden><span>Correo institucional</span><a href="mailto:<?=e($email)?>"><?=e($email)?></a></div><?php else:?></div><?php endif;?></article><?php endforeach;?></div><?php if($hiddenCount>0):?><button class="ed-participant-more" type="button" aria-expanded="false" aria-controls="<?=$groupId?>" data-participant-group-toggle data-collapsed-label="Ver <?=$hiddenCount?> más" data-expanded-label="Ver menos"><span>Ver <?=$hiddenCount?> más</span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button><?php endif;?><?php endif;?>
+                    <?php foreach ($participantGroups as $group):
+                        $groupId = 'participant-group-' . e($section['id']) . '-' . e($group['tone']);
+                        $hiddenCount = max(0, count($group['people']) - (int) $group['limit']);
+                        $moreLabel = $hiddenCount === 1 ? 'Ver otro 1' : 'Ver otros ' . $hiddenCount;
+                    ?>
+                        <section class="ed-participant-group is-<?= e($group['tone']) ?>">
+                            <header class="ed-participant-group-heading">
+                                <div class="ed-participant-group-title"><i class="fa-solid <?= e($group['icon']) ?>" aria-hidden="true"></i><h3><?= e($group['label']) ?></h3></div>
+                                <?php if ($hiddenCount > 0): ?><button class="ed-participant-more" type="button" aria-expanded="false" aria-controls="<?= $groupId ?>" data-participant-group-toggle data-collapsed-label="<?= e($moreLabel) ?>" data-expanded-label="Ver menos"><span><?= e($moreLabel) ?></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button><?php endif; ?>
+                            </header>
+                            <?php if (!$group['people']): ?>
+                                <p class="ed-participant-empty"><?= e($group['empty']) ?></p>
+                            <?php else: ?>
+                                <div class="ed-participant-people" id="<?= $groupId ?>">
+                                    <?php foreach ($group['people'] as $personIndex => $person):
+                                        $username = trim((string) ($person['username'] ?? ''));
+                                        $name = trim((string) ($person['name'] ?? ''));
+                                        $email = trim((string) ($person['email'] ?? ''));
+                                        $contactId = 'participant-contact-' . e($section['id']) . '-' . e($group['tone']) . '-' . (int) $personIndex;
+                                        $expandable = $email !== '';
+                                        $overflow = $personIndex >= (int) $group['limit'];
+                                    ?>
+                                        <article class="ed-participant-person"<?= $overflow ? ' hidden data-participant-overflow-item' : '' ?>>
+                                            <?php if ($expandable): ?><button class="ed-participant-person-main" type="button" aria-expanded="false" aria-controls="<?= $contactId ?>" data-participant-contact-toggle><?php else: ?><div class="ed-participant-person-main"><?php endif; ?>
+                                                <span class="user-avatar ed-participant-avatar" aria-hidden="true"><?php if (!empty($person['avatar_url'])): ?><img src="<?= e((string) $person['avatar_url']) ?>" alt=""><?php else: ?><?= e((string) ($person['initial'] ?? 'U')) ?><?php endif; ?></span>
+                                                <span class="ed-participant-identity"><strong><?= e($username !== '' ? '@' . $username : $name) ?></strong><?php if ($username !== ''): ?><span><?= e($name) ?></span><?php endif; ?><?php if (($person['role'] ?? '') !== 'Estudiante'): ?><small><?= e((string) ($person['role'] ?? '')) ?></small><?php endif; ?></span>
+                                                <span class="ed-participant-person-actions"><?php if (!empty($person['leader']) && count($authors) > 1): ?><span class="ed-leader-badge">Líder</span><?php endif; ?><?php if ($expandable): ?><i class="fa-solid fa-chevron-down ed-participant-contact-chevron" aria-hidden="true"></i><?php endif; ?></span>
+                                            <?php if ($expandable): ?></button><div class="ed-participant-contact" id="<?= $contactId ?>" hidden><span>Correo institucional</span><a href="mailto:<?= e($email) ?>"><?= e($email) ?></a></div><?php else: ?></div><?php endif; ?>
+                                        </article>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
                         </section>
-                    <?php endforeach;?>
+                    <?php endforeach; ?>
                 </div>
             <?php elseif ($section['type'] === 'metadata'): ?>
                 <dl class="ed-information-meta"><?php foreach ($content as $item): ?><div<?= !empty($item['secondary'])?' class="is-secondary"':'' ?><?= !empty($item['key']) ? ' data-material-field="' . e($item['key']) . '"' : '' ?>><dt><?php if(!empty($item['icon'])):?><i class="fa-solid <?=e((string)$item['icon'])?>" aria-hidden="true"></i><?php endif;?><?= e($item['label']) ?></dt><dd><?= e($item['value']) ?></dd></div><?php endforeach; ?></dl>
