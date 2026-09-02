@@ -15,6 +15,44 @@ $documentReviewEnabled = $recordIsProject
     && (string)($digitalRecord['admin_actions']['status'] ?? '') === 'development'
     && $documentReview !== [];
 $documentReviewSummary = is_array($documentReview['summary'] ?? null) ? $documentReview['summary'] : [];
+$fileExtension = static function (array $file): string {
+    $extension = trim((string) ($file['extension'] ?? ''));
+    if ($extension === '') {
+        $extension = pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION);
+    }
+    return mb_strtolower(ltrim($extension, '.'), 'UTF-8');
+};
+$regularFiles = [];
+$zipFiles = [];
+$seenFileIds = [];
+foreach (array_merge($documents, $archives) as $file) {
+    $fileId = (int) ($file['id'] ?? 0);
+    if ($fileId > 0 && isset($seenFileIds[$fileId])) {
+        continue;
+    }
+    if ($fileId > 0) {
+        $seenFileIds[$fileId] = true;
+    }
+    if ($fileExtension($file) === 'zip') {
+        $zipFiles[] = $file;
+    } else {
+        $regularFiles[] = $file;
+    }
+}
+$fileNameKey = static fn (array $file): string => mb_strtolower(trim((string) ($file['name'] ?? '')), 'UTF-8');
+$sortFilesByName = static function (array $items) use ($fileNameKey): array {
+    $indexedItems = [];
+    foreach (array_values($items) as $index => $file) {
+        $indexedItems[] = ['file' => $file, 'index' => $index];
+    }
+    usort($indexedItems, static function (array $left, array $right) use ($fileNameKey): int {
+        $comparison = strnatcmp($fileNameKey($left['file']), $fileNameKey($right['file']));
+        return $comparison !== 0 ? $comparison : ($left['index'] <=> $right['index']);
+    });
+    return array_map(static fn (array $item): array => $item['file'], $indexedItems);
+};
+$documents = $sortFilesByName($regularFiles);
+$archives = $sortFilesByName($zipFiles);
 $selectableFiles = array_values(array_merge($documents, $archives));
 $totalZipSizeBytes = array_sum(array_map(static fn (array $file): int => (int) ($file['size_bytes'] ?? 0), $selectableFiles));
 $totalZipSizeLabel = !empty($package['size']) ? (string) $package['size'] : ($totalZipSizeBytes > 0 ? ArchiveService::formatBytes($totalZipSizeBytes) : '');
@@ -24,10 +62,9 @@ $selectedDocument = current(array_filter(
     static fn (array $file): bool => !empty($file['is_presentation'])
         && (!array_key_exists('available', $file) || !empty($file['available']))
 )) ?: null;
-$archiveGroupLabel = $documentReviewEnabled ? 'Archivos ZIP' : 'Archivos comprimidos adicionales';
+$archiveGroupLabel = 'Archivos ZIP';
 $documentGroups = array_filter([
-    'Archivo de presentación' => array_values(array_filter($documents, static fn (array $document): bool => !empty($document['is_presentation']) && empty($document['is_package']))),
-    'Archivos del ' . $recordFileOwner => array_values(array_filter($documents, static fn (array $document): bool => empty($document['is_presentation']) && empty($document['is_package']))),
+    'Archivos' => array_values(array_filter($documents, static fn (array $document): bool => empty($document['is_package']))),
     $archiveGroupLabel => $archives,
 ]);
 $visualForExtension = static function (string $extension): array {
@@ -205,11 +242,11 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
         </div>
         <div class="ed-files-empty-inline" data-record-files-empty<?= $selectableFiles ? ' hidden' : '' ?>><i class="fa-regular fa-folder-open" aria-hidden="true"></i><h3>Este <?= e($recordFileOwner) ?> no contiene archivos</h3><p>Los documentos aparecerán aquí cuando sean incorporados al expediente.</p></div>
         <?php $documentIndex = 0; foreach ($documentGroups as $groupLabel => $groupDocuments):
-            $groupKey = $groupLabel === 'Archivo de presentación' ? 'presentation' : ($groupLabel === $archiveGroupLabel ? 'archives' : 'additional'); ?>
+            $groupKey = $groupLabel === $archiveGroupLabel ? 'archives' : 'additional'; ?>
             <section class="ed-document-group" data-file-group="<?= e($groupKey) ?>" aria-labelledby="recordFileGroup<?= $documentIndex ?>">
                 <h3 id="recordFileGroup<?= $documentIndex ?>"><?= e($groupLabel) ?></h3>
                 <div class="ed-document-list" data-file-group-list role="list" aria-label="<?= e($groupLabel) ?>">
-                    <?php foreach ($groupDocuments as $document): $selected = !empty($document['is_presentation']); $available = !array_key_exists('available', $document) || !empty($document['available']); $fileVisual = $visualForExtension((string) ($document['extension'] ?? '')); $canRetire = $canManageFiles && empty($document['is_package']); $presentationEligible = $available && !empty($document['preview_supported']) && empty($document['is_package']) && (!array_key_exists('presentation_eligible',$document)||!empty($document['presentation_eligible'])); ?>
+                    <?php foreach ($groupDocuments as $document): $selected = !empty($document['is_presentation']); $available = !array_key_exists('available', $document) || !empty($document['available']); $fileVisual = $visualForExtension($fileExtension($document)); $canRetire = $canManageFiles && empty($document['is_package']); $presentationEligible = $available && !empty($document['preview_supported']) && empty($document['is_package']) && (!array_key_exists('presentation_eligible',$document)||!empty($document['presentation_eligible'])); ?>
                         <div class="ed-document-item" role="listitem" data-record-file-item>
                         <input class="ed-file-checkbox" type="checkbox" data-file-select value="<?= (int) $document['id'] ?>" aria-label="Seleccionar <?= e($document['name']) ?>" hidden>
                         <button class="ed-document-row<?= $selected ? ' is-selected' : '' ?><?= $available ? '' : ' is-unavailable' ?>" type="button"<?= $available ? '' : ' disabled' ?>
@@ -259,7 +296,7 @@ html.theme-dark .ed-document-row.is-selected,body.dark-mode .ed-document-row.is-
                             </a>
                         <?php endif; ?>
                         </div>
-                        <?php if (($document['extension'] ?? '') === 'zip'): ?>
+                        <?php if ($fileExtension($document) === 'zip'): ?>
                             <div class="ed-zip-tree" data-zip-tree data-zip-file-id="<?= (int) $document['id'] ?>" role="tree" aria-label="Contenido de <?= e($document['name']) ?>" hidden></div>
                         <?php endif; ?>
                     <?php $documentIndex++; endforeach; ?>

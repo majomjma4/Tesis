@@ -3211,21 +3211,47 @@ function ensureNeutralFileGroup(key) {
     group.className = "ed-document-group";
     group.dataset.fileGroup = key;
     const heading = document.createElement("h3");
-    heading.textContent = key === "presentation"
-        ? "Archivo de presentación"
-        : (key === "archives" ? "Archivos comprimidos adicionales" : "Archivos del material");
+    heading.textContent = key === "archives" ? "Archivos ZIP" : "Archivos";
     const list = document.createElement("div");
     list.className = "ed-document-list";
     list.dataset.fileGroupList = "";
     list.setAttribute("role", "listbox");
     list.setAttribute("aria-label", heading.textContent);
     group.append(heading, list);
-    if (key === "presentation") {
-        panel.insertBefore(group, panel.querySelector(".ed-document-group"));
-    } else {
-        panel.append(group);
-    }
+    const archiveGroup = panel.querySelector('[data-file-group="archives"]');
+    if (key === "archives" || !archiveGroup) panel.append(group);
+    else panel.insertBefore(group, archiveGroup);
     return list;
+}
+
+function sortNeutralFileGroup(key) {
+    const group = neutralFileList?.querySelector(`[data-file-group="${key}"]`);
+    const list = group?.querySelector("[data-file-group-list]");
+    if (!list) return;
+
+    const items = Array.from(list.children)
+        .filter((child) => child.matches("[data-record-file-item]"))
+        .map((item, index) => ({
+            item,
+            tree: item.nextElementSibling?.matches("[data-zip-tree]") ? item.nextElementSibling : null,
+            index
+        }));
+    items.sort((left, right) => {
+        const leftName = left.item.querySelector("[data-record-file]")?.dataset.fileName || "";
+        const rightName = right.item.querySelector("[data-record-file]")?.dataset.fileName || "";
+        const comparison = leftName.localeCompare(rightName, undefined, { sensitivity: "base", numeric: true });
+        return comparison !== 0 ? comparison : left.index - right.index;
+    });
+    items.forEach(({ item, tree }) => {
+        list.append(item);
+        if (tree) list.append(tree);
+    });
+}
+
+function isNeutralZipFile(button) {
+    const extension = String(button?.dataset.fileExtension || "").trim().replace(/^\./, "").toLowerCase();
+    if (extension !== "") return extension === "zip";
+    return /\.zip$/i.test(String(button?.dataset.fileName || ""));
 }
 
 function syncNeutralFilesEmptyState() {
@@ -3284,12 +3310,12 @@ function syncPresentationFile(targetButton) {
             bindFilePresentationAction(action, item);
         }
         const destination = ensureNeutralFileGroup(
-            isPresentation ? "presentation" : (button.dataset.fileExtension === "zip" ? "archives" : "additional")
+            isNeutralZipFile(button) ? "archives" : "additional"
         );
         if (destination && item) destination.append(item);
     });
-    const presentationGroup = neutralFileList?.querySelector('[data-file-group="presentation"]');
-    if (presentationGroup && !presentationGroup.querySelector("[data-record-file]")) presentationGroup.remove();
+    sortNeutralFileGroup("additional");
+    sortNeutralFileGroup("archives");
     syncNeutralFilesEmptyState();
     if (targetButton) {
         selectNeutralFile(targetButton);
@@ -3301,7 +3327,7 @@ function syncPresentationFile(targetButton) {
 function appendNeutralAddedFiles(files) {
     files.forEach((file) => {
         const visual = getNeutralFileVisualType(file.extension);
-        const list = ensureNeutralFileGroup(visual.extension === "zip" || file.is_archive ? "archives" : "additional");
+        const list = ensureNeutralFileGroup(visual.extension === "zip" ? "archives" : "additional");
         if (!list) return;
         const button = document.createElement("button");
         button.type = "button";
@@ -3401,6 +3427,8 @@ function appendNeutralAddedFiles(files) {
         bindNeutralFileButton(button);
         bindNeutralFileMenu(item);
     });
+    sortNeutralFileGroup("additional");
+    sortNeutralFileGroup("archives");
     syncNeutralFilesEmptyState();
 }
 
@@ -4090,9 +4118,7 @@ function applyFileReplacement(file, targetButton = fileReplaceTarget) {
         bindFilePresentationAction(presentationAction, item);
     }
     const destination = ensureNeutralFileGroup(
-        button.dataset.filePresentation === "true"
-            ? "presentation"
-            : (visual.extension === "zip" ? "archives" : "additional")
+        visual.extension === "zip" ? "archives" : "additional"
     );
     oldTree?.remove();
     neutralZipTreeStates.delete(String(file.id));
@@ -4108,6 +4134,8 @@ function applyFileReplacement(file, targetButton = fileReplaceTarget) {
         item.after(tree);
     }
     if (oldGroup && !oldGroup.querySelector("[data-record-file]")) oldGroup.remove();
+    sortNeutralFileGroup("additional");
+    sortNeutralFileGroup("archives");
     if (wasSelected || button.dataset.filePresentation === "true") selectNeutralFile(button);
 }
 
