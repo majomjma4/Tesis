@@ -190,10 +190,64 @@ final class RepositoryController
             return $project;
         }, (array) ($result['items'] ?? []));
 
+        // El catálogo conserva la presentación separada de las capacidades
+        // efectivas. El menú usa la misma política que el detalle y no infiere
+        // ownership por rol ni por datos visibles de la card.
+        $repositoryProjectCapabilities = [];
+        // El script/modal se cargan para el Teacher habilitado aunque la
+        // página actual no contenga todavía su card (filtros/paginación AJAX).
+        $hasRepositoryProjectActions = $directProjectUi;
+        if ($projects !== []) {
+            try {
+                $repositoryProjectCapabilities = (new ProjectCapabilityService())->forProjectIds(
+                    array_map(static fn (array $project): int => (int) ($project['id'] ?? 0), $projects),
+                    'repository'
+                );
+                foreach ($repositoryProjectCapabilities as $capabilities) {
+                    if (!empty($capabilities['manage_own_repository_status'])) {
+                        $hasRepositoryProjectActions = true;
+                        break;
+                    }
+                }
+            } catch (Throwable $exception) {
+                error_log('Repository project card capabilities: ' . $exception->getMessage());
+            }
+        }
+
+        $repositorySupportMaterialCapabilities = [];
+        $hasRepositorySupportMaterialActions = false;
+        if ($supportDocuments !== []) {
+            $supportCapabilityService = new SupportMaterialCapabilityService();
+            foreach ($supportDocuments as $supportDocument) {
+                $supportMaterialId = (int) ($supportDocument['id'] ?? 0);
+                if ($supportMaterialId < 1) continue;
+                try {
+                    $materialCapabilities = [
+                        'edit_information' => $supportCapabilityService->canEditInformation($session, $supportDocument),
+                        'manage_files' => $supportCapabilityService->canManageFiles($session, $supportDocument),
+                        'change_status' => $supportCapabilityService->canChangeStatus($session, $supportDocument),
+                        'delete' => $supportCapabilityService->canDelete($session, $supportDocument),
+                    ];
+                } catch (Throwable $exception) {
+                    error_log('Repository support material card capabilities: ' . $exception->getMessage());
+                    $materialCapabilities = [
+                        'edit_information' => false,
+                        'manage_files' => false,
+                        'change_status' => false,
+                        'delete' => false,
+                    ];
+                }
+                $repositorySupportMaterialCapabilities[$supportMaterialId] = $materialCapabilities;
+                if (in_array(true, $materialCapabilities, true)) $hasRepositorySupportMaterialActions = true;
+            }
+        }
+        $hasRepositoryCardActions = $hasRepositoryProjectActions || $hasRepositorySupportMaterialActions;
+
         View::render('repository/repositorio', [
             'currentPage'=>'repository', 'title'=>'Repositorio Institucional | Gestión Documental Académica',
             'pageStyles'=>[asset('css/repository-reader.css'), asset('css/notifications.css')], 'pageScript'=>asset('js/repository.js'),
             'pageScripts'=>array_values(array_filter([
+                $hasRepositoryCardActions ? asset('js/material-admin-actions.js') : null,
                 $teacherMaterialUi ? asset('js/teacher-support-materials.js') : null,
                 ($teacherMaterialUi || $directProjectUi) ? asset('js/teacher-repository-content.js') : null,
                 $teacherRepositoryUi ? asset('js/teacher-repository-management.js') : null,
@@ -216,6 +270,12 @@ final class RepositoryController
             'supportMaterialCategories'=>$supportMaterialCategories,
             'supportMaterialTypes'=>$supportMaterialTypes,
             'supportMaterialKeywords'=>$supportMaterialKeywords,
+            'repositoryProjectCapabilities'=>$repositoryProjectCapabilities,
+            'repositorySupportMaterialCapabilities'=>$repositorySupportMaterialCapabilities,
+            'repositoryProjectActionUi'=>$hasRepositoryProjectActions,
+            'repositoryProjectActionCsrf'=>$hasRepositoryProjectActions ? $session->csrfToken('repository_teacher_content') : '',
+            'repositorySupportMaterialActionUi'=>$hasRepositorySupportMaterialActions,
+            'repositorySupportMaterialActionCsrf'=>$hasRepositorySupportMaterialActions ? $session->csrfToken('admin_repository') : '',
             'supportMaterialManageFileEndpoint'=>$teacherMaterialUi ? route('support-material-manage-file') : '',
             'supportMaterialManageSaveEndpoint'=>$teacherMaterialUi ? route('support-material-manage-save') : '',
             'supportMaterialCsrf'=>$teacherMaterialUi ? $session->csrfToken('admin_repository') : '',

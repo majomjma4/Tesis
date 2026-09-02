@@ -321,6 +321,124 @@ function getSupportCards() {
     return [...document.querySelectorAll("#panelSupport .ar-material-card:not(.repository-more-card)")];
 }
 
+function closeRepositoryCardMenus(restoreFocus = false, except = null) {
+    document.querySelectorAll("[data-repository-card-menu]").forEach((menu) => {
+        if (menu === except) return;
+        const panel = menu.querySelector("[data-record-menu-panel]");
+        const trigger = menu.querySelector("[data-repository-card-menu-trigger]");
+        if (panel) panel.hidden = true;
+        trigger?.setAttribute("aria-expanded", "false");
+        menu.closest(".ar-project-card, .ar-material-card")?.classList.remove("is-menu-open");
+        if (restoreFocus && trigger) trigger.focus();
+    });
+}
+
+function repositoryCardMenuItems(panel) {
+    return [...(panel?.querySelectorAll('[role="menuitem"]:not([disabled]):not([hidden])') || [])];
+}
+
+function openRepositoryCardAction(button) {
+    const card = button.closest(".ar-project-card, .ar-material-card");
+    const action = button.dataset.recordAdminAction;
+    if (!card || !action || !window.SupportMaterialAdminActions?.open) return;
+    const isMaterial = card.classList.contains("ar-material-card");
+    const entity = isMaterial ? "material" : "project";
+    const status = card.dataset.recordStatus || "published";
+    const available = card.dataset.recordAvailable === "1";
+    closeRepositoryCardMenus();
+    window.SupportMaterialAdminActions.open({
+        trigger: button,
+        type: action === "availability" ? (available ? "availability_off" : "availability_on") : (action === "publication" ? (status === "published" ? "withdraw" : "publish") : "trash"),
+        action,
+        available,
+        endpoint: isMaterial ? (card.dataset.materialActionEndpoint || "") : (card.dataset.projectActionEndpoint || ""),
+        csrf: isMaterial ? (card.dataset.materialActionCsrf || "") : (card.dataset.projectActionCsrf || ""),
+        trashEndpoint: isMaterial ? "" : (card.dataset.projectTrashEndpoint || ""),
+        trashCsrf: isMaterial ? "" : (card.dataset.projectTrashCsrf || ""),
+        entity,
+        material: { id: isMaterial ? (card.dataset.materialId || "") : (card.dataset.projectId || ""), title: card.querySelector("h3")?.textContent?.trim() || "" },
+        onSuccess: result => {
+            sessionStorage.setItem("repositoryToast", result.message || "Acción completada.");
+            const becameUnavailable = action === "availability"
+                && card.dataset.teacherOwnerStatusManagement === "true"
+                && card.dataset.recordAvailable === "1";
+            if (becameUnavailable) {
+                const target = new URL(window.location.href);
+                target.searchParams.set("tab", "management");
+                target.searchParams.set("management_section", "unavailable");
+                target.hash = "teacherOwnedPanel-unavailable";
+                window.location.assign(target.href);
+                return;
+            }
+            window.location.reload();
+        },
+    });
+}
+
+document.addEventListener("click", (event) => {
+    const trigger = event.target.closest?.("[data-repository-card-menu-trigger]");
+    if (trigger) {
+        event.preventDefault();
+        event.stopPropagation();
+        const menu = trigger.closest("[data-repository-card-menu]");
+        const panel = menu?.querySelector("[data-record-menu-panel]");
+        if (!menu || !panel) return;
+        const opening = panel.hidden;
+        closeRepositoryCardMenus(false, menu);
+        panel.hidden = !opening;
+        trigger.setAttribute("aria-expanded", String(opening));
+        menu.closest(".ar-project-card, .ar-material-card")?.classList.toggle("is-menu-open", opening);
+        if (opening) repositoryCardMenuItems(panel)[0]?.focus();
+        return;
+    }
+    const action = event.target.closest?.("[data-repository-card-menu] [data-record-admin-action]");
+    if (action) {
+        event.preventDefault();
+        event.stopPropagation();
+        openRepositoryCardAction(action);
+        return;
+    }
+    if (!event.target.closest?.("[data-repository-card-menu]")) closeRepositoryCardMenus();
+});
+
+document.addEventListener("keydown", (event) => {
+    const trigger = event.target.closest?.("[data-repository-card-menu-trigger]");
+    const panel = event.target.closest?.("[data-repository-card-menu] [data-record-menu-panel]");
+    if (trigger && ["ArrowDown", "ArrowUp"].includes(event.key)) {
+        event.preventDefault();
+        const menu = trigger.closest("[data-repository-card-menu]");
+        const targetPanel = menu?.querySelector("[data-record-menu-panel]");
+        if (!targetPanel) return;
+        closeRepositoryCardMenus(false, menu);
+        targetPanel.hidden = false;
+        trigger.setAttribute("aria-expanded", "true");
+        const items = repositoryCardMenuItems(targetPanel);
+        (event.key === "ArrowUp" ? items.at(-1) : items[0])?.focus();
+        return;
+    }
+    if (!panel) return;
+    const menu = panel.closest("[data-repository-card-menu]");
+    const items = repositoryCardMenuItems(panel);
+    const index = items.indexOf(document.activeElement);
+    if (event.key === "Escape") {
+        event.preventDefault();
+        closeRepositoryCardMenus();
+        menu?.querySelector("[data-repository-card-menu-trigger]")?.focus();
+        return;
+    }
+    if (event.key === "Tab") {
+        closeRepositoryCardMenus();
+        return;
+    }
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key) || !items.length) return;
+    event.preventDefault();
+    const next = event.key === "Home" ? 0
+        : event.key === "End" ? items.length - 1
+            : event.key === "ArrowUp" ? (index <= 0 ? items.length - 1 : index - 1)
+                : (index >= items.length - 1 ? 0 : index + 1);
+    items[next]?.focus();
+});
+
 function highlightProjectResults() {
     const terms = normalizeRepositoryText(document.querySelector('#repositoryProjectFilters input[name="search"]')?.value || "")
         .split(" ")

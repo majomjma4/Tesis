@@ -92,6 +92,7 @@ $teacherTrashRetentionText = count($teacherTrashRetentionValues) === 1
                 <div class="teacher-owned-content__grid">
                     <?php foreach ($items as $item):
                         $kind = (string) ($item['kind'] ?? '');
+                        $originLabel = $kind === 'material' ? 'Material de apoyo' : 'Proyecto académico';
                         $itemId = (int) ($item['id'] ?? 0);
                         $fileCount = (int) ($item['file_count'] ?? 0);
                         $title = (string) ($item['title'] ?? 'Contenido sin t&iacute;tulo');
@@ -119,6 +120,7 @@ $teacherTrashRetentionText = count($teacherTrashRetentionValues) === 1
                                     </label>
                                 <?php endif; ?>
                                 <span class="teacher-owned-content__kind"><i class="fa-solid <?= $kind === 'project' ? 'fa-diagram-project' : 'fa-book-open' ?>" aria-hidden="true"></i> <?= e($type) ?></span>
+                                <span class="teacher-owned-content__origin"><?= e($originLabel) ?></span>
                                 </div>
                                 <span class="teacher-owned-content__state teacher-owned-content__state--<?= e($key) ?>"><?= e((string) $section['title']) ?></span>
                             </header>

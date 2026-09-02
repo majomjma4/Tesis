@@ -137,6 +137,40 @@
                 <div class="ar-grid" id="readerProjectGrid">
                     <?php foreach ($projects as $project): ?>
                         <?php
+                        $projectCardId = (int) ($project['id'] ?? 0);
+                        $projectCardCapabilities = is_array(($repositoryProjectCapabilities ?? [])[$projectCardId] ?? null)
+                            ? ($repositoryProjectCapabilities[$projectCardId] ?? [])
+                            : [];
+                        $projectCardMenuActions = [];
+                        $projectCardOwnStatus = !empty($projectCardCapabilities['manage_own_repository_status']);
+                        if ($projectCardOwnStatus) {
+                            $projectCardMenuActions[] = [
+                                'label' => 'Marcar como no disponible',
+                                'icon' => 'fa-ban',
+                                'enabled' => true,
+                                'action' => 'availability',
+                            ];
+                            $projectCardMenuActions[] = [
+                                'label' => 'Retirar publicación',
+                                'icon' => 'fa-box-archive',
+                                'enabled' => true,
+                                'action' => 'publication',
+                            ];
+                        }
+                        if (!empty($projectCardCapabilities['edit_information'])) {
+                            $projectCardMenuActions[] = [
+                                'label' => 'Enviar a Papelera',
+                                'icon' => 'fa-trash-can',
+                                'enabled' => true,
+                                'action' => 'trash',
+                                'danger' => true,
+                                'separator' => $projectCardMenuActions !== [],
+                            ];
+                        }
+                        $projectCardActionEndpoint = $projectCardOwnStatus ? route('repository-direct-project-status') : '';
+                        $projectCardTrashEndpoint = $projectCardOwnStatus ? route('repository-direct-project-trash') : '';
+                        $projectCardActionCsrf = $projectCardOwnStatus ? (string) ($repositoryProjectActionCsrf ?? '') : '';
+                        $projectCardTrashCsrf = $projectCardOwnStatus ? (string) ($repositoryProjectActionCsrf ?? '') : '';
                         $projectSearchText = implode(' ', [
                             $project['code'] ?? '',
                             $project['title'],
@@ -179,6 +213,15 @@
                             data-type="<?= e($typeSlug) ?>"
                             data-type-code="<?= e($typeCode) ?>"
                             data-pao="<?= e($project['pao'] ?? '') ?>"
+                            <?php if ($projectCardMenuActions): ?>
+                            data-record-status="published"
+                            data-record-available="1"
+                            data-project-action-endpoint="<?= e($projectCardActionEndpoint) ?>"
+                            data-project-action-csrf="<?= e($projectCardActionCsrf) ?>"
+                            data-project-trash-endpoint="<?= e($projectCardTrashEndpoint) ?>"
+                            data-project-trash-csrf="<?= e($projectCardTrashCsrf) ?>"
+                            data-teacher-owner-status-management="<?= $projectCardOwnStatus ? 'true' : 'false' ?>"
+                            <?php endif; ?>
                         >
                             <header>
                                 <span class="ar-code"><?= e($project['code'] ?? '') ?></span>
@@ -204,6 +247,13 @@
                                     <a class="ar-icon-action" href="<?= e($project['package_download_url']) ?>" data-tooltip="Descargar ZIP" aria-label="Descargar ZIP completo de <?= e($project['title']) ?>">
                                         <i class="fa-solid fa-download" aria-hidden="true"></i>
                                     </a>
+                                <?php endif; ?>
+                                <?php if ($projectCardMenuActions): ?>
+                                    <?php
+                                    $repositoryCardMenuId = 'repositoryProjectActionsMenu-' . $projectCardId;
+                                    $repositoryCardMenuActions = $projectCardMenuActions;
+                                    require __DIR__ . '/_repository-card-action-menu.php';
+                                    ?>
                                 <?php endif; ?>
                             </footer>
                         </article>
@@ -268,10 +318,71 @@
 
                 <div class="ar-grid" id="repositorySupportGrid">
                         <?php foreach ($supportDocuments as $document): ?>
+                            <?php
+                            $supportMaterialCardId = (int) ($document['id'] ?? 0);
+                            $supportMaterialCardCapabilities = is_array(($repositorySupportMaterialCapabilities ?? [])[$supportMaterialCardId] ?? null)
+                                ? ($repositorySupportMaterialCapabilities[$supportMaterialCardId] ?? [])
+                                : [];
+                            $supportMaterialStatus = (string) ($document['status_key'] ?? 'published');
+                            $supportMaterialIsPublished = $supportMaterialStatus === 'published';
+                            $supportMaterialIsAvailable = !empty($document['is_available']);
+                            $supportMaterialMenuActions = [];
+                            $supportMaterialCanManageFiles = !empty($supportMaterialCardCapabilities['manage_files']);
+                            $supportMaterialCanChangeStatus = !empty($supportMaterialCardCapabilities['change_status']);
+                            $supportMaterialCanDelete = !empty($supportMaterialCardCapabilities['delete']);
+                            $supportMaterialDetailUrl = (string) ($document['detail_url'] ?? (route('support-material-detail') . '&id=' . $supportMaterialCardId));
+                            if ($supportMaterialCanChangeStatus) {
+                                if ($supportMaterialIsPublished) {
+                                    $supportMaterialMenuActions[] = [
+                                        'label' => $supportMaterialIsAvailable ? 'Marcar como no disponible' : 'Marcar como disponible',
+                                        'icon' => $supportMaterialIsAvailable ? 'fa-ban' : 'fa-circle-check',
+                                        'enabled' => true,
+                                        'action' => 'availability',
+                                    ];
+                                }
+                                $supportMaterialMenuActions[] = [
+                                    'label' => $supportMaterialIsPublished ? 'Retirar publicación' : 'Publicar material',
+                                    'icon' => $supportMaterialIsPublished ? 'fa-box-archive' : 'fa-box-open',
+                                    'enabled' => true,
+                                    'action' => 'publication',
+                                ];
+                            }
+                            if ($supportMaterialCanManageFiles) {
+                                $supportMaterialMenuActions[] = [
+                                    'label' => 'Gestionar archivos',
+                                    'icon' => 'fa-folder-open',
+                                    'enabled' => true,
+                                    'url' => $supportMaterialDetailUrl . '&tab=files',
+                                ];
+                            }
+                            if ($supportMaterialCanDelete) {
+                                $supportMaterialMenuActions[] = [
+                                    'label' => 'Enviar a Papelera',
+                                    'icon' => 'fa-trash-can',
+                                    'enabled' => true,
+                                    'action' => 'trash',
+                                    'danger' => true,
+                                    'separator' => $supportMaterialMenuActions !== [],
+                                ];
+                            }
+                            $supportMaterialActionEndpoint = ($supportMaterialCanChangeStatus || $supportMaterialCanDelete)
+                                ? route('support-material-manage-status')
+                                : '';
+                            $supportMaterialActionCsrf = ($supportMaterialCanChangeStatus || $supportMaterialCanDelete)
+                                ? (string) ($repositorySupportMaterialActionCsrf ?? '')
+                                : '';
+                            ?>
                             <article class="ar-material-card"
+                                data-material-id="<?= $supportMaterialCardId ?>"
                                 data-category-slug="<?= e($document['category_slug']) ?>"
                                 data-support-text="<?= e($document['title'] . ' ' . $document['description'] . ' ' . $document['type'] . ' ' . $document['year'] . ' ' . $document['pao_label'] . ' ' . $document['category_label'] . ' ' . implode(' ', $document['keywords'])) ?>"
                                 data-support-category="<?= e($document['category_slug']) ?>"
+                                <?php if ($supportMaterialMenuActions): ?>
+                                data-record-status="<?= e($supportMaterialStatus) ?>"
+                                data-record-available="<?= $supportMaterialIsAvailable ? '1' : '0' ?>"
+                                data-material-action-endpoint="<?= e($supportMaterialActionEndpoint) ?>"
+                                data-material-action-csrf="<?= e($supportMaterialActionCsrf) ?>"
+                                <?php endif; ?>
                             >
                                 <header>
                                     <span class="ar-material-icon"><i class="fa-regular fa-file-lines"></i></span>
@@ -291,6 +402,13 @@
                                     <a class="ar-icon-action" href="<?= e(route('support-material-package-download') . '&material_id=' . (int) $document['id']) ?>" data-tooltip="Descargar ZIP" aria-label="Descargar ZIP completo de <?= e($document['title']) ?>">
                                         <i class="fa-solid fa-download" aria-hidden="true"></i>
                                     </a>
+                                    <?php if ($supportMaterialMenuActions): ?>
+                                        <?php
+                                        $repositoryCardMenuId = 'repositorySupportMaterialActionsMenu-' . $supportMaterialCardId;
+                                        $repositoryCardMenuActions = $supportMaterialMenuActions;
+                                        require __DIR__ . '/_repository-card-action-menu.php';
+                                        ?>
+                                    <?php endif; ?>
                                 </footer>
                             </article>
                         <?php endforeach; ?>
@@ -319,3 +437,6 @@
 <?php require __DIR__ . '/_teacher-material-modal.php'; ?>
 <?php require __DIR__ . '/_teacher-repository-content-selector.php'; ?>
 <?php require __DIR__ . '/_teacher-direct-project-modal.php'; ?>
+<?php if (!empty($repositoryProjectActionUi) || !empty($repositorySupportMaterialActionUi)): ?>
+    <?php require __DIR__ . '/_material-admin-action-dialog.php'; ?>
+<?php endif; ?>
