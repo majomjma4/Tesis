@@ -381,6 +381,8 @@ body:is(.app-student-workspace-fullscreen,.project-review-fullscreen) .student-w
 .student-workspace .sw-primary-link,.student-workspace .sw-secondary-link { display:inline-flex; align-items:center; gap:.45rem; border-radius:8px; padding:.55rem .9rem; font-size:var(--font-md); font-weight:700; text-decoration:none; }
 .student-workspace .sw-primary-link { background:var(--sw-primary); color:#fff; }
 .student-workspace .sw-secondary-link { color:var(--sw-text); background:var(--sw-bg-soft); border:1px solid var(--sw-border); }
+.student-workspace .sw-header-download.ed-action { min-height:42px; padding:0 14px; border:1px solid var(--line); border-radius:10px; background:var(--surface-soft); color:var(--text); display:inline-flex; align-items:center; justify-content:center; gap:7px; font:inherit; font-size:var(--font-sm); font-weight:800; white-space:nowrap; text-decoration:none; transition:.18s ease; }
+.student-workspace .sw-header-download.ed-action:hover,.student-workspace .sw-header-download.ed-action:focus-visible { border-color:#60a5fa; background:#eff6ff; color:var(--primary); outline:0; transform:translateY(-1px); }
 .student-workspace .sw-toggle-btn,.student-workspace .sw-panel-toggle { border:1px solid var(--sw-border); background:#fff; color:var(--sw-text); border-radius:6px; cursor:pointer; padding:.35rem .6rem; font-size:var(--font-md); font-weight:600; }
 .student-workspace .sw-card { background:var(--surface,#fff); border:1px solid var(--sw-border); border-radius:12px; padding:1.25rem; box-shadow: 0 2px 8px rgba(15,23,42,0.03); }
 .student-workspace .sw-section-heading { margin-bottom:1rem; }

@@ -87,6 +87,9 @@ $formatDate = static fn (?string $date, bool $time = false): string => format_ut
                         <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> <span>Editar información</span>
                     </button>
                 <?php endif; ?>
+                <?php if ($canDownloadHeader): ?>
+                    <a class="ed-action sw-header-download" href="<?= e($headerDownloadUrl) ?>" download data-record-download aria-label="Descargar archivos del proyecto"><i class="fa-solid fa-download" aria-hidden="true"></i>Descargar</a>
+                <?php endif; ?>
                 <span class="sw-badge-status is-<?= e($status) ?>" data-sw-project-status-badge><i class="fa-solid fa-circle-dot" aria-hidden="true"></i><?= e($statusLabel) ?></span>
             </div>
         </div>

@@ -6,16 +6,7 @@ $institutionalReadOnly = array_key_exists('institutionalReadOnly', get_defined_v
 if ($project === null): ?>
     <section class="repository-detail-not-found"><i class="fa-solid fa-folder-open"></i><h1>Proyecto no encontrado</h1><p>El expediente solicitado no existe o no está disponible para tu cuenta.</p><a class="open-btn" href="<?= e($returnUrl) ?>">Volver</a></section>
 <?php else:
-    $useModernWorkspace = !empty($isStudentContext)
-        || ($projectContext === 'academic' && empty($institutionalReadOnly) && !(new AuthSessionService())->isAdminModeActive());
-    if ($useModernWorkspace) {
-        require __DIR__ . '/_student-workspace.php';
-        return;
-    }
-    $projectId = (int) $project['id'];
-    $detailUrl = (string) $detailUrl;
     $projectContext = (string) ($projectContext ?? ($publicContext ? 'repository' : 'academic'));
-    $isDirectRepositoryProject = (string) ($project['publication_origin'] ?? '') === ProjectPublicationOrigin::DIRECT_REPOSITORY;
     $projectCapabilities = array_replace([
         'view_project' => false,
         'edit_information' => false,
@@ -33,7 +24,23 @@ if ($project === null): ?>
         'create_observation' => false,
         'respond_observation' => false,
         'download_files' => false,
+        'download_academic_package' => false,
     ], is_array($projectCapabilities ?? null) ? $projectCapabilities : []);
+    $projectId = (int) $project['id'];
+    $headerDownloadUrl = $publicContext
+        ? route('repository-download') . '&id=' . $projectId
+        : route('project-package-download') . '&id=' . $projectId . ($projectContext === 'repository_owner' ? '&context=repository_owner' : '');
+    $canDownloadHeader = $publicContext
+        ? !empty($projectCapabilities['download_files'])
+        : !empty($projectCapabilities['download_academic_package']);
+    $useModernWorkspace = !empty($isStudentContext)
+        || ($projectContext === 'academic' && empty($institutionalReadOnly) && !(new AuthSessionService())->isAdminModeActive());
+    if ($useModernWorkspace) {
+        require __DIR__ . '/_student-workspace.php';
+        return;
+    }
+    $detailUrl = (string) $detailUrl;
+    $isDirectRepositoryProject = (string) ($project['publication_origin'] ?? '') === ProjectPublicationOrigin::DIRECT_REPOSITORY;
     $projectStatusTransitions = is_array($projectStatusTransitions ?? null) ? $projectStatusTransitions : [];
     $isAcademicManagement = $projectContext === 'academic_management';
     // Flags del contrato común del detalle: el administrador llega desde el
@@ -109,11 +116,11 @@ if ($project === null): ?>
     $packageService = new ProjectRepositoryPackageService();
     try {
         $headerPackage = $publicContext
-            ? $packageService->describe($projectId, route('repository-download') . '&id=' . $projectId)
+            ? $packageService->describe($projectId, $headerDownloadUrl)
             : ($isTrackingContext && !empty($projectCapabilities['download_academic_package'])
                 ? ($projectContext === 'repository_owner'
-                    ? $packageService->describeRepositoryOwner($projectId, route('project-package-download') . '&id=' . $projectId . '&context=repository_owner')
-                    : $packageService->describeAcademic($projectId, route('project-package-download') . '&id=' . $projectId))
+                    ? $packageService->describeRepositoryOwner($projectId, $headerDownloadUrl)
+                    : $packageService->describeAcademic($projectId, $headerDownloadUrl))
                 : ['available'=>false,'download_url'=>'','file_count'=>0,'size_bytes'=>0,'size'=>'','source'=>'academic']);
     } catch (Throwable $packageError) {
         error_log('Academic project package descriptor: ' . $packageError->getMessage());
@@ -235,10 +242,8 @@ if ($project === null): ?>
     } elseif (!$publicContext && !empty($projectCapabilities['register_delivery']) && $canDeliver) {
         $actions[] = ['id' => 'delivery', 'label' => 'Registrar entrega', 'kind' => 'primary', 'icon' => 'fa-upload', 'url' => $detailUrl . '&tab=review', 'enabled' => true];
     }
-    if (($publicContext || $projectContext === 'repository_owner')
-        && !empty($projectCapabilities['download_files'])
-        && !empty($headerPackage['available'])) {
-        $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>(string)$headerPackage['download_url'],'enabled'=>true,'download'=>true];
+    if ($canDownloadHeader && $headerDownloadUrl !== '') {
+        $actions[]=['id'=>'download','label'=>'Descargar','kind'=>'secondary','icon'=>'fa-download','icon_style'=>'fa-solid','url'=>$headerDownloadUrl,'enabled'=>true,'download'=>true];
     }
     if($isAcademicManagement&&(string)$project['status']==='published')$actions[]=['id'=>'repository','label'=>'Ver en Repositorio','kind'=>'secondary','icon'=>'fa-book-open','url'=>route('repository-detail').'&id='.$projectId,'enabled'=>true];
     $statusActionCount=$isAcademicManagement&&!empty($projectCapabilities['change_status'])?count($projectStatusTransitions):0;

@@ -488,7 +488,7 @@ final class RepositoryController
         }
 
         session_write_close();
-        $this->sendDownloadHeaders($project['archive']['name'], 'application/zip', $fileSize);
+        $this->sendDownloadHeaders(project_download_filename($project), 'application/zip', $fileSize);
         readfile($zipPath);
         exit;
     }
@@ -1027,7 +1027,7 @@ final class RepositoryController
 
     private function sendDownloadHeaders(string $fileName, string $mimeType, int $fileSize): void
     {
-        $fallbackName = preg_replace('/[^A-Za-z0-9._-]/', '_', $fileName) ?: 'archivo';
+        $fallbackName = project_download_filename_fallback($fileName);
         header('Content-Type: ' . $mimeType);
         header('Content-Length: ' . $fileSize);
         header('Content-Disposition: attachment; filename="' . $fallbackName . '"; filename*=UTF-8\'\'' . rawurlencode($fileName));

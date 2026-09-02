@@ -35,6 +35,68 @@ function route(string $page = 'dashboard'): string
     return base_url('index.php?page=' . urlencode($page));
 }
 
+/**
+ * Construye el nombre visible de un paquete ZIP de proyecto sin exponer el ID
+ * salvo como último recurso. El nombre físico del paquete no depende de esta
+ * función y puede continuar usando la clave técnica del almacenamiento.
+ */
+function project_download_filename(array $project): string
+{
+    $sanitize = static function (mixed $value, int $limit): string {
+        $value = trim((string) $value);
+        if ($value === '') return '';
+        if (class_exists('Normalizer')) {
+            $normalized = Normalizer::normalize($value, Normalizer::FORM_C);
+            if (is_string($normalized)) $value = $normalized;
+        }
+        $value = (string) preg_replace('/[\x00-\x1F\x7F]/u', '', $value);
+        $value = (string) preg_replace('/[^\p{L}\p{N}_-]+/u', '_', $value);
+        $value = (string) preg_replace('/_+/u', '_', $value);
+        $value = trim($value, " ._-\t\r\n");
+        if ($value === '') return '';
+        return trim(mb_substr($value, 0, $limit, 'UTF-8'), " ._-");
+    };
+
+    $title = $sanitize($project['title'] ?? '', 140);
+    if ($title === '') return 'Proyecto_' . max(0, (int) ($project['id'] ?? 0)) . '.zip';
+
+    $code = $sanitize($project['code'] ?? '', 60);
+    if ($code !== '') {
+        $titleLimit = max(1, 180 - mb_strlen($code, 'UTF-8') - 1);
+        $title = trim(mb_substr($title, 0, $titleLimit, 'UTF-8'), " ._-");
+        $name = $title . '_' . $code;
+    } else {
+        $name = mb_substr($title, 0, 180, 'UTF-8');
+    }
+
+    return trim($name, " ._-") . '.zip';
+}
+
+/** Returns an ASCII fallback for clients that do not support filename*. */
+function project_download_filename_fallback(string $filename, string $fallback = 'archivo'): string
+{
+    if (class_exists('Normalizer')) {
+        $normalized = Normalizer::normalize($filename, Normalizer::FORM_D);
+        if (is_string($normalized)) {
+            $filename = (string) preg_replace('/\p{Mn}+/u', '', $normalized);
+        }
+    }
+    if (function_exists('iconv')) {
+        $transliterated = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $filename);
+        if (is_string($transliterated) && $transliterated !== '') $filename = $transliterated;
+    }
+    $safe = (string) preg_replace('/[^A-Za-z0-9._-]+/', '_', $filename);
+    $safe = trim($safe, '._-');
+    return $safe !== '' ? $safe : $fallback;
+}
+
+/** Builds a safe RFC 6266 Content-Disposition value for a project package. */
+function project_download_content_disposition(array $project): string
+{
+    $filename = project_download_filename($project);
+    return 'attachment; filename="' . project_download_filename_fallback($filename, 'Proyecto.zip') . '"; filename*=UTF-8\'\'' . rawurlencode($filename);
+}
+
 /** Returns a safe same-origin path for post-action redirects. */
 function safe_internal_redirect_target(string $candidate, string $fallback): string
 {

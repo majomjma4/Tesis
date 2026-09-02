@@ -927,7 +927,7 @@ final class ProjectsController
             session_write_close();
             header('Content-Type: application/zip');
             header('Content-Length: ' . $size);
-            header("Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode('proyecto-' . (string)$project['code'] . '.zip'));
+            header('Content-Disposition: ' . project_download_content_disposition($project));
             header('X-Content-Type-Options: nosniff');
             header('Cache-Control: private, no-store, max-age=0');
             readfile($path);
