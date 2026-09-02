@@ -220,8 +220,7 @@ body.dark-mode .ed-form-state{color:#6ee7b7}body.dark-mode .ed-form-state.is-dir
             <?php elseif ($section['type'] === 'review_notice'): ?>
                 <aside class="ed-review-notice-inline" role="status"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><div><strong><?=e((string)$content['message'])?></strong><?php if(!empty($content['count'])):?><span><?=(int)$content['count']?> observación<?=((int)$content['count']===1?'':'es')?> pendiente<?=((int)$content['count']===1?'':'s')?>.</span><?php endif;?></div></aside>
             <?php elseif ($section['type'] === 'project_tags'): ?>
-                <?php if ($content): ?><div class="ed-tags"><?php foreach ($content as $tag): ?><span class="ed-classification-tag is-tone-<?= e($classificationTone((string)$tag)) ?>"><i class="fa-solid fa-tag" aria-hidden="true"></i><span><?= e($tag) ?></span></span><?php endforeach; ?></div>
-                <?php else: ?><p class="ed-project-classification-empty">Este proyecto no tiene etiquetas de clasificación registradas.</p><?php endif; ?>
+                <?php $projectClassificationLabels = $content; require __DIR__ . '/../projects/_project-classification-content.php'; ?>
             <?php elseif ($section['type'] === 'tags'): ?>
                 <?php if ($content): ?>
                     <div class="ed-tags"><?php foreach ($content as $tag): ?><span class="ed-classification-tag is-tone-<?= e($classificationTone((string) $tag)) ?>"><i class="fa-solid fa-tag" aria-hidden="true"></i><span><?= e($tag) ?></span></span><?php endforeach; ?></div>

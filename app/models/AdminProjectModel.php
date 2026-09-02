@@ -4,7 +4,6 @@ final class AdminProjectModel
 {
     private const STATUSES=ProjectCapabilityService::INSTITUTIONAL_ACTIVE_STATUSES;
     private const WRITABLE_STATUSES=['development','under_review','approved','defense','tribunal_approved','published'];
-    private const PROJECT_KEYWORD_EXCLUSIONS=['reglamento','normativa','plantilla','formato','guía documental','manual','tutorial'];
     private const STATUS_LABELS=['development'=>'En desarrollo','under_review'=>'En revisión','approved'=>'Aprobado','defense'=>'En tribunal','tribunal_approved'=>'Aprobado por el Tribunal','published'=>'Publicado'];
     public function listing(array $f,array $pagination=[]):array
     {
@@ -73,13 +72,10 @@ final class AdminProjectModel
         $statement->execute($params);
         return array_map('intval',$statement->fetch()?:[]);
     }
-    public function catalogs():array{$d=Database::connection();return ['types'=>$d->query('SELECT id,code,name FROM project_types WHERE is_active=1 ORDER BY name')->fetchAll(),'careers'=>$d->query('SELECT id,name FROM careers WHERE is_active=1 ORDER BY name')->fetchAll(),'periods'=>$d->query("SELECT id,name,status,starts_on FROM academic_periods WHERE status IN ('active','closed') ORDER BY (status='active') DESC, starts_on DESC")->fetchAll(),'teachers'=>$d->query("SELECT u.id,u.username,u.full_name,u.email FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.status='active' AND tp.can_tutor=1 ORDER BY u.full_name")->fetchAll(),'students'=>$d->query("SELECT DISTINCT u.id,u.username,u.full_name,u.email,sp.institutional_code FROM users u INNER JOIN student_profiles sp ON sp.user_id=u.id INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id AND r.code='student' WHERE u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL ORDER BY u.full_name")->fetchAll(),'keywords'=>$this->projectKeywordCatalog()];}
-    private function projectKeywordCatalog():array
+    public function catalogs():array{$d=Database::connection();return ['types'=>$d->query('SELECT id,code,name FROM project_types WHERE is_active=1 ORDER BY name')->fetchAll(),'careers'=>$d->query('SELECT id,name FROM careers WHERE is_active=1 ORDER BY name')->fetchAll(),'periods'=>$d->query("SELECT id,name,status,starts_on FROM academic_periods WHERE status IN ('active','closed') ORDER BY (status='active') DESC, starts_on DESC")->fetchAll(),'teachers'=>$d->query("SELECT u.id,u.username,u.full_name,u.email FROM users u JOIN teacher_profiles tp ON tp.user_id=u.id WHERE u.status='active' AND tp.can_tutor=1 ORDER BY u.full_name")->fetchAll(),'students'=>$d->query("SELECT DISTINCT u.id,u.username,u.full_name,u.email,sp.institutional_code FROM users u INNER JOIN student_profiles sp ON sp.user_id=u.id INNER JOIN user_roles ur ON ur.user_id=u.id INNER JOIN roles r ON r.id=ur.role_id AND r.code='student' WHERE u.status='active' AND u.deleted_at IS NULL AND u.purged_at IS NULL ORDER BY u.full_name")->fetchAll(),'keywords'=>$this->projectKeywordCatalog($d)];}
+    private function projectKeywordCatalog(?PDO $db=null):array
     {
-        return array_values(array_filter(
-            (new SupportMaterialModel())->keywordCatalog(),
-            static fn(string $keyword):bool=>!in_array(mb_strtolower(trim($keyword),'UTF-8'),self::PROJECT_KEYWORD_EXCLUSIONS,true)
-        ));
+        return array_values(array_map(static fn(array $keyword):string=>(string)$keyword['name'],(new ProjectKeywordModel())->listActive($db)));
     }
     private function filteredQuery(array $filters):array
     {
@@ -182,7 +178,7 @@ final class AdminProjectModel
                     else{$old=$old===null?null:(string)$old;$value=$value===null?null:(string)$value;}
                     if($old!==$value)$changed[$field]=[$old,$value];
                 }
-                $keywordChange=(new ProjectKeywordModel())->syncDifferential($d,$id,(array)($v['keywords']??[]),(new SupportMaterialModel())->keywordCatalog());
+                $keywordChange=(new ProjectKeywordModel())->syncDifferential($d,$id,(array)($v['keywords']??[]),$this->projectKeywordCatalog($d));
                 if(!$changed&&!$keywordChange['changed']&&!$tutoringChange['changed']&&!$authorChange['changed'])throw new InvalidArgumentException('No se detectaron cambios en el proyecto.');
                 $publishing=$v['status']==='published'&&(string)$before['status']!=='published';
                 $summary=(string)($v['summary']??'');$descriptionChanged=false;$descriptionOrigin='existing';
@@ -249,7 +245,7 @@ final class AdminProjectModel
             $q=$d->prepare("INSERT INTO projects(code,project_type_id,career_id,academic_period_id,title,subtitle,tutor_id,status,current_stage,created_by) VALUES(:code,:type,:career,:period,:title,:subtitle,:tutor,:status,'registration',:creator)");
             $q->execute(['code'=>$code,'type'=>$v['project_type_id'],'career'=>$v['career_id'],'period'=>$v['academic_period_id'],'title'=>$v['title'],'subtitle'=>$v['subtitle']?:null,'tutor'=>$tutor,'status'=>$v['status'],'creator'=>$actor]);
             $id=(int)$d->lastInsertId();
-            (new ProjectKeywordModel())->syncDifferential($d,$id,(array)($v['keywords']??[]),(new SupportMaterialModel())->keywordCatalog());
+            (new ProjectKeywordModel())->syncDifferential($d,$id,(array)($v['keywords']??[]),$this->projectKeywordCatalog($d));
             (new ProjectAuditService($d))->record($id,$actor,'project_created','project',$id,null,$v+['code'=>$code]);
             return $id;
         });

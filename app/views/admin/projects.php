@@ -259,11 +259,11 @@ $typeLabels = [
                             <div class="ap-keyword-options" role="listbox" aria-multiselectable="true"
                                 data-project-keyword-options></div>
                             <p class="ap-keyword-limit" role="status" aria-live="polite" hidden
-                                data-project-keyword-limit>Máximo 4 etiquetas de clasificación.</p>
+                                data-project-keyword-limit>Máximo 8 etiquetas de clasificación.</p>
                         </div>
                     </div>
                     <div class="ap-keyword-chips" aria-live="polite" data-project-keyword-chips></div><small
-                        class="ap-section-note">Máximo cuatro etiquetas.</small>
+                        class="ap-section-note">Máximo ocho etiquetas.</small>
                     <script type="application/json"
                         data-project-keyword-catalog><?= json_encode(array_values((array) ($catalogs['keywords'] ?? [])), JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?></script>
                 </section>

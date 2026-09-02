@@ -617,7 +617,7 @@
     const renderKeywordSelection = () => {
         const inputs = [...(keywordOptions?.querySelectorAll('input') || [])];
         const selected = inputs.filter(input => input.checked);
-        const atLimit = selected.length >= 4;
+        const atLimit = selected.length >= 8;
         inputs.forEach(input => {
             input.disabled = atLimit && !input.checked;
             input.closest('[role="option"]')?.setAttribute('aria-selected', String(input.checked));
@@ -742,7 +742,7 @@
         setText('[data-project-updated]', readableDate(value('updated_at')), 'Sin información');
         const tags = form.querySelector('[data-project-tags]');
         if (tags) {
-            const values = (Array.isArray(project?.tags) ? project.tags : Array.isArray(project?.keywords) ? project.keywords : []).slice(0, 4);
+            const values = (Array.isArray(project?.tags) ? project.tags : Array.isArray(project?.keywords) ? project.keywords : []).slice(0, 8);
             tags.replaceChildren(...(values.length ? values.map(tag => Object.assign(document.createElement('span'), { textContent: typeof tag === 'string' ? tag : tag.name })) : [Object.assign(document.createElement('span'), { textContent: 'Sin etiquetas registradas' })]));
         }
         loadKeywordSelector(project);
