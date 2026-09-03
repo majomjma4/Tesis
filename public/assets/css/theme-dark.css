@@ -1841,6 +1841,42 @@ body.dark-mode:not(.account-page) {
     color: var(--theme-purple-text) !important;
 }
 
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-workspace .sw-history-subrecord {
+    background: var(--surface-soft);
+    border-color: var(--line);
+    border-left-color: var(--theme-info-border);
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-workspace .sw-history-subrecord-date {
+    color: var(--muted);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-workspace .sw-history-subrecord-reason {
+    color: var(--text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-workspace .sw-history-subrecord .sw-secondary-link {
+    background: var(--surface);
+    border-color: var(--line);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-workspace .sw-history-subrecord .sw-secondary-link:hover,
+:is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-workspace .sw-history-subrecord .sw-secondary-link:focus-visible {
+    background: color-mix(in srgb, var(--blue) 16%, var(--surface));
+    border-color: var(--blue);
+    color: var(--theme-info-text);
+}
+
+:is(html.theme-dark body.project-review-fullscreen, body.dark-mode.project-review-fullscreen) .student-workspace :is(
+    .sw-history-accordion[open],
+    .sw-history-accordion[open] .sw-history-accordion-body
+) {
+    background: var(--surface);
+    border-color: var(--line);
+}
+
 :is(html.theme-dark body:not(.account-page), body.dark-mode:not(.account-page)) .student-workspace :is(
     .sw-historical-obs-card.sw-review-color-4,
     .sw-preview-state-card.is-loading .sw-state-icon-badge,

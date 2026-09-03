@@ -10,6 +10,7 @@ $typeCode = (string) ($project['type_code'] ?? '');
 $isDegreeProject = $typeCode === 'thesis';
 $participants = (array) ($project['participants'] ?? []);
 $studentEditSituation = (array) ($project['student_edit_situation'] ?? []);
+$isUnderReview = $status === 'under_review';
 $controlledStudentRequest = empty($isTeacherContext) && empty($isAdministrator)
     && !empty($studentEditSituation['can_request_controlled_modification']);
 // Extract tutors
@@ -89,7 +90,7 @@ $formatDate = static fn (?string $date, bool $time = false): string => format_ut
                         <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> <span>Editar información</span>
                     </button>
                 <?php endif; ?>
-                <?php if (!empty($projectCapabilities['create_adjustment_request']) && empty($hasPendingModificationRequest)): ?>
+                <?php if (!$isUnderReview && !empty($projectCapabilities['create_adjustment_request']) && empty($hasPendingModificationRequest)): ?>
                     <a class="ed-action sw-header-adjustment" href="#projectAdjustmentDialog">
                         <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
                         <span><?= $controlledStudentRequest ? 'Solicitar modificación' : 'Solicitar cambios' ?></span>
@@ -153,7 +154,9 @@ $formatDate = static fn (?string $date, bool $time = false): string => format_ut
         <?php foreach ($tabs as $key => [$label,$icon]): ?><a class="sw-tab-btn<?= $activeTab === $key ? ' is-active' : '' ?>" href="<?= e($detailUrl . '&tab=' . $key) ?>" role="tab" aria-selected="<?= $activeTab === $key ? 'true' : 'false' ?>" data-sw-tab="<?= e($key) ?>"><i class="fa-solid <?= e($icon) ?>" aria-hidden="true"></i><?= e($label) ?></a><?php endforeach; ?>
     </nav>
     <main>
-        <?php require __DIR__ . '/_project-classification.php'; ?>
+        <?php if (!$isUnderReview): ?>
+            <?php require __DIR__ . '/_project-classification.php'; ?>
+        <?php endif; ?>
         <?php foreach (array_keys($tabs) as $key): ?><section class="sw-tab-pane<?= $activeTab === $key ? ' is-active' : '' ?>" id="swTab-<?= e($key) ?>" role="tabpanel"><?php require __DIR__ . '/student-workspace/_' . $key . '.php'; ?></section><?php endforeach; ?>
     </main>
     <?php if (!empty($projectCapabilities['create_adjustment_request']) || !empty($projectCapabilities['view_adjustment_requests'])): ?>

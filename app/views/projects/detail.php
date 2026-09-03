@@ -44,6 +44,8 @@ if ($project === null): ?>
     $publicationOrigin = (string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW);
     $isDirectRepositoryProject = $publicationOrigin === ProjectPublicationOrigin::DIRECT_REPOSITORY;
     $isAcademicWorkflowProject = $publicationOrigin === ProjectPublicationOrigin::WORKFLOW;
+    $isAcademicUnderReview = $projectContext === 'academic'
+        && (string) ($project['status'] ?? '') === 'under_review';
     $projectStatusTransitions = is_array($projectStatusTransitions ?? null) ? $projectStatusTransitions : [];
     $isAcademicManagement = $projectContext === 'academic_management';
     // Flags del contrato común del detalle: el administrador llega desde el
@@ -235,11 +237,17 @@ if ($project === null): ?>
             ['id'=>'project-classification','title'=>'Clasificación','icon'=>'fa-tags','type'=>'project_tags','content'=>array_map(static fn(array $keyword):string=>(string)$keyword['name'],(array)($project['keywords']??[]))],
         ],static fn(?array $section):bool=>$section!==null));
     }
+    if ($isAcademicUnderReview) {
+        $informationSections = array_values(array_filter(
+            $informationSections,
+            static fn(array $section): bool => ($section['id'] ?? '') !== 'project-classification'
+        ));
+    }
     $actions=[];
     if (($publicContext || $isAcademicManagement) && !empty($projectCapabilities['edit_information'])) {
         $actions[]=['id'=>'edit','label'=>'Editar','kind'=>'primary','icon'=>'fa-pen-to-square','enabled'=>true,'trigger'=>'project-editor'];
     }
-    if (!$isAdministrator && !empty($projectCapabilities['create_adjustment_request'])) {
+    if (!$isAdministrator && !$isAcademicUnderReview && !empty($projectCapabilities['create_adjustment_request'])) {
         $isPublishedStudentRequest = $publicContext && $projectContext === 'repository' && $adjustmentActor === 'student';
         if (!empty($hasPendingModificationRequest)) {
             $actions[] = ['id' => $isPublishedStudentRequest ? 'modification-pending' : 'adjustment-pending', 'label' => 'Solicitud pendiente', 'kind' => 'secondary', 'icon' => 'fa-clock', 'enabled' => false, 'title' => 'Ya existe una solicitud de cambios pendiente de revisión.'];

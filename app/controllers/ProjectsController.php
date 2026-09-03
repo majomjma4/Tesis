@@ -509,7 +509,7 @@ final class ProjectsController
                 $descriptionReminder ? asset('js/project-description.js') : null,
                 $hasAdjustmentUi ? asset('js/project-adjustments.js') : null,
                 !$isAdministrator ? asset('vendor/jszip/3.10.1/jszip.min.js') : null,
-                $isAdministrator ? asset('js/admin-projects.js') : ($isStudent && !$isTeacher ? asset('js/student-project-workspace.js') : null),
+                $isAdministrator ? asset('js/admin-projects.js') : (($isStudent || ($isTeacher && !empty($projectCapabilities['review_documents']))) ? asset('js/student-project-workspace.js') : null),
                 !$isAdministrator && !empty($projectCapabilities['review_documents']) ? asset('js/teacher-project-review.js') : null,
                 !empty($projectCapabilities['publish_project']) ? asset('js/projects.js') : null,
                 $isAdministrator && $projectStatusTransitions !== [] ? asset('js/project-status-transition.js') : null,
@@ -880,7 +880,22 @@ final class ProjectsController
         if (!$session->isAuthenticated()||$projectId<1||$versionId<1) throw new InvalidArgumentException('Solicitud no válida.');
         $context=$session->isAdminModeActive()?'academic_management':'academic';
         if (!(new ProjectCapabilityService())->canViewProjectResource($projectId, $context)) throw new RuntimeException('No tienes autorización para consultar esta versión.');
-        throw new InvalidArgumentException('Las versiones historicas no estan disponibles para archivos.');
+        if (empty((new ProjectCapabilityService())->forProjectId($projectId, $context)['view_academic_history'])) {
+            throw new RuntimeException('No tienes autorizacion para consultar esta version.');
+        }
+        $version=(new ProjectFileVersionHistoryService())->accessibleVersion(
+            $projectId,
+            $versionId,
+            (new ProjectAccessService())->currentUserId(),
+            $context
+        );
+        $requestedChecksum = strtolower(trim((string)($_GET['v']??'')));
+        if ($requestedChecksum !== ''
+            && (!preg_match('/^[a-f0-9]{16,64}$/', $requestedChecksum)
+                || !hash_equals(substr(strtolower((string)$version['checksum_sha256']), 0, strlen($requestedChecksum)), $requestedChecksum))) {
+            throw new InvalidArgumentException('Version no valida.');
+        }
+        return $version;
     }
 
     public function fileContent(): void
