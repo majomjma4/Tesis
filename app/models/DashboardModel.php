@@ -62,8 +62,9 @@ final class DashboardModel
             $capabilities = ['is_tutor'=>false,'is_cotutor'=>false,'is_reviewer'=>false,'is_tribunal_member'=>false,'can_manage_thesis'=>false,'manage_thesis_process'=>false];
         }
         $followUp = $this->teacherFollowUp($projects, $deliveries);
-        $projectItems = array_map(static function (array $project) use ($deliveries, $latestDeliveries, $adjustments): array {
+        $projectItems = array_map(function (array $project) use ($deliveries, $latestDeliveries, $adjustments): array {
             $id = (int) $project['id'];
+            $projectRoute = $this->teacherProjectRoute($project);
             $situation = (array) ($project['teacher_situation_data'] ?? []);
             // El servicio central siempre entrega esta estructura; si no lo hace,
             // se conserva el contrato neutro sin volver a inferir el workflow.
@@ -86,8 +87,9 @@ final class DashboardModel
                 'reviews_pending' => (int) ($situation['review_units'] ?? 0),
                 'validation_pending' => 0,
                 'adjustments_pending' => (int) ($adjustments[$id] ?? 0),
-                'route' => route('project-detail') . '&id=' . $id,
-                'action' => ['label'=>(bool)($situation['requires_attention']??false)?'Revisar proyecto':'Ver proyecto','route'=>route('project-detail').'&id='.$id],
+                'publication_origin' => (string) ($project['publication_origin'] ?? ProjectPublicationOrigin::WORKFLOW),
+                'route' => $projectRoute,
+                'action' => ['label'=>(bool)($situation['requires_attention']??false)?'Revisar proyecto':'Ver proyecto','route'=>$projectRoute],
             ];
         }, $projects);
         $allCount = count($projects);
@@ -126,6 +128,26 @@ final class DashboardModel
             'notifications' => ['items'=>$notificationItems,'unread'=>$unread,'error'=>$notificationError,'route'=>route('notifications')],
             'repository' => ['items'=>$repositoryItems,'has_more'=>count($repository)>6,'route'=>route('repository'),'direct_add'=>['supported'=>false,'route'=>null]],
         ];
+    }
+
+    /** Construye el destino del card docente respetando el origen y estado del proyecto. */
+    private function teacherProjectRoute(array $project): string
+    {
+        $id = (int) ($project['id'] ?? 0);
+        $origin = strtolower(trim((string) ($project['publication_origin'] ?? '')));
+        $status = strtolower(trim((string) ($project['status_key'] ?? '')));
+
+        if ($id < 1 || !empty($project['deleted_at']) || !empty($project['withdrawn_at']) || in_array($status, ['deleted', 'withdrawn'], true)) {
+            return '';
+        }
+
+        if ($origin === ProjectPublicationOrigin::DIRECT_REPOSITORY) {
+            return $status === 'published' ? route('repository-detail') . '&id=' . $id : '';
+        }
+
+        if ($origin !== ProjectPublicationOrigin::WORKFLOW) return '';
+
+        return ($status === 'published' ? route('repository-detail') : route('project-detail')) . '&id=' . $id;
     }
 
     public function emptyTeacherDashboard(int $teacherId = 0): array
